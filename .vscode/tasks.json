@@ -1,0 +1,41 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build-debug",
+            "command": "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe",
+            "args": [
+                "/m",
+                "/p:Configuration=Debug",
+                "/p:Platform=x64",
+                "/p:OutDir=${workspaceFolder}/x64/Debug/",
+                "/p:IntDir=${workspaceFolder}/x64/Debug/",
+                "${workspaceFolder}/VoxelDestroyer.vcxproj"
+            ],
+            "type": "shell",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$msCompile"]
+        },
+        {
+            "label": "build-release",
+            "command": "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe",
+            "args": [
+                "/m",
+                "/p:Configuration=Release",
+                "/p:Platform=x64",
+                "/p:OutDir=${workspaceFolder}/x64/Release/",
+                "/p:IntDir=${workspaceFolder}/x64/Release/",
+                "${workspaceFolder}/VoxelDestroyer.vcxproj"
+            ],
+            "type": "shell",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$msCompile"]
+        }
+    ]
+}
