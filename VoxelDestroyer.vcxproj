@@ -136,6 +136,12 @@
   <ItemGroup>
     <ClInclude Include="plugin.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pbd.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pbd.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

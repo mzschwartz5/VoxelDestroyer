@@ -11,20 +11,16 @@
 #include <maya/MFloatPointArray.h>
 #include <maya/MDagPath.h>
 #include <maya/MFnDagNode.h>
+#include "pbd.h"
+#include <vector>
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
 
+PBD pbdSimulator;
 MCallbackId callbackId;
 MFnTransform sphereTransform;
-
-// Ball properties
 double ballPosition = 50.0; // Initial height
-double ballVelocity = 0.0;
-const double gravity = -9.8;
-const double timeStep = 1.0 / 60.0; // Assuming 60 FPS
-const double groundLevel = 0.0;
-const double restitution = 0.8; // Bounciness factor
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -41,62 +37,22 @@ MSyntax plugin::syntax()
 	return syntax;
 }
 
-void testCallback(void* clientData) {
-	// This is very basic, assumes 60 FPS / constant frame rate.
-	
-    // Update ball velocity and position
-    ballVelocity += gravity * timeStep;
-	ballPosition += ballVelocity * timeStep;
+void simulatePBDStep(void* clientData) {
 
-    // Check for collision with the ground
-    if (ballPosition <= groundLevel) {
-        ballPosition = groundLevel;
-        ballVelocity = -ballVelocity * restitution;
-    }
-
-    // Update the sphere's position
+	const std::vector<Particle>& particles = pbdSimulator.simulateStep();
 	MPoint translation = sphereTransform.getTranslation(MSpace::kWorld);
-	translation.y = ballPosition;
+
+	translation.y = particles[0].position.y;
 	sphereTransform.setTranslation(translation, MSpace::kWorld);
 }
+
 // Plugin doIt function
 MStatus plugin::doIt(const MArgList& argList)
 {
 	MStatus status;
-	MGlobal::displayInfo("Hello World!");
 
-	// Define the argument flags
-	const char* nameFlag = "-n";
-	const char* idFlag = "-i";
-
-	// Parse the arguments
-	MArgDatabase argData(syntax(), argList, &status);
-	if (!status) {
-		MGlobal::displayError("Failed to parse arguments: " + status.errorString());
-		return status;
-	}
-
-	// Extract arguments "name" and "id"
-	MString name;
-	int id = 0;
-	if (argData.isFlagSet(nameFlag)) {
-		status = argData.getFlagArgument(nameFlag, 0, name);
-		if (!status) {
-			MGlobal::displayError("Failed to parse 'name' argument");
-			return status;
-		}
-	}
-	if (argData.isFlagSet(idFlag)) {
-		status = argData.getFlagArgument(idFlag, 0, id);
-		if (!status) {
-			MGlobal::displayError("Failed to parse 'id' argument");
-			return status;
-		}
-	}
-
-	// Create the dialog box command
-	MString dialogCmd = "confirmDialog -title \"Hello Maya\" -message \"Name: " + name + ", ID: " + id + "\" -button \"OK\"";
-	MGlobal::executeCommand(dialogCmd);
+	std::vector<glm::vec3> myParticles = {{0.0f, 50.0f, 0.0f}};
+	pbdSimulator = PBD(myParticles);
 
 	return status;
 }
@@ -156,7 +112,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 		status.perror("registerCommand failed");
 
 	// Register a callback
-	callbackId = MEventMessage::addEventCallback("timeChanged", testCallback);
+	callbackId = MEventMessage::addEventCallback("timeChanged", simulatePBDStep);
 	if (callbackId == 0) {
 		MGlobal::displayError("Failed to register callback");
 		return MStatus::kFailure;
