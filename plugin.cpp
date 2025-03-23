@@ -42,7 +42,7 @@ void simulatePBDStep(void* clientData) {
 	const std::vector<Particle>& particles = pbdSimulator.simulateStep();
 	MPoint translation = sphereTransform.getTranslation(MSpace::kWorld);
 
-	translation.y = particles[0].position.y;
+	translation.y = particles[0].newPosition.y;
 	sphereTransform.setTranslation(translation, MSpace::kWorld);
 }
 
