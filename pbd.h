@@ -21,7 +21,7 @@ public:
 
 private:
     std::vector<Particle> particles;
-    int substeps = 1;
+    int substeps = 10;
     float timeStep;
 
     // Constraint solvers

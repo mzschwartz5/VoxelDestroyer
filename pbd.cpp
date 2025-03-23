@@ -1,4 +1,5 @@
 #include "pbd.h"
+#include <maya/MGlobal.h>
 
 const std::vector<Particle>& PBD::simulateStep()
 {
@@ -44,17 +45,21 @@ void PBD::solveDistanceConstraint()
     Particle& p1 = particles[0];
     Particle& p2 = particles[1];
     float desiredDistance = 5.0f;
+    float compliance = 0.3f;
 
     glm::vec3 delta = p2.newPosition - p1.newPosition;
+    float deltalen = glm::length(delta);
+    if (deltalen == 0.0f) return;
 
-    float C = glm::length(delta) - desiredDistance;
-    glm::vec3 C1 = delta / glm::length(delta);
-
-    float C1_norm = glm::length(C1);
+    float C = deltalen - desiredDistance;
+    glm::vec3 C1 = delta / deltalen;
     glm::vec3 C2 = -C1;
-    float C2_norm = C1_norm;
 
-    float lambda = C / (p1.w * C1_norm * C1_norm + p2.w * C2_norm * C2_norm);
+    float w_tot = p1.w + p2.w;
+    if (w_tot == 0.0f) return;
+
+    float alpha = compliance / (timeStep * timeStep);
+    float lambda = C / (w_tot + alpha);
 
     p1.newPosition += lambda * p1.w * C1;
     p2.newPosition += lambda * p2.w * C2;

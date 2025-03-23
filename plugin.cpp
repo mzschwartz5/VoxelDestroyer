@@ -41,10 +41,6 @@ MSyntax plugin::syntax()
 void simulatePBDStep(void* clientData) {
 
 	const std::vector<Particle>& particles = pbdSimulator.simulateStep();
-
-	// log positions of each particle
-	MGlobal::displayInfo("Particle 1: " + MString("(") + particles[0].newPosition.x + ", " + particles[0].newPosition.y + ", " + particles[0].newPosition.z + ")");
-	MGlobal::displayInfo("Particle 2: " + MString("(") + particles[1].newPosition.x + ", " + particles[1].newPosition.y + ", " + particles[1].newPosition.z + ")");
 	
 	// Update the sphere positions assuming particles[0] and particles[1] are the two spheres
 	MGlobal::executeCommand(MString("setAttr ball1.translateX ") + particles[0].newPosition.x);
