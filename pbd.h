@@ -7,7 +7,7 @@ struct Particle
     glm::vec3 newPosition;
     glm::vec3 oldPosition;
     glm::vec3 velocity;
-    float mass;
+    float w; // inverse mass
 };
 
 class PBD
@@ -21,9 +21,10 @@ public:
 
 private:
     std::vector<Particle> particles;
-    int substeps = 10;
+    int substeps = 1;
     float timeStep;
 
     // Constraint solvers
     void solveGroundCollision();
+    void solveDistanceConstraint();
 };

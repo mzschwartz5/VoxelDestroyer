@@ -19,7 +19,8 @@
 
 PBD pbdSimulator;
 MCallbackId callbackId;
-MFnTransform sphereTransform;
+MFnTransform sphereTransform1;
+MFnTransform sphereTransform2;
 double ballPosition = 50.0; // Initial height
 
 // Maya Plugin creator function
@@ -40,10 +41,19 @@ MSyntax plugin::syntax()
 void simulatePBDStep(void* clientData) {
 
 	const std::vector<Particle>& particles = pbdSimulator.simulateStep();
-	MPoint translation = sphereTransform.getTranslation(MSpace::kWorld);
 
-	translation.y = particles[0].newPosition.y;
-	sphereTransform.setTranslation(translation, MSpace::kWorld);
+	// log positions of each particle
+	MGlobal::displayInfo("Particle 1: " + MString("(") + particles[0].newPosition.x + ", " + particles[0].newPosition.y + ", " + particles[0].newPosition.z + ")");
+	MGlobal::displayInfo("Particle 2: " + MString("(") + particles[1].newPosition.x + ", " + particles[1].newPosition.y + ", " + particles[1].newPosition.z + ")");
+	
+	// Update the sphere positions assuming particles[0] and particles[1] are the two spheres
+	MGlobal::executeCommand(MString("setAttr ball1.translateX ") + particles[0].newPosition.x);
+	MGlobal::executeCommand(MString("setAttr ball1.translateY ") + particles[0].newPosition.y);
+	MGlobal::executeCommand(MString("setAttr ball1.translateZ ") + particles[0].newPosition.z);
+
+	MGlobal::executeCommand(MString("setAttr ball2.translateX ") + particles[1].newPosition.x);
+	MGlobal::executeCommand(MString("setAttr ball2.translateY ") + particles[1].newPosition.y);
+	MGlobal::executeCommand(MString("setAttr ball2.translateZ ") + particles[1].newPosition.z);
 }
 
 // Plugin doIt function
@@ -51,53 +61,28 @@ MStatus plugin::doIt(const MArgList& argList)
 {
 	MStatus status;
 
-	std::vector<glm::vec3> myParticles = {{0.0f, 50.0f, 0.0f}};
+	std::vector<glm::vec3> myParticles = {{5.0f, 0.0f, 0.0f}, {-5.0f, 0.0f, 0.0f}};
 	pbdSimulator = PBD(myParticles);
 
 	return status;
 }
 
-MStatus createSphere()
+MStatus createSphere(glm::vec3 initialPos, std::string name)
 {
     MStatus status;
 
-    // Create the sphere using MGlobal
-    MGlobal::executeCommand("polySphere -name \"bouncingBall\"");
+    // Create the sphere using MGlobal with the initial position
+    std::string command = "polySphere -name ";
+	command += name;
+    MGlobal::executeCommand(command.c_str());
 
-    // Get the sphere object by name
-    MSelectionList selectionList;
-    status = MGlobal::getSelectionListByName("bouncingBall", selectionList);
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("Failed to find the sphere by name.");
-        return status;
-    }
-
-    // Get the DAG path for the sphere (the first item in the selection list)
-    MDagPath dagPath;
-    status = selectionList.getDagPath(0, dagPath);
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("Failed to get the DAG path for the sphere.");
-        return status;
-    }
-
-    // Ensure the DAG path is a transform node
-    if (!dagPath.hasFn(MFn::kTransform)) {
-        MGlobal::displayError("The sphere object is not a valid transform node.");
-        return MStatus::kFailure;
-    }
-
-	sphereTransform.setObject(dagPath);
-
-    // Set the translation
-    MPoint translation = sphereTransform.getTranslation(MSpace::kWorld);  // Get current translation
-    translation.y += ballPosition;
-
-    // Apply the translation to the sphere
-    status = sphereTransform.setTranslation(translation, MSpace::kWorld);
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("Failed to set the translation for the sphere: " + status.errorString());
-        return status;
-    }
+    // Translate the sphere to the initial position
+    std::string translateCommand = "move -absolute ";
+    translateCommand += std::to_string(initialPos.x) + " ";
+    translateCommand += std::to_string(initialPos.y) + " ";
+    translateCommand += std::to_string(initialPos.z) + " ";
+    translateCommand += name;
+    MGlobal::executeCommand(translateCommand.c_str());
 
     return MS::kSuccess;
 }
@@ -119,12 +104,9 @@ EXPORT MStatus initializePlugin(MObject obj)
 	}
 
 	// Create the sphere
-	status = createSphere();
-	if (status != MS::kSuccess) {
-		MGlobal::displayError("Failed to create the sphere.");
-		return status;
-	}
-
+	createSphere({5.0f, 0.0f, 0.0f}, "ball1");
+	createSphere({-5.0f, 0.0f, 0.0f}, "ball2");
+	
 	return status;
 }
 
@@ -141,7 +123,8 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	MEventMessage::removeCallback(callbackId);
 
 	// Delete the sphere
-	MGlobal::executeCommand("delete bouncingBall");
+	MGlobal::executeCommand("delete ball1");
+	MGlobal::executeCommand("delete ball2");
 
 	return status;
 }
