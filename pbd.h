@@ -17,9 +17,12 @@ public:
     PBD(const std::vector<glm::vec3>& positions);
     ~PBD() = default;
     const std::vector<Particle>& simulateStep();
+    void simulateSubstep();
 
 private:
     std::vector<Particle> particles;
+    int substeps = 10;
+    float timeStep;
 
     // Constraint solvers
     void solveGroundCollision();

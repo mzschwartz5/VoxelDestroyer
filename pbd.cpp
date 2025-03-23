@@ -1,9 +1,16 @@
 #include "pbd.h"
 
-const float timeStep = 0.01f;
-
 const std::vector<Particle>& PBD::simulateStep()
 {
+    for (int i = 0; i < substeps; i++)
+    {
+        simulateSubstep();
+    }
+
+    return particles;
+}
+
+void PBD::simulateSubstep() {
     // Iterate over all particles and apply gravity
     for (auto& particle : particles)
     {
@@ -18,8 +25,6 @@ const std::vector<Particle>& PBD::simulateStep()
     {
         particle.velocity = (particle.newPosition - particle.oldPosition) / timeStep;
     }
-
-    return particles;
 }
 
 void PBD::solveGroundCollision()
@@ -35,6 +40,8 @@ void PBD::solveGroundCollision()
 
 PBD::PBD(const std::vector<glm::vec3>& positions)
 {
+    timeStep = 0.01f / substeps;
+
     for (const auto& position : positions)
     {
         Particle particle;
