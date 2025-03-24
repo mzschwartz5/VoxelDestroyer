@@ -19,6 +19,8 @@ public:
     const std::vector<Particle>& simulateStep();
     void simulateSubstep();
 
+	std::vector<Particle> getParticles() const { return particles; }
+
 private:
     std::vector<Particle> particles;
     int substeps = 10;
