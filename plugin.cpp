@@ -20,6 +20,7 @@
 
 PBD pbdSimulator;
 MCallbackId callbackId;
+MDagPath selectedMeshDagPath;
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -39,15 +40,27 @@ MSyntax plugin::syntax()
 void simulatePBDStep(void* clientData) {
 
 	const std::vector<Particle>& particles = pbdSimulator.simulateStep();
-	
+
+	MFnMesh meshFn(selectedMeshDagPath);
+	MPointArray vertexArray;
+	meshFn.getPoints(vertexArray, MSpace::kWorld);
+
 	int idx = 1;
 	for (auto& particle : particles) {
 		MString str = "setAttr ball" + MString(std::to_string(idx).c_str());
 		MGlobal::executeCommand(MString(str + ".translateX ") + particle.position.x);
 		MGlobal::executeCommand(MString(str + ".translateY ") + particle.position.y);
 		MGlobal::executeCommand(MString(str + ".translateZ ") + particle.position.z);
+
+		vertexArray[idx - 1] = MPoint(particle.position.x, particle.position.y, particle.position.z);
+		
 		idx++;
 	}
+
+	meshFn.setPoints(vertexArray, MSpace::kWorld);
+	meshFn.updateSurface();
+
+	MGlobal::executeCommand("refresh");
 }
 
 MStatus createSphere(glm::vec3 initialPos, std::string name)
@@ -71,6 +84,7 @@ MStatus createSphere(glm::vec3 initialPos, std::string name)
 }
 
 // Function to create particles at each vertex of the selected mesh
+
 MStatus createParticlesFromSelectedMesh()
 {
 	MStatus status;
@@ -87,11 +101,10 @@ MStatus createParticlesFromSelectedMesh()
 	}
 
 	for (; !iter.isDone(); iter.next()) {
-		MDagPath dagPath;
-		iter.getDagPath(dagPath);
+		iter.getDagPath(selectedMeshDagPath);
 
 		// Create an MFnMesh function set to operate on the selected mesh
-		MFnMesh meshFn(dagPath, &status);
+		MFnMesh meshFn(selectedMeshDagPath, &status);
 		if (status != MS::kSuccess) {
 			MGlobal::displayError("Failed to create MFnMesh.");
 			return status;
@@ -116,14 +129,10 @@ MStatus createParticlesFromSelectedMesh()
 	return MS::kSuccess;
 }
 
-
 // Plugin doIt function
 MStatus plugin::doIt(const MArgList& argList)
 {
 	MStatus status;
-
-	//std::vector<glm::vec3> myParticles = {{5.0f, 0.0f, 0.0f}, {-5.0f, 0.0f, 0.0f}, {0.0f, 5.0f, 0.0f}, {0.0f, 0.0f, 5.0f}};
-	//pbdSimulator = PBD(myParticles);
 
 	createParticlesFromSelectedMesh();
 
@@ -145,12 +154,6 @@ EXPORT MStatus initializePlugin(MObject obj)
 		MGlobal::displayError("Failed to register callback");
 		return MStatus::kFailure;
 	}
-
-	// Create four spheres to simulate (the points of) a tetrahedron
-	/*createSphere({5.0f, 0.0f, 0.0f}, "ball1");
-	createSphere({-5.0f, 0.0f, 0.0f}, "ball2");
-	createSphere({0.0f, 5.0f, 0.0f}, "ball3");
-	createSphere({0.0f, 0.0f, 5.0f}, "ball4");*/
 	
 	return status;
 }
