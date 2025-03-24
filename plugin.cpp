@@ -19,9 +19,6 @@
 
 PBD pbdSimulator;
 MCallbackId callbackId;
-MFnTransform sphereTransform1;
-MFnTransform sphereTransform2;
-double ballPosition = 50.0; // Initial height
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -42,22 +39,15 @@ void simulatePBDStep(void* clientData) {
 
 	const std::vector<Particle>& particles = pbdSimulator.simulateStep();
 	
-	// Update the sphere positions assuming particles[0] and particles[1] are the two spheres
-	MGlobal::executeCommand(MString("setAttr ball1.translateX ") + particles[0].position.x);
-	MGlobal::executeCommand(MString("setAttr ball1.translateY ") + particles[0].position.y);
-	MGlobal::executeCommand(MString("setAttr ball1.translateZ ") + particles[0].position.z);
-
-	MGlobal::executeCommand(MString("setAttr ball2.translateX ") + particles[1].position.x);
-	MGlobal::executeCommand(MString("setAttr ball2.translateY ") + particles[1].position.y);
-	MGlobal::executeCommand(MString("setAttr ball2.translateZ ") + particles[1].position.z);
-
-	MGlobal::executeCommand(MString("setAttr ball3.translateX ") + particles[2].position.x);
-	MGlobal::executeCommand(MString("setAttr ball3.translateY ") + particles[2].position.y);
-	MGlobal::executeCommand(MString("setAttr ball3.translateZ ") + particles[2].position.z);
-
-	MGlobal::executeCommand(MString("setAttr ball4.translateX ") + particles[3].position.x);
-	MGlobal::executeCommand(MString("setAttr ball4.translateY ") + particles[3].position.y);
-	MGlobal::executeCommand(MString("setAttr ball4.translateZ ") + particles[3].position.z);
+	int idx = 1;
+	for (auto& particle : particles) {
+		MString str = "setAttr ball" + MString(std::to_string(idx).c_str());
+		MGlobal::executeCommand(MString(str + ".translateX ") + particle.position.x);
+		MGlobal::executeCommand(MString(str + ".translateY ") + particle.position.y);
+		MGlobal::executeCommand(MString(str + ".translateZ ") + particle.position.z);
+		idx++;
+	}
+	
 }
 
 // Plugin doIt function
