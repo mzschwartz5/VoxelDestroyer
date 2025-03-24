@@ -4,7 +4,7 @@
 
 struct Particle
 {
-    glm::vec3 newPosition;
+    glm::vec3 position;
     glm::vec3 oldPosition;
     glm::vec3 velocity;
     float w; // inverse mass
@@ -27,4 +27,5 @@ private:
     // Constraint solvers
     void solveGroundCollision();
     void solveDistanceConstraint();
+    void solveVolumeConstraint();
 };

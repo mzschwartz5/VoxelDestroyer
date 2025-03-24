@@ -43,13 +43,21 @@ void simulatePBDStep(void* clientData) {
 	const std::vector<Particle>& particles = pbdSimulator.simulateStep();
 	
 	// Update the sphere positions assuming particles[0] and particles[1] are the two spheres
-	MGlobal::executeCommand(MString("setAttr ball1.translateX ") + particles[0].newPosition.x);
-	MGlobal::executeCommand(MString("setAttr ball1.translateY ") + particles[0].newPosition.y);
-	MGlobal::executeCommand(MString("setAttr ball1.translateZ ") + particles[0].newPosition.z);
+	MGlobal::executeCommand(MString("setAttr ball1.translateX ") + particles[0].position.x);
+	MGlobal::executeCommand(MString("setAttr ball1.translateY ") + particles[0].position.y);
+	MGlobal::executeCommand(MString("setAttr ball1.translateZ ") + particles[0].position.z);
 
-	MGlobal::executeCommand(MString("setAttr ball2.translateX ") + particles[1].newPosition.x);
-	MGlobal::executeCommand(MString("setAttr ball2.translateY ") + particles[1].newPosition.y);
-	MGlobal::executeCommand(MString("setAttr ball2.translateZ ") + particles[1].newPosition.z);
+	MGlobal::executeCommand(MString("setAttr ball2.translateX ") + particles[1].position.x);
+	MGlobal::executeCommand(MString("setAttr ball2.translateY ") + particles[1].position.y);
+	MGlobal::executeCommand(MString("setAttr ball2.translateZ ") + particles[1].position.z);
+
+	MGlobal::executeCommand(MString("setAttr ball3.translateX ") + particles[2].position.x);
+	MGlobal::executeCommand(MString("setAttr ball3.translateY ") + particles[2].position.y);
+	MGlobal::executeCommand(MString("setAttr ball3.translateZ ") + particles[2].position.z);
+
+	MGlobal::executeCommand(MString("setAttr ball4.translateX ") + particles[3].position.x);
+	MGlobal::executeCommand(MString("setAttr ball4.translateY ") + particles[3].position.y);
+	MGlobal::executeCommand(MString("setAttr ball4.translateZ ") + particles[3].position.z);
 }
 
 // Plugin doIt function
@@ -57,7 +65,7 @@ MStatus plugin::doIt(const MArgList& argList)
 {
 	MStatus status;
 
-	std::vector<glm::vec3> myParticles = {{5.0f, 0.0f, 0.0f}, {-5.0f, 0.0f, 0.0f}};
+	std::vector<glm::vec3> myParticles = {{5.0f, 0.0f, 0.0f}, {-5.0f, 0.0f, 0.0f}, {0.0f, 5.0f, 0.0f}, {0.0f, 0.0f, 5.0f}};
 	pbdSimulator = PBD(myParticles);
 
 	return status;
@@ -99,9 +107,11 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return MStatus::kFailure;
 	}
 
-	// Create the sphere
+	// Create four spheres to simulate (the points of) a tetrahedron
 	createSphere({5.0f, 0.0f, 0.0f}, "ball1");
 	createSphere({-5.0f, 0.0f, 0.0f}, "ball2");
+	createSphere({0.0f, 5.0f, 0.0f}, "ball3");
+	createSphere({0.0f, 0.0f, 5.0f}, "ball4");
 	
 	return status;
 }
@@ -121,6 +131,8 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	// Delete the sphere
 	MGlobal::executeCommand("delete ball1");
 	MGlobal::executeCommand("delete ball2");
+	MGlobal::executeCommand("delete ball3");
+	MGlobal::executeCommand("delete ball4");
 
 	return status;
 }
