@@ -113,8 +113,6 @@ MStatus createParticlesFromSelectedMesh()
 				tet[i] = vertexIndices[i];
 			}
 
-            std::swap(tet[2], tet[3]);
-
 			tetIndices.push_back(tet);
 		}
 

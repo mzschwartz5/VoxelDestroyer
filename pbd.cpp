@@ -15,6 +15,7 @@ void PBD::simulateSubstep() {
     // Iterate over all particles and apply gravity
     for (auto& particle : particles)
     {
+        if (particle.w == 0.0f) continue;
         particle.velocity += glm::vec3(0.0f, -10.0f, 0.0f) * timeStep;
         particle.oldPosition = particle.position;
         particle.position += particle.velocity * timeStep;
@@ -26,6 +27,7 @@ void PBD::simulateSubstep() {
 
     for (auto& particle : particles)
     {
+        if (particle.w == 0.0f) continue;
         particle.velocity = (particle.position - particle.oldPosition) / timeStep;
     }
 }
@@ -62,25 +64,25 @@ void PBD::solveGroundCollision()
 
 void PBD::solveDistanceConstraint()
 {
-    float compliance = 0.01f;
+    float compliance = .001f;
+    float alpha = compliance / (timeStep * timeStep);
 
     for (const auto& edge: edges) {
         Particle& p1 = particles[edge.indices[0]];
         Particle& p2 = particles[edge.indices[1]];
+        
+        float w_tot = p1.w + p2.w;
+        if (w_tot == 0.0f) continue;
     
         glm::vec3 delta = p2.position - p1.position;
         float deltalen = glm::length(delta);
-        if (deltalen == 0.0f) return;
+        if (deltalen == 0.0f) continue;
     
-        float C = deltalen - edge.restLength;
+        float C = edge.restLength - deltalen;
         glm::vec3 C1 = delta / deltalen;
         glm::vec3 C2 = -C1;
     
-        float w_tot = p1.w + p2.w;
-        if (w_tot == 0.0f) return;
-    
-        float alpha = compliance / (timeStep * timeStep);
-        float lambda = C / (w_tot + alpha);
+        float lambda = -C / (w_tot + alpha);
 
         p1.position += lambda * p1.w * C1;
         p2.position += lambda * p2.w * C2;
@@ -90,15 +92,13 @@ void PBD::solveDistanceConstraint()
 void PBD::solveVolumeConstraint() 
 {
     float compliance = 0.0f;
+    float alpha = compliance / (timeStep * timeStep);
     
     for (const auto& tet: tetrahedra) {
         Particle& p1 = particles[tet.indices[0]];
         Particle& p2 = particles[tet.indices[1]];
         Particle& p3 = particles[tet.indices[2]];
         Particle& p4 = particles[tet.indices[3]];
-    
-        float w_tot = p1.w + p2.w + p3.w + p4.w;
-        if (w_tot == 0.0f) return;
     
         glm::vec3 delC1 = glm::cross(p4.position - p2.position, p3.position - p2.position) / 6.0f;
         glm::vec3 delC2 = glm::cross(p3.position - p1.position, p4.position - p1.position) / 6.0f;
@@ -109,10 +109,12 @@ void PBD::solveVolumeConstraint()
         float delC3Len = glm::length(delC3);
         float delC4Len = glm::length(delC4);
     
-        float C = tet.restVolume - getTetVolume(tet);
+        float C = getTetVolume(tet) - tet.restVolume;
         
-        float alpha = compliance / (timeStep * timeStep);
-        float lambda = -C / (p1.w * delC1Len * delC1Len + p2.w * delC2Len * delC2Len + p3.w * delC3Len * delC3Len + p4.w * delC4Len * delC4Len + alpha);
+        float w_tot = p1.w * delC1Len * delC1Len + p2.w * delC2Len * delC2Len + p3.w * delC3Len * delC3Len + p4.w * delC4Len * delC4Len;
+        if (w_tot == 0.0f) continue;
+
+        float lambda = -C / (w_tot + alpha);
 
         // Update the positions
         p1.position += lambda * p1.w * delC1;
@@ -128,7 +130,7 @@ PBD::PBD(
     const std::vector<std::array<int, 2>>& edgeIndices
 )
 {
-    timeStep = (1.0f / 60.0f) / substeps;
+    timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
 
     for (const auto& position : positions)
     {
