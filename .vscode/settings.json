@@ -4,6 +4,7 @@
         "system_error": "cpp",
         "vector": "cpp",
         "xstring": "cpp",
-        "xtree": "cpp"
+        "xtree": "cpp",
+        "array": "cpp"
     }
 }

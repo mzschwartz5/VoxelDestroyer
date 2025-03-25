@@ -8,6 +8,8 @@
 #include <maya/MFnTransform.h>
 #include <maya/MFnMesh.h>
 #include <maya/MPointArray.h>
+#include <maya/MItMeshPolygon.h>
+#include <maya/MItMeshEdge.h>
 #include <maya/MFloatPointArray.h>
 #include <maya/MDagPath.h>
 #include <maya/MFnDagNode.h>
@@ -45,15 +47,9 @@ void simulatePBDStep(void* clientData) {
 	MPointArray vertexArray;
 	meshFn.getPoints(vertexArray, MSpace::kWorld);
 
-	int idx = 1;
+	int idx = 0;
 	for (auto& particle : particles) {
-		MString str = "setAttr ball" + MString(std::to_string(idx).c_str());
-		MGlobal::executeCommand(MString(str + ".translateX ") + particle.position.x);
-		MGlobal::executeCommand(MString(str + ".translateY ") + particle.position.y);
-		MGlobal::executeCommand(MString(str + ".translateZ ") + particle.position.z);
-
-		vertexArray[idx - 1] = MPoint(particle.position.x, particle.position.y, particle.position.z);
-		
+		vertexArray[idx] = MPoint(particle.position.x, particle.position.y, particle.position.z);
 		idx++;
 	}
 
@@ -63,52 +59,35 @@ void simulatePBDStep(void* clientData) {
 	MGlobal::executeCommand("refresh");
 }
 
-MStatus createSphere(glm::vec3 initialPos, std::string name)
-{
-	MStatus status;
-
-	// Create the sphere using MGlobal with the initial position
-	std::string command = "polySphere -name ";
-	command += name;
-	MGlobal::executeCommand(command.c_str());
-
-	// Translate the sphere to the initial position
-	std::string translateCommand = "move -absolute ";
-	translateCommand += std::to_string(initialPos.x) + " ";
-	translateCommand += std::to_string(initialPos.y) + " ";
-	translateCommand += std::to_string(initialPos.z) + " ";
-	translateCommand += name;
-	MGlobal::executeCommand(translateCommand.c_str());
-
-	return MS::kSuccess;
-}
-
 // Function to create particles at each vertex of the selected mesh
-
 MStatus createParticlesFromSelectedMesh()
 {
-	MStatus status;
+    MStatus status;
 
-	// Get the current selection
-	MSelectionList selection;
-	MGlobal::getActiveSelectionList(selection);
+    // Get the current selection
+    MSelectionList selection;
+    MGlobal::getActiveSelectionList(selection);
 
-	// Iterate through the selection list
-	MItSelectionList iter(selection, MFn::kMesh, &status);
-	if (status != MS::kSuccess) {
-		MGlobal::displayError("No mesh selected.");
-		return status;
-	}
+    // Iterate through the selection list
+    MItSelectionList iter(selection, MFn::kMesh, &status);
+    if (status != MS::kSuccess) {
+        MGlobal::displayError("No mesh selected.");
+        return status;
+    }
 
-	for (; !iter.isDone(); iter.next()) {
-		iter.getDagPath(selectedMeshDagPath);
+	std::vector<glm::vec3> particles;
+	std::vector<std::array<int, 4>> tetIndices;
+	std::vector<std::array<int, 2>> edgeIndices;
 
-		// Create an MFnMesh function set to operate on the selected mesh
-		MFnMesh meshFn(selectedMeshDagPath, &status);
-		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to create MFnMesh.");
-			return status;
-		}
+    for (; !iter.isDone(); iter.next()) {
+        iter.getDagPath(selectedMeshDagPath);
+
+        // Create an MFnMesh function set to operate on the selected mesh
+        MFnMesh meshFn(selectedMeshDagPath, &status);
+        if (status != MS::kSuccess) {
+            MGlobal::displayError("Failed to create MFnMesh.");
+            return status;
+        }
 
 		// Get the vertex positions
 		MPointArray vertexArray;
@@ -119,14 +98,44 @@ MStatus createParticlesFromSelectedMesh()
 		for (unsigned int i = 0; i < vertexArray.length(); ++i) {
 			MPoint point = vertexArray[i];
 			particles.push_back(glm::vec3(point.x, point.y, point.z));
-			createSphere({ float(point.x), float(point.y), float(point.z) }, "ball" + std::to_string(i + 1));
 		}
 
-		// Initialize the PBD simulator with the particles
-		pbdSimulator = PBD(particles);
-	}
+		// Iterate over each face of the mesh
+		MItMeshPolygon faceIter(selectedMeshDagPath, MObject::kNullObj, &status);
 
-	return MS::kSuccess;
+		for (; !faceIter.isDone(); faceIter.next()) {
+			MIntArray vertexIndices;
+			faceIter.getVertices(vertexIndices);
+
+			// Create tetrahedra from each face
+			std::array<int, 4> tet;
+			for (unsigned int i = 0; i < 4; ++i) {
+				tet[i] = vertexIndices[i];
+			}
+
+            std::swap(tet[2], tet[3]);
+
+			tetIndices.push_back(tet);
+		}
+
+		// Iterate over each edge of the mesh
+		MItMeshEdge edgeIter(selectedMeshDagPath, MObject::kNullObj, &status);
+
+		for (; !edgeIter.isDone(); edgeIter.next()) {
+			MIntArray vertexIndices;
+			
+			std::array<int, 2> edge;
+			edge[0] = edgeIter.index(0);
+			edge[1] = edgeIter.index(1);
+
+			edgeIndices.push_back(edge);
+		}
+
+        // Initialize the PBD simulator with the particles
+        pbdSimulator = PBD(particles, tetIndices, edgeIndices);
+    }
+
+    return MS::kSuccess;
 }
 
 // Plugin doIt function
@@ -135,6 +144,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	MStatus status;
 
 	createParticlesFromSelectedMesh();
+	MGlobal::displayInfo("Particles created.");
 
 	return status;
 }
@@ -169,13 +179,6 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 
 	// Deregister the callback
 	MEventMessage::removeCallback(callbackId);
-
-	// Delete the sphere
-	int idx = 1;
-	for (auto& particle : pbdSimulator.getParticles()) {
-		MGlobal::executeCommand("delete ball" + MString(std::to_string(idx).c_str()));
-		idx++;
-	}
 
 	return status;
 }
