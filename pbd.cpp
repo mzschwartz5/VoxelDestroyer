@@ -39,7 +39,7 @@ float PBD::getTetVolume(const Tetrahedron& tet) const
     const Particle& p3 = particles[tet.indices[2]];
     const Particle& p4 = particles[tet.indices[3]];
 
-    return glm::abs(glm::dot(p4.position - p1.position, glm::cross(p2.position - p1.position, p3.position - p1.position))) / 6.0f;
+    return glm::dot(p4.position - p1.position, glm::cross(p2.position - p1.position, p3.position - p1.position)) / 6.0f;
 }
 
 float PBD::getEdgeLength(const Edge& edge) const
@@ -54,6 +54,8 @@ void PBD::solveGroundCollision()
 {
     for (auto& particle : particles)
     {
+        if (particle.w == 0.0f) continue;
+
         if (particle.position.y < 0.0f)
         {
             particle.position = particle.oldPosition;
@@ -64,7 +66,7 @@ void PBD::solveGroundCollision()
 
 void PBD::solveDistanceConstraint()
 {
-    float compliance = .001f;
+    float compliance = 500.0f;
     float alpha = compliance / (timeStep * timeStep);
 
     for (const auto& edge: edges) {
@@ -74,14 +76,13 @@ void PBD::solveDistanceConstraint()
         float w_tot = p1.w + p2.w;
         if (w_tot == 0.0f) continue;
     
-        glm::vec3 delta = p2.position - p1.position;
+        glm::vec3 delta = p1.position - p2.position;
         float deltalen = glm::length(delta);
         if (deltalen == 0.0f) continue;
     
-        float C = edge.restLength - deltalen;
+        float C = deltalen - edge.restLength;
         glm::vec3 C1 = delta / deltalen;
         glm::vec3 C2 = -C1;
-    
         float lambda = -C / (w_tot + alpha);
 
         p1.position += lambda * p1.w * C1;
@@ -108,12 +109,12 @@ void PBD::solveVolumeConstraint()
         float delC2Len = glm::length(delC2);
         float delC3Len = glm::length(delC3);
         float delC4Len = glm::length(delC4);
-    
-        float C = getTetVolume(tet) - tet.restVolume;
+        
         
         float w_tot = p1.w * delC1Len * delC1Len + p2.w * delC2Len * delC2Len + p3.w * delC3Len * delC3Len + p4.w * delC4Len * delC4Len;
         if (w_tot == 0.0f) continue;
-
+        
+        float C = getTetVolume(tet) - tet.restVolume;
         float lambda = -C / (w_tot + alpha);
 
         // Update the positions
