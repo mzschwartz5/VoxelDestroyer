@@ -2,8 +2,9 @@
 #include <d3dcompiler.h>
 #include "resource.h"
 
-DirectX::DirectX()
+DirectX::DirectX(HINSTANCE pluginInstance)
 {
+    this->pluginInstance = pluginInstance;
     // Get the renderer
     MRenderer* renderer = MRenderer::theRenderer();
     if (!renderer) {
@@ -54,42 +55,17 @@ void DirectX::tearDown()
     }
 }
 
-
-// This is a hacky way to get the plugin module handle, which we use to find shaders embedded in the .mll
-// Since GetModuleHandle() returns the handle of the host application, not the plugin, we use a dummy variable,
-// whose address we pass to GetModuleHandleEx() to get the plugin module handle.
-//
-// Also note: google suggests using DllMain to get and store the module handle, but Maya defines that in MfnPlugin and we can't override it.
-static int dummyVariable = 0;
-HMODULE GetPluginModuleHandle()
-{
-    HMODULE hModule = NULL;
-
-    // Use GetModuleHandleEx to retrieve the module handle
-    if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                          reinterpret_cast<LPCWSTR>(&dummyVariable), &hModule))
-    {
-        return hModule;
-    }
-    else
-    {
-        // Handle error if needed
-        MGlobal::displayError("Failed to get plugin module handle");
-        return NULL;
-    }
-}
-
 void DirectX::loadComputeShaders()
 {
     // Locate the shader resource    
-    HRSRC hResource = FindResource(GetPluginModuleHandle(), MAKEINTRESOURCE(IDR_SHADER1), L"SHADER");
+    HRSRC hResource = FindResource(pluginInstance, MAKEINTRESOURCE(IDR_SHADER1), L"SHADER");
     if (!hResource) {
         MGlobal::displayError("Failed to find shader resource");
         return;
     }
 
     // Load the shader resource
-    HGLOBAL hResourceData = LoadResource(GetPluginModuleHandle(), hResource);
+    HGLOBAL hResourceData = LoadResource(pluginInstance, hResource);
     if (!hResourceData) {
         MGlobal::displayError("Failed to load shader resource");
         return;
@@ -103,7 +79,7 @@ void DirectX::loadComputeShaders()
     }
 
     // Get the size of the resource
-    DWORD resourceSize = SizeofResource(GetPluginModuleHandle(), hResource);
+    DWORD resourceSize = SizeofResource(pluginInstance, hResource);
     if (resourceSize == 0) {
         MGlobal::displayError("Failed to get the size of the shader resource");
         return;

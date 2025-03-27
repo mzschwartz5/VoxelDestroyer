@@ -7,7 +7,8 @@ using namespace MHWRender;
 class DirectX
 {
 public:
-    DirectX();
+    DirectX() = default;
+    DirectX(HINSTANCE pluginInstance);
     ~DirectX();
 
     void tearDown();
@@ -15,6 +16,8 @@ public:
 
 private:
     void loadComputeShaders();
+
+    HINSTANCE pluginInstance;
 
     ID3D11Device* dxDevice = NULL;
     ID3D11DeviceContext* dxContext = NULL;

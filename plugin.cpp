@@ -166,7 +166,8 @@ EXPORT MStatus initializePlugin(MObject obj)
 	}
 
 	// Initialize DirectX
-	dx = DirectX();
+	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
+	dx = DirectX(MhInstPlugin);
 	
 	return status;
 }
