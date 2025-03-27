@@ -3,19 +3,17 @@
 #include <maya/MGlobal.h>
 #include <maya/MArgDatabase.h>
 #include <maya/MEventMessage.h>
-#include <maya/MAnimControl.h>
 #include <maya/MSelectionList.h>
-#include <maya/MFnTransform.h>
 #include <maya/MFnMesh.h>
 #include <maya/MPointArray.h>
 #include <maya/MItMeshPolygon.h>
 #include <maya/MItMeshEdge.h>
-#include <maya/MFloatPointArray.h>
 #include <maya/MDagPath.h>
 #include <maya/MFnDagNode.h>
 #include <maya/MItSelectionList.h>
 #include "pbd.h"
 #include <vector>
+#include "directx.h"
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -23,6 +21,7 @@
 PBD pbdSimulator;
 MCallbackId callbackId;
 MDagPath selectedMeshDagPath;
+DirectX dx;
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -144,6 +143,9 @@ MStatus plugin::doIt(const MArgList& argList)
 	createParticlesFromSelectedMesh();
 	MGlobal::displayInfo("Particles created.");
 
+	dx.dispatchComputeShaders();
+	MGlobal::displayInfo("Compute shaders dispatched.");
+
 	return status;
 }
 
@@ -162,6 +164,9 @@ EXPORT MStatus initializePlugin(MObject obj)
 		MGlobal::displayError("Failed to register callback");
 		return MStatus::kFailure;
 	}
+
+	// Initialize DirectX
+	dx = DirectX();
 	
 	return status;
 }
@@ -177,6 +182,8 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 
 	// Deregister the callback
 	MEventMessage::removeCallback(callbackId);
+
+	dx.tearDown();
 
 	return status;
 }
