@@ -7,14 +7,14 @@ DirectX::DirectX()
     // Get the renderer
     MRenderer* renderer = MRenderer::theRenderer();
     if (!renderer) {
-        MGlobal::displayError("Failed to get the renderer");
+        MGlobal::displayError("Failed to get the renderer, check that the viewport is set to Viewport 2.0");
         return;
     }
 
     // Get the device handle
     void* deviceHandle = renderer->GPUDeviceHandle();
     if (!deviceHandle) {
-        MGlobal::displayError("Failed to get the device handle");
+        MGlobal::displayError("Failed to get the device handle, check that Viewport 2.0 Rendering Engine is set to DirectX 11");
         return;
     }
 
