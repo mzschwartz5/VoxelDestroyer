@@ -39,10 +39,12 @@ DirectX::~DirectX()
 
 void DirectX::tearDown()
 {
-    if (computeShader) {
-        computeShader->Release();
-        computeShader = NULL;
+    for (auto& shader : computeShaders) {
+        if (shader.shaderPtr) {
+            shader.shaderPtr->Release();
+        }
     }
+    computeShaders.clear();
 
     if (dxContext) {
         dxContext->Release();
@@ -55,10 +57,24 @@ void DirectX::tearDown()
     }
 }
 
+
 void DirectX::loadComputeShaders()
 {
+    ComputeShader firstShader;
+    firstShader.name = "IDR_SHADER1";
+    firstShader.id = IDR_SHADER1;
+	firstShader.shaderPtr = NULL;
+	computeShaders.push_back(firstShader);
+
+    loadComputeShader(firstShader);
+	bindDemoShader();
+}
+
+void DirectX::loadComputeShader(ComputeShader& computeShader)
+{
+
     // Locate the shader resource    
-    HRSRC hResource = FindResource(pluginInstance, MAKEINTRESOURCE(IDR_SHADER1), L"SHADER");
+    HRSRC hResource = FindResource(pluginInstance, MAKEINTRESOURCE(computeShader.id), L"SHADER");
     if (!hResource) {
         MGlobal::displayError("Failed to find shader resource");
         return;
@@ -93,23 +109,28 @@ void DirectX::loadComputeShaders()
         return;
     }
 
-    hr = dxDevice->CreateComputeShader( ( DWORD* )pPSBuf->GetBufferPointer(), pPSBuf->GetBufferSize(), NULL, &computeShader );
+    hr = dxDevice->CreateComputeShader( ( DWORD* )pPSBuf->GetBufferPointer(), pPSBuf->GetBufferSize(), NULL, &computeShader.shaderPtr);
     if (FAILED(hr)) {
         MGlobal::displayError("Failed to create compute shader");
         return;
     }
     pPSBuf->Release();
 
+}
+
+void DirectX::bindDemoShader() {
     // Here we would set up buffers and resources for the compute shader
-    dxContext->CSSetShader(computeShader, NULL, 0);
+    dxContext->CSSetShader(computeShaders[0].shaderPtr, NULL, 0);
 }
 
 void DirectX::dispatchComputeShaders()
 {
-    if (!dxContext || !computeShader) {
-        MGlobal::displayError("Failed to dispatch compute shaders");
-        return;
-    }
+	for (auto& shader : computeShaders) {
+        if (!dxContext || !shader.shaderPtr) {
+            MGlobal::displayError("Failed to dispatch compute shaders");
+            return;
+        }
 
-    dxContext->Dispatch(1, 1, 1);
+        dxContext->Dispatch(1, 1, 1);
+	}
 }
