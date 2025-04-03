@@ -11,23 +11,11 @@ struct Particle
     float w = 0.0f; // inverse mass
 };
 
-struct Tetrahedron
-{
-    std::array<int, 4> indices;
-    float restVolume;
-};
-
-struct Edge
-{
-    std::array<int, 2> indices;
-    float restLength;
-};
-
 class PBD
 {
 public:
     PBD() = default;
-    PBD(const std::vector<glm::vec3>& positions, const std::vector<std::array<int, 4>>& tetrahedra, const std::vector<std::array<int, 2>>& edges);
+    PBD(const std::vector<glm::vec3>& positions);
     ~PBD() = default;
     const std::vector<Particle>& simulateStep();
     void simulateSubstep();
@@ -36,16 +24,9 @@ public:
 
 private:
     std::vector<Particle> particles;
-    std::vector<Tetrahedron> tetrahedra;
-    std::vector<Edge> edges;
     int substeps = 10;
     float timeStep;
 
-    float getTetVolume(const Tetrahedron& tet) const;
-    float getEdgeLength(const Edge& edge) const;
-
     // Constraint solvers
     void solveGroundCollision();
-    void solveDistanceConstraint();
-    void solveVolumeConstraint();
 };

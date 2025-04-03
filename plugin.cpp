@@ -75,8 +75,6 @@ MStatus createParticlesFromSelectedMesh()
     }
 
 	std::vector<glm::vec3> particles;
-	std::vector<std::array<int, 4>> tetIndices;
-	std::vector<std::array<int, 2>> edgeIndices;
 
     for (; !iter.isDone(); iter.next()) {
         iter.getDagPath(selectedMeshDagPath);
@@ -99,37 +97,8 @@ MStatus createParticlesFromSelectedMesh()
 			particles.push_back(glm::vec3(point.x, point.y, point.z));
 		}
 
-		// Iterate over each face of the mesh
-		MItMeshPolygon faceIter(selectedMeshDagPath, MObject::kNullObj, &status);
-
-		for (; !faceIter.isDone(); faceIter.next()) {
-			MIntArray vertexIndices;
-			faceIter.getVertices(vertexIndices);
-
-			// Create tetrahedra from each face
-			std::array<int, 4> tet;
-			for (unsigned int i = 0; i < 4; ++i) {
-				tet[i] = vertexIndices[i];
-			}
-
-			tetIndices.push_back(tet);
-		}
-
-		// Iterate over each edge of the mesh
-		MItMeshEdge edgeIter(selectedMeshDagPath, MObject::kNullObj, &status);
-
-		for (; !edgeIter.isDone(); edgeIter.next()) {
-			MIntArray vertexIndices;
-			
-			std::array<int, 2> edge;
-			edge[0] = edgeIter.index(0);
-			edge[1] = edgeIter.index(1);
-
-			edgeIndices.push_back(edge);
-		}
-
         // Initialize the PBD simulator with the particles
-        pbdSimulator = PBD(particles, tetIndices, edgeIndices);
+        pbdSimulator = PBD(particles);
     }
 
     return MS::kSuccess;

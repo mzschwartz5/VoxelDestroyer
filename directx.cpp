@@ -64,9 +64,9 @@ void DirectX::loadComputeShaders()
     firstShader.name = "IDR_SHADER1";
     firstShader.id = IDR_SHADER1;
 	firstShader.shaderPtr = NULL;
-	computeShaders.push_back(firstShader);
-
     loadComputeShader(firstShader);
+    
+	computeShaders.push_back(firstShader);
 	bindDemoShader();
 }
 
