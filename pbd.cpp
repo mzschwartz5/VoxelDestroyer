@@ -1,6 +1,68 @@
 #include "pbd.h"
 #include <maya/MGlobal.h>
 
+PBD::PBD(const std::vector<glm::vec3>& positions) {
+    timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
+
+    for (const auto& position : positions) {
+        Particle particle;
+        particle.oldPosition = particle.position = position;
+        particle.velocity = glm::vec3(0.0f);
+        particle.w = 1.0f;
+        particles.push_back(particle);
+    }
+
+    for (int i = 0; i < particles.size(); i += 8) {
+		Voxel voxel;
+        std::array<Particle*, 8> voxelParticles = {
+            &particles[i], &particles[i + 1], &particles[i + 2], &particles[i + 3],
+            &particles[i + 4], &particles[i + 5], &particles[i + 6], &particles[i + 7]
+        };
+
+        // Sort particles based on their positions to match the desired winding order
+        std::sort(voxelParticles.begin(), voxelParticles.end(), [](Particle* a, Particle* b) {
+            return a->position.y < b->position.y || (a->position.y == b->position.y && a->position.z < b->position.z) || (a->position.y == b->position.y && a->position.z == b->position.z && a->position.x < b->position.x);
+            });
+
+        // Assign sorted particles to the voxel
+        voxel.particles[0] = *voxelParticles[0]; // Back face bottom left
+        voxel.particles[1] = *voxelParticles[1]; // Back face bottom right
+        voxel.particles[2] = *voxelParticles[2]; // Back face top left
+        voxel.particles[3] = *voxelParticles[3]; // Back face top right
+        voxel.particles[4] = *voxelParticles[4]; // Front face bottom left
+        voxel.particles[5] = *voxelParticles[5]; // Front face bottom right
+        voxel.particles[6] = *voxelParticles[6]; // Front face top left
+        voxel.particles[7] = *voxelParticles[7]; // Front face top right
+
+        glm::vec3& p0 = voxel.particles[0].position;
+        glm::vec3& p1 = voxel.particles[1].position;
+        glm::vec3& p2 = voxel.particles[2].position;
+        glm::vec3& p3 = voxel.particles[3].position;
+        glm::vec3& p4 = voxel.particles[4].position;
+        glm::vec3& p5 = voxel.particles[5].position;
+        glm::vec3& p6 = voxel.particles[6].position;
+        glm::vec3& p7 = voxel.particles[7].position;
+
+        glm::vec3 v0 = ((p1 - p0) + (p3 - p2) + (p5 - p4) + (p7 - p6)) / 4.0f;
+        glm::vec3 v1 = ((p1 - p0) + (p3 - p1) + (p6 - p4) + (p7 - p5)) / 4.0f;
+        glm::vec3 v2 = ((p4 - p0) + (p5 - p1) + (p6 - p2) + (p7 - p3)) / 4.0f;
+
+        glm::vec3 u0 = v0 - project(v0, v1, v2, 0.5f);
+        glm::vec3 u1 = v1 - project(v1, v2, v0, 0.5f);
+        glm::vec3 u2 = v2 - project(v2, v0, v1, 0.5f);
+
+        float beta = 1.0f;
+        float length0 = glm::length(u0);
+        u0 = (u0 / length0) * ((1.f - beta) * 0.1f + (beta * (length0 * 0.5f)));
+        float length1 = glm::length(u1);
+        u1 = (u1 / length1) * ((1.f - beta) * 0.1f + (beta * (length1 * 0.5f)));
+        float length2 = glm::length(u2);
+        u2 = (u2 / length2) * ((1.f - beta) * 0.1f + (beta * (length2 * 0.5f)));
+
+        voxel.volume = glm::dot(glm::cross(u0, u1), u2);
+    }
+}
+
 const std::vector<Particle>& PBD::simulateStep()
 {
     for (int i = 0; i < substeps; i++)
@@ -22,6 +84,9 @@ void PBD::simulateSubstep() {
     }
 
     solveGroundCollision();
+	for (auto& voxel : voxels) {
+		solveVGS(voxel, 0.1f, 0.5f, 1.0f, 3);
+	}
 
     for (auto& particle : particles)
     {
@@ -44,17 +109,77 @@ void PBD::solveGroundCollision()
     }
 }
 
-PBD::PBD(
-    const std::vector<glm::vec3>& positions
-)
-{
-    timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
+glm::vec3 PBD::project(glm::vec3 x, glm::vec3 y, glm::vec3 z, float relaxation) {
+	glm::vec3 projY = (glm::dot(y, x) / glm::dot(y, y)) * y;
+    glm::vec3 projZ = (glm::dot(z, x) / glm::dot(z, z)) * z;
+    return relaxation * (projY + projZ);
+}
 
-    for (const auto& position : positions)
-    {
-        Particle particle;
-        particle.oldPosition = particle.position = position;
-        particle.velocity = glm::vec3(0.0f);
-        particles.push_back(particle);
+void PBD::solveVGS(Voxel& voxel, float particle_radius, float relaxation, float beta, unsigned int iter_count) {
+
+    for (unsigned int i = 0; i < iter_count; i++) {
+        glm::vec3& p0 = voxel.particles[0].position;
+        glm::vec3& p1 = voxel.particles[1].position;
+        glm::vec3& p2 = voxel.particles[2].position;
+        glm::vec3& p3 = voxel.particles[3].position;
+        glm::vec3& p4 = voxel.particles[4].position;
+        glm::vec3& p5 = voxel.particles[5].position;
+        glm::vec3& p6 = voxel.particles[6].position;
+        glm::vec3& p7 = voxel.particles[7].position;
+		glm::vec3 centroid = p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7;
+		centroid /= 8.0f;
+
+		glm::vec3 v0 = ((p1 - p0) + (p3 - p2) + (p5 - p4) + (p7 - p6)) / 4.0f;
+        glm::vec3 v1 = ((p1 - p0) + (p3 - p1) + (p6 - p4) + (p7 - p5)) / 4.0f;
+        glm::vec3 v2 = ((p4 - p0) + (p5 - p1) + (p6 - p2) + (p7 - p3)) / 4.0f;
+
+        glm::vec3 u0 = v0 - project(v0, v1, v2, relaxation);
+        glm::vec3 u1 = v1 - project(v1, v2, v0, relaxation);
+		glm::vec3 u2 = v2 - project(v2, v0, v1, relaxation);
+
+		float length0 = glm::length(u0);
+        u0 = (u0 / length0) * ((1.f - beta) * particle_radius + (beta * (length0  * 0.5f)));
+		float length1 = glm::length(u1);
+		u1 = (u1 / length1) * ((1.f - beta) * particle_radius + (beta * (length1 * 0.5f)));
+		float length2 = glm::length(u2);
+		u2 = (u2 / length2) * ((1.f - beta) * particle_radius + (beta * (length2 * 0.5f)));
+		
+        float init_volume = voxel.volume;
+        voxel.volume = glm::dot(glm::cross(u0, u1), u2);
+        float mult = 0.5f * glm::pow((init_volume / voxel.volume), 1.f / 3.f);
+		u0 *= mult;
+		u1 *= mult;
+		u2 *= mult;
+		
+		if (voxel.particles[0].w != 0.0f) {
+            p0 = centroid - u0 - u1 - u2;
+		}
+
+        if (voxel.particles[1].w != 0.0f) {
+            p1 = centroid + u0 - u1 - u2;
+        }
+
+		if (voxel.particles[2].w != 0.0f) {
+			p2 = centroid - u0 + u1 - u2;
+		}
+
+        if (voxel.particles[3].w != 0.0f) {
+            p3 = centroid + u0 + u1 - u2;
+        }
+
+		if (voxel.particles[4].w != 0.0f) {
+			p4 = centroid - u0 - u1 + u2;
+		}
+        if (voxel.particles[5].w != 0.0f) {
+            p5 = centroid + u0 - u1 + u2;
+        }
+
+		if (voxel.particles[6].w != 0.0f) {
+			p6 = centroid - u0 + u1 + u2;
+		}
+
+        if (voxel.particles[7].w != 0.0f) {
+            p7 = centroid + u0 + u1 + u2;
+        }
     }
 }

@@ -56,6 +56,7 @@ void simulatePBDStep(void* clientData) {
 	meshFn.updateSurface();
 
 	MGlobal::executeCommand("refresh");
+
 }
 
 // Function to create particles at each vertex of the selected mesh
@@ -99,6 +100,9 @@ MStatus createParticlesFromSelectedMesh()
 
         // Initialize the PBD simulator with the particles
         pbdSimulator = PBD(particles);
+		std::string str = particles.size() + " particles created.";
+		MGlobal::displayInfo(MString(str.c_str()));
+
     }
 
     return MS::kSuccess;
