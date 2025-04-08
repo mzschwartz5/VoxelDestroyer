@@ -39,5 +39,5 @@ private:
 
     void solveVGS(Voxel& voxel, float particle_radius, float relaxation, float beta, unsigned int iter_count);
 
-    glm::vec3 project(glm::vec3 x, glm::vec3 y, glm::vec3 z, float relaxation);
+    glm::vec3 project(glm::vec3 x, glm::vec3 y);
 };
