@@ -100,8 +100,6 @@ MStatus createParticlesFromSelectedMesh()
 
         // Initialize the PBD simulator with the particles
         pbdSimulator = PBD(particles);
-		std::string str = particles.size() + " particles created.";
-		MGlobal::displayInfo(MString(str.c_str()));
 
     }
 

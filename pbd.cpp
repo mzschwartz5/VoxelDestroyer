@@ -14,24 +14,21 @@ PBD::PBD(const std::vector<glm::vec3>& positions) {
 
     for (int i = 0; i < particles.size(); i += 8) {
 		Voxel voxel;
-        std::array<Particle*, 8> voxelParticles = {
-            &particles[i], &particles[i + 1], &particles[i + 2], &particles[i + 3],
-            &particles[i + 4], &particles[i + 5], &particles[i + 6], &particles[i + 7]
-        };
+        std::array<int, 8> voxelParticles = {i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7};
 
         // Sort particles based on their positions to match the desired winding order
-        std::sort(voxelParticles.begin(), voxelParticles.end(), [](Particle* a, Particle* b) {
+        std::sort(voxelParticles.begin(), voxelParticles.end(), [this](int a, int b) {
             // First sort by Z (back face before front face)
-            if (a->position.z < b->position.z) return true;
-            if (a->position.z > b->position.z) return false;
+            if (particles[a].position.z < particles[b].position.z) return true;
+            if (particles[a].position.z > particles[b].position.z) return false;
 
             // If Z is equal, sort by Y (bottom before top)
-            if (a->position.y < b->position.y) return true;
-            if (a->position.y > b->position.y) return false;
+            if (particles[a].position.y < particles[b].position.y) return true;
+            if (particles[a].position.y > particles[b].position.y) return false;
 
             // If Z and Y are equal, sort by X (left before right)
-            return a->position.x < b->position.x;
-            });
+            return particles[a].position.x < particles[b].position.x;
+        });
 
         voxel.particles = voxelParticles;
         voxel.volume = 1.0f; // use the edge length cubed later
@@ -92,14 +89,14 @@ glm::vec3 PBD::project(glm::vec3 x, glm::vec3 y) {
 
 void PBD::solveVGS(Voxel& voxel, float particle_radius, float relaxation, float beta, unsigned int iter_count) {
     for (unsigned int i = 0; i < iter_count; i++) {
-        glm::vec3& p0 = voxel.particles[0]->position;
-        glm::vec3& p1 = voxel.particles[1]->position;
-        glm::vec3& p2 = voxel.particles[2]->position;
-        glm::vec3& p3 = voxel.particles[3]->position;
-        glm::vec3& p4 = voxel.particles[4]->position;
-        glm::vec3& p5 = voxel.particles[5]->position;
-        glm::vec3& p6 = voxel.particles[6]->position;
-        glm::vec3& p7 = voxel.particles[7]->position;
+        glm::vec3& p0 = particles[voxel.particles[0]].position;
+        glm::vec3& p1 = particles[voxel.particles[1]].position;
+        glm::vec3& p2 = particles[voxel.particles[2]].position;
+        glm::vec3& p3 = particles[voxel.particles[3]].position;
+        glm::vec3& p4 = particles[voxel.particles[4]].position;
+        glm::vec3& p5 = particles[voxel.particles[5]].position;
+        glm::vec3& p6 = particles[voxel.particles[6]].position;
+        glm::vec3& p7 = particles[voxel.particles[7]].position;
 		glm::vec3 centroid = p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7;
 		centroid /= 8.0f;
 
@@ -122,34 +119,34 @@ void PBD::solveVGS(Voxel& voxel, float particle_radius, float relaxation, float 
         u1 *= mult;
         u2 *= mult;
 
-		if (voxel.particles[0]->w != 0.0f) {
+		if (particles[voxel.particles[0]].w != 0.0f) {
             p0 = centroid - u0 - u1 - u2;
 		}
 
-        if (voxel.particles[1]->w != 0.0f) {
+        if (particles[voxel.particles[1]].w != 0.0f) {
             p1 = centroid + u0 - u1 - u2;
         }
 
-		if (voxel.particles[2]->w != 0.0f) {
+		if (particles[voxel.particles[2]].w != 0.0f) {
 			p2 = centroid - u0 + u1 - u2;
 		}
 
-        if (voxel.particles[3]->w != 0.0f) {
+        if (particles[voxel.particles[3]].w != 0.0f) {
             p3 = centroid + u0 + u1 - u2;
         }
 
-		if (voxel.particles[4]->w != 0.0f) {
+		if (particles[voxel.particles[4]].w != 0.0f) {
 			p4 = centroid - u0 - u1 + u2;
 		}
-        if (voxel.particles[5]->w != 0.0f) {
+        if (particles[voxel.particles[5]].w != 0.0f) {
             p5 = centroid + u0 - u1 + u2;
         }
 
-		if (voxel.particles[6]->w != 0.0f) {
+		if (particles[voxel.particles[6]].w != 0.0f) {
 			p6 = centroid - u0 + u1 + u2;
 		}
 
-        if (voxel.particles[7]->w != 0.0f) {
+        if (particles[voxel.particles[7]].w != 0.0f) {
             p7 = centroid + u0 + u1 + u2;
         }
     }
