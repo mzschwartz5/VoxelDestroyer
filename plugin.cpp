@@ -114,7 +114,11 @@ MStatus plugin::doIt(const MArgList& argList)
 	createParticlesFromSelectedMesh();
 	MGlobal::displayInfo("Particles created.");
 
-	voxelizer.voxelizeSelectedMesh();
+	voxelizer.voxelizeSelectedMesh(
+		10.0f,
+		1.0f, // voxel size
+		MPoint(0.0f, 0.0f, 0.0f) // grid center
+	);
 	MGlobal::displayInfo("Mesh voxelized.");
 
 	dx.dispatchComputeShaders();
