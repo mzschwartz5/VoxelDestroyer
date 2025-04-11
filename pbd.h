@@ -18,6 +18,13 @@ struct Voxel {
     float restVolume;
 };
 
+struct FaceConstraint {
+    int voxelOneIdx;
+    int voxelTwoIdx;
+    float tensionLimit;
+	float compressionLimit;
+};
+
 class PBD
 {
 public:
@@ -38,7 +45,11 @@ private:
     // Constraint solvers
     void solveGroundCollision();
 
-    void solveVGS(Voxel& voxel, float particle_radius, float relaxation, float beta, unsigned int iter_count);
+    void solveVGS(Voxel& voxel, unsigned int iter_count);
 
     glm::vec3 project(glm::vec3 x, glm::vec3 y);
+
+    float BETA{ 0.99f };
+    float PARTICLE_RADIUS{ 0.1f };
+    float RELAXATION{ 0.5f };
 };

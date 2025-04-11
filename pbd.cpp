@@ -59,7 +59,7 @@ void PBD::simulateSubstep() {
 
     solveGroundCollision();
 	for (auto& voxel : voxels) {
-		solveVGS(voxel, 0.1f, 0.5f, 1.0f, 3);
+		solveVGS(voxel, 3);
 	}
 
     for (auto& particle : particles)
@@ -87,7 +87,7 @@ glm::vec3 PBD::project(glm::vec3 x, glm::vec3 y) {
     return (glm::dot(y, x) / glm::dot(y, y)) * y;
 }
 
-void PBD::solveVGS(Voxel& voxel, float particle_radius, float relaxation, float beta, unsigned int iter_count) {
+void PBD::solveVGS(Voxel& voxel, unsigned int iter_count) {
     for (unsigned int i = 0; i < iter_count; i++) {
         glm::vec3& p0 = particles[voxel.particles[0]].position;
         glm::vec3& p1 = particles[voxel.particles[1]].position;
@@ -104,13 +104,13 @@ void PBD::solveVGS(Voxel& voxel, float particle_radius, float relaxation, float 
         glm::vec3 v1 = ((p2 - p0) + (p3 - p1) + (p6 - p4) + (p7 - p5)) / 4.0f;
         glm::vec3 v2 = ((p4 - p0) + (p5 - p1) + (p6 - p2) + (p7 - p3)) / 4.0f;
         
-        glm::vec3 u0 = v0 - relaxation * (project(v0, v1) + project(v0, v2));
-        glm::vec3 u1 = v1 - relaxation * (project(v1, v2) + project(v1, v0));
-        glm::vec3 u2 = v2 - relaxation * (project(v2, v0) + project(v2, v1));
+        glm::vec3 u0 = v0 - RELAXATION * (project(v0, v1) + project(v0, v2));
+        glm::vec3 u1 = v1 - RELAXATION * (project(v1, v2) + project(v1, v0));
+        glm::vec3 u2 = v2 - RELAXATION * (project(v2, v0) + project(v2, v1));
 
-        u0 = glm::normalize(u0) * ((1.f - beta) * particle_radius + (beta * glm::length(v0)  * 0.5f));
-		u1 = glm::normalize(u1) * ((1.f - beta) * particle_radius + (beta * glm::length(v1) * 0.5f));
-		u2 = glm::normalize(u2) * ((1.f - beta) * particle_radius + (beta * glm::length(v2) * 0.5f));
+        u0 = glm::normalize(u0) * ((1.f - BETA) * PARTICLE_RADIUS + (BETA * glm::length(v0)  * 0.5f));
+		u1 = glm::normalize(u1) * ((1.f - BETA) * PARTICLE_RADIUS + (BETA * glm::length(v1) * 0.5f));
+		u2 = glm::normalize(u2) * ((1.f - BETA) * PARTICLE_RADIUS + (BETA * glm::length(v2) * 0.5f));
 		
         float volume = glm::dot(glm::cross(u0, u1), u2);
         float mult = 0.5f * glm::pow((voxel.restVolume / volume), 1.0f / 3.0f);
