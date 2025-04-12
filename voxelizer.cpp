@@ -10,19 +10,31 @@ MObject Voxelizer::voxelizeSelectedMesh(
     MStatus& status
 ) {
 
+    int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
+    std::vector<bool> voxels;
+    voxels.resize(voxelsPerEdge * voxelsPerEdge * voxelsPerEdge, false);
     VoxelMesh voxelMesh;
 
     std::vector<Triangle> meshTris = getTrianglesOfSelectedMesh(status, voxelSize);
-
-    std::vector<bool> overlappedVoxels = getVoxelsOverlappingTriangles(
+    
+    getInteriorVoxels(
         meshTris,
         gridEdgeLength,
         voxelSize,
-        gridCenter
+        gridCenter,
+        voxels
     );
 
+    // getSurfaceVoxels(
+    //     meshTris,
+    //     gridEdgeLength,
+    //     voxelSize,
+    //     gridCenter,
+    //     voxels
+    // );
+
     createVoxels(
-        overlappedVoxels,
+        voxels,
         gridEdgeLength,
         voxelSize,
         gridCenter,
@@ -102,6 +114,7 @@ std::vector<Triangle> Voxelizer::getTrianglesOfSelectedMesh(MStatus& status, flo
 
 Triangle Voxelizer::processMayaTriangle(const MPointArray& vertices, float voxelSize) {
     Triangle triangle;
+    triangle.vertices = vertices;
     triangle.normal = ((vertices[1] - vertices[0]) ^ (vertices[2] - vertices[0])).normal();
 
     triangle.boundingBox.expand(vertices[0]);
@@ -151,18 +164,15 @@ Triangle Voxelizer::processMayaTriangle(const MPointArray& vertices, float voxel
     return triangle;
 }
 
-std::vector<bool> Voxelizer::getVoxelsOverlappingTriangles(
+void Voxelizer::getSurfaceVoxels(
     const std::vector<Triangle>& triangles,
     float gridEdgeLength,
     float voxelSize,
-    MPoint gridCenter
+    MPoint gridCenter,
+    std::vector<bool>& voxels
 ) {
     
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
-    
-    std::vector<bool> voxels;
-    voxels.resize(voxelsPerEdge * voxelsPerEdge * voxelsPerEdge, false);
-
     MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
 
     for (const Triangle& tri : triangles) {
@@ -190,8 +200,6 @@ std::vector<bool> Voxelizer::getVoxelsOverlappingTriangles(
             }
         }
     }
-
-    return voxels;
 }
 
 bool Voxelizer::doesTriangleOverlapVoxel(
@@ -210,6 +218,94 @@ bool Voxelizer::doesTriangleOverlapVoxel(
     }
 
     return true;
+}
+
+void Voxelizer::getInteriorVoxels(
+    const std::vector<Triangle>& triangles,
+    float gridEdgeLength,
+    float voxelSize,
+    MPoint gridCenter,
+    std::vector<bool>& voxels
+) {
+    
+    int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
+    MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
+
+    for (const Triangle& tri : triangles) {
+        // The algorithm for interior voxels only examines the YZ plane of the triangle
+        // Then we search over every voxel in each X column whose YZ center is overlapped by the triangle.
+        MPoint voxelMin = MPoint(
+            0,
+            std::max(0, static_cast<int>(std::ceil((tri.boundingBox.min().y - (voxelSize / 2.0) - gridMin.y) / voxelSize))),
+            std::max(0, static_cast<int>(std::ceil((tri.boundingBox.min().z - (voxelSize / 2.0) - gridMin.z) / voxelSize)))
+        );
+
+        MPoint voxelMax = MPoint(
+            0,
+            std::min(voxelsPerEdge - 1, static_cast<int>(std::ceil((tri.boundingBox.max().y - (voxelSize / 2.0) - gridMin.y) / voxelSize))),
+            std::min(voxelsPerEdge - 1, static_cast<int>(std::ceil((tri.boundingBox.max().z - (voxelSize / 2.0) - gridMin.z) / voxelSize)))
+        );
+
+        for (int y = static_cast<int>(voxelMin.y); y <= voxelMax.y; ++y) {
+            for (int z = static_cast<int>(voxelMin.z); z <= voxelMax.z; ++z) {
+                MVector voxelCenter = MVector(
+                    0,
+                    y * voxelSize + (voxelSize / 2.0) + gridMin.y,
+                    z * voxelSize + (voxelSize / 2.0) + gridMin.z
+                );
+                
+                if (!doesTriangleOverlapVoxelCenter(tri, voxelCenter)) continue;
+                double xIntercept = getTriangleVoxelCenterIntercept(tri, voxelCenter);
+                int xVoxelMin = std::max(0, static_cast<int>(std::ceil((xIntercept - (voxelSize / 2.0) - gridMin.x) / voxelSize)));
+
+                // Now iterate over all voxels in the column (in +x) and flip their occupancy state
+                for (int x = xVoxelMin; x <= voxelsPerEdge - 1; ++x) {
+                    int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
+                    voxels[index] = !voxels[index];
+                }
+            }
+        }
+    }
+}
+
+bool Voxelizer::doesTriangleOverlapVoxelCenter(
+    const Triangle& triangle,
+    const MVector& voxelCenterYZ  // YZ center of the voxel
+) {
+    for (int i = 0; i < 3; ++i) {
+        // Compute the edge function value
+        double edgeFunctionValue = (triangle.n_ei_yz[i] * voxelCenterYZ) + triangle.d_ei_yz[i];
+
+        // Apply the top-left fill rule
+        double f_yz_ei = 0.0;
+        if (triangle.n_ei_yz[i].y > 0 || 
+            (triangle.n_ei_yz[i].y == 0 && triangle.n_ei_yz[i].z < 0)) {
+            f_yz_ei = std::numeric_limits<double>::epsilon();
+        }
+
+        if (edgeFunctionValue + f_yz_ei <= 0) return false;
+    }
+    return true;
+}
+
+// Using the plane equation of the triangle to find the intercept
+// (Can alternatively think of this as a projection)
+double Voxelizer::getTriangleVoxelCenterIntercept(
+    const Triangle& triangle,
+    const MVector& voxelCenterYZ // YZ coords of the voxel column center
+) {
+    // Calculate D using one of the triangle's vertices
+    const MPoint& vertex = triangle.vertices[0];
+    double D = -(triangle.normal.x * vertex.x + triangle.normal.y * vertex.y + triangle.normal.z * vertex.z);
+
+    // Check for vertical plane (Nx == 0)
+    if (triangle.normal.x == 0) {
+        return triangle.boundingBox.min().x;
+    }
+
+    // Compute the X-coordinate using the plane equation
+    double X_intercept = -(triangle.normal.y * voxelCenterYZ.y + triangle.normal.z * voxelCenterYZ.z + D) / triangle.normal.x;
+    return X_intercept;
 }
 
 void Voxelizer::createVoxels(

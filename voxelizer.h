@@ -11,6 +11,7 @@
 // "Surface voxelization" for a mathematical explanation of the below fields / how they're used.
 // This isn't a triangle, per se, as much as it is the required values precomputed for later use in triangle/voxel intersection
 struct Triangle {
+    MPointArray vertices;
     MBoundingBox boundingBox; 
     MVector normal;
     // Derived values used in determining triangle plane / voxel overlap
@@ -63,17 +64,38 @@ private:
         const MPointArray& vertices, // vertex positions of the triangle
         float voxelSize              // edge length of a single voxel
     );
-      
-    std::vector<bool> getVoxelsOverlappingTriangles(
+    
+    // Does a conservative surface voxelization
+    void getSurfaceVoxels(
         const std::vector<Triangle>& triangles, // triangles to check against
         float gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
         float voxelSize,                        // edge length of a single voxel
-        MPoint gridCenter                       // center of the grid in world space
+        MPoint gridCenter,                      // center of the grid in world space
+        std::vector<bool>& voxels
+    );
+
+    void getInteriorVoxels(
+        const std::vector<Triangle>& triangles, // triangles to check against
+        float gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
+        float voxelSize,                        // edge length of a single voxel
+        MPoint gridCenter,                      // center of the grid in world space
+        std::vector<bool>& voxels               // output array of voxels (true = occupied, false = empty)
     );
 
     bool doesTriangleOverlapVoxel(
         const Triangle& triangle, // triangle to check against
         const MVector& voxelMin    // min corner of the voxel
+    );
+
+    bool doesTriangleOverlapVoxelCenter(
+        const Triangle& triangle,    // triangle to check against
+        const MVector& voxelCenterYZ // YZ coords of the voxel column center
+    );
+
+    // Returns the X coordinate where the voxel column center intersects the triangle plane
+    double getTriangleVoxelCenterIntercept(
+        const Triangle& triangle,    // triangle to check against
+        const MVector& voxelCenterYZ // YZ coords of the voxel column center
     );
 
     void createVoxels(
