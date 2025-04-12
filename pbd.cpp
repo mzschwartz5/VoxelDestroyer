@@ -35,6 +35,16 @@ PBD::PBD(const std::vector<glm::vec3>& positions) {
         voxel.restVolume = voxel.volume;
         voxels.push_back(voxel);
     }
+
+    PARTICLE_RADIUS = glm::length(particles[voxels[0].particles[1]].position - particles[voxels[0].particles[2]].position) * 0.25f;
+
+    //create face to face constraints
+    FaceConstraint faceConstraint;
+    faceConstraint.voxelOneIdx = 0;
+    faceConstraint.voxelTwoIdx = 1;
+    faceConstraint.compressionLimit = 1.f;
+    faceConstraint.tensionLimit = 1.f;
+    faceConstraints[0].push_back(faceConstraint);
 }
 
 const std::vector<Particle>& PBD::simulateStep()
@@ -61,6 +71,11 @@ void PBD::simulateSubstep() {
 	for (auto& voxel : voxels) {
 		solveVGS(voxel, 3);
 	}
+    for (int i = 0; i < faceConstraints.size(); i++) {
+        for (auto& constraint : faceConstraints[i]) {
+            solveFaceConstraint(constraint, i);
+        }
+    }
 
     for (auto& particle : particles)
     {
@@ -149,5 +164,150 @@ void PBD::solveVGS(Voxel& voxel, unsigned int iter_count) {
         if (particles[voxel.particles[7]].w != 0.0f) {
             p7 = centroid + u0 + u1 + u2;
         }
+    }
+}
+
+void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
+    //constraint has already beem broken
+	if (faceConstraint.voxelOneIdx == -1 || faceConstraint.voxelTwoIdx == -1) {
+		return;
+	}
+
+    Voxel& voxelOne = voxels[faceConstraint.voxelOneIdx];
+    Voxel& voxelTwo = voxels[faceConstraint.voxelTwoIdx];
+    //new position = (cube corner - cube center - particle_radius / 2)
+	glm::vec3& v1p0 = particles[voxelOne.particles[0]].position;
+	glm::vec3& v1p1 = particles[voxelOne.particles[1]].position;
+	glm::vec3& v1p2 = particles[voxelOne.particles[2]].position;
+	glm::vec3& v1p3 = particles[voxelOne.particles[3]].position;
+	glm::vec3& v1p4 = particles[voxelOne.particles[4]].position;
+	glm::vec3& v1p5 = particles[voxelOne.particles[5]].position;
+	glm::vec3& v1p6 = particles[voxelOne.particles[6]].position;
+	glm::vec3& v1p7 = particles[voxelOne.particles[7]].position;
+	glm::vec3& v2p0 = particles[voxelTwo.particles[0]].position;
+	glm::vec3& v2p1 = particles[voxelTwo.particles[1]].position;
+	glm::vec3& v2p2 = particles[voxelTwo.particles[2]].position;
+	glm::vec3& v2p3 = particles[voxelTwo.particles[3]].position;
+	glm::vec3& v2p4 = particles[voxelTwo.particles[4]].position;
+	glm::vec3& v2p5 = particles[voxelTwo.particles[5]].position;
+	glm::vec3& v2p6 = particles[voxelTwo.particles[6]].position;
+	glm::vec3& v2p7 = particles[voxelTwo.particles[7]].position;
+
+	glm::vec3 cv1 = (v1p0 + v1p1 + v1p2 + v1p3 + v1p4 + v1p5 + v1p6 + v1p7) / 8.0f;
+	glm::vec3 cv2 = (v2p0 + v2p1 + v2p2 + v2p3 + v2p4 + v2p5 + v2p6 + v2p7) / 8.0f;
+
+	glm::vec3 cv1p0 = v1p0 - cv1 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv1p1 = v1p1 - cv1 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv1p2 = v1p2 - cv1 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv1p3 = v1p3 - cv1 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv1p4 = v1p4 - cv1 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv1p5 = v1p5 - cv1 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv1p6 = v1p6 - cv1 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv1p7 = v1p7 - cv1 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+
+	glm::vec3 cv2p0 = v2p0 - cv2 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv2p1 = v2p1 - cv2 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv2p2 = v2p2 - cv2 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv2p3 = v2p3 - cv2 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv2p4 = v2p4 - cv2 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv2p5 = v2p5 - cv2 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv2p6 = v2p6 - cv2 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+	glm::vec3 cv2p7 = v2p7 - cv2 - glm::vec3(PARTICLE_RADIUS / 2.0f);
+
+    std::array<std::pair<std::pair<int, int>, float>, 4 > edges; //id, id, length
+
+    //length of 4 edges crossing constraint - voxel 1 is guaranteed to be to the left, below, or in front of voxel 2
+    float l1, l2, l3, l4;
+    switch (axis) {
+    case 0:
+        //l1 = 1 to 0
+		l1 = glm::length(cv1p1 - cv2p0);
+        edges[0] = { {1, 0}, l1 };
+
+        //l2 = 5 to 4
+		l2 = glm::length(cv1p5 - cv2p4);
+		edges[1] = { {5, 4}, l2 };
+
+        //l3 = 3 to 2
+		l3 = glm::length(cv1p3 - cv2p2);
+		edges[2] = { {3, 2}, l3 };
+
+		//l4 = 7 to 6
+		l4 = glm::length(cv1p7 - cv2p6);
+		edges[3] = { {7, 6}, l4 };
+
+        break;
+    case 1:
+        //l1 = 6 to 4
+        l1 = glm::length(cv1p6 - cv2p4);
+        edges[0] = { {6, 4}, l1 };
+
+        //l2 = 7 to 5
+		l2 = glm::length(cv1p7 - cv2p5);
+		edges[1] = { {7, 5}, l2 };
+
+        //l3 = 2 to 0
+        l3 = glm::length(cv1p2 - cv2p0);
+		edges[2] = { {2, 0}, l3 };
+
+		//l4 = 3 to 1
+        l4 = glm::length(cv1p3 - cv2p1);
+		edges[3] = { {3, 1}, l4 };
+
+        break;
+    case 2:
+        //l1 = 0 to 4
+        l1 = glm::length(cv1p0 - cv2p4);
+		edges[0] = { {0, 4}, l1 };
+
+		//l2 = 1 to 5
+        l2 = glm::length(cv1p1 - cv2p5);
+		edges[1] = { {1, 5}, l2 };
+
+		//l3 = 2 to 6
+		l3 = glm::length(cv1p2 - cv2p6);
+		edges[2] = { {2, 6}, l3 };
+
+		//l4 = 3 to 7
+		l4 = glm::length(cv1p3 - cv2p7);
+		edges[3] = { {3, 7}, l4 };
+
+        break;
+    }
+
+	float min = std::min(std::min(l1, l2), std::min(l3, l4));
+	float max = std::max(std::max(l1, l2), std::max(l3, l4));
+
+    //break the constraint
+	if (max > faceConstraint.tensionLimit || min < faceConstraint.compressionLimit) {
+        faceConstraint.voxelOneIdx = -1;
+        faceConstraint.voxelTwoIdx = -1;
+        return;
+	}
+
+    //check if constraint is inside out(volume < 0) - if yes, invert shortest edge
+
+    //enforce distance
+    float compliance = 500.0f;
+    float alpha = compliance / (timeStep * timeStep);
+
+    for (const auto& edge : edges) {
+        Particle& p1 = particles[voxelOne.particles[edge.first.first]];
+        Particle& p2 = particles[voxelTwo.particles[edge.first.second]];
+
+        float w_tot = p1.w + p2.w;
+        if (w_tot == 0.0f) continue;
+
+		glm::vec3 delta = p2.position - p1.position; //can i still do this with the "centered" particles?
+        float deltalen = edge.second;
+        if (deltalen == 0.0f) continue;
+
+        float C = deltalen - PARTICLE_RADIUS * 4.0f;
+        glm::vec3 C1 = delta / deltalen;
+        glm::vec3 C2 = -C1;
+        float lambda = -C / (w_tot + alpha);
+
+        p1.position += lambda * p1.w * C1;
+        p2.position += lambda * p2.w * C2;
     }
 }

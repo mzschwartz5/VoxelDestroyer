@@ -39,6 +39,7 @@ public:
 private:
     std::vector<Particle> particles;
 	std::vector<Voxel> voxels;
+    std::array<std::vector<FaceConstraint>, 3> faceConstraints; //0 = x, 1 = y, 2 = z
     int substeps = 10;
     float timeStep;
 
@@ -46,6 +47,8 @@ private:
     void solveGroundCollision();
 
     void solveVGS(Voxel& voxel, unsigned int iter_count);
+
+    void solveFaceConstraint(FaceConstraint& faceConstraint, int axis);
 
     glm::vec3 project(glm::vec3 x, glm::vec3 y);
 
