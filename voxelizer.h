@@ -24,6 +24,7 @@ struct Triangle {
     double d_ei_xy[3];   // Edge distances for the xy plane
     double d_ei_xz[3];   // Edge distances for the xz plane
     double d_ei_yz[3];   // Edge distances for the yz plane
+    double d_ei_yz_solid[3]; // Edge distances for the yz plane (for solid voxelization)
 };
 
 struct VoxelMesh {

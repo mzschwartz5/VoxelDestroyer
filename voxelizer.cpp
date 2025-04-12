@@ -25,13 +25,13 @@ MObject Voxelizer::voxelizeSelectedMesh(
         voxels
     );
 
-    // getSurfaceVoxels(
-    //     meshTris,
-    //     gridEdgeLength,
-    //     voxelSize,
-    //     gridCenter,
-    //     voxels
-    // );
+    getSurfaceVoxels(
+        meshTris,
+        gridEdgeLength,
+        voxelSize,
+        gridCenter,
+        voxels
+    );
 
     createVoxels(
         voxels,
@@ -156,7 +156,8 @@ Triangle Voxelizer::processMayaTriangle(const MPointArray& vertices, float voxel
         triangle.n_ei_yz[i] = (MVector(0.0, -edge.z, edge.y) * (triangle.normal.x < 0 ? -1 : 1)).normal();
 
         MVector vi_yz(0.0, vertices[i].y, vertices[i].z); // Project vi onto YZ plane
-        triangle.d_ei_yz[i] = -triangle.n_ei_yz[i] * vi_yz
+        triangle.d_ei_yz_solid[i] = -triangle.n_ei_yz[i] * vi_yz;
+        triangle.d_ei_yz[i] = triangle.d_ei_yz_solid[i]
             + std::max(0.0, voxelSize * triangle.n_ei_yz[i].y)
             + std::max(0.0, voxelSize * triangle.n_ei_yz[i].z);
     }
@@ -242,8 +243,8 @@ void Voxelizer::getInteriorVoxels(
 
         MPoint voxelMax = MPoint(
             0,
-            std::min(voxelsPerEdge - 1, static_cast<int>(std::ceil((tri.boundingBox.max().y - (voxelSize / 2.0) - gridMin.y) / voxelSize))),
-            std::min(voxelsPerEdge - 1, static_cast<int>(std::ceil((tri.boundingBox.max().z - (voxelSize / 2.0) - gridMin.z) / voxelSize)))
+            std::min(voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().y - (voxelSize / 2.0) - gridMin.y) / voxelSize))),
+            std::min(voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().z - (voxelSize / 2.0) - gridMin.z) / voxelSize)))
         );
 
         for (int y = static_cast<int>(voxelMin.y); y <= voxelMax.y; ++y) {
@@ -259,7 +260,7 @@ void Voxelizer::getInteriorVoxels(
                 int xVoxelMin = std::max(0, static_cast<int>(std::ceil((xIntercept - (voxelSize / 2.0) - gridMin.x) / voxelSize)));
 
                 // Now iterate over all voxels in the column (in +x) and flip their occupancy state
-                for (int x = xVoxelMin; x <= voxelsPerEdge - 1; ++x) {
+                for (int x = xVoxelMin; x < voxelsPerEdge; ++x) {
                     int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
                     voxels[index] = !voxels[index];
                 }
@@ -274,7 +275,7 @@ bool Voxelizer::doesTriangleOverlapVoxelCenter(
 ) {
     for (int i = 0; i < 3; ++i) {
         // Compute the edge function value
-        double edgeFunctionValue = (triangle.n_ei_yz[i] * voxelCenterYZ) + triangle.d_ei_yz[i];
+        double edgeFunctionValue = (triangle.n_ei_yz[i] * voxelCenterYZ) + triangle.d_ei_yz_solid[i];
 
         // Apply the top-left fill rule
         double f_yz_ei = 0.0;
