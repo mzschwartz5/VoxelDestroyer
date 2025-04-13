@@ -13,7 +13,7 @@ struct Particle
 };
 
 struct Voxel {
-	std::array<int, 8> particles;
+	std::array<int, 8> particles; //indices into the global array of particles
     float volume;
     float restVolume;
 };

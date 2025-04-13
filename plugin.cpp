@@ -13,14 +13,14 @@
 #include <maya/MItSelectionList.h>
 #include "pbd.h"
 #include <vector>
-#include "directx.h"
+//#include "directx.h"
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
 
 PBD pbdSimulator;
 MCallbackId callbackId;
-DirectX dx;
+//DirectX dx;
 std::vector<std::pair<MDagPath, std::pair<size_t, size_t>>> meshParticleRanges; // Mesh and its particle range
 
 // Maya Plugin creator function
@@ -136,8 +136,8 @@ MStatus plugin::doIt(const MArgList& argList)
 
 	MGlobal::displayInfo("Particles created for all selected meshes.");
 
-	dx.dispatchComputeShaders();
-	MGlobal::displayInfo("Compute shaders dispatched.");
+	//dx.dispatchComputeShaders();
+	//MGlobal::displayInfo("Compute shaders dispatched.");
 
 	return status;
 }
@@ -161,7 +161,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 
 	// Initialize DirectX
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
-	dx = DirectX(MhInstPlugin);
+	//dx = DirectX(MhInstPlugin);
 	
 	return status;
 }
@@ -178,7 +178,7 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	// Deregister the callback
 	MEventMessage::removeCallback(callbackId);
 
-	dx.tearDown();
+	//dx.tearDown();
 
 	return status;
 }
