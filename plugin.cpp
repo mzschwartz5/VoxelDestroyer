@@ -110,7 +110,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	// createParticlesFromSelectedMesh();
 	MGlobal::displayInfo("Particles created.");
 
-	MObject mesh = voxelizer.voxelizeSelectedMesh(
+	voxelizer.voxelizeSelectedMesh(
 		2.5f,
 		0.1f, // voxel size
 		MPoint(0.0f, 0.0f, 0.0f), // grid center
@@ -162,7 +162,6 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	MEventMessage::removeCallback(callbackId);
 
 	// dx.tearDown();
-	voxelizer.tearDown();
 
 	return status;
 }

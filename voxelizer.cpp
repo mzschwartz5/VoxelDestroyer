@@ -1,7 +1,7 @@
 #include "voxelizer.h"
 #include <maya/MSelectionList.h>
 #include <maya/MDagPath.h>
-#include <maya/MItMeshPolygon.h>
+#include <maya/MFnTransform.h>
 
 MObject Voxelizer::voxelizeSelectedMesh(
     float gridEdgeLength,
@@ -11,12 +11,17 @@ MObject Voxelizer::voxelizeSelectedMesh(
 ) {
 
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
-    std::vector<bool> voxels;
-    voxels.resize(voxelsPerEdge * voxelsPerEdge * voxelsPerEdge, false);
-    VoxelMesh voxelMesh;
-
-    std::vector<Triangle> meshTris = getTrianglesOfSelectedMesh(status, voxelSize);
+    std::vector<MeshVoxel> voxels;
+    voxels.resize(voxelsPerEdge * voxelsPerEdge * voxelsPerEdge);
     
+    MDagPath selectedMeshPath = getSelectedMesh(status);
+    MFnMesh selectedMesh(selectedMeshPath, &status);
+    // This is what Maya does when you select a mesh and click Modify > Freeze Transformations
+    // It's neceessary for the boolean operations to work correctly.
+    MGlobal::executeCommand(MString("makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 -pn 1"), false, true);
+
+    std::vector<Triangle> meshTris = getTrianglesOfMesh(selectedMesh, voxelSize, status);
+
     getInteriorVoxels(
         meshTris,
         gridEdgeLength,
@@ -33,26 +38,19 @@ MObject Voxelizer::voxelizeSelectedMesh(
         voxels
     );
 
-    createVoxels(
+    MObject voxelizedMesh = createVoxels(
         voxels,
         gridEdgeLength,
         voxelSize,
         gridCenter,
-        voxelMesh
+        selectedMesh
     );
 
-    MObject mesh = voxelMesh.create();
-    if (mesh.isNull()) {
-        MGlobal::displayError("Failed to create voxel mesh.");
-        status = MS::kFailure;
-        return MObject::kNullObj;
-    }
-
     status = MS::kSuccess;
-    return mesh;
+    return voxelizedMesh;
 }
 
-std::vector<Triangle> Voxelizer::getTrianglesOfSelectedMesh(MStatus& status, float voxelSize) {
+MDagPath Voxelizer::getSelectedMesh(MStatus& status) {
     // Get the current selection
     MSelectionList selection;
     MGlobal::getActiveSelectionList(selection);
@@ -61,7 +59,7 @@ std::vector<Triangle> Voxelizer::getTrianglesOfSelectedMesh(MStatus& status, flo
     if (selection.isEmpty()) {
         MGlobal::displayError("No mesh selected.");
         status = MS::kFailure;
-        return {};
+        return MDagPath();
     }
 
     // Get the first selected item and ensure it's a mesh
@@ -70,17 +68,13 @@ std::vector<Triangle> Voxelizer::getTrianglesOfSelectedMesh(MStatus& status, flo
     if (status != MS::kSuccess || !activeMeshDagPath.hasFn(MFn::kMesh)) {
         MGlobal::displayError("The selected item is not a mesh.");
         status = MS::kFailure;
-        return {};
+        return MDagPath();
     }
 
-    // Create an MFnMesh function set to operate on the selected mesh
-    MFnMesh meshFn(activeMeshDagPath, &status);
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("Failed to create MFnMesh.");
-        return {};
-    }
+    return activeMeshDagPath;
+}
 
-    // Use MFnMesh::getTriangles to retrieve triangle data
+std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxelSize, MStatus& status) {
     MIntArray triangleCounts;
     MIntArray triangleVertices;
     status = meshFn.getTriangles(triangleCounts, triangleVertices);
@@ -170,7 +164,7 @@ void Voxelizer::getSurfaceVoxels(
     float gridEdgeLength,
     float voxelSize,
     MPoint gridCenter,
-    std::vector<bool>& voxels
+    std::vector<MeshVoxel>& voxels
 ) {
     
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
@@ -196,7 +190,8 @@ void Voxelizer::getSurfaceVoxels(
                     
                     MVector voxelMinCorner(MVector(x, y, z) * voxelSize + gridMin);
                     if (!doesTriangleOverlapVoxel(tri, voxelMinCorner)) continue;
-                    voxels[index] = true;
+                    voxels[index].occupied = true;
+                    voxels[index].isSurface = true;
                 }
             }
         }
@@ -226,7 +221,7 @@ void Voxelizer::getInteriorVoxels(
     float gridEdgeLength,
     float voxelSize,
     MPoint gridCenter,
-    std::vector<bool>& voxels
+    std::vector<MeshVoxel>& voxels
 ) {
     
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
@@ -262,7 +257,7 @@ void Voxelizer::getInteriorVoxels(
                 // Now iterate over all voxels in the column (in +x) and flip their occupancy state
                 for (int x = xVoxelMin; x < voxelsPerEdge; ++x) {
                     int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
-                    voxels[index] = !voxels[index];
+                    voxels[index].occupied = !voxels[index].occupied;
                 }
             }
         }
@@ -309,21 +304,23 @@ double Voxelizer::getTriangleVoxelCenterIntercept(
     return X_intercept;
 }
 
-void Voxelizer::createVoxels(
-    const std::vector<bool>& overlappedVoxels,
+MObject Voxelizer::createVoxels(
+    const std::vector<MeshVoxel>& overlappedVoxels,
     float gridEdgeLength, 
     float voxelSize,       
     MPoint gridCenter,      
-    VoxelMesh& voxelMesh // output mesh
+    MFnMesh& originalMesh
 ) {
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
     MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
 
+    MString combinedMeshName = originalMesh.name() + "_voxelized";
+    MString meshNamesConcatenated;
     for (int x = 0; x < voxelsPerEdge; ++x) {
         for (int y = 0; y < voxelsPerEdge; ++y) {
             for (int z = 0; z < voxelsPerEdge; ++z) {
                 int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
-                if (!overlappedVoxels[index]) continue;
+                if (!overlappedVoxels[index].occupied) continue;
 
                 MPoint voxelMin = MPoint(
                     x * voxelSize + gridMin.x,
@@ -331,45 +328,93 @@ void Voxelizer::createVoxels(
                     z * voxelSize + gridMin.z
                 );
 
-                addVoxelToMesh(voxelMin, voxelSize, voxelMesh);
+                MObject voxel = addVoxelToMesh(voxelMin, voxelSize, overlappedVoxels[index].isSurface, originalMesh);
+                meshNamesConcatenated += " " + MFnMesh(voxel).name();
             }
         }
     }
+
+    // Use MEL to combine all the voxels into one mesh
+    MGlobal::executeCommand(MString("polyUnite -ch 0 -mergeUVSets 1 -name ") + combinedMeshName + " " + meshNamesConcatenated, false, true);
+    MSelectionList selectionList;
+    selectionList.add(combinedMeshName);
+    MObject combinedMesh;
+    selectionList.getDependNode(0, combinedMesh);
+
+    return combinedMesh;
 }
 
 int faceIndices[6][4] = {
-    {0, 2, 3, 1}, // Bottom
-    {4, 5, 7, 6}, // Top
-    {0, 1, 5, 4}, // Front
-    {1, 3, 7, 5}, // Right
-    {3, 2, 6, 7}, // Back
-    {2, 0, 4, 6}  // Left
+    {0, 1, 3, 2}, // Bottom
+    {4, 6, 7, 5}, // Top
+    {0, 4, 5, 1}, // Front
+    {1, 5, 7, 3}, // Right
+    {3, 7, 6, 2}, // Back
+    {2, 6, 4, 0}  // Left
 };
 
-void Voxelizer::addVoxelToMesh(
+MObject Voxelizer::addVoxelToMesh(
     const MPoint& voxelMin,
     float voxelSize,
-    VoxelMesh& voxelMesh
+    bool isSurface,
+    MFnMesh& originalMesh
 ) {
-    MPoint voxelMax = voxelMin + MVector(voxelSize, voxelSize, voxelSize);
-    int baseIndex = voxelMesh.vertices.length();
+    MPointArray cubeVertices;
+    MPoint voxelMax = MPoint(
+        voxelMin.x + voxelSize,
+        voxelMin.y + voxelSize,
+        voxelMin.z + voxelSize
+    );
 
-    voxelMesh.vertices.append(voxelMin);
-    voxelMesh.vertices.append(MPoint(voxelMin.x, voxelMin.y, voxelMax.z));
-    voxelMesh.vertices.append(MPoint(voxelMin.x, voxelMax.y, voxelMin.z));
-    voxelMesh.vertices.append(MPoint(voxelMin.x, voxelMax.y, voxelMax.z));
-    voxelMesh.vertices.append(MPoint(voxelMax.x, voxelMin.y, voxelMin.z));
-    voxelMesh.vertices.append(MPoint(voxelMax.x, voxelMin.y, voxelMax.z));
-    voxelMesh.vertices.append(MPoint(voxelMax.x, voxelMax.y, voxelMin.z));
-    voxelMesh.vertices.append(voxelMax);
+    MPoint voxelCenter = MPoint(
+        voxelMin.x + 0.5 * voxelSize,
+        voxelMin.y + 0.5 * voxelSize,
+        voxelMin.z + 0.5 * voxelSize
+    );
+    
+    float halfVoxelSize = voxelSize * 0.5f;
 
+    cubeVertices.append(voxelMin);
+    cubeVertices.append(MPoint(voxelMin.x, voxelMin.y, voxelMax.z));
+    cubeVertices.append(MPoint(voxelMin.x, voxelMax.y, voxelMin.z));
+    cubeVertices.append(MPoint(voxelMin.x, voxelMax.y, voxelMax.z));
+    cubeVertices.append(MPoint(voxelMax.x, voxelMin.y, voxelMin.z));
+    cubeVertices.append(MPoint(voxelMax.x, voxelMin.y, voxelMax.z));
+    cubeVertices.append(MPoint(voxelMax.x, voxelMax.y, voxelMin.z));
+    cubeVertices.append(voxelMax);
+
+    MIntArray faceCounts;
+    MIntArray faceConnects;
     for (int i = 0; i < 6; ++i) {
-        voxelMesh.faceCounts.append(4);
+        faceCounts.append(4);
         for (int j = 0; j < 4; ++j) {
-            voxelMesh.faceConnects.append(baseIndex + faceIndices[i][j]);
+            faceConnects.append(faceIndices[i][j]);
         }
     }
-}
 
-void Voxelizer::tearDown() {
+    MFnTransform cubeTransformFn;
+    MObject cubeTransform = cubeTransformFn.create();
+    cubeTransformFn.setRotatePivot(voxelCenter, MSpace::kTransform, true);
+
+    // Create the cube mesh under the transform
+    MFnMesh cubeMeshFn;
+    MObject cube = cubeMeshFn.create(
+        cubeVertices.length(),
+        faceCounts.length(),
+        cubeVertices,
+        faceCounts,
+        faceConnects,
+        cubeTransform
+    );
+
+    if (!isSurface) return cube; // only need to do the boolean intersection of surface voxels
+
+    MObjectArray objsToIntersect;
+    objsToIntersect.append(cubeMeshFn.object());
+    objsToIntersect.append(originalMesh.object());
+    // TODO: make the last param (useLegacy) an option in the user interface for this tool.
+    // It's MUCH faster than the new boolean operation but can produce worse results for complex inputs.
+    cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect, true);
+
+    return cube;
 }

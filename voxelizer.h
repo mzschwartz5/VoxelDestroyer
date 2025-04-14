@@ -27,21 +27,12 @@ struct Triangle {
     double d_ei_yz_solid[3]; // Edge distances for the yz plane (for solid voxelization)
 };
 
-struct VoxelMesh {
-    MPointArray vertices;
-    MIntArray faceCounts;
-    MIntArray faceConnects;
-
-    MObject create() {
-        MStatus status;
-        MFnMesh meshFn;
-        MObject mesh = meshFn.create(vertices.length(), faceCounts.length(), vertices, faceCounts, faceConnects, MObject::kNullObj, &status);
-        if (status != MS::kSuccess) {
-            MGlobal::displayError("Failed to create voxel mesh.");
-            return MObject::kNullObj;
-        }
-        return mesh;
-    }
+// Had to name it this to avoid collision with PBD's Voxel struct
+// But in the future let's rename this Voxel and delete that struct / merge their fields together.
+struct MeshVoxel {
+    bool occupied = false; // contains some part (surface or interior) of the underlying mesh
+    bool isSurface = false;
+    // Later: add the mesh vertices contained by this voxel (or the voxel vertices if this is interior)
 };
 
 class Voxelizer {
@@ -50,7 +41,6 @@ public:
     Voxelizer() = default;
     ~Voxelizer() = default;
 
-    void tearDown();
     MObject voxelizeSelectedMesh(
         float gridEdgeLength,
         float voxelSize,
@@ -60,7 +50,10 @@ public:
 
 private:
 
-    std::vector<Triangle> getTrianglesOfSelectedMesh(MStatus& status, float voxelSize);
+    MDagPath getSelectedMesh(MStatus& status);
+
+    std::vector<Triangle> getTrianglesOfMesh(MFnMesh& mesh, float voxelSize, MStatus& status);
+
     Triangle processMayaTriangle(
         const MPointArray& vertices, // vertex positions of the triangle
         float voxelSize              // edge length of a single voxel
@@ -72,7 +65,7 @@ private:
         float gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
         float voxelSize,                        // edge length of a single voxel
         MPoint gridCenter,                      // center of the grid in world space
-        std::vector<bool>& voxels
+        std::vector<MeshVoxel>& voxels
     );
 
     void getInteriorVoxels(
@@ -80,7 +73,7 @@ private:
         float gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
         float voxelSize,                        // edge length of a single voxel
         MPoint gridCenter,                      // center of the grid in world space
-        std::vector<bool>& voxels               // output array of voxels (true = occupied, false = empty)
+        std::vector<MeshVoxel>& voxels               // output array of voxels (true = occupied, false = empty)
     );
 
     bool doesTriangleOverlapVoxel(
@@ -99,17 +92,18 @@ private:
         const MVector& voxelCenterYZ // YZ coords of the voxel column center
     );
 
-    void createVoxels(
-        const std::vector<bool>& overlappedVoxels,
+    MObject createVoxels(
+        const std::vector<MeshVoxel>& occupiedVoxels,
         float gridEdgeLength, 
         float voxelSize,       
         MPoint gridCenter,      
-        VoxelMesh& voxelMesh // output mesh
+        MFnMesh& originalSurface
     );
 
-    void addVoxelToMesh(
+    MObject addVoxelToMesh(
         const MPoint& voxelMin, // min corner of the voxel
         float voxelSize,       // edge length of a single voxel
-        VoxelMesh& voxelMesh   // output mesh
+        bool isInterior,
+        MFnMesh& originalSurface
     );
 };
