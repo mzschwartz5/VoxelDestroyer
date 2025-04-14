@@ -1,23 +1,21 @@
 #include "plugin.h"
 #include <maya/MFnPlugin.h>
 #include <maya/MGlobal.h>
-#include <maya/MArgDatabase.h>
 #include <maya/MEventMessage.h>
 #include <maya/MSelectionList.h>
 #include <maya/MFnMesh.h>
 #include <maya/MPointArray.h>
-#include <maya/MItMeshPolygon.h>
-#include <maya/MItMeshEdge.h>
 #include <maya/MDagPath.h>
-#include <maya/MFnDagNode.h>
 #include <maya/MItSelectionList.h>
 #include "pbd.h"
 #include <vector>
+#include "voxelizer.h"
 #include "directx.h"
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
 
+Voxelizer voxelizer;
 PBD pbdSimulator;
 MCallbackId callbackId;
 MDagPath selectedMeshDagPath;
@@ -109,10 +107,19 @@ MStatus plugin::doIt(const MArgList& argList)
 {
 	MStatus status;
 
-	createParticlesFromSelectedMesh();
+	// createParticlesFromSelectedMesh();
 	MGlobal::displayInfo("Particles created.");
 
-	dx.dispatchComputeShaders();
+	voxelizer.voxelizeSelectedMesh(
+		2.5f,
+		0.1f, // voxel size
+		MPoint(0.0f, 0.0f, 0.0f), // grid center
+		status
+	);
+	
+	MGlobal::displayInfo("Mesh voxelized.");
+
+	// dx.dispatchComputeShaders();
 	MGlobal::displayInfo("Compute shaders dispatched.");
 
 	return status;
@@ -136,7 +143,8 @@ EXPORT MStatus initializePlugin(MObject obj)
 
 	// Initialize DirectX
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
-	dx = DirectX(MhInstPlugin);
+	// dx = DirectX(MhInstPlugin);
+	voxelizer = Voxelizer();
 	
 	return status;
 }
@@ -153,7 +161,7 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	// Deregister the callback
 	MEventMessage::removeCallback(callbackId);
 
-	dx.tearDown();
+	// dx.tearDown();
 
 	return status;
 }
