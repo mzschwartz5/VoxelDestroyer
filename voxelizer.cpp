@@ -305,7 +305,7 @@ double Voxelizer::getTriangleVoxelCenterIntercept(
 }
 
 MObject Voxelizer::createVoxels(
-    const std::vector<MeshVoxel>& overlappedVoxels,
+    std::vector<MeshVoxel>& overlappedVoxels,
     float gridEdgeLength, 
     float voxelSize,       
     MPoint gridCenter,      
@@ -328,7 +328,7 @@ MObject Voxelizer::createVoxels(
                     z * voxelSize + gridMin.z
                 );
 
-                MObject voxel = addVoxelToMesh(voxelMin, voxelSize, overlappedVoxels[index].isSurface, originalMesh);
+                MObject voxel = addVoxelToMesh(voxelMin, voxelSize, overlappedVoxels[index], originalMesh);
                 meshNamesConcatenated += " " + MFnMesh(voxel).name();
             }
         }
@@ -356,7 +356,7 @@ int faceIndices[6][4] = {
 MObject Voxelizer::addVoxelToMesh(
     const MPoint& voxelMin,
     float voxelSize,
-    bool isSurface,
+    MeshVoxel& meshVoxel,
     MFnMesh& originalMesh
 ) {
     MPointArray cubeVertices;
@@ -407,7 +407,12 @@ MObject Voxelizer::addVoxelToMesh(
         cubeTransform
     );
 
-    if (!isSurface) return cube; // only need to do the boolean intersection of surface voxels
+    // only need to do the boolean intersection of surface voxels
+    if (!meshVoxel.isSurface) {
+        // Explore later: a way to store a reference to the vertices or to a MFnMesh maybe, so that we can easily change the vertex positions.
+        meshVoxel.vertices = cubeVertices;
+        return cube; 
+    }
 
     MObjectArray objsToIntersect;
     objsToIntersect.append(cubeMeshFn.object());
@@ -415,6 +420,10 @@ MObject Voxelizer::addVoxelToMesh(
     // TODO: make the last param (useLegacy) an option in the user interface for this tool.
     // It's MUCH faster than the new boolean operation but can produce worse results for complex inputs.
     cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect, true);
+
+    // Store vertices in the MeshVoxel object
+    // Same as above, we can explore a way to store a reference to the vertices or to a MFnMesh so that we can easily change the vertex positions.
+    cubeMeshFn.getPoints(meshVoxel.vertices, MSpace::kWorld);
 
     return cube;
 }

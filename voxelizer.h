@@ -32,7 +32,7 @@ struct Triangle {
 struct MeshVoxel {
     bool occupied = false; // contains some part (surface or interior) of the underlying mesh
     bool isSurface = false;
-    // Later: add the mesh vertices contained by this voxel (or the voxel vertices if this is interior)
+    MPointArray vertices; // vertices owned by this voxel (to be transformed during the PBD (VGS) simulation)
 };
 
 class Voxelizer {
@@ -93,7 +93,7 @@ private:
     );
 
     MObject createVoxels(
-        const std::vector<MeshVoxel>& occupiedVoxels,
+        std::vector<MeshVoxel>& occupiedVoxels,
         float gridEdgeLength, 
         float voxelSize,       
         MPoint gridCenter,      
@@ -102,8 +102,8 @@ private:
 
     MObject addVoxelToMesh(
         const MPoint& voxelMin, // min corner of the voxel
-        float voxelSize,       // edge length of a single voxel
-        bool isInterior,
+        float voxelSize,        // edge length of a single voxel
+        MeshVoxel& meshVoxel,
         MFnMesh& originalSurface
     );
 };
