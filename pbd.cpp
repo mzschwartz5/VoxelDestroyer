@@ -43,7 +43,7 @@ PBD::PBD(const std::vector<glm::vec3>& positions) {
     FaceConstraint faceConstraint;
     faceConstraint.voxelOneIdx = 0;
     faceConstraint.voxelTwoIdx = 1;
-    faceConstraint.compressionLimit = PARTICLE_RADIUS * 0.1f;
+    faceConstraint.compressionLimit = -FLT_MAX;
     faceConstraint.tensionLimit = FLT_MAX;
     faceConstraints[0].push_back(faceConstraint);
 }
@@ -177,154 +177,254 @@ void PBD::solveVGS(Voxel& voxel, unsigned int iter_count) {
 }
 
 void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
-    //constraint has already beem broken
-	if (faceConstraint.voxelOneIdx == -1 || faceConstraint.voxelTwoIdx == -1) {
-		return;
-	}
+    //check if constraint has already been broken
+    if (faceConstraint.voxelOneIdx == -1 || faceConstraint.voxelTwoIdx == -1) {
+        return;
+    }
 
     Voxel& voxelOne = voxels[faceConstraint.voxelOneIdx];
     Voxel& voxelTwo = voxels[faceConstraint.voxelTwoIdx];
 
-	glm::vec3& v1p0 = particles[voxelOne.particles[0]].position;
-	glm::vec3& v1p1 = particles[voxelOne.particles[1]].position;
-	glm::vec3& v1p2 = particles[voxelOne.particles[2]].position;
-	glm::vec3& v1p3 = particles[voxelOne.particles[3]].position;
-	glm::vec3& v1p4 = particles[voxelOne.particles[4]].position;
-	glm::vec3& v1p5 = particles[voxelOne.particles[5]].position;
-	glm::vec3& v1p6 = particles[voxelOne.particles[6]].position;
-	glm::vec3& v1p7 = particles[voxelOne.particles[7]].position;
+    //arrays to hold face particles
+    std::array<glm::vec3*, 4> faceOne;
+    std::array<glm::vec3*, 4> faceTwo;
+    std::array<float, 4> faceOneW;
+    std::array<float, 4> faceTwoW;
+    std::array<int, 4> faceOneIndices;
+    std::array<int, 4> faceTwoIndices;
 
-	glm::vec3& v2p0 = particles[voxelTwo.particles[0]].position;
-	glm::vec3& v2p1 = particles[voxelTwo.particles[1]].position;
-	glm::vec3& v2p2 = particles[voxelTwo.particles[2]].position;
-	glm::vec3& v2p3 = particles[voxelTwo.particles[3]].position;
-	glm::vec3& v2p4 = particles[voxelTwo.particles[4]].position;
-	glm::vec3& v2p5 = particles[voxelTwo.particles[5]].position;
-	glm::vec3& v2p6 = particles[voxelTwo.particles[6]].position;
-	glm::vec3& v2p7 = particles[voxelTwo.particles[7]].position;
+    //calculate centers
+    glm::vec3 v1Center = (particles[voxelOne.particles[0]].position +
+        particles[voxelOne.particles[1]].position +
+        particles[voxelOne.particles[2]].position +
+        particles[voxelOne.particles[3]].position +
+        particles[voxelOne.particles[4]].position +
+        particles[voxelOne.particles[5]].position +
+        particles[voxelOne.particles[6]].position +
+        particles[voxelOne.particles[7]].position) / 8.0f;
 
-	glm::vec3 cv1 = (v1p0 + v1p1 + v1p2 + v1p3 + v1p4 + v1p5 + v1p6 + v1p7) / 8.0f;
-	glm::vec3 cv2 = (v2p0 + v2p1 + v2p2 + v2p3 + v2p4 + v2p5 + v2p6 + v2p7) / 8.0f;
+    glm::vec3 v2Center = (particles[voxelTwo.particles[0]].position +
+        particles[voxelTwo.particles[1]].position +
+        particles[voxelTwo.particles[2]].position +
+        particles[voxelTwo.particles[3]].position +
+        particles[voxelTwo.particles[4]].position +
+        particles[voxelTwo.particles[5]].position +
+        particles[voxelTwo.particles[6]].position +
+        particles[voxelTwo.particles[7]].position) / 8.0f;
 
-	glm::vec3 cv1p0 = (v1p0 + cv1) / 2.0f;
-	glm::vec3 cv1p1 = (v1p1 + cv1) / 2.0f;
-	glm::vec3 cv1p2 = (v1p2 + cv1) / 2.0f;
-	glm::vec3 cv1p3 = (v1p3 + cv1) / 2.0f;
-	glm::vec3 cv1p4 = (v1p4 + cv1) / 2.0f;
-	glm::vec3 cv1p5 = (v1p5 + cv1) / 2.0f;
-	glm::vec3 cv1p6 = (v1p6 + cv1) / 2.0f;
-	glm::vec3 cv1p7 = (v1p7 + cv1) / 2.0f;
-	std::array<glm::vec3, 8> cv1p = { cv1p0, cv1p1, cv1p2, cv1p3, cv1p4, cv1p5, cv1p6, cv1p7 };
+    //calculate midpoint positions for every vertex
+    std::array<glm::vec3, 8> v1MidPositions;
+    std::array<glm::vec3, 8> v2MidPositions;
 
-	glm::vec3 cv2p0 = (v2p0 + cv2) / 2.0f;
-	glm::vec3 cv2p1 = (v2p1 + cv2) / 2.0f;
-	glm::vec3 cv2p2 = (v2p2 + cv2) / 2.0f;
-	glm::vec3 cv2p3 = (v2p3 + cv2) / 2.0f;
-	glm::vec3 cv2p4 = (v2p4 + cv2) / 2.0f;
-	glm::vec3 cv2p5 = (v2p5 + cv2) / 2.0f;
-	glm::vec3 cv2p6 = (v2p6 + cv2) / 2.0f;
-	glm::vec3 cv2p7 = (v2p7 + cv2) / 2.0f;
-	std::array<glm::vec3, 8> cv2p = { cv2p0, cv2p1, cv2p2, cv2p3, cv2p4, cv2p5, cv2p6, cv2p7 };
+    for (int i = 0; i < 8; i++) {
+        v1MidPositions[i] = (particles[voxelOne.particles[i]].position + v1Center) / 2.0f;
+        v2MidPositions[i] = (particles[voxelTwo.particles[i]].position + v2Center) / 2.0f;
+    }
 
-    std::array<std::pair<std::pair<int, int>, float>, 4 > edges; //id, id, length
-
-    //length of 4 edges crossing constraint - voxel 1 is guaranteed to be to the left, below, or in front of voxel 2
-    float l1, l2, l3, l4;
+    //define face indices based on axis, matching the GPU implementation
     switch (axis) {
-    case 0:
-        //l1 = 1 to 0
-		l1 = glm::length(cv1p1 - cv2p0);
-        edges[0] = { {1, 0}, l1 };
-
-        //l2 = 5 to 4
-		l2 = glm::length(cv1p5 - cv2p4);
-		edges[1] = { {5, 4}, l2 };
-
-        //l3 = 3 to 2
-		l3 = glm::length(cv1p3 - cv2p2);
-		edges[2] = { {3, 2}, l3 };
-
-		//l4 = 7 to 6
-		l4 = glm::length(cv1p7 - cv2p6);
-		edges[3] = { {7, 6}, l4 };
-
+    case 0: //x-axis
+        //negative X face (voxel 1) to positive X face (voxel 2)
+        faceOneIndices = { 0, 2, 4, 6 }; //-X face indices
+        faceTwoIndices = { 1, 3, 5, 7 }; //+X face indices
         break;
-    case 1:
-        //l1 = 6 to 4
-        l1 = glm::length(cv1p6 - cv2p4);
-        edges[0] = { {6, 4}, l1 };
-
-        //l2 = 7 to 5
-		l2 = glm::length(cv1p7 - cv2p5);
-		edges[1] = { {7, 5}, l2 };
-
-        //l3 = 2 to 0
-        l3 = glm::length(cv1p2 - cv2p0);
-		edges[2] = { {2, 0}, l3 };
-
-		//l4 = 3 to 1
-        l4 = glm::length(cv1p3 - cv2p1);
-		edges[3] = { {3, 1}, l4 };
-
+    case 1: //y-axis
+        //negative Y face (voxel 1) to positive Y face (voxel 2)
+        faceOneIndices = { 0, 1, 4, 5 }; //-Y face indices
+        faceTwoIndices = { 2, 3, 6, 7 }; //+Y face indices
         break;
-    case 2:
-        //l1 = 0 to 4
-        l1 = glm::length(cv1p0 - cv2p4);
-		edges[0] = { {0, 4}, l1 };
-
-		//l2 = 1 to 5
-        l2 = glm::length(cv1p1 - cv2p5);
-		edges[1] = { {1, 5}, l2 };
-
-		//l3 = 2 to 6
-		l3 = glm::length(cv1p2 - cv2p6);
-		edges[2] = { {2, 6}, l3 };
-
-		//l4 = 3 to 7
-		l4 = glm::length(cv1p3 - cv2p7);
-		edges[3] = { {3, 7}, l4 };
-
+    case 2: //z-axis
+        //negative Z face (voxel 1) to positive Z face (voxel 2)
+        faceOneIndices = { 0, 1, 2, 3 }; //-Z face indices
+        faceTwoIndices = { 4, 5, 6, 7 }; //+Z face indices
         break;
     }
 
-    float radiusTimesTwo = 2.0f * PARTICLE_RADIUS;
-	float minStrain = std::min(std::min((l1 - radiusTimesTwo)  / radiusTimesTwo, (l2 - radiusTimesTwo) / radiusTimesTwo), 
-        std::min((l3 - radiusTimesTwo) / radiusTimesTwo, (l4 - radiusTimesTwo) / radiusTimesTwo));
-    float maxStrain = std::max(std::max((l1 - radiusTimesTwo) / radiusTimesTwo, (l2 - radiusTimesTwo) / radiusTimesTwo),
-        std::max((l3 - radiusTimesTwo) / radiusTimesTwo, (l4 - radiusTimesTwo) / radiusTimesTwo));
+    //set up references to midpoint positions and get inverse masses
+    for (int i = 0; i < 4; i++) {
+        faceOne[i] = &v1MidPositions[faceOneIndices[i]];
+        faceTwo[i] = &v2MidPositions[faceTwoIndices[i]];
 
-    //break the constraint
-	if (maxStrain > faceConstraint.tensionLimit || minStrain < faceConstraint.compressionLimit) {
-		MGlobal::displayInfo("Constraint broken");
-        faceConstraint.voxelOneIdx = -1;
-        faceConstraint.voxelTwoIdx = -1;
-        return;
-	}
+        faceOneW[i] = particles[voxelOne.particles[faceOneIndices[i]]].w;
+        faceTwoW[i] = particles[voxelTwo.particles[faceTwoIndices[i]]].w;
+    }
 
-    //check if constraint is inside out(volume < 0) - if yes, invert shortest edge
+    //check if constraint should be deleted (fracture check)
+    bool enableFracture = true;
+    if (enableFracture) {
+        for (int i = 0; i < 4; i++) {
+            glm::vec3 u = *faceTwo[i] - *faceOne[i];
+            float L = glm::length(u);
+            float strain = (L - 2.0f * PARTICLE_RADIUS) / (2.0f * PARTICLE_RADIUS);
 
-    //enforce distance
-    float compliance = 0.1f;
-    float alpha = compliance / (timeStep * timeStep);
+            if (strain > faceConstraint.tensionLimit || strain < faceConstraint.compressionLimit) {
+                MGlobal::displayInfo("Constraint broken");
+                faceConstraint.voxelOneIdx = -1;
+                faceConstraint.voxelTwoIdx = -1;
+                return;
+            }
+        }
+    }
 
-    for (const auto& edge : edges) {
-        auto& particlesInEdge = edge.first;
-        Particle& p1 = particles[voxelOne.particles[particlesInEdge.first]];
-        Particle& p2 = particles[voxelTwo.particles[particlesInEdge.second]];
+    //calculate midpoint face center
+    glm::vec3 center = glm::vec3(0.0f);
+    for (int i = 0; i < 4; i++) {
+        center += *faceOne[i] + *faceTwo[i];
+    }
+    center /= 8.0f;
 
-        float w_tot = p1.w + p2.w;
-        if (w_tot == 0.0f) continue;
+    //calculate edge vectors for shape preservation
+    glm::vec3 dp[3];
 
-		glm::vec3 delta = cv2p[voxelTwo.particles[particlesInEdge.second] % 8] - cv1p[voxelOne.particles[particlesInEdge.first] % 8];
-        float deltalen = edge.second;
-        if (deltalen == 0.0f) continue;
+    //check if either voxel is static
+    float sumW1 = faceOneW[0] + faceOneW[1] + faceOneW[2] + faceOneW[3];
+    float sumW2 = faceTwoW[0] + faceTwoW[1] + faceTwoW[2] + faceTwoW[3];
 
-        float C = deltalen - PARTICLE_RADIUS * 2.0f;
-        glm::vec3 C1 = delta / deltalen;
-        glm::vec3 C2 = -C1;
-        float lambda = -C / (w_tot + alpha);
+    if (sumW1 == 0.0f || sumW2 == 0.0f) {
+        //handle static voxel case
+        glm::vec3 u1, u2, u0;
 
-        p1.position += lambda * p1.w * C1;
-        p2.position += lambda * p2.w * C2;
+        if (sumW1 == 0.0f) { //voxel 1 is static
+            u1 = (*faceOne[1] - *faceOne[0]) + (*faceOne[3] - *faceOne[2]);
+            u2 = (*faceOne[2] - *faceOne[0]) + (*faceOne[3] - *faceOne[1]);
+        }
+        else { //voxel 2 is static
+            u1 = (*faceTwo[1] - *faceTwo[0]) + (*faceTwo[3] - *faceTwo[2]);
+            u2 = (*faceTwo[2] - *faceTwo[0]) + (*faceTwo[3] - *faceTwo[1]);
+        }
+
+        //calculate the normal vector based on axis
+        if (axis == 0 || axis == 2) {
+            u0 = glm::cross(u1, u2);
+        }
+        else {
+            u0 = glm::cross(u2, u1);
+        }
+
+        //normalize and scale by radius
+        dp[0] = glm::normalize(u1) * PARTICLE_RADIUS;
+        dp[1] = glm::normalize(u2) * PARTICLE_RADIUS;
+        dp[2] = glm::normalize(u0) * PARTICLE_RADIUS;
+
+        //check if volume is negative
+        float V = glm::dot(glm::cross(dp[0], dp[1]), dp[2]);
+        if (V < 0.0f) {
+            //GPU code has a comment about breaking the constraint
+        }
+
+        //save  original midpoint positions
+        std::array<glm::vec3, 4> origFaceOne, origFaceTwo;
+        for (int i = 0; i < 4; i++) {
+            origFaceOne[i] = *faceOne[i];
+            origFaceTwo[i] = *faceTwo[i];
+        }
+
+        //update midpoint positions
+        if (faceOneW[0] != 0.0f) *faceOne[0] = center - dp[0] - dp[1] - dp[2];
+        if (faceOneW[1] != 0.0f) *faceOne[1] = center + dp[0] - dp[1] - dp[2];
+        if (faceOneW[2] != 0.0f) *faceOne[2] = center - dp[0] + dp[1] - dp[2];
+        if (faceOneW[3] != 0.0f) *faceOne[3] = center + dp[0] + dp[1] - dp[2];
+        if (faceTwoW[0] != 0.0f) *faceTwo[0] = center - dp[0] - dp[1] + dp[2];
+        if (faceTwoW[1] != 0.0f) *faceTwo[1] = center + dp[0] - dp[1] + dp[2];
+        if (faceTwoW[2] != 0.0f) *faceTwo[2] = center - dp[0] + dp[1] + dp[2];
+        if (faceTwoW[3] != 0.0f) *faceTwo[3] = center + dp[0] + dp[1] + dp[2];
+
+        //apply delta from midpoint positions back to particle positions
+        for (int i = 0; i < 4; i++) {
+            if (faceOneW[i] != 0.0f) {
+                glm::vec3 delta = *faceOne[i] - origFaceOne[i];
+                particles[voxelOne.particles[faceOneIndices[i]]].position += delta;
+            }
+
+            if (faceTwoW[i] != 0.0f) {
+                glm::vec3 delta = *faceTwo[i] - origFaceTwo[i];
+                particles[voxelTwo.particles[faceTwoIndices[i]]].position += delta;
+            }
+        }
+    }
+    else {
+        //no static voxels - apply iterative shape preservation
+        float alpha = 0.75f;
+        float alphaLen = 0.0f;
+
+        for (int iter = 0; iter < 3; iter++) {
+            //calculate edge vectors
+            dp[0] = (*faceTwo[0] - *faceOne[0]) + (*faceTwo[1] - *faceOne[1]) +
+                (*faceTwo[2] - *faceOne[2]) + (*faceTwo[3] - *faceOne[3]);
+
+            dp[1] = (*faceOne[1] - *faceOne[0]) + (*faceOne[3] - *faceOne[2]) +
+                (*faceTwo[1] - *faceTwo[0]) + (*faceTwo[3] - *faceTwo[2]);
+
+            dp[2] = (*faceOne[2] - *faceOne[0]) + (*faceOne[3] - *faceOne[1]) +
+                (*faceTwo[2] - *faceTwo[0]) + (*faceTwo[3] - *faceTwo[1]);
+
+            //recalculate center
+            center = glm::vec3(0.0f);
+            for (int i = 0; i < 4; i++) {
+                center += *faceOne[i] + *faceTwo[i];
+            }
+            center /= 8.0f;
+
+            //apply orthogonalization
+            auto proj = [](const glm::vec3& u, const glm::vec3& v) -> glm::vec3 {
+                const float eps = 1e-12f;
+                return glm::dot(v, u) / (glm::dot(u, u) + eps) * u;
+                };
+
+            glm::vec3 u0 = dp[0] - alpha * (proj(dp[1], dp[0]) + proj(dp[2], dp[0]));
+            glm::vec3 u1 = dp[1] - alpha * (proj(dp[0], dp[1]) + proj(dp[2], dp[1]));
+            glm::vec3 u2 = dp[2] - alpha * (proj(dp[0], dp[2]) + proj(dp[1], dp[2]));
+
+            //check for flipping
+            float V = glm::dot(glm::cross(u0, u1), u2);
+            //if (axis == 1) V = -V; //hack to match GPU code
+
+            if (V < 0.0f) {
+                MGlobal::displayInfo("Constraint broken due to flipping");
+                faceConstraint.voxelOneIdx = -1;
+                faceConstraint.voxelTwoIdx = -1;
+                return;
+            }
+
+            //calculate normalized and scaled edge vectors
+            glm::vec3 lenu = glm::vec3(glm::length(u0), glm::length(u1), glm::length(u2)) + glm::vec3(1e-12f);
+            glm::vec3 lenp = glm::vec3(glm::length(dp[0]), glm::length(dp[1]), glm::length(dp[2])) + glm::vec3(1e-12f);
+
+            float r_v = pow(PARTICLE_RADIUS * PARTICLE_RADIUS * PARTICLE_RADIUS / (lenp[0] * lenp[1] * lenp[2]), 0.3333f);
+
+            dp[0] = u0 / lenu[0] * glm::mix(PARTICLE_RADIUS, lenp[0] * r_v, alphaLen);
+            dp[1] = u1 / lenu[1] * glm::mix(PARTICLE_RADIUS, lenp[1] * r_v, alphaLen);
+            dp[2] = u2 / lenu[2] * glm::mix(PARTICLE_RADIUS, lenp[2] * r_v, alphaLen);
+
+            //save original midpoint positions
+            std::array<glm::vec3, 4> origFaceOne, origFaceTwo;
+            for (int i = 0; i < 4; i++) {
+                origFaceOne[i] = *faceOne[i];
+                origFaceTwo[i] = *faceTwo[i];
+            }
+
+            //update midpoint positions
+            if (faceOneW[0] != 0.0f) *faceOne[0] = center - dp[0] - dp[1] - dp[2];
+            if (faceOneW[1] != 0.0f) *faceOne[1] = center + dp[0] - dp[1] - dp[2];
+            if (faceOneW[2] != 0.0f) *faceOne[2] = center - dp[0] + dp[1] - dp[2];
+            if (faceOneW[3] != 0.0f) *faceOne[3] = center + dp[0] + dp[1] - dp[2];
+            if (faceTwoW[0] != 0.0f) *faceTwo[0] = center - dp[0] - dp[1] + dp[2];
+            if (faceTwoW[1] != 0.0f) *faceTwo[1] = center + dp[0] - dp[1] + dp[2];
+            if (faceTwoW[2] != 0.0f) *faceTwo[2] = center - dp[0] + dp[1] + dp[2];
+            if (faceTwoW[3] != 0.0f) *faceTwo[3] = center + dp[0] + dp[1] + dp[2];
+
+            //apply delta from midpoint positions back to particle positions
+            for (int i = 0; i < 4; i++) {
+                if (faceOneW[i] != 0.0f) {
+                    glm::vec3 delta = *faceOne[i] - origFaceOne[i];
+                    particles[voxelOne.particles[faceOneIndices[i]]].position += delta;
+                }
+
+                if (faceTwoW[i] != 0.0f) {
+                    glm::vec3 delta = *faceTwo[i] - origFaceTwo[i];
+                    particles[voxelTwo.particles[faceTwoIndices[i]]].position += delta;
+                }
+            }
+        }
     }
 }
