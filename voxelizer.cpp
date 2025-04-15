@@ -2,16 +2,19 @@
 #include <maya/MSelectionList.h>
 #include <maya/MDagPath.h>
 #include <maya/MFnTransform.h>
+#include <algorithm>
+#include <maya/MFnSet.h>
 
-MObject Voxelizer::voxelizeSelectedMesh(
+std::vector<Voxel> Voxelizer::voxelizeSelectedMesh(
     float gridEdgeLength,
     float voxelSize,
     MPoint gridCenter,
+    MDagPath& voxelizedMeshPath,
     MStatus& status
 ) {
 
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
-    std::vector<MeshVoxel> voxels;
+    std::vector<Voxel> voxels;
     voxels.resize(voxelsPerEdge * voxelsPerEdge * voxelsPerEdge);
     
     MDagPath selectedMeshPath = getSelectedMesh(status);
@@ -38,7 +41,7 @@ MObject Voxelizer::voxelizeSelectedMesh(
         voxels
     );
 
-    MObject voxelizedMesh = createVoxels(
+    voxelizedMeshPath = createVoxels(
         voxels,
         gridEdgeLength,
         voxelSize,
@@ -47,7 +50,7 @@ MObject Voxelizer::voxelizeSelectedMesh(
     );
 
     status = MS::kSuccess;
-    return voxelizedMesh;
+    return voxels;
 }
 
 MDagPath Voxelizer::getSelectedMesh(MStatus& status) {
@@ -164,7 +167,7 @@ void Voxelizer::getSurfaceVoxels(
     float gridEdgeLength,
     float voxelSize,
     MPoint gridCenter,
-    std::vector<MeshVoxel>& voxels
+    std::vector<Voxel>& voxels
 ) {
     
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
@@ -192,6 +195,7 @@ void Voxelizer::getSurfaceVoxels(
                     if (!doesTriangleOverlapVoxel(tri, voxelMinCorner)) continue;
                     voxels[index].occupied = true;
                     voxels[index].isSurface = true;
+                    voxels[index].mortonCode = toMortonCode(x, y, z);
                 }
             }
         }
@@ -221,7 +225,7 @@ void Voxelizer::getInteriorVoxels(
     float gridEdgeLength,
     float voxelSize,
     MPoint gridCenter,
-    std::vector<MeshVoxel>& voxels
+    std::vector<Voxel>& voxels
 ) {
     
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
@@ -258,6 +262,7 @@ void Voxelizer::getInteriorVoxels(
                 for (int x = xVoxelMin; x < voxelsPerEdge; ++x) {
                     int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
                     voxels[index].occupied = !voxels[index].occupied;
+                    voxels[index].mortonCode = toMortonCode(x, y, z);
                 }
             }
         }
@@ -304,8 +309,8 @@ double Voxelizer::getTriangleVoxelCenterIntercept(
     return X_intercept;
 }
 
-MObject Voxelizer::createVoxels(
-    std::vector<MeshVoxel>& overlappedVoxels,
+MDagPath Voxelizer::createVoxels(
+    std::vector<Voxel>& overlappedVoxels,
     float gridEdgeLength, 
     float voxelSize,       
     MPoint gridCenter,      
@@ -334,14 +339,37 @@ MObject Voxelizer::createVoxels(
         }
     }
 
+    std::sort(overlappedVoxels.begin(), overlappedVoxels.end(), [](const Voxel& a, const Voxel& b) {
+        return a.mortonCode < b.mortonCode;
+    });
+
     // Use MEL to combine all the voxels into one mesh
     MGlobal::executeCommand(MString("polyUnite -ch 0 -mergeUVSets 1 -name ") + combinedMeshName + " " + meshNamesConcatenated, false, true);
-    MSelectionList selectionList;
-    selectionList.add(combinedMeshName);
-    MObject combinedMesh;
-    selectionList.getDependNode(0, combinedMesh);
 
-    return combinedMesh;
+    // Use MEL to transferAttributes the normals from the original mesh to the new voxelized/combined one
+    MGlobal::executeCommand(MString("select -r ") + originalMesh.name(), false, true); // Select the original mesh first
+    MGlobal::executeCommand(MString("select -add ") + combinedMeshName, false, true);  // Then select the new combined mesh
+    MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
+    MGlobal::executeCommand("delete -ch " + combinedMeshName + ";"); // Delete the history of the combined mesh to decouple it from the original mesh
+
+    // Retrieve the MObject of the resulting mesh
+    MSelectionList resultSelectionList;
+    resultSelectionList.add(combinedMeshName);
+    MObject resultMeshObject;
+    resultSelectionList.getDependNode(0, resultMeshObject);
+
+    // Add the initial shading group to the combined mesh
+    // TODO: apply the shading group of the original mesh to the combined mesh
+    MObject shadingGroup;
+    MSelectionList shadingGroupSelectionList;
+    MGlobal::getSelectionListByName("initialShadingGroup", shadingGroupSelectionList);
+    shadingGroupSelectionList.getDependNode(0, shadingGroup);
+    MFnSet shadingGroupFn(shadingGroup);
+    shadingGroupFn.addMember(resultMeshObject);
+
+    MDagPath resultMeshDagPath;
+    MDagPath::getAPathTo(resultMeshObject, resultMeshDagPath);
+    return resultMeshDagPath;
 }
 
 int faceIndices[6][4] = {
@@ -356,7 +384,7 @@ int faceIndices[6][4] = {
 MObject Voxelizer::addVoxelToMesh(
     const MPoint& voxelMin,
     float voxelSize,
-    MeshVoxel& meshVoxel,
+    Voxel& voxel,
     MFnMesh& originalMesh
 ) {
     MPointArray cubeVertices;
@@ -382,6 +410,7 @@ MObject Voxelizer::addVoxelToMesh(
     cubeVertices.append(MPoint(voxelMax.x, voxelMin.y, voxelMax.z));
     cubeVertices.append(MPoint(voxelMax.x, voxelMax.y, voxelMin.z));
     cubeVertices.append(voxelMax);
+    voxel.corners = cubeVertices;
 
     MIntArray faceCounts;
     MIntArray faceConnects;
@@ -408,22 +437,54 @@ MObject Voxelizer::addVoxelToMesh(
     );
 
     // only need to do the boolean intersection of surface voxels
-    if (!meshVoxel.isSurface) {
+    if (!voxel.isSurface) {
         // Explore later: a way to store a reference to the vertices or to a MFnMesh maybe, so that we can easily change the vertex positions.
-        meshVoxel.vertices = cubeVertices;
+        voxel.vertices = cubeVertices;
         return cube; 
     }
 
-    MObjectArray objsToIntersect;
-    objsToIntersect.append(cubeMeshFn.object());
-    objsToIntersect.append(originalMesh.object());
-    // TODO: make the last param (useLegacy) an option in the user interface for this tool.
-    // It's MUCH faster than the new boolean operation but can produce worse results for complex inputs.
-    cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect, true);
+    // Boolean'ing every cube with the mesh is SLOW. It's done serially. Would be much faster if in parallel, but Maya doesn't support (afaik).
+    // Could look into replacing the following with CGAL, which could be parallelized.
 
-    // Store vertices in the MeshVoxel object
+    // TEMPORARILY COMMENTED OUT - until we have code in place to transform the vertices within each voxel, just return the voxel itself.
+    // MObjectArray objsToIntersect;
+    // objsToIntersect.append(cubeMeshFn.object());
+    // objsToIntersect.append(originalMesh.object());
+    // cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect);
+
+    // Store vertices in the Voxel object
     // Same as above, we can explore a way to store a reference to the vertices or to a MFnMesh so that we can easily change the vertex positions.
-    cubeMeshFn.getPoints(meshVoxel.vertices, MSpace::kWorld);
+    cubeMeshFn.getPoints(voxel.vertices, MSpace::kWorld);
 
     return cube;
+}
+
+// From: https://github.com/liamdon/fast-morton/blob/main/src/3d/mb/decode.ts
+const uint32_t magicBitsMask3DDecode[] = {
+    0x00000000, 0x000003ff, 0x000300ff, 0x0300f00f, 0x30c30c3, 0x9249249
+};
+
+uint32_t morton3DGetThirdBits(uint32_t coord) {
+    uint32_t x = coord & magicBitsMask3DDecode[5];
+    x = (x ^ (x >> 2)) & magicBitsMask3DDecode[4];
+    x = (x ^ (x >> 4)) & magicBitsMask3DDecode[3];
+    x = (x ^ (x >> 8)) & magicBitsMask3DDecode[2];
+    x = (x ^ (x >> 16)) & magicBitsMask3DDecode[1];
+    return x;
+}
+
+uint32_t Voxelizer::toMortonCode(uint32_t x, uint32_t y, uint32_t z) {
+    auto spreadBits = [](uint32_t value) -> uint32_t {
+        value = (value | (value << 16)) & 0x030000FF;
+        value = (value | (value << 8)) & 0x0300F00F;
+        value = (value | (value << 4)) & 0x030C30C3;
+        value = (value | (value << 2)) & 0x09249249;
+        return value;
+    };
+
+    uint32_t xBits = spreadBits(x);
+    uint32_t yBits = spreadBits(y) << 1;
+    uint32_t zBits = spreadBits(z) << 2;
+
+    return xBits | yBits | zBits;
 }

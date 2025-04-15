@@ -27,12 +27,12 @@ struct Triangle {
     double d_ei_yz_solid[3]; // Edge distances for the yz plane (for solid voxelization)
 };
 
-// Had to name it this to avoid collision with PBD's Voxel struct
-// But in the future let's rename this Voxel and delete that struct / merge their fields together.
-struct MeshVoxel {
+struct Voxel {
     bool occupied = false; // contains some part (surface or interior) of the underlying mesh
     bool isSurface = false;
+    uint32_t mortonCode = UINT32_MAX;
     MPointArray vertices; // vertices owned by this voxel (to be transformed during the PBD (VGS) simulation)
+    MPointArray corners;  // ordered according to the VGS expectations
 };
 
 class Voxelizer {
@@ -41,10 +41,11 @@ public:
     Voxelizer() = default;
     ~Voxelizer() = default;
 
-    MObject voxelizeSelectedMesh(
+    std::vector<Voxel> voxelizeSelectedMesh(
         float gridEdgeLength,
         float voxelSize,
         MPoint gridCenter,
+        MDagPath& voxelizedMeshDagPath,
         MStatus& status
     );
 
@@ -65,7 +66,7 @@ private:
         float gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
         float voxelSize,                        // edge length of a single voxel
         MPoint gridCenter,                      // center of the grid in world space
-        std::vector<MeshVoxel>& voxels
+        std::vector<Voxel>& voxels
     );
 
     void getInteriorVoxels(
@@ -73,7 +74,7 @@ private:
         float gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
         float voxelSize,                        // edge length of a single voxel
         MPoint gridCenter,                      // center of the grid in world space
-        std::vector<MeshVoxel>& voxels               // output array of voxels (true = occupied, false = empty)
+        std::vector<Voxel>& voxels               // output array of voxels (true = occupied, false = empty)
     );
 
     bool doesTriangleOverlapVoxel(
@@ -92,8 +93,8 @@ private:
         const MVector& voxelCenterYZ // YZ coords of the voxel column center
     );
 
-    MObject createVoxels(
-        std::vector<MeshVoxel>& occupiedVoxels,
+    MDagPath createVoxels(
+        std::vector<Voxel>& occupiedVoxels,
         float gridEdgeLength, 
         float voxelSize,       
         MPoint gridCenter,      
@@ -103,7 +104,13 @@ private:
     MObject addVoxelToMesh(
         const MPoint& voxelMin, // min corner of the voxel
         float voxelSize,        // edge length of a single voxel
-        MeshVoxel& meshVoxel,
+        Voxel& voxel,
         MFnMesh& originalSurface
+    );
+
+    uint32_t toMortonCode(
+        uint32_t x,
+        uint32_t y,
+        uint32_t z
     );
 };
