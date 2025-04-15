@@ -43,8 +43,8 @@ PBD::PBD(const std::vector<glm::vec3>& positions) {
     FaceConstraint faceConstraint;
     faceConstraint.voxelOneIdx = 0;
     faceConstraint.voxelTwoIdx = 1;
-    faceConstraint.compressionLimit = -FLT_MAX;
-    faceConstraint.tensionLimit = FLT_MAX;
+    faceConstraint.compressionLimit = -PARTICLE_RADIUS * 10.0f;
+    faceConstraint.tensionLimit = PARTICLE_RADIUS * 1.28f;
     faceConstraints[0].push_back(faceConstraint);
 }
 
@@ -66,11 +66,12 @@ void PBD::simulateSubstep() {
         if (particle.w == 0.0f) continue;
         particle.velocity += glm::vec3(0.0f, -10.0f, 0.0f) * timeStep;
         if (idx < 8) {
-            particle.velocity += glm::vec3(0.01f, 0.f, 0.f);
+            //particle.velocity += glm::vec3(0.01f, 0.f, 0.f);
         }
         else {
-            particle.velocity += glm::vec3(-0.01f, 0.f, 0.f);
+            //particle.velocity += glm::vec3(-0.01f, 0.f, 0.f);
         }
+        particle.velocity += glm::vec3(-0.01f, 0.f, 0.01f);
         idx++;
         particle.oldPosition = particle.position;
         particle.position += particle.velocity * timeStep;
@@ -185,13 +186,12 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
     Voxel& voxelOne = voxels[faceConstraint.voxelOneIdx];
     Voxel& voxelTwo = voxels[faceConstraint.voxelTwoIdx];
 
-    //arrays to hold face particles
-    std::array<glm::vec3*, 4> faceOne;
-    std::array<glm::vec3*, 4> faceTwo;
-    std::array<float, 4> faceOneW;
-    std::array<float, 4> faceTwoW;
-    std::array<int, 4> faceOneIndices;
-    std::array<int, 4> faceTwoIndices;
+    std::array<glm::vec3*, 4> faceOne; //midpoint particle positions for relevant face of voxel 1
+    std::array<glm::vec3*, 4> faceTwo; //midpoint particle positions for relevant face of voxel 2
+    std::array<float, 4> faceOneW; //particle weights for relevant face of voxel 1
+    std::array<float, 4> faceTwoW; //particle weights for relevant face of voxel 2
+    std::array<int, 4> faceOneIndices; //particle indices for relevant face of voxel 1
+    std::array<int, 4> faceTwoIndices; //particle indices for relevant face of voxel 2
 
     //calculate centers
     glm::vec3 v1Center = (particles[voxelOne.particles[0]].position +
@@ -217,8 +217,8 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
     std::array<glm::vec3, 8> v2MidPositions;
 
     for (int i = 0; i < 8; i++) {
-        v1MidPositions[i] = (particles[voxelOne.particles[i]].position + v1Center) / 2.0f;
-        v2MidPositions[i] = (particles[voxelTwo.particles[i]].position + v2Center) / 2.0f;
+        v1MidPositions[i] = (particles[voxelOne.particles[i]].position + v1Center) * 0.5f;
+        v2MidPositions[i] = (particles[voxelTwo.particles[i]].position + v2Center) * 0.5f;
     }
 
     //define face indices based on axis, matching the GPU implementation
@@ -258,7 +258,9 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
             float strain = (L - 2.0f * PARTICLE_RADIUS) / (2.0f * PARTICLE_RADIUS);
 
             if (strain > faceConstraint.tensionLimit || strain < faceConstraint.compressionLimit) {
-                MGlobal::displayInfo("Constraint broken");
+                MGlobal::displayInfo("Constraint broken due to tension or compression");
+                std::string vStr{ "Strain: " + std::to_string(strain) };
+                MGlobal::displayInfo(vStr.c_str());
                 faceConstraint.voxelOneIdx = -1;
                 faceConstraint.voxelTwoIdx = -1;
                 return;
@@ -267,11 +269,11 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
     }
 
     //calculate midpoint face center
-    glm::vec3 center = glm::vec3(0.0f);
+    glm::vec3 centerOfVoxels = glm::vec3(0.0f);
     for (int i = 0; i < 4; i++) {
-        center += *faceOne[i] + *faceTwo[i];
+        centerOfVoxels += *faceOne[i] + *faceTwo[i];
     }
-    center /= 8.0f;
+    centerOfVoxels *= 0.125f;
 
     //calculate edge vectors for shape preservation
     glm::vec3 dp[3];
@@ -321,14 +323,14 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
         }
 
         //update midpoint positions
-        if (faceOneW[0] != 0.0f) *faceOne[0] = center - dp[0] - dp[1] - dp[2];
-        if (faceOneW[1] != 0.0f) *faceOne[1] = center + dp[0] - dp[1] - dp[2];
-        if (faceOneW[2] != 0.0f) *faceOne[2] = center - dp[0] + dp[1] - dp[2];
-        if (faceOneW[3] != 0.0f) *faceOne[3] = center + dp[0] + dp[1] - dp[2];
-        if (faceTwoW[0] != 0.0f) *faceTwo[0] = center - dp[0] - dp[1] + dp[2];
-        if (faceTwoW[1] != 0.0f) *faceTwo[1] = center + dp[0] - dp[1] + dp[2];
-        if (faceTwoW[2] != 0.0f) *faceTwo[2] = center - dp[0] + dp[1] + dp[2];
-        if (faceTwoW[3] != 0.0f) *faceTwo[3] = center + dp[0] + dp[1] + dp[2];
+        if (faceOneW[0] != 0.0f) *faceOne[0] = centerOfVoxels - dp[0] - dp[1] - dp[2];
+        if (faceOneW[1] != 0.0f) *faceOne[1] = centerOfVoxels + dp[0] - dp[1] - dp[2];
+        if (faceOneW[2] != 0.0f) *faceOne[2] = centerOfVoxels - dp[0] + dp[1] - dp[2];
+        if (faceOneW[3] != 0.0f) *faceOne[3] = centerOfVoxels + dp[0] + dp[1] - dp[2];
+        if (faceTwoW[0] != 0.0f) *faceTwo[0] = centerOfVoxels - dp[0] - dp[1] + dp[2];
+        if (faceTwoW[1] != 0.0f) *faceTwo[1] = centerOfVoxels + dp[0] - dp[1] + dp[2];
+        if (faceTwoW[2] != 0.0f) *faceTwo[2] = centerOfVoxels - dp[0] + dp[1] + dp[2];
+        if (faceTwoW[3] != 0.0f) *faceTwo[3] = centerOfVoxels + dp[0] + dp[1] + dp[2];
 
         //apply delta from midpoint positions back to particle positions
         for (int i = 0; i < 4; i++) {
@@ -344,8 +346,8 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
         }
     } else {
         //no static voxels - apply iterative shape preservation
-        float alpha = 0.75f;
-        float alphaLen = 0.0f;
+        float alpha = 0.9f;
+        float alphaLen = 0.9f;
 
         for (int iter = 0; iter < 3; iter++) {
             //calculate edge vectors
@@ -359,11 +361,11 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
                 (*faceTwo[2] - *faceTwo[0]) + (*faceTwo[3] - *faceTwo[1]);
 
             //recalculate center
-            center = glm::vec3(0.0f);
+            centerOfVoxels = glm::vec3(0.0f);
             for (int i = 0; i < 4; i++) {
-                center += *faceOne[i] + *faceTwo[i];
+                centerOfVoxels += *faceOne[i] + *faceTwo[i];
             }
-            center /= 8.0f;
+            centerOfVoxels *= 0.125f;
 
             //apply orthogonalization
             auto proj = [](const glm::vec3& u, const glm::vec3& v) -> glm::vec3 {
@@ -377,7 +379,7 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
 
             //check for flipping
             float V = glm::dot(glm::cross(u0, u1), u2);
-            if (axis == 0) V = -V; //hack to match GPU code
+            if (axis == 0) V = -V; //hack from GPU code
 
             if (V < 0.0f) {
                 MGlobal::displayInfo("Constraint broken due to flipping");
@@ -394,6 +396,7 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
 
             float r_v = pow(PARTICLE_RADIUS * PARTICLE_RADIUS * PARTICLE_RADIUS / (lenp[0] * lenp[1] * lenp[2]), 0.3333f);
 
+            //scale change in position based on alpha
             dp[0] = u0 / lenu[0] * glm::mix(PARTICLE_RADIUS, lenp[0] * r_v, alphaLen);
             dp[1] = u1 / lenu[1] * glm::mix(PARTICLE_RADIUS, lenp[1] * r_v, alphaLen);
             dp[2] = u2 / lenu[2] * glm::mix(PARTICLE_RADIUS, lenp[2] * r_v, alphaLen);
@@ -406,14 +409,14 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
             }
 
             //update midpoint positions
-            if (faceOneW[0] != 0.0f) *faceOne[0] = center - dp[0] - dp[1] - dp[2];
-            if (faceOneW[1] != 0.0f) *faceOne[1] = center + dp[0] - dp[1] - dp[2];
-            if (faceOneW[2] != 0.0f) *faceOne[2] = center - dp[0] + dp[1] - dp[2];
-            if (faceOneW[3] != 0.0f) *faceOne[3] = center + dp[0] + dp[1] - dp[2];
-            if (faceTwoW[0] != 0.0f) *faceTwo[0] = center - dp[0] - dp[1] + dp[2];
-            if (faceTwoW[1] != 0.0f) *faceTwo[1] = center + dp[0] - dp[1] + dp[2];
-            if (faceTwoW[2] != 0.0f) *faceTwo[2] = center - dp[0] + dp[1] + dp[2];
-            if (faceTwoW[3] != 0.0f) *faceTwo[3] = center + dp[0] + dp[1] + dp[2];
+            if (faceOneW[0] != 0.0f) *faceOne[0] = centerOfVoxels - dp[0] - dp[1] - dp[2];
+            if (faceOneW[1] != 0.0f) *faceOne[1] = centerOfVoxels + dp[0] - dp[1] - dp[2];
+            if (faceOneW[2] != 0.0f) *faceOne[2] = centerOfVoxels - dp[0] + dp[1] - dp[2];
+            if (faceOneW[3] != 0.0f) *faceOne[3] = centerOfVoxels + dp[0] + dp[1] - dp[2];
+            if (faceTwoW[0] != 0.0f) *faceTwo[0] = centerOfVoxels - dp[0] - dp[1] + dp[2];
+            if (faceTwoW[1] != 0.0f) *faceTwo[1] = centerOfVoxels + dp[0] - dp[1] + dp[2];
+            if (faceTwoW[2] != 0.0f) *faceTwo[2] = centerOfVoxels - dp[0] + dp[1] + dp[2];
+            if (faceTwoW[3] != 0.0f) *faceTwo[3] = centerOfVoxels + dp[0] + dp[1] + dp[2];
 
             //apply delta from midpoint positions back to particle positions
             for (int i = 0; i < 4; i++) {
