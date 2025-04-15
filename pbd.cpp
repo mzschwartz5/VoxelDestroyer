@@ -281,6 +281,7 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
     float sumW2 = faceTwoW[0] + faceTwoW[1] + faceTwoW[2] + faceTwoW[3];
 
     if (sumW1 == 0.0f || sumW2 == 0.0f) {
+        MGlobal::displayInfo("Static voxel");
         //handle static voxel case
         glm::vec3 u1, u2, u0;
 
@@ -341,8 +342,7 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
                 particles[voxelTwo.particles[faceTwoIndices[i]]].position += delta;
             }
         }
-    }
-    else {
+    } else {
         //no static voxels - apply iterative shape preservation
         float alpha = 0.75f;
         float alphaLen = 0.0f;
@@ -377,10 +377,12 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
 
             //check for flipping
             float V = glm::dot(glm::cross(u0, u1), u2);
-            //if (axis == 1) V = -V; //hack to match GPU code
+            if (axis == 0) V = -V; //hack to match GPU code
 
             if (V < 0.0f) {
                 MGlobal::displayInfo("Constraint broken due to flipping");
+                std::string vStr{ "Volume: " + std::to_string(V) };
+                MGlobal::displayInfo(vStr.c_str());
                 faceConstraint.voxelOneIdx = -1;
                 faceConstraint.voxelTwoIdx = -1;
                 return;
