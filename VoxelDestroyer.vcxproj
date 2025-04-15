@@ -135,11 +135,13 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="pbd.h" />
     <ClInclude Include="directx.h" />
+    <ClInclude Include="voxelizer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="plugin.cpp" />
     <ClCompile Include="pbd.cpp" />
     <ClCompile Include="directx.cpp" />
+    <ClCompile Include="voxelizer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shaders\testcompute.hlsl">
