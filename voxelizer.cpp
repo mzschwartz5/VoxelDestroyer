@@ -9,6 +9,7 @@ std::vector<Voxel> Voxelizer::voxelizeSelectedMesh(
     float gridEdgeLength,
     float voxelSize,
     MPoint gridCenter,
+    MDagPath& voxelizedMeshPath,
     MStatus& status
 ) {
 
@@ -40,7 +41,7 @@ std::vector<Voxel> Voxelizer::voxelizeSelectedMesh(
         voxels
     );
 
-    createVoxels(
+    voxelizedMeshPath = createVoxels(
         voxels,
         gridEdgeLength,
         voxelSize,
@@ -308,7 +309,7 @@ double Voxelizer::getTriangleVoxelCenterIntercept(
     return X_intercept;
 }
 
-void Voxelizer::createVoxels(
+MDagPath Voxelizer::createVoxels(
     std::vector<Voxel>& overlappedVoxels,
     float gridEdgeLength, 
     float voxelSize,       
@@ -365,6 +366,10 @@ void Voxelizer::createVoxels(
     shadingGroupSelectionList.getDependNode(0, shadingGroup);
     MFnSet shadingGroupFn(shadingGroup);
     shadingGroupFn.addMember(resultMeshObject);
+
+    MDagPath resultMeshDagPath;
+    MDagPath::getAPathTo(resultMeshObject, resultMeshDagPath);
+    return resultMeshDagPath;
 }
 
 int faceIndices[6][4] = {
@@ -441,10 +446,11 @@ MObject Voxelizer::addVoxelToMesh(
     // Boolean'ing every cube with the mesh is SLOW. It's done serially. Would be much faster if in parallel, but Maya doesn't support (afaik).
     // Could look into replacing the following with CGAL, which could be parallelized.
 
-    MObjectArray objsToIntersect;
-    objsToIntersect.append(cubeMeshFn.object());
-    objsToIntersect.append(originalMesh.object());
-    cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect);
+    // TEMPORARILY COMMENTED OUT - until we have code in place to transform the vertices within each voxel, just return the voxel itself.
+    // MObjectArray objsToIntersect;
+    // objsToIntersect.append(cubeMeshFn.object());
+    // objsToIntersect.append(originalMesh.object());
+    // cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect);
 
     // Store vertices in the Voxel object
     // Same as above, we can explore a way to store a reference to the vertices or to a MFnMesh so that we can easily change the vertex positions.
