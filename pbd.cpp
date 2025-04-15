@@ -2,50 +2,16 @@
 #include <maya/MGlobal.h>
 #include <float.h>
 
-PBD::PBD(const std::vector<glm::vec3>& positions) {
+PBD::PBD() {
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
 
-    for (const auto& position : positions) {
-        Particle particle;
-        particle.oldPosition = particle.position = position;
-        particle.velocity = glm::vec3(0.0f);
-        particle.w = 1.0f;
-        particles.push_back(particle);
-    }
-
-    for (int i = 0; i < particles.size(); i += 8) {
-		Voxel voxel;
-        std::array<int, 8> voxelParticles = {i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7};
-
-        // Sort particles based on their positions to match the desired winding order
-        std::sort(voxelParticles.begin(), voxelParticles.end(), [this](int a, int b) {
-            // First sort by Z (back face before front face)
-            if (particles[a].position.z < particles[b].position.z) return true;
-            if (particles[a].position.z > particles[b].position.z) return false;
-
-            // If Z is equal, sort by Y (bottom before top)
-            if (particles[a].position.y < particles[b].position.y) return true;
-            if (particles[a].position.y > particles[b].position.y) return false;
-
-            // If Z and Y are equal, sort by X (left before right)
-            return particles[a].position.x < particles[b].position.x;
-        });
-
-        voxel.particles = voxelParticles;
-        voxel.volume = 1.0f; // use the edge length cubed later
-        voxel.restVolume = voxel.volume;
-        voxels.push_back(voxel);
-    }
-
-    PARTICLE_RADIUS = glm::length(particles[voxels[0].particles[1]].position - particles[voxels[0].particles[2]].position) * 0.25f;
-
     //create face to face constraints
-    FaceConstraint faceConstraint;
+    /*FaceConstraint faceConstraint;
     faceConstraint.voxelOneIdx = 0;
     faceConstraint.voxelTwoIdx = 1;
     faceConstraint.compressionLimit = -PARTICLE_RADIUS * 10.0f;
     faceConstraint.tensionLimit = PARTICLE_RADIUS * 1.28f;
-    faceConstraints[0].push_back(faceConstraint);
+    faceConstraints[0].push_back(faceConstraint);*/
 }
 
 const std::vector<Particle>& PBD::simulateStep()
@@ -92,6 +58,42 @@ void PBD::simulateSubstep() {
         if (particle.w == 0.0f) continue;
         particle.velocity = (particle.position - particle.oldPosition) / timeStep;
     }
+}
+
+Voxel& PBD::addParticlesAndMakeVoxel(std::array<glm::vec3, 8> particlesToAdd, int voxelCount) {
+    for (const auto& position : particlesToAdd) {
+        Particle particle;
+        particle.oldPosition = particle.position = position;
+        particle.velocity = glm::vec3(0.0f);
+        particle.w = 1.0f;
+        particles.push_back(particle);
+    }
+
+    int startParticleIdx = voxelCount * 8;
+    Voxel voxel;
+    std::array<int, 8> voxelParticles = { startParticleIdx, startParticleIdx + 1,
+            startParticleIdx + 2, startParticleIdx + 3, startParticleIdx + 4,
+            startParticleIdx + 5, startParticleIdx + 6, startParticleIdx + 7 };
+
+    // Sort particles based on their positions to match the desired winding order
+    std::sort(voxelParticles.begin(), voxelParticles.end(), [this](int a, int b) {
+        // First sort by Z (back face before front face)
+        if (particles[a].position.z < particles[b].position.z) return true;
+        if (particles[a].position.z > particles[b].position.z) return false;
+
+        // If Z is equal, sort by Y (bottom before top)
+        if (particles[a].position.y < particles[b].position.y) return true;
+        if (particles[a].position.y > particles[b].position.y) return false;
+
+        // If Z and Y are equal, sort by X (left before right)
+        return particles[a].position.x < particles[b].position.x;
+        });
+
+    voxel.particles = voxelParticles;
+    voxel.volume = 1.0f; // use the edge length cubed later
+    voxel.restVolume = voxel.volume;
+    voxels.push_back(voxel);
+    return voxel;
 }
 
 void PBD::solveGroundCollision()

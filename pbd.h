@@ -14,6 +14,7 @@ struct Particle
 
 struct Voxel {
 	std::array<int, 8> particles; //indices into the global array of particles
+    glm::vec3 center;
     float volume;
     float restVolume;
 };
@@ -28,13 +29,16 @@ struct FaceConstraint {
 class PBD
 {
 public:
-    PBD() = default;
-    PBD(const std::vector<glm::vec3>& positions);
+    PBD();
     ~PBD() = default;
     const std::vector<Particle>& simulateStep();
     void simulateSubstep();
 
 	std::vector<Particle> getParticles() const { return particles; }
+
+    Voxel& addParticlesAndMakeVoxel(std::array<glm::vec3, 8> particlesToAdd, int voxelCount);
+
+    void setParticleRadius() { PARTICLE_RADIUS = glm::length(particles[voxels[0].particles[1]].position - particles[voxels[0].particles[2]].position) * 0.25f; }
 
 private:
     std::vector<Particle> particles;

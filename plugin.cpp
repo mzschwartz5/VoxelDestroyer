@@ -21,7 +21,7 @@
 PBD pbdSimulator;
 MCallbackId callbackId;
 //DirectX dx;
-std::vector<std::pair<MDagPath, std::pair<size_t, size_t>>> meshParticleRanges; // Mesh and its particle range
+std::vector<std::pair<MDagPath, Voxel>> meshVoxelMap;
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -41,18 +41,20 @@ MSyntax plugin::syntax()
 void simulatePBDStep(void* clientData) {
 	const std::vector<Particle>& particles = pbdSimulator.simulateStep();
 
-	for (const auto& entry : meshParticleRanges) {
+	for (const auto& entry : meshVoxelMap) {
 		auto& meshDagPath = entry.first;
-		auto& range = entry.second;
+		auto& voxel = entry.second;
 		MFnMesh meshFn(meshDagPath);
 		MPointArray vertexArray;
 		meshFn.getPoints(vertexArray, MSpace::kWorld);
 
 		// Update the vertex positions based on the corresponding particles
-		size_t startIdx = range.first;
-		size_t endIdx = range.second;
-		for (size_t i = startIdx; i < endIdx; ++i) {
-			vertexArray[i - startIdx] = MPoint(particles[i].position.x, particles[i].position.y, particles[i].position.z);
+		for (int i = 0; i < voxel.particles.size(); i++) {
+			auto& particlePos = particles[voxel.particles[i]].position;
+			auto& voxelCenter = voxel.center;
+			auto particleDif = particlePos - voxelCenter;
+			auto newVertPos = voxelCenter + particleDif * 2.0f;
+			vertexArray[i] = MPoint(newVertPos[0], newVertPos[1], newVertPos[2]);
 		}
 
 		// Apply the updated vertex positions to the mesh
@@ -81,9 +83,7 @@ MStatus createParticlesFromSelectedMesh()
 		MGlobal::displayError("No mesh selected.");
 		return status;
 	}
-
-	std::vector<glm::vec3> allParticles;
-	meshParticleRanges.clear(); // Clear any previous mappings
+	meshVoxelMap.clear(); // Clear any previous mappings
 
 	for (; !iter.isDone(); iter.next()) {
 		MDagPath meshDagPath;
@@ -100,24 +100,28 @@ MStatus createParticlesFromSelectedMesh()
 		MPointArray vertexArray;
 		meshFn.getPoints(vertexArray, MSpace::kWorld);
 
-		// Store the starting index of this mesh's particles
-		size_t startIdx = allParticles.size();
+		std::array<glm::vec3, 8> currentVoxelPositions;
+		glm::vec3 center{ 0.0f, 0.0f, 0.0f };
 
 		// Add particles for each vertex position
 		for (unsigned int i = 0; i < vertexArray.length(); ++i) {
 			MPoint point = vertexArray[i];
-			allParticles.push_back(glm::vec3(point.x, point.y, point.z));
+			center += glm::vec3(point.x, point.y, point.z);
+			currentVoxelPositions[i] = glm::vec3(point.x, point.y, point.z);
 		}
 
-		// Store the ending index of this mesh's particles
-		size_t endIdx = allParticles.size();
+		center *= 0.125f;
+		for (auto& position : currentVoxelPositions) {
+			auto diffToCenter = position - center;
+			position = center + diffToCenter * 0.5f;
+		}
+
+		Voxel& newVoxel = pbdSimulator.addParticlesAndMakeVoxel(currentVoxelPositions, meshVoxelMap.size());
+		newVoxel.center = center;
 
 		// Map the mesh to its particle range
-		meshParticleRanges.emplace_back(meshDagPath, std::make_pair(startIdx, endIdx));
+		meshVoxelMap.emplace_back(meshDagPath, newVoxel);
 	}
-
-	// Initialize the PBD simulator with all particles
-	pbdSimulator = PBD(allParticles);
 
 	return MS::kSuccess;
 }
@@ -158,6 +162,8 @@ EXPORT MStatus initializePlugin(MObject obj)
 		MGlobal::displayError("Failed to register callback");
 		return MStatus::kFailure;
 	}
+
+	pbdSimulator = PBD();
 
 	// Initialize DirectX
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
