@@ -45,6 +45,7 @@ public:
         float gridEdgeLength,
         float voxelSize,
         MPoint gridCenter,
+        MDagPath& voxelizedMeshDagPath,
         MStatus& status
     );
 
@@ -92,7 +93,7 @@ private:
         const MVector& voxelCenterYZ // YZ coords of the voxel column center
     );
 
-    void createVoxels(
+    MDagPath createVoxels(
         std::vector<Voxel>& occupiedVoxels,
         float gridEdgeLength, 
         float voxelSize,       

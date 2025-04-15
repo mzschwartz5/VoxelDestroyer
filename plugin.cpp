@@ -18,7 +18,7 @@
 Voxelizer voxelizer;
 PBD pbdSimulator;
 MCallbackId callbackId;
-MDagPath selectedMeshDagPath;
+MDagPath voxelizedMeshDagPath;
 DirectX dx;
 
 // Maya Plugin creator function
@@ -40,7 +40,7 @@ void simulatePBDStep(void* clientData) {
 
 	const std::vector<Particle>& particles = pbdSimulator.simulateStep();
 
-	MFnMesh meshFn(selectedMeshDagPath);
+	MFnMesh meshFn(voxelizedMeshDagPath);
 	MPointArray vertexArray;
 	meshFn.getPoints(vertexArray, MSpace::kWorld);
 
@@ -56,68 +56,34 @@ void simulatePBDStep(void* clientData) {
 	MGlobal::executeCommand("refresh");
 }
 
-// Function to create particles at each vertex of the selected mesh
-MStatus createParticlesFromSelectedMesh()
-{
-    MStatus status;
-
-    // Get the current selection
-    MSelectionList selection;
-    MGlobal::getActiveSelectionList(selection);
-
-    // Iterate through the selection list
-    MItSelectionList iter(selection, MFn::kMesh, &status);
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("No mesh selected.");
-        return status;
-    }
-
-	std::vector<glm::vec3> particles;
-
-    for (; !iter.isDone(); iter.next()) {
-        iter.getDagPath(selectedMeshDagPath);
-
-        // Create an MFnMesh function set to operate on the selected mesh
-        MFnMesh meshFn(selectedMeshDagPath, &status);
-        if (status != MS::kSuccess) {
-            MGlobal::displayError("Failed to create MFnMesh.");
-            return status;
-        }
-
-		// Get the vertex positions
-		MPointArray vertexArray;
-		meshFn.getPoints(vertexArray, MSpace::kWorld);
-
-		// Create particles at each vertex position
-		std::vector<glm::vec3> particles;
-		for (unsigned int i = 0; i < vertexArray.length(); ++i) {
-			MPoint point = vertexArray[i];
-			particles.push_back(glm::vec3(point.x, point.y, point.z));
-		}
-
-        // Initialize the PBD simulator with the particles
-        pbdSimulator = PBD(particles);
-    }
-
-    return MS::kSuccess;
-}
-
 // Plugin doIt function
 MStatus plugin::doIt(const MArgList& argList)
 {
 	MStatus status;
 
-	// createParticlesFromSelectedMesh();
-	MGlobal::displayInfo("Particles created.");
-
-	voxelizer.voxelizeSelectedMesh(
-		2.5f,
-		0.1f, // voxel size
-		MPoint(0.0f, 0.0f, 0.0f), // grid center
+	std::vector<Voxel> voxels = voxelizer.voxelizeSelectedMesh(
+		1.76f,
+		0.25f, // voxel size
+		MPoint(0.0f, 0.875f, 0.0f), // grid center
+		voxelizedMeshDagPath,
 		status
 	);
-	
-	MGlobal::displayInfo("Mesh voxelized.");
+
+	MGlobal::displayInfo("Mesh voxelized. Dag path: " + voxelizedMeshDagPath.fullPathName());
+
+	// Iterate over voxels and collect voxels.corners into a single particle list for the PBD simulator
+	std::vector<glm::vec3> particlePositions;
+	for (const auto& voxel : voxels) {
+		if (!voxel.occupied) continue;
+		
+		for (const auto& corner : voxel.corners) {
+			particlePositions.push_back(glm::vec3(corner.x, corner.y, corner.z));
+		}
+	}
+
+	pbdSimulator = PBD(particlePositions);
+
+	MGlobal::displayInfo("PBD particles initialized.");
 
 	// dx.dispatchComputeShaders();
 	MGlobal::displayInfo("Compute shaders dispatched.");
