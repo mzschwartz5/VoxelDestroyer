@@ -322,11 +322,13 @@ MDagPath Voxelizer::createVoxels(
 
     MString combinedMeshName = originalMesh.name() + "_voxelized";
     MString meshNamesConcatenated;
+    int filteredIndex = 0;
     for (int x = 0; x < voxelsPerEdge; ++x) {
         for (int y = 0; y < voxelsPerEdge; ++y) {
             for (int z = 0; z < voxelsPerEdge; ++z) {
                 int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
                 if (!overlappedVoxels[index].occupied) continue;
+                overlappedVoxels[index].filteredIndex = filteredIndex;
 
                 MPoint voxelMin = MPoint(
                     x * voxelSize + gridMin.x,
@@ -336,6 +338,7 @@ MDagPath Voxelizer::createVoxels(
 
                 MObject voxel = addVoxelToMesh(voxelMin, voxelSize, overlappedVoxels[index], originalMesh);
                 meshNamesConcatenated += " " + MFnMesh(voxel).name();
+                filteredIndex++;
             }
         }
     }
