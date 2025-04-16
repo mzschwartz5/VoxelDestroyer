@@ -1,10 +1,12 @@
 #include "directx.h"
 #include <d3dcompiler.h>
-#include "resource.h"
+#include "../resource.h"
+#include "../directx/compute/updatevoxelbasescompute.h"
 
 DirectX::DirectX(HINSTANCE pluginInstance)
 {
     this->pluginInstance = pluginInstance;
+
     // Get the renderer
     MRenderer* renderer = MRenderer::theRenderer();
     if (!renderer) {
@@ -37,13 +39,24 @@ DirectX::~DirectX()
     tearDown();
 }
 
+void DirectX::dispatchShaderByType(ComputeShaderType type, int threadGroupCount)
+{
+    auto it = computeShaders.find(type);
+    if (it == computeShaders.end()) {
+        MGlobal::displayError("Compute shader type not found");
+        return;
+    }
+
+    ComputeShader& computeShader = it->second;
+    computeShader.dispatch(dxContext, threadGroupCount);
+}
+
 void DirectX::tearDown()
 {
-    for (auto& shader : computeShaders) {
-        if (shader.shaderPtr) {
-            shader.shaderPtr->Release();
-        }
+    for (auto& computeShader : computeShaders) {
+        computeShader.second.tearDown();
     }
+
     computeShaders.clear();
 
     if (dxContext) {
@@ -57,24 +70,18 @@ void DirectX::tearDown()
     }
 }
 
-
 void DirectX::loadComputeShaders()
 {
-    ComputeShader firstShader;
-    firstShader.name = "IDR_SHADER1";
-    firstShader.id = IDR_SHADER1;
-	firstShader.shaderPtr = NULL;
-    loadComputeShader(firstShader);
-    
-	computeShaders.push_back(firstShader);
-	bindDemoShader();
+    UpdateVoxelBasesCompute updateVoxelBasisCompute;
+    loadComputeShader(updateVoxelBasisCompute);
 }
 
 void DirectX::loadComputeShader(ComputeShader& computeShader)
 {
+	computeShaders[computeShader.getType()] = computeShader;
 
     // Locate the shader resource    
-    HRSRC hResource = FindResource(pluginInstance, MAKEINTRESOURCE(computeShader.id), L"SHADER");
+    HRSRC hResource = FindResource(pluginInstance, MAKEINTRESOURCE(computeShader.getId()), L"SHADER");
     if (!hResource) {
         MGlobal::displayError("Failed to find shader resource");
         return;
@@ -109,28 +116,10 @@ void DirectX::loadComputeShader(ComputeShader& computeShader)
         return;
     }
 
-    hr = dxDevice->CreateComputeShader( ( DWORD* )pPSBuf->GetBufferPointer(), pPSBuf->GetBufferSize(), NULL, &computeShader.shaderPtr);
+    hr = dxDevice->CreateComputeShader( ( DWORD* )pPSBuf->GetBufferPointer(), pPSBuf->GetBufferSize(), NULL, &computeShader.getShaderPtr());
     if (FAILED(hr)) {
         MGlobal::displayError("Failed to create compute shader");
         return;
     }
     pPSBuf->Release();
-
-}
-
-void DirectX::bindDemoShader() {
-    // Here we would set up buffers and resources for the compute shader
-    dxContext->CSSetShader(computeShaders[0].shaderPtr, NULL, 0);
-}
-
-void DirectX::dispatchComputeShaders()
-{
-	for (auto& shader : computeShaders) {
-        if (!dxContext || !shader.shaderPtr) {
-            MGlobal::displayError("Failed to dispatch compute shaders");
-            return;
-        }
-
-        dxContext->Dispatch(1, 1, 1);
-	}
 }

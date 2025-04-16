@@ -10,7 +10,8 @@
 #include "pbd.h"
 #include <vector>
 #include "voxelizer.h"
-#include "directx.h"
+#include "directx/directx.h"
+#include "directx/compute/computeshader.h"
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -38,6 +39,8 @@ MSyntax plugin::syntax()
 
 void simulatePBDStep(void* clientData) {
 	const std::vector<Particle>& particles = pbdSimulator.simulateStep();
+
+	dx.dispatchShaderByType(ComputeShaderType::UpdateVoxelBasis, 1);
 
 	MFnMesh meshFn(voxelizedMeshDagPath);
 	MPointArray vertexArray;
@@ -83,10 +86,6 @@ MStatus plugin::doIt(const MArgList& argList)
 	pbdSimulator = PBD(particlePositions, voxelSize);
 
 	MGlobal::displayInfo("PBD particles initialized.");
-
-	// dx.dispatchComputeShaders();
-	//MGlobal::displayInfo("Compute shaders dispatched.");
-
 	return status;
 }
 
@@ -109,7 +108,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 
 	// Initialize DirectX
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
-	// dx = DirectX(MhInstPlugin);
+	dx = DirectX(MhInstPlugin);
 	voxelizer = Voxelizer();
 	
 	return status;
@@ -127,7 +126,7 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	// Deregister the callback
 	MEventMessage::removeCallback(callbackId);
 
-	// dx.tearDown();
+	dx.tearDown();
 
 	return status;
 }

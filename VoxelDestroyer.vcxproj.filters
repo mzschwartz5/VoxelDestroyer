@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="shaders\testcompute.hlsl" />
+    <FxCompile Include="shaders\updatevoxelbasis.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="plugin.cpp">
