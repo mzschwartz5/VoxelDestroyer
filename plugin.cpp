@@ -39,15 +39,15 @@ MSyntax plugin::syntax()
 }
 
 void simulatePBDStep(void* clientData) {
-	const std::vector<Particle>& particles = pbdSimulator.simulateStep();
+	const Particles& particles = pbdSimulator.simulateStep();
 
 	MFnMesh meshFn(voxelizedMeshDagPath);
 	MPointArray vertexArray;
 	meshFn.getPoints(vertexArray, MSpace::kWorld);
 
 	int idx = 0;
-	for (auto& particle : particles) {
-		vertexArray[idx] = MPoint(particle.position.x, particle.position.y, particle.position.z);
+	for (int i = 0; i < particles.numParticles; i++) {
+		vertexArray[idx] = MPoint(particles.positions[i].x, particles.positions[i].y, particles.positions[i].z);
 		idx++;
 	}
 
