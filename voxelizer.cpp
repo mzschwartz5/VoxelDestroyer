@@ -373,11 +373,11 @@ MDagPath Voxelizer::createVoxels(
 }
 
 int faceIndices[6][4] = {
-    {0, 1, 3, 2}, // Bottom
-    {4, 6, 7, 5}, // Top
-    {0, 4, 5, 1}, // Front
+    {0, 1, 5, 4}, // Bottom
+    {2, 3, 7, 6}, // Top
+    {4, 6, 7, 5}, // Front
     {1, 5, 7, 3}, // Right
-    {3, 7, 6, 2}, // Back
+    {2, 3, 1, 0}, // Back
     {2, 6, 4, 0}  // Left
 };
 
@@ -403,12 +403,12 @@ MObject Voxelizer::addVoxelToMesh(
     float halfVoxelSize = voxelSize * 0.5f;
 
     cubeVertices.append(voxelMin);
-    cubeVertices.append(MPoint(voxelMin.x, voxelMin.y, voxelMax.z));
-    cubeVertices.append(MPoint(voxelMin.x, voxelMax.y, voxelMin.z));
-    cubeVertices.append(MPoint(voxelMin.x, voxelMax.y, voxelMax.z));
     cubeVertices.append(MPoint(voxelMax.x, voxelMin.y, voxelMin.z));
-    cubeVertices.append(MPoint(voxelMax.x, voxelMin.y, voxelMax.z));
+    cubeVertices.append(MPoint(voxelMin.x, voxelMax.y, voxelMin.z));
     cubeVertices.append(MPoint(voxelMax.x, voxelMax.y, voxelMin.z));
+    cubeVertices.append(MPoint(voxelMin.x, voxelMin.y, voxelMax.z));
+    cubeVertices.append(MPoint(voxelMax.x, voxelMin.y, voxelMax.z));
+    cubeVertices.append(MPoint(voxelMin.x, voxelMax.y, voxelMax.z));
     cubeVertices.append(voxelMax);
     voxel.corners = cubeVertices;
 
