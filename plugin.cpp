@@ -43,19 +43,15 @@ void simulatePBDStep(void* clientData) {
 	MPointArray vertexArray;
 	meshFn.getPoints(vertexArray, MSpace::kWorld);
 
-		// Update the vertex positions based on the corresponding particles
-		size_t startIdx = range.first;
-		size_t endIdx = range.second;
-		for (size_t i = startIdx; i < endIdx; ++i) {
-			vertexArray[i - startIdx] = MPoint(particles[i].position.x, particles[i].position.y, particles[i].position.z);
-		}
-
-		// Apply the updated vertex positions to the mesh
-		meshFn.setPoints(vertexArray, MSpace::kWorld);
-		meshFn.updateSurface();
+	int idx = 0;
+	for (auto& particle : particles) {
+		vertexArray[idx] = MPoint(particle.position.x, particle.position.y, particle.position.z);
+		idx++;
 	}
 
-	// Refresh the viewport
+	meshFn.setPoints(vertexArray, MSpace::kWorld);
+	meshFn.updateSurface();
+
 	MGlobal::executeCommand("refresh");
 }
 
@@ -63,18 +59,18 @@ void simulatePBDStep(void* clientData) {
 MStatus plugin::doIt(const MArgList& argList)
 {
 	MStatus status;
-
+	float voxelSize = 0.25f;
 	std::vector<Voxel> voxels = voxelizer.voxelizeSelectedMesh(
-		1.76f,
-		0.25f, // voxel size
-		MPoint(0.0f, 0.875f, 0.0f), // grid center
+		1.0f, //size of the grid
+		voxelSize, // voxel size
+		MPoint(0.0f, 3.0f, 0.0f), // grid center
 		voxelizedMeshDagPath,
 		status
 	);
 
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + voxelizedMeshDagPath.fullPathName());
 
-	// Iterate over voxels and collect voxels.corners into a single particle list for the PBD simulator
+	// Iterate over voxels and collect voxels corners into a single particle list for the PBD simulator
 	std::vector<glm::vec3> particlePositions;
 	for (const auto& voxel : voxels) {
 		if (!voxel.occupied) continue;
@@ -84,12 +80,12 @@ MStatus plugin::doIt(const MArgList& argList)
 		}
 	}
 
-	pbdSimulator = PBD(particlePositions);
+	pbdSimulator = PBD(particlePositions, voxelSize);
 
 	MGlobal::displayInfo("PBD particles initialized.");
 
 	// dx.dispatchComputeShaders();
-	MGlobal::displayInfo("Compute shaders dispatched.");
+	//MGlobal::displayInfo("Compute shaders dispatched.");
 
 	return status;
 }

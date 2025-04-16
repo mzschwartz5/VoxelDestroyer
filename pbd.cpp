@@ -2,7 +2,7 @@
 #include <maya/MGlobal.h>
 #include <float.h>
 
-PBD::PBD(const std::vector<glm::vec3>& positions) {
+PBD::PBD(const std::vector<glm::vec3>& positions, float voxelSize) {
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
 
     for (const auto& position : positions) {
@@ -13,39 +13,7 @@ PBD::PBD(const std::vector<glm::vec3>& positions) {
         particles.push_back(particle);
     }
 
-    for (int i = 0; i < particles.size(); i += 8) {
-		Voxel voxel;
-        std::array<int, 8> voxelParticles = {i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6, i + 7};
-
-        // Sort particles based on their positions to match the desired winding order
-        std::sort(voxelParticles.begin(), voxelParticles.end(), [this](int a, int b) {
-            // First sort by Z (back face before front face)
-            if (particles[a].position.z < particles[b].position.z) return true;
-            if (particles[a].position.z > particles[b].position.z) return false;
-
-            // If Z is equal, sort by Y (bottom before top)
-            if (particles[a].position.y < particles[b].position.y) return true;
-            if (particles[a].position.y > particles[b].position.y) return false;
-
-            // If Z and Y are equal, sort by X (left before right)
-            return particles[a].position.x < particles[b].position.x;
-        });
-
-        voxel.particles = voxelParticles;
-        voxel.volume = 1.0f; // use the edge length cubed later
-        voxel.restVolume = voxel.volume;
-        voxels.push_back(voxel);
-    }
-
-    PARTICLE_RADIUS = glm::length(particles[voxels[0].particles[1]].position - particles[voxels[0].particles[2]].position) * 0.25f;
-
-    //create face to face constraints
-    FaceConstraint faceConstraint;
-    faceConstraint.voxelOneIdx = 0;
-    faceConstraint.voxelTwoIdx = 1;
-    faceConstraint.compressionLimit = -PARTICLE_RADIUS * 10.0f;
-    faceConstraint.tensionLimit = PARTICLE_RADIUS * 1.28f;
-    faceConstraints[0].push_back(faceConstraint);
+    setRadiusAndVolumeFromLength(voxelSize);
 }
 
 const std::vector<Particle>& PBD::simulateStep()
@@ -65,27 +33,20 @@ void PBD::simulateSubstep() {
     {
         if (particle.w == 0.0f) continue;
         particle.velocity += glm::vec3(0.0f, -10.0f, 0.0f) * timeStep;
-        if (idx < 8) {
-            //particle.velocity += glm::vec3(0.01f, 0.f, 0.f);
-        }
-        else {
-            //particle.velocity += glm::vec3(-0.01f, 0.f, 0.f);
-        }
-        particle.velocity += glm::vec3(-0.01f, 0.f, 0.01f);
         idx++;
         particle.oldPosition = particle.position;
         particle.position += particle.velocity * timeStep;
     }
 
     solveGroundCollision();
-	for (auto& voxel : voxels) {
-		solveVGS(voxel, 3);
+    for (int i = 0; i < particles.size(); i += 8) {
+		solveVGS(i, 3);
 	}
-    for (int i = 0; i < faceConstraints.size(); i++) {
+    /*for (int i = 0; i < faceConstraints.size(); i++) {
         for (auto& constraint : faceConstraints[i]) {
             solveFaceConstraint(constraint, i);
         }
-    }
+    }*/
 
     for (auto& particle : particles)
     {
@@ -112,22 +73,32 @@ glm::vec3 PBD::project(glm::vec3 x, glm::vec3 y) {
     return (glm::dot(y, x) / glm::dot(y, y)) * y;
 }
 
-void PBD::solveVGS(Voxel& voxel, unsigned int iter_count) {
+void PBD::solveVGS(int start_idx, unsigned int iter_count) {
     for (unsigned int i = 0; i < iter_count; i++) {
-        glm::vec3& p0 = particles[voxel.particles[0]].position;
-        glm::vec3& p1 = particles[voxel.particles[1]].position;
-        glm::vec3& p2 = particles[voxel.particles[2]].position;
-        glm::vec3& p3 = particles[voxel.particles[3]].position;
-        glm::vec3& p4 = particles[voxel.particles[4]].position;
-        glm::vec3& p5 = particles[voxel.particles[5]].position;
-        glm::vec3& p6 = particles[voxel.particles[6]].position;
-        glm::vec3& p7 = particles[voxel.particles[7]].position;
-		glm::vec3 centroid = p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7;
-		centroid /= 8.0f;
+		Particle& particle0 = particles[start_idx];
+		Particle& particle1 = particles[start_idx + 1];
+		Particle& particle2 = particles[start_idx + 2];
+		Particle& particle3 = particles[start_idx + 3];
+		Particle& particle4 = particles[start_idx + 4];
+		Particle& particle5 = particles[start_idx + 5];
+		Particle& particle6 = particles[start_idx + 6];
+		Particle& particle7 = particles[start_idx + 7];
 
-		glm::vec3 v0 = ((p1 - p0) + (p3 - p2) + (p5 - p4) + (p7 - p6)) / 4.0f;
-        glm::vec3 v1 = ((p2 - p0) + (p3 - p1) + (p6 - p4) + (p7 - p5)) / 4.0f;
-        glm::vec3 v2 = ((p4 - p0) + (p5 - p1) + (p6 - p2) + (p7 - p3)) / 4.0f;
+        glm::vec3& p0 = particle0.position;
+        glm::vec3& p1 = particle1.position;
+		glm::vec3& p2 = particle2.position;
+		glm::vec3& p3 = particle3.position;
+		glm::vec3& p4 = particle4.position;
+		glm::vec3& p5 = particle5.position;
+		glm::vec3& p6 = particle6.position;
+		glm::vec3& p7 = particle7.position;
+
+		glm::vec3 centroid = p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7;
+		centroid *= 0.125f;
+
+		glm::vec3 v0 = ((p1 - p0) + (p3 - p2) + (p5 - p4) + (p7 - p6)) * 0.25f;
+        glm::vec3 v1 = ((p2 - p0) + (p3 - p1) + (p6 - p4) + (p7 - p5)) * 0.25f;
+        glm::vec3 v2 = ((p4 - p0) + (p5 - p1) + (p6 - p2) + (p7 - p3)) * 0.25f;
         
         glm::vec3 u0 = v0 - RELAXATION * (project(v0, v1) + project(v0, v2));
         glm::vec3 u1 = v1 - RELAXATION * (project(v1, v2) + project(v1, v0));
@@ -138,46 +109,46 @@ void PBD::solveVGS(Voxel& voxel, unsigned int iter_count) {
 		u2 = glm::normalize(u2) * ((1.f - BETA) * PARTICLE_RADIUS + (BETA * glm::length(v2) * 0.5f));
 		
         float volume = glm::dot(glm::cross(u0, u1), u2);
-        float mult = 0.5f * glm::pow((voxel.restVolume / volume), 1.0f / 3.0f);
+        float mult = 0.5f * glm::pow((VOXEL_REST_VOLUME / volume), 1.0f / 3.0f);
 
         u0 *= mult;
         u1 *= mult;
         u2 *= mult;
 
-		if (particles[voxel.particles[0]].w != 0.0f) {
+		if (particle0.w != 0.0f) {
             p0 = centroid - u0 - u1 - u2;
 		}
 
-        if (particles[voxel.particles[1]].w != 0.0f) {
+        if (particle1.w != 0.0f) {
             p1 = centroid + u0 - u1 - u2;
         }
 
-		if (particles[voxel.particles[2]].w != 0.0f) {
+		if (particle2.w != 0.0f) {
 			p2 = centroid - u0 + u1 - u2;
 		}
 
-        if (particles[voxel.particles[3]].w != 0.0f) {
+        if (particle3.w != 0.0f) {
             p3 = centroid + u0 + u1 - u2;
         }
 
-		if (particles[voxel.particles[4]].w != 0.0f) {
+		if (particle4.w != 0.0f) {
 			p4 = centroid - u0 - u1 + u2;
 		}
-        if (particles[voxel.particles[5]].w != 0.0f) {
+        if (particle5.w != 0.0f) {
             p5 = centroid + u0 - u1 + u2;
         }
 
-		if (particles[voxel.particles[6]].w != 0.0f) {
+		if (particle6.w != 0.0f) {
 			p6 = centroid - u0 + u1 + u2;
 		}
 
-        if (particles[voxel.particles[7]].w != 0.0f) {
+        if (particle7.w != 0.0f) {
             p7 = centroid + u0 + u1 + u2;
         }
     }
 }
 
-void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
+/*void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
     //check if constraint has already been broken
     if (faceConstraint.voxelOneIdx == -1 || faceConstraint.voxelTwoIdx == -1) {
         return;
@@ -432,4 +403,4 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
             }
         }
     }
-}
+}*/
