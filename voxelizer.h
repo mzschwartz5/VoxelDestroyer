@@ -107,10 +107,4 @@ private:
         Voxel& voxel,
         MFnMesh& originalSurface
     );
-
-    uint32_t toMortonCode(
-        uint32_t x,
-        uint32_t y,
-        uint32_t z
-    );
 };
