@@ -31,6 +31,7 @@ struct Voxel {
     bool occupied = false; // contains some part (surface or interior) of the underlying mesh
     bool isSurface = false;
     uint32_t mortonCode = UINT32_MAX;
+    int filteredIndex;    // what the index of this voxel would be if we filtered out unoccupied voxels.
     MPointArray vertices; // vertices owned by this voxel (to be transformed during the PBD (VGS) simulation)
     MPointArray corners;  // ordered according to the VGS expectations
 };
@@ -106,11 +107,5 @@ private:
         float voxelSize,        // edge length of a single voxel
         Voxel& voxel,
         MFnMesh& originalSurface
-    );
-
-    uint32_t toMortonCode(
-        uint32_t x,
-        uint32_t y,
-        uint32_t z
     );
 };
