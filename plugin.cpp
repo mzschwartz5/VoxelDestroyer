@@ -12,6 +12,7 @@
 #include "voxelizer.h"
 #include "directx/directx.h"
 #include "directx/compute/computeshader.h"
+#include "directx/compute/updatevoxelbasescompute.h"
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -40,8 +41,6 @@ MSyntax plugin::syntax()
 void simulatePBDStep(void* clientData) {
 	const std::vector<Particle>& particles = pbdSimulator.simulateStep();
 
-	dx.dispatchShaderByType(ComputeShaderType::UpdateVoxelBasis, 1);
-
 	MFnMesh meshFn(voxelizedMeshDagPath);
 	MPointArray vertexArray;
 	meshFn.getPoints(vertexArray, MSpace::kWorld);
@@ -51,6 +50,10 @@ void simulatePBDStep(void* clientData) {
 		vertexArray[idx] = MPoint(particle.position.x, particle.position.y, particle.position.z);
 		idx++;
 	}
+
+	// Need to update particles?
+	UpdateVoxelBasesCompute& updateVoxelBasisCompute = static_cast<UpdateVoxelBasesCompute&>(dx.getShaderByType(ComputeShaderType::UpdateVoxelBasis));
+	updateVoxelBasisCompute.dispatch(1);
 
 	meshFn.setPoints(vertexArray, MSpace::kWorld);
 	meshFn.updateSurface();
@@ -62,11 +65,11 @@ void simulatePBDStep(void* clientData) {
 MStatus plugin::doIt(const MArgList& argList)
 {
 	MStatus status;
-	float voxelSize = 0.25f;
+	float voxelSize = 0.1f;
 	std::vector<Voxel> voxels = voxelizer.voxelizeSelectedMesh(
-		1.0f, //size of the grid
+		3.0f, //size of the grid
 		voxelSize, // voxel size
-		MPoint(0.0f, 3.0f, 0.0f), // grid center
+		MPoint(0.0f, 0.0f, 0.0f), // grid center
 		voxelizedMeshDagPath,
 		status
 	);

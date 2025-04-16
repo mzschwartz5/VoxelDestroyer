@@ -39,16 +39,14 @@ DirectX::~DirectX()
     tearDown();
 }
 
-void DirectX::dispatchShaderByType(ComputeShaderType type, int threadGroupCount)
+ComputeShader& DirectX::getShaderByType(ComputeShaderType type)
 {
     auto it = computeShaders.find(type);
     if (it == computeShaders.end()) {
         MGlobal::displayError("Compute shader type not found");
-        return;
     }
 
-    ComputeShader& computeShader = it->second;
-    computeShader.dispatch(dxContext, threadGroupCount);
+    return it->second;
 }
 
 void DirectX::tearDown()
@@ -72,7 +70,7 @@ void DirectX::tearDown()
 
 void DirectX::loadComputeShaders()
 {
-    UpdateVoxelBasesCompute updateVoxelBasisCompute;
+    UpdateVoxelBasesCompute updateVoxelBasisCompute(dxDevice, dxContext, 1000); // todo: should not be initialized here...
     loadComputeShader(updateVoxelBasisCompute);
 }
 

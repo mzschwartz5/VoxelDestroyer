@@ -14,7 +14,7 @@ public:
     ~DirectX();
 
     void tearDown();
-    void dispatchShaderByType(ComputeShaderType type, int threadGroupCount);
+    ComputeShader& getShaderByType(ComputeShaderType type);
 
 private:
     void loadComputeShaders();
