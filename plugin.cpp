@@ -1,6 +1,5 @@
 #include "plugin.h"
 #include <maya/MFnPlugin.h>
-#include <maya/MGlobal.h>
 #include <maya/MEventMessage.h>
 #include <maya/MSelectionList.h>
 #include <maya/MFnMesh.h>
@@ -11,8 +10,6 @@
 #include <vector>
 #include "voxelizer.h"
 #include "directx/directx.h"
-#include "directx/compute/computeshader.h"
-#include "directx/compute/updatevoxelbasescompute.h"
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -21,7 +18,9 @@ Voxelizer voxelizer;
 PBD pbdSimulator;
 MCallbackId callbackId;
 MDagPath voxelizedMeshDagPath;
-DirectX dx;
+
+// Compute shaders
+UpdateVoxelBasesCompute updateVoxelBasesCompute;
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -51,9 +50,8 @@ void simulatePBDStep(void* clientData) {
 		idx++;
 	}
 
-	// Need to update particles?
-	UpdateVoxelBasesCompute& updateVoxelBasisCompute = static_cast<UpdateVoxelBasesCompute&>(dx.getShaderByType(ComputeShaderType::UpdateVoxelBasis));
-	updateVoxelBasisCompute.dispatch(1);
+	updateVoxelBasesCompute.updateParticleBuffer(particles.positions);
+	updateVoxelBasesCompute.dispatch(1);
 
 	meshFn.setPoints(vertexArray, MSpace::kWorld);
 	meshFn.updateSurface();
@@ -67,12 +65,15 @@ MStatus plugin::doIt(const MArgList& argList)
 	MStatus status;
 	float voxelSize = 0.1f;
 	std::vector<Voxel> voxels = voxelizer.voxelizeSelectedMesh(
-		3.0f, //size of the grid
+		1.0f, //size of the grid
 		voxelSize, // voxel size
 		MPoint(0.0f, 0.0f, 0.0f), // grid center
 		voxelizedMeshDagPath,
 		status
 	);
+
+	// TODO: handle if doIt is called repeatedly... this will just create new buffers but not free old ones?
+	updateVoxelBasesCompute = UpdateVoxelBasesCompute(static_cast<int>(voxels.size()) * 8); // 8 particles per voxel
 
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + voxelizedMeshDagPath.fullPathName());
 
@@ -111,7 +112,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 
 	// Initialize DirectX
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
-	dx = DirectX(MhInstPlugin);
+	DirectX::initialize(MhInstPlugin);
 	voxelizer = Voxelizer();
 	
 	return status;
@@ -128,8 +129,6 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 
 	// Deregister the callback
 	MEventMessage::removeCallback(callbackId);
-
-	dx.tearDown();
 
 	return status;
 }
