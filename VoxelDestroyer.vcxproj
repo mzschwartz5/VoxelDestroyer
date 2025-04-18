@@ -138,21 +138,13 @@
     <ClInclude Include="voxelizer.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\updatevoxelbasescompute.h" />
+    <ClInclude Include="constants.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="plugin.cpp" />
     <ClCompile Include="pbd.cpp" />
     <ClCompile Include="directx\directx.cpp" />
     <ClCompile Include="voxelizer.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="shaders\updatevoxelbasis.hlsl">
-      <EntryPoint>main</EntryPoint>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
-    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resources.rc" />

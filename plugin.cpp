@@ -10,6 +10,8 @@
 #include <vector>
 #include "voxelizer.h"
 #include "directx/directx.h"
+#include "constants.h"
+#include <memory>
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -20,7 +22,8 @@ MCallbackId callbackId;
 MDagPath voxelizedMeshDagPath;
 
 // Compute shaders
-UpdateVoxelBasesCompute updateVoxelBasesCompute;
+std::unique_ptr<UpdateVoxelBasesCompute> updateVoxelBasesCompute;
+int updateVoxelBasesNumWorkgroups;
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -50,8 +53,8 @@ void simulatePBDStep(void* clientData) {
 		idx++;
 	}
 
-	updateVoxelBasesCompute.updateParticleBuffer(particles.positions);
-	updateVoxelBasesCompute.dispatch(1);
+	updateVoxelBasesCompute->updateParticleBuffer(particles.positions);
+	updateVoxelBasesCompute->dispatch(updateVoxelBasesNumWorkgroups);
 
 	meshFn.setPoints(vertexArray, MSpace::kWorld);
 	meshFn.updateSurface();
@@ -67,14 +70,17 @@ MStatus plugin::doIt(const MArgList& argList)
 	std::vector<Voxel> voxels = voxelizer.voxelizeSelectedMesh(
 		1.0f, //size of the grid
 		voxelSize, // voxel size
-		MPoint(0.0f, 0.0f, 0.0f), // grid center
+		MPoint(0.0f, 3.0f, 0.0f), // grid center
 		voxelizedMeshDagPath,
 		status
 	);
 
 	// TODO: handle if doIt is called repeatedly... this will just create new buffers but not free old ones?
-	updateVoxelBasesCompute = UpdateVoxelBasesCompute(static_cast<int>(voxels.size()) * 8); // 8 particles per voxel
-
+	// Also need to make sure that this is called before updating the buffers in the callback...
+	updateVoxelBasesCompute = std::make_unique<UpdateVoxelBasesCompute>();
+	updateVoxelBasesCompute->initializeBuffers(static_cast<int>(voxels.size()) * 8); // 8 particles per voxel
+	updateVoxelBasesNumWorkgroups = (static_cast<int>(voxels.size()) + UPDATE_VOXEL_BASES_THEADS - 1) / UPDATE_VOXEL_BASES_THEADS;
+	
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + voxelizedMeshDagPath.fullPathName());
 
 	// Iterate over voxels and collect voxels corners into a single particle list for the PBD simulator

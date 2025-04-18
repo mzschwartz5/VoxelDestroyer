@@ -1,4 +1,5 @@
 #pragma once
+#include "constants.h"
 #include <d3d11.h>
 #include <wrl/client.h>
 #include "../../resource.h"
@@ -67,15 +68,29 @@ protected:
             return;
         }
         
+        // Replace the shader macros with the actual values
+        const std::string updateVoxelBasesThreadsStr = std::to_string(UPDATE_VOXEL_BASES_THEADS);
+        D3D_SHADER_MACRO SHADER_MACROS[] = {
+            { "UPDATE_VOXEL_BASES_THEADS", updateVoxelBasesThreadsStr.c_str() },
+            { NULL, NULL } // Terminate the array
+        };
+
         ID3D10Blob* pPSBuf = NULL;    
-        HRESULT hr = D3DCompile(pResourceData, resourceSize, NULL, NULL, NULL, "main", "cs_5_0", 0, 0, &pPSBuf, NULL);
+        ID3D10Blob* pErrorBlob = NULL;
+        HRESULT hr = D3DCompile(pResourceData, resourceSize, NULL, SHADER_MACROS, NULL, "main", "cs_5_0", 0, 0, &pPSBuf, &pErrorBlob);
 
         if (FAILED(hr)) {
-            MGlobal::displayError("Failed to compile shader");
+            if (pErrorBlob) {
+                const char* errorMessage = static_cast<const char*>(pErrorBlob->GetBufferPointer());
+                MGlobal::displayError(MString(("Failed to compile shader: " + std::string(errorMessage)).c_str()));
+                pErrorBlob->Release();
+            } else {
+                MGlobal::displayError("Failed to compile shader: Unknown error");
+            }
             return;
         }
 
-        hr = DirectX::getDevice()->CreateComputeShader( ( DWORD* )pPSBuf->GetBufferPointer(), pPSBuf->GetBufferSize(), NULL, &shaderPtr);
+        hr = DirectX::getDevice()->CreateComputeShader( pPSBuf->GetBufferPointer(), pPSBuf->GetBufferSize(), NULL, &shaderPtr);
         if (FAILED(hr)) {
             MGlobal::displayError("Failed to create compute shader");
             return;

@@ -11,8 +11,8 @@ void DirectX::initialize(HINSTANCE pluginInstance)
 
     // Get the renderer
     MRenderer* renderer = MRenderer::theRenderer();
-    if (!renderer) {
-        MGlobal::displayError("Failed to get the renderer, check that the viewport is set to Viewport 2.0");
+    if (!renderer || renderer->drawAPI() != DrawAPI::kDirectX11) {
+        MGlobal::displayError("Failed to get the renderer, check that the viewport is set to Viewport 2.0 with DirectX 11 as the rendering engine");
         return;
     }
 

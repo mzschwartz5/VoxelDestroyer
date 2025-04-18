@@ -6,8 +6,8 @@ PBD::PBD(const std::vector<vec3>& positions, float voxelSize) {
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
 
     for (const auto& position : positions) {
-        particles.positions.push_back(vec4(position, 1.0f));
-        particles.oldPositions.push_back(vec4(position, 1.0f));
+        particles.positions.push_back(vec4(position, 0.0f));
+        particles.oldPositions.push_back(vec4(position, 0.0f));
         particles.velocities.push_back(vec4(0.0f));
         particles.w.push_back(1.0f);
         particles.numParticles++;
