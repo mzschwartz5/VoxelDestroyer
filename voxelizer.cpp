@@ -373,12 +373,12 @@ MDagPath Voxelizer::createVoxels(
 }
 
 int faceIndices[6][4] = {
-    {0, 1, 5, 4}, // Bottom
-    {2, 3, 7, 6}, // Top
-    {4, 6, 7, 5}, // Front
-    {1, 5, 7, 3}, // Right
-    {2, 3, 1, 0}, // Back
-    {2, 6, 4, 0}  // Left
+    {0, 4, 6, 2}, // Bottom
+    {1, 3, 7, 5}, // Top
+    {0, 1, 5, 4}, // Front
+    {4, 5, 7, 6}, // Right
+    {6, 7, 3, 2}, // Back
+    {2, 3, 1, 0}  // Left
 };
 
 MObject Voxelizer::addVoxelToMesh(

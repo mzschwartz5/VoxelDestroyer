@@ -2,21 +2,21 @@
 #include <maya/MGlobal.h>
 #include <float.h>
 
-PBD::PBD(const std::vector<glm::vec3>& positions, float voxelSize) {
+PBD::PBD(const std::vector<vec3>& positions, float voxelSize) {
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
 
     for (const auto& position : positions) {
-        Particle particle;
-        particle.oldPosition = particle.position = position;
-        particle.velocity = glm::vec3(0.0f);
-        particle.w = 1.0f;
-        particles.push_back(particle);
+        particles.positions.push_back(vec4(position, 0.0f));
+        particles.oldPositions.push_back(vec4(position, 0.0f));
+        particles.velocities.push_back(vec4(0.0f));
+        particles.w.push_back(1.0f);
+        particles.numParticles++;
     }
 
     setRadiusAndVolumeFromLength(voxelSize);
 }
 
-const std::vector<Particle>& PBD::simulateStep()
+const Particles& PBD::simulateStep()
 {
     for (int i = 0; i < substeps; i++)
     {
@@ -28,18 +28,16 @@ const std::vector<Particle>& PBD::simulateStep()
 
 void PBD::simulateSubstep() {
     // Iterate over all particles and apply gravity
-    int idx = 0;
-    for (auto& particle : particles)
+    for (int i = 0; i < particles.numParticles; ++i)
     {
-        if (particle.w == 0.0f) continue;
-        particle.velocity += glm::vec3(0.0f, -10.0f, 0.0f) * timeStep;
-        idx++;
-        particle.oldPosition = particle.position;
-        particle.position += particle.velocity * timeStep;
+        if (particles.w[i] == 0.0f) continue;
+        particles.velocities[i] += vec4(0.0f, -10.0f, 0.0f, 0.0f) * timeStep;
+        particles.oldPositions[i] = particles.positions[i];
+        particles.positions[i] += particles.velocities[i] * timeStep;
     }
 
     solveGroundCollision();
-    for (int i = 0; i < particles.size(); i += 8) {
+    for (int i = 0; i < particles.numParticles; i += 8) {
 		solveVGS(i, 3);
 	}
     /*for (int i = 0; i < faceConstraints.size(); i++) {
@@ -48,101 +46,92 @@ void PBD::simulateSubstep() {
         }
     }*/
 
-    for (auto& particle : particles)
+    for (int i = 0; i < particles.numParticles; ++i)
     {
-        if (particle.w == 0.0f) continue;
-        particle.velocity = (particle.position - particle.oldPosition) / timeStep;
+        if (particles.w[i] == 0.0f) continue;
+        particles.velocities[i] = (particles.positions[i] - particles.oldPositions[i]) / timeStep;
     }
 }
 
 void PBD::solveGroundCollision()
 {
-    for (auto& particle : particles)
+    for (int i = 0; i < particles.numParticles; ++i)
     {
-        if (particle.w == 0.0f) continue;
+        if (particles.w[i] == 0.0f) continue;
 
-        if (particle.position.y < 0.0f)
+        if (particles.positions[i].y < 0.0f)
         {
-            particle.position = particle.oldPosition;
-            particle.position.y = 0.0f;
+            particles.positions[i] = particles.oldPositions[i];
+            particles.positions[i].y = 0.0f;
         }
     }
 }
 
-glm::vec3 PBD::project(glm::vec3 x, glm::vec3 y) {
+vec4 PBD::project(vec4 x, vec4 y) {
     return (glm::dot(y, x) / glm::dot(y, y)) * y;
 }
 
 void PBD::solveVGS(int start_idx, unsigned int iter_count) {
     for (unsigned int i = 0; i < iter_count; i++) {
-		Particle& particle0 = particles[start_idx];
-		Particle& particle1 = particles[start_idx + 1];
-		Particle& particle2 = particles[start_idx + 2];
-		Particle& particle3 = particles[start_idx + 3];
-		Particle& particle4 = particles[start_idx + 4];
-		Particle& particle5 = particles[start_idx + 5];
-		Particle& particle6 = particles[start_idx + 6];
-		Particle& particle7 = particles[start_idx + 7];
+        vec4& p0 = particles.positions[start_idx];
+        vec4& p1 = particles.positions[start_idx + 1];
+		vec4& p2 = particles.positions[start_idx + 2];
+		vec4& p3 = particles.positions[start_idx + 3];
+		vec4& p4 = particles.positions[start_idx + 4];
+		vec4& p5 = particles.positions[start_idx + 5];
+		vec4& p6 = particles.positions[start_idx + 6];
+		vec4& p7 = particles.positions[start_idx + 7];
 
-        glm::vec3& p0 = particle0.position;
-        glm::vec3& p1 = particle1.position;
-		glm::vec3& p2 = particle2.position;
-		glm::vec3& p3 = particle3.position;
-		glm::vec3& p4 = particle4.position;
-		glm::vec3& p5 = particle5.position;
-		glm::vec3& p6 = particle6.position;
-		glm::vec3& p7 = particle7.position;
-
-		glm::vec3 centroid = p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7;
+		vec4 centroid = p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7;
 		centroid *= 0.125f;
 
-		glm::vec3 v0 = ((p1 - p0) + (p3 - p2) + (p5 - p4) + (p7 - p6)) * 0.25f;
-        glm::vec3 v1 = ((p2 - p0) + (p3 - p1) + (p6 - p4) + (p7 - p5)) * 0.25f;
-        glm::vec3 v2 = ((p4 - p0) + (p5 - p1) + (p6 - p2) + (p7 - p3)) * 0.25f;
+		vec4 v0 = ((p1 - p0) + (p3 - p2) + (p5 - p4) + (p7 - p6)) * 0.25f;
+        vec4 v1 = ((p2 - p0) + (p3 - p1) + (p6 - p4) + (p7 - p5)) * 0.25f;
+        vec4 v2 = ((p4 - p0) + (p5 - p1) + (p6 - p2) + (p7 - p3)) * 0.25f;
         
-        glm::vec3 u0 = v0 - RELAXATION * (project(v0, v1) + project(v0, v2));
-        glm::vec3 u1 = v1 - RELAXATION * (project(v1, v2) + project(v1, v0));
-        glm::vec3 u2 = v2 - RELAXATION * (project(v2, v0) + project(v2, v1));
+        vec4 u0 = v0 - RELAXATION * (project(v0, v1) + project(v0, v2));
+        vec4 u1 = v1 - RELAXATION * (project(v1, v2) + project(v1, v0));
+        vec4 u2 = v2 - RELAXATION * (project(v2, v0) + project(v2, v1));
 
         u0 = glm::normalize(u0) * ((1.f - BETA) * PARTICLE_RADIUS + (BETA * glm::length(v0)  * 0.5f));
 		u1 = glm::normalize(u1) * ((1.f - BETA) * PARTICLE_RADIUS + (BETA * glm::length(v1) * 0.5f));
 		u2 = glm::normalize(u2) * ((1.f - BETA) * PARTICLE_RADIUS + (BETA * glm::length(v2) * 0.5f));
 		
-        float volume = glm::dot(glm::cross(u0, u1), u2);
+        float volume = glm::dot(glm::cross(vec3(u0), vec3(u1)), vec3(u2));
         float mult = 0.5f * glm::pow((VOXEL_REST_VOLUME / volume), 1.0f / 3.0f);
 
         u0 *= mult;
         u1 *= mult;
         u2 *= mult;
 
-		if (particle0.w != 0.0f) {
+		if (particles.w[start_idx] != 0.0f) {
             p0 = centroid - u0 - u1 - u2;
 		}
 
-        if (particle1.w != 0.0f) {
+        if (particles.w[start_idx + 1] != 0.0f) {
             p1 = centroid + u0 - u1 - u2;
         }
 
-		if (particle2.w != 0.0f) {
+		if (particles.w[start_idx + 2] != 0.0f) {
 			p2 = centroid - u0 + u1 - u2;
 		}
 
-        if (particle3.w != 0.0f) {
+        if (particles.w[start_idx + 3] != 0.0f) {
             p3 = centroid + u0 + u1 - u2;
         }
 
-		if (particle4.w != 0.0f) {
+		if (particles.w[start_idx + 4] != 0.0f) {
 			p4 = centroid - u0 - u1 + u2;
 		}
-        if (particle5.w != 0.0f) {
+        if (particles.w[start_idx + 5] != 0.0f) {
             p5 = centroid + u0 - u1 + u2;
         }
 
-		if (particle6.w != 0.0f) {
+		if (particles.w[start_idx + 6] != 0.0f) {
 			p6 = centroid - u0 + u1 + u2;
 		}
 
-        if (particle7.w != 0.0f) {
+        if (particles.w[start_idx + 7] != 0.0f) {
             p7 = centroid + u0 + u1 + u2;
         }
     }
@@ -157,15 +146,15 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
     Voxel& voxelOne = voxels[faceConstraint.voxelOneIdx];
     Voxel& voxelTwo = voxels[faceConstraint.voxelTwoIdx];
 
-    std::array<glm::vec3*, 4> faceOne; //midpoint particle positions for relevant face of voxel 1
-    std::array<glm::vec3*, 4> faceTwo; //midpoint particle positions for relevant face of voxel 2
+    std::array<vec3*, 4> faceOne; //midpoint particle positions for relevant face of voxel 1
+    std::array<vec3*, 4> faceTwo; //midpoint particle positions for relevant face of voxel 2
     std::array<float, 4> faceOneW; //particle weights for relevant face of voxel 1
     std::array<float, 4> faceTwoW; //particle weights for relevant face of voxel 2
     std::array<int, 4> faceOneIndices; //particle indices for relevant face of voxel 1
     std::array<int, 4> faceTwoIndices; //particle indices for relevant face of voxel 2
 
     //calculate centers
-    glm::vec3 v1Center = (particles[voxelOne.particles[0]].position +
+    vec3 v1Center = (particles[voxelOne.particles[0]].position +
         particles[voxelOne.particles[1]].position +
         particles[voxelOne.particles[2]].position +
         particles[voxelOne.particles[3]].position +
@@ -174,7 +163,7 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
         particles[voxelOne.particles[6]].position +
         particles[voxelOne.particles[7]].position) / 8.0f;
 
-    glm::vec3 v2Center = (particles[voxelTwo.particles[0]].position +
+    vec3 v2Center = (particles[voxelTwo.particles[0]].position +
         particles[voxelTwo.particles[1]].position +
         particles[voxelTwo.particles[2]].position +
         particles[voxelTwo.particles[3]].position +
@@ -184,8 +173,8 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
         particles[voxelTwo.particles[7]].position) / 8.0f;
 
     //calculate midpoint positions for every vertex
-    std::array<glm::vec3, 8> v1MidPositions;
-    std::array<glm::vec3, 8> v2MidPositions;
+    std::array<vec3, 8> v1MidPositions;
+    std::array<vec3, 8> v2MidPositions;
 
     for (int i = 0; i < 8; i++) {
         v1MidPositions[i] = (particles[voxelOne.particles[i]].position + v1Center) * 0.5f;
@@ -224,7 +213,7 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
     bool enableFracture = true;
     if (enableFracture) {
         for (int i = 0; i < 4; i++) {
-            glm::vec3 u = *faceTwo[i] - *faceOne[i];
+            vec3 u = *faceTwo[i] - *faceOne[i];
             float L = glm::length(u);
             float strain = (L - 2.0f * PARTICLE_RADIUS) / (2.0f * PARTICLE_RADIUS);
 
@@ -240,14 +229,14 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
     }
 
     //calculate midpoint face center
-    glm::vec3 centerOfVoxels = glm::vec3(0.0f);
+    vec3 centerOfVoxels = vec3(0.0f);
     for (int i = 0; i < 4; i++) {
         centerOfVoxels += *faceOne[i] + *faceTwo[i];
     }
     centerOfVoxels *= 0.125f;
 
     //calculate edge vectors for shape preservation
-    glm::vec3 dp[3];
+    vec3 dp[3];
 
     //check if either voxel is static
     float sumW1 = faceOneW[0] + faceOneW[1] + faceOneW[2] + faceOneW[3];
@@ -256,7 +245,7 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
     if (sumW1 == 0.0f || sumW2 == 0.0f) {
         MGlobal::displayInfo("Static voxel");
         //handle static voxel case
-        glm::vec3 u1, u2, u0;
+        vec3 u1, u2, u0;
 
         if (sumW1 == 0.0f) { //voxel 1 is static
             u1 = (*faceOne[1] - *faceOne[0]) + (*faceOne[3] - *faceOne[2]);
@@ -287,7 +276,7 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
         }
 
         //save  original midpoint positions
-        std::array<glm::vec3, 4> origFaceOne, origFaceTwo;
+        std::array<vec3, 4> origFaceOne, origFaceTwo;
         for (int i = 0; i < 4; i++) {
             origFaceOne[i] = *faceOne[i];
             origFaceTwo[i] = *faceTwo[i];
@@ -306,12 +295,12 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
         //apply delta from midpoint positions back to particle positions
         for (int i = 0; i < 4; i++) {
             if (faceOneW[i] != 0.0f) {
-                glm::vec3 delta = *faceOne[i] - origFaceOne[i];
+                vec3 delta = *faceOne[i] - origFaceOne[i];
                 particles[voxelOne.particles[faceOneIndices[i]]].position += delta;
             }
 
             if (faceTwoW[i] != 0.0f) {
-                glm::vec3 delta = *faceTwo[i] - origFaceTwo[i];
+                vec3 delta = *faceTwo[i] - origFaceTwo[i];
                 particles[voxelTwo.particles[faceTwoIndices[i]]].position += delta;
             }
         }
@@ -332,21 +321,21 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
                 (*faceTwo[2] - *faceTwo[0]) + (*faceTwo[3] - *faceTwo[1]);
 
             //recalculate center
-            centerOfVoxels = glm::vec3(0.0f);
+            centerOfVoxels = vec3(0.0f);
             for (int i = 0; i < 4; i++) {
                 centerOfVoxels += *faceOne[i] + *faceTwo[i];
             }
             centerOfVoxels *= 0.125f;
 
             //apply orthogonalization
-            auto proj = [](const glm::vec3& u, const glm::vec3& v) -> glm::vec3 {
+            auto proj = [](const vec3& u, const vec3& v) -> vec3 {
                 const float eps = 1e-12f;
                 return glm::dot(v, u) / (glm::dot(u, u) + eps) * u;
                 };
 
-            glm::vec3 u0 = dp[0] - alpha * (proj(dp[1], dp[0]) + proj(dp[2], dp[0]));
-            glm::vec3 u1 = dp[1] - alpha * (proj(dp[0], dp[1]) + proj(dp[2], dp[1]));
-            glm::vec3 u2 = dp[2] - alpha * (proj(dp[0], dp[2]) + proj(dp[1], dp[2]));
+            vec3 u0 = dp[0] - alpha * (proj(dp[1], dp[0]) + proj(dp[2], dp[0]));
+            vec3 u1 = dp[1] - alpha * (proj(dp[0], dp[1]) + proj(dp[2], dp[1]));
+            vec3 u2 = dp[2] - alpha * (proj(dp[0], dp[2]) + proj(dp[1], dp[2]));
 
             //check for flipping
             float V = glm::dot(glm::cross(u0, u1), u2);
@@ -362,8 +351,8 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
             }
 
             //calculate normalized and scaled edge vectors
-            glm::vec3 lenu = glm::vec3(glm::length(u0), glm::length(u1), glm::length(u2)) + glm::vec3(1e-12f);
-            glm::vec3 lenp = glm::vec3(glm::length(dp[0]), glm::length(dp[1]), glm::length(dp[2])) + glm::vec3(1e-12f);
+            vec3 lenu = vec3(glm::length(u0), glm::length(u1), glm::length(u2)) + vec3(1e-12f);
+            vec3 lenp = vec3(glm::length(dp[0]), glm::length(dp[1]), glm::length(dp[2])) + vec3(1e-12f);
 
             float r_v = pow(PARTICLE_RADIUS * PARTICLE_RADIUS * PARTICLE_RADIUS / (lenp[0] * lenp[1] * lenp[2]), 0.3333f);
 
@@ -373,7 +362,7 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
             dp[2] = u2 / lenu[2] * glm::mix(PARTICLE_RADIUS, lenp[2] * r_v, alphaLen);
 
             //save original midpoint positions
-            std::array<glm::vec3, 4> origFaceOne, origFaceTwo;
+            std::array<vec3, 4> origFaceOne, origFaceTwo;
             for (int i = 0; i < 4; i++) {
                 origFaceOne[i] = *faceOne[i];
                 origFaceTwo[i] = *faceTwo[i];
@@ -392,12 +381,12 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
             //apply delta from midpoint positions back to particle positions
             for (int i = 0; i < 4; i++) {
                 if (faceOneW[i] != 0.0f) {
-                    glm::vec3 delta = *faceOne[i] - origFaceOne[i];
+                    vec3 delta = *faceOne[i] - origFaceOne[i];
                     particles[voxelOne.particles[faceOneIndices[i]]].position += delta;
                 }
 
                 if (faceTwoW[i] != 0.0f) {
-                    glm::vec3 delta = *faceTwo[i] - origFaceTwo[i];
+                    vec3 delta = *faceTwo[i] - origFaceTwo[i];
                     particles[voxelTwo.particles[faceTwoIndices[i]]].position += delta;
                 }
             }

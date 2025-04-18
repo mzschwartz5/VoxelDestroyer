@@ -3,13 +3,16 @@
 #include <algorithm>
 #include <vector>
 #include <array>
+using glm::vec3;
+using glm::vec4;
 
-struct Particle
+struct Particles
 {
-    glm::vec3 position;
-    glm::vec3 oldPosition;
-    glm::vec3 velocity;
-    float w = 0.0f; // inverse mass
+    std::vector<vec4> positions;
+    std::vector<vec4> oldPositions;
+    std::vector<vec4> velocities;
+    std::vector<float> w; // inverse mass
+    int numParticles{ 0 };
 };
 
 //struct FaceConstraint {
@@ -23,15 +26,15 @@ class PBD
 {
 public:
     PBD() = default;
-    PBD(const std::vector<glm::vec3>& positions, float voxelSize);
+    PBD(const std::vector<vec3>& positions, float voxelSize);
     ~PBD() = default;
-    const std::vector<Particle>& simulateStep();
+    const Particles& simulateStep();
     void simulateSubstep();
 
-	std::vector<Particle> getParticles() const { return particles; }
+	Particles getParticles() const { return particles; }
 
 private:
-    std::vector<Particle> particles;
+    Particles particles;
     //std::array<std::vector<FaceConstraint>, 3> faceConstraints; //0 = x, 1 = y, 2 = z
     int substeps = 10;
     float timeStep;
@@ -43,7 +46,7 @@ private:
 
     //void solveFaceConstraint(FaceConstraint& faceConstraint, int axis);
 
-    glm::vec3 project(glm::vec3 x, glm::vec3 y);
+    vec4 project(vec4 x, vec4 y);
 
     float BETA{ 0.99f };
     float PARTICLE_RADIUS{ 0.1f };
