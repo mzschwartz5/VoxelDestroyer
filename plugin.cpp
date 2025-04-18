@@ -46,7 +46,7 @@ MStatus plugin::doIt(const MArgList& argList)
 {
 	MStatus status;
 	float voxelSize = 0.1f;
-	std::vector<Voxel> voxels = voxelizer.voxelizeSelectedMesh(
+	Voxels voxels = voxelizer.voxelizeSelectedMesh(
 		1.0f, //size of the grid
 		voxelSize, // voxel size
 		MPoint(0.0f, 3.0f, 0.0f), // grid center
@@ -61,18 +61,8 @@ MStatus plugin::doIt(const MArgList& argList)
 	
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
 
-	// Iterate over voxels and collect voxels corners into a single particle list for the PBD simulator
-	std::vector<glm::vec3> particlePositions;
-	for (const auto& voxel : voxels) {
-		if (!voxel.occupied) continue;
-		
-		for (const auto& corner : voxel.corners) {
-			particlePositions.push_back(glm::vec3(corner.x, corner.y, corner.z));
-		}
-	}
-
 	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
-	plugin::pbdSimulator = PBD(particlePositions, voxelSize);
+	plugin::pbdSimulator = PBD(voxels.corners, voxelSize);
 
 	MGlobal::displayInfo("PBD particles initialized.");
 	return status;

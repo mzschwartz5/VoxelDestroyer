@@ -4,9 +4,8 @@
 #include <maya/MFnTransform.h>
 #include <algorithm>
 #include <maya/MFnSet.h>
-#include "utils.h"
 
-std::vector<Voxel> Voxelizer::voxelizeSelectedMesh(
+Voxels Voxelizer::voxelizeSelectedMesh(
     float gridEdgeLength,
     float voxelSize,
     MPoint gridCenter,
@@ -15,7 +14,7 @@ std::vector<Voxel> Voxelizer::voxelizeSelectedMesh(
 ) {
 
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
-    std::vector<Voxel> voxels;
+    Voxels voxels;
     voxels.resize(voxelsPerEdge * voxelsPerEdge * voxelsPerEdge);
     
     MDagPath selectedMeshPath = getSelectedMesh(status);
@@ -168,7 +167,7 @@ void Voxelizer::getSurfaceVoxels(
     float gridEdgeLength,
     float voxelSize,
     MPoint gridCenter,
-    std::vector<Voxel>& voxels
+    Voxels& voxels
 ) {
     
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
@@ -194,9 +193,8 @@ void Voxelizer::getSurfaceVoxels(
                     
                     MVector voxelMinCorner(MVector(x, y, z) * voxelSize + gridMin);
                     if (!doesTriangleOverlapVoxel(tri, voxelMinCorner)) continue;
-                    voxels[index].occupied = true;
-                    voxels[index].isSurface = true;
-                    voxels[index].mortonCode = Utils::toMortonCode(x, y, z);
+                    voxels.occupied[index] = true;
+                    voxels.isSurface[index] = true;
                 }
             }
         }
@@ -226,7 +224,7 @@ void Voxelizer::getInteriorVoxels(
     float gridEdgeLength,
     float voxelSize,
     MPoint gridCenter,
-    std::vector<Voxel>& voxels
+    Voxels& voxels
 ) {
     
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
@@ -262,8 +260,7 @@ void Voxelizer::getInteriorVoxels(
                 // Now iterate over all voxels in the column (in +x) and flip their occupancy state
                 for (int x = xVoxelMin; x < voxelsPerEdge; ++x) {
                     int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
-                    voxels[index].occupied = !voxels[index].occupied;
-                    voxels[index].mortonCode = Utils::toMortonCode(x, y, z);
+                    voxels.occupied[index] = !voxels.occupied[index];
                 }
             }
         }
@@ -311,7 +308,7 @@ double Voxelizer::getTriangleVoxelCenterIntercept(
 }
 
 MDagPath Voxelizer::createVoxels(
-    std::vector<Voxel>& overlappedVoxels,
+    Voxels& overlappedVoxels ,
     float gridEdgeLength, 
     float voxelSize,       
     MPoint gridCenter,      
@@ -322,13 +319,11 @@ MDagPath Voxelizer::createVoxels(
 
     MString combinedMeshName = originalMesh.name() + "_voxelized";
     MString meshNamesConcatenated;
-    int filteredIndex = 0;
     for (int x = 0; x < voxelsPerEdge; ++x) {
         for (int y = 0; y < voxelsPerEdge; ++y) {
             for (int z = 0; z < voxelsPerEdge; ++z) {
                 int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
-                if (!overlappedVoxels[index].occupied) continue;
-                overlappedVoxels[index].filteredIndex = filteredIndex;
+                if (!overlappedVoxels.occupied[index]) continue;
 
                 MPoint voxelMin = MPoint(
                     x * voxelSize + gridMin.x,
@@ -336,9 +331,8 @@ MDagPath Voxelizer::createVoxels(
                     z * voxelSize + gridMin.z
                 );
 
-                MObject voxel = addVoxelToMesh(voxelMin, voxelSize, overlappedVoxels[index], originalMesh);
+                MObject voxel = addVoxelToMesh(voxelMin, voxelSize, overlappedVoxels.isSurface[index], overlappedVoxels, originalMesh);
                 meshNamesConcatenated += " " + MFnMesh(voxel).name();
-                filteredIndex++;
             }
         }
     }
@@ -384,9 +378,12 @@ int faceIndices[6][4] = {
 MObject Voxelizer::addVoxelToMesh(
     const MPoint& voxelMin,
     float voxelSize,
-    Voxel& voxel,
+    bool isSurface,
+    Voxels& voxels,
     MFnMesh& originalMesh
 ) {
+    voxels.vertStartIdx.push_back(voxels.totalVerts);
+
     MPointArray cubeVertices;
     MPoint voxelMax = MPoint(
         voxelMin.x + voxelSize,
@@ -410,7 +407,14 @@ MObject Voxelizer::addVoxelToMesh(
     cubeVertices.append(MPoint(voxelMax.x, voxelMin.y, voxelMax.z));
     cubeVertices.append(MPoint(voxelMin.x, voxelMax.y, voxelMax.z));
     cubeVertices.append(voxelMax);
-    voxel.corners = cubeVertices;
+
+    for (int i = 0; i < 8; ++i) {
+        voxels.corners.push_back(glm::vec3(
+            cubeVertices[i].x,
+            cubeVertices[i].y,
+            cubeVertices[i].z
+        ));
+    }
 
     MIntArray faceCounts;
     MIntArray faceConnects;
@@ -437,9 +441,9 @@ MObject Voxelizer::addVoxelToMesh(
     );
 
     // only need to do the boolean intersection of surface voxels
-    if (!voxel.isSurface) {
-        // Explore later: a way to store a reference to the vertices or to a MFnMesh maybe, so that we can easily change the vertex positions.
-        voxel.vertices = cubeVertices;
+    if (!isSurface) {
+        voxels.numVerts.push_back(cubeVertices.length()); // should always be 8
+        voxels.totalVerts += cubeVertices.length();
         return cube; 
     }
 
@@ -452,9 +456,8 @@ MObject Voxelizer::addVoxelToMesh(
     // objsToIntersect.append(originalMesh.object());
     // cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect);
 
-    // Store vertices in the Voxel object
-    // Same as above, we can explore a way to store a reference to the vertices or to a MFnMesh so that we can easily change the vertex positions.
-    cubeMeshFn.getPoints(voxel.vertices, MSpace::kWorld);
-
+    // Set the vert start idx and number of verts for the voxel
+    voxels.numVerts.push_back(cubeMeshFn.numVertices());
+    voxels.totalVerts += cubeMeshFn.numVertices();
     return cube;
 }
