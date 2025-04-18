@@ -35,8 +35,8 @@ void plugin::simulate(void* clientData) {
 	// For rendering, we need to update each voxel with its new basis, which we'll use to transform all vertices owned by that voxel
 	bindVerticesCompute->updateParticleBuffer(particles.positions); // (owns the particles buffer)
 	transformVerticesCompute->dispatch(transformVerticesNumWorkgroups);
-	
-	// TODO: map back updated vertex positions to CPU and update the mesh using meshFn.setPoints with an MFloatPointArray.
+	// Uncomment once the compute shaders are working as expected. Then remove the loop above and make vertexArray MFloatPointArray.
+	//transformVerticesCompute->copyTransformedVertsToCPU(vertexArray, meshFn.numVertices());
 
 	meshFn.setPoints(vertexArray, MSpace::kWorld);
 	meshFn.updateSurface();
