@@ -69,8 +69,10 @@ protected:
         
         // Replace the shader macros with the actual values
         const std::string updateVoxelBasesThreadsStr = std::to_string(UPDATE_VOXEL_BASES_THEADS);
+        const std::string registerVerticesThreadsStr = std::to_string(BIND_VERTICES_THREADS);
         D3D_SHADER_MACRO SHADER_MACROS[] = {
             { "UPDATE_VOXEL_BASES_THEADS", updateVoxelBasesThreadsStr.c_str() },
+            { "BIND_VERTICES_THREADS", registerVerticesThreadsStr.c_str() },
             { NULL, NULL } // Terminate the array
         };
 

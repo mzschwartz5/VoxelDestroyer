@@ -9,8 +9,9 @@ MCallbackId plugin::callbackId = 0;
 MDagPath plugin::voxelizedMeshDagPath = MDagPath();
 
 // Compute shaders
-std::unique_ptr<UpdateVoxelBasesCompute> plugin::updateVoxelBasesCompute = nullptr;
 int plugin::updateVoxelBasesNumWorkgroups = 0;
+std::unique_ptr<UpdateVoxelBasesCompute> plugin::updateVoxelBasesCompute = nullptr;
+std::unique_ptr<BindVerticesCompute> plugin::bindVerticesCompute = nullptr;
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -53,13 +54,28 @@ MStatus plugin::doIt(const MArgList& argList)
 		plugin::voxelizedMeshDagPath,
 		status
 	);
+	MFnMesh voxelMeshFn(plugin::voxelizedMeshDagPath);
+	
+	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
 
 	// TODO: handle if doIt is called repeatedly... this will just create new buffers but not free old ones?
 	// Also need to make sure that this is called before updating the buffers in the callback...
 	plugin::updateVoxelBasesCompute = std::make_unique<UpdateVoxelBasesCompute>(static_cast<int>(voxels.size()) * 8);
 	plugin::updateVoxelBasesNumWorkgroups = (static_cast<int>(voxels.size()) + UPDATE_VOXEL_BASES_THEADS - 1) / UPDATE_VOXEL_BASES_THEADS;
 	
-	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
+	MGlobal::displayInfo("Update voxel bases compute shader initialized.");
+
+	// Calculate a local rest position for each vertex in every voxel.
+	plugin::bindVerticesCompute = std::make_unique<BindVerticesCompute>(
+		updateVoxelBasesCompute->getParticlesSRV(),
+		voxelMeshFn.getRawPoints(&status),
+		voxelMeshFn.numVertices(&status),
+		voxels.vertStartIdx, 
+		voxels.numVerts
+	);
+	bindVerticesCompute->dispatch(voxels.size());
+
+	MGlobal::displayInfo("Bind vertices compute shader dispatched.");
 
 	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
 	plugin::pbdSimulator = PBD(voxels.corners, voxelSize);

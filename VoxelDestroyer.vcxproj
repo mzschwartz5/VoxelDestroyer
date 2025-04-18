@@ -138,6 +138,7 @@
     <ClInclude Include="voxelizer.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\updatevoxelbasescompute.h" />
+    <ClInclude Include="directx\compute\bindverticescompute.h" />
     <ClInclude Include="constants.h" />
   </ItemGroup>
   <ItemGroup>

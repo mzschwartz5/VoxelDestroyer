@@ -15,16 +15,16 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="shaders\updatevoxelbasis.hlsl" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="plugin.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="pbd.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="directx.cpp">
+    <ClCompile Include="directx\directx.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="voxelizer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -35,10 +35,22 @@
     <ClInclude Include="pbd.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="directx.h">
+    <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="resource.h">
+    <ClInclude Include="directx\directx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="voxelizer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="directx\compute\computeshader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="directx\compute\updatevoxelbasescompute.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="constants.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

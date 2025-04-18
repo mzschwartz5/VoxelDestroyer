@@ -16,6 +16,25 @@ public:
         memcpy(mappedResource.pData, particles.data(), particles.size() * sizeof(glm::vec4));
         DirectX::getContext()->Unmap(particlesBuffer.Get(), 0);
     }
+
+    const ComPtr<ID3D11ShaderResourceView>& getParticlesSRV() const { return particlesSRV; }
+        
+private:
+    ComPtr<ID3D11Buffer> particlesBuffer;
+    ComPtr<ID3D11Buffer> voxelBasesBuffer;
+    ComPtr<ID3D11ShaderResourceView> particlesSRV;
+    ComPtr<ID3D11UnorderedAccessView> voxelBasesUAV;
+    
+    void bind() override
+    {
+        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        
+        ID3D11ShaderResourceView* srvs[] = { particlesSRV.Get() };
+        DirectX::getContext()->CSSetShaderResources(0, 1, srvs);
+        
+        ID3D11UnorderedAccessView* uavs[] = { voxelBasesUAV.Get() };
+        DirectX::getContext()->CSSetUnorderedAccessViews(0, 1, uavs, nullptr); // No need for initialCounts
+    };
     
     void initializeBuffers(int numParticles) {
         D3D11_BUFFER_DESC bufferDesc = {};
@@ -56,24 +75,6 @@ public:
     
         DirectX::getDevice()->CreateUnorderedAccessView(voxelBasesBuffer.Get(), &uavDesc, &voxelBasesUAV);
     }
-
-private:
-    ComPtr<ID3D11Buffer> particlesBuffer;
-    ComPtr<ID3D11Buffer> voxelBasesBuffer;
-    ComPtr<ID3D11ShaderResourceView> particlesSRV;
-    ComPtr<ID3D11UnorderedAccessView> voxelBasesUAV;
-
-    void bind() override
-    {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
-        
-        ID3D11ShaderResourceView* srvs[] = { particlesSRV.Get() };
-        DirectX::getContext()->CSSetShaderResources(0, 1, srvs);
-
-        ID3D11UnorderedAccessView* uavs[] = { voxelBasesUAV.Get() };
-        DirectX::getContext()->CSSetUnorderedAccessViews(0, 1, uavs, nullptr); // No need for initialCounts
-    };
-    
 
     void tearDown() override
     {
