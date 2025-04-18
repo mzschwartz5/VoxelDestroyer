@@ -6,7 +6,9 @@ class UpdateVoxelBasesCompute : public ComputeShader
 {
 
 public:
-    UpdateVoxelBasesCompute() : ComputeShader(IDR_SHADER1){};
+    UpdateVoxelBasesCompute(int numParticles) : ComputeShader(IDR_SHADER1) {
+        initializeBuffers(numParticles);
+    };
 
     void updateParticleBuffer(const std::vector<glm::vec4>& particles) {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -58,7 +60,6 @@ public:
 private:
     ComPtr<ID3D11Buffer> particlesBuffer;
     ComPtr<ID3D11Buffer> voxelBasesBuffer;
-    ComPtr<ID3D11Buffer> debugBasesBuffer;
     ComPtr<ID3D11ShaderResourceView> particlesSRV;
     ComPtr<ID3D11UnorderedAccessView> voxelBasesUAV;
 

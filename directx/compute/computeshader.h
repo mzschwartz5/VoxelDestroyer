@@ -6,7 +6,6 @@
 #include "../directx.h"
 using namespace Microsoft::WRL;
 
-
 class ComputeShader
 {
 public:
