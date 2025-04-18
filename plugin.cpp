@@ -9,8 +9,8 @@ MCallbackId plugin::callbackId = 0;
 MDagPath plugin::voxelizedMeshDagPath = MDagPath();
 
 // Compute shaders
-int plugin::updateVoxelBasesNumWorkgroups = 0;
-std::unique_ptr<UpdateVoxelBasesCompute> plugin::updateVoxelBasesCompute = nullptr;
+int plugin::transformVerticesNumWorkgroups = 0;
+std::unique_ptr<TransformVerticesCompute> plugin::transformVerticesCompute = nullptr;
 std::unique_ptr<BindVerticesCompute> plugin::bindVerticesCompute = nullptr;
 
 // Maya Plugin creator function
@@ -33,8 +33,10 @@ void plugin::simulate(void* clientData) {
 	}
 
 	// For rendering, we need to update each voxel with its new basis, which we'll use to transform all vertices owned by that voxel
-	updateVoxelBasesCompute->updateParticleBuffer(particles.positions);
-	updateVoxelBasesCompute->dispatch(updateVoxelBasesNumWorkgroups);
+	bindVerticesCompute->updateParticleBuffer(particles.positions); // (owns the particles buffer)
+	transformVerticesCompute->dispatch(transformVerticesNumWorkgroups);
+	
+	// TODO: map back updated vertex positions to CPU and update the mesh using meshFn.setPoints with an MFloatPointArray.
 
 	meshFn.setPoints(vertexArray, MSpace::kWorld);
 	meshFn.updateSurface();
@@ -60,14 +62,9 @@ MStatus plugin::doIt(const MArgList& argList)
 
 	// TODO: handle if doIt is called repeatedly... this will just create new buffers but not free old ones?
 	// Also need to make sure that this is called before updating the buffers in the callback...
-	plugin::updateVoxelBasesCompute = std::make_unique<UpdateVoxelBasesCompute>(static_cast<int>(voxels.size()) * 8);
-	plugin::updateVoxelBasesNumWorkgroups = (static_cast<int>(voxels.size()) + UPDATE_VOXEL_BASES_THEADS - 1) / UPDATE_VOXEL_BASES_THEADS;
-	
-	MGlobal::displayInfo("Update voxel bases compute shader initialized.");
-
 	// Calculate a local rest position for each vertex in every voxel.
 	plugin::bindVerticesCompute = std::make_unique<BindVerticesCompute>(
-		updateVoxelBasesCompute->getParticlesSRV(),
+		static_cast<int>(voxels.size()) * 8, // 8 particles per voxel
 		voxelMeshFn.getRawPoints(&status),
 		voxelMeshFn.numVertices(&status),
 		voxels.vertStartIdx, 
@@ -76,6 +73,17 @@ MStatus plugin::doIt(const MArgList& argList)
 	bindVerticesCompute->dispatch(voxels.size());
 
 	MGlobal::displayInfo("Bind vertices compute shader dispatched.");
+
+	plugin::transformVerticesCompute = std::make_unique<TransformVerticesCompute>(
+		voxelMeshFn.numVertices(&status),
+		bindVerticesCompute->getParticlesSRV(), 			
+		bindVerticesCompute->getVertStartIdxSRV(), 
+		bindVerticesCompute->getNumVerticesSRV(), 
+		bindVerticesCompute->getLocalRestPositionsSRV()
+	);
+	plugin::transformVerticesNumWorkgroups = voxels.size();
+	
+	MGlobal::displayInfo("Transform vertices compute shader initialized.");
 
 	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
 	plugin::pbdSimulator = PBD(voxels.corners, voxelSize);

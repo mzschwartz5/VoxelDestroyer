@@ -47,7 +47,7 @@
     <ClInclude Include="directx\compute\computeshader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="directx\compute\updatevoxelbasescompute.h">
+    <ClInclude Include="directx\compute\transformVerticesCompute.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="constants.h">

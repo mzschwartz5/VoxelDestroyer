@@ -6,35 +6,55 @@ class BindVerticesCompute : public ComputeShader
 {
 public:
     BindVerticesCompute(
-        const ComPtr<ID3D11ShaderResourceView>& particlesSRV, 
+        int numParticles,
         const float* vertices, 
         int numVerts,
         const std::vector<uint>& vertStartIds,
         const std::vector<uint>& numVertices
-    ) : ComputeShader(IDR_SHADER2), particlesSRV(particlesSRV) 
+    ) : ComputeShader(IDR_SHADER2)
     {
-        initializeBuffers(vertices, numVerts, vertStartIds, numVertices);
+        initializeBuffers(numParticles, vertices, numVerts, vertStartIds, numVertices);
     };
 
-    // Maybe we should be providing a UAV instead of a buffer?
-    const ComPtr<ID3D11Buffer>& getLocalRestPositionsBuffer() const { return localRestPositionsBuffer; };
+    void updateParticleBuffer(const std::vector<glm::vec4>& particles) {
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        HRESULT hr = DirectX::getContext()->Map(particlesBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        memcpy(mappedResource.pData, particles.data(), particles.size() * sizeof(glm::vec4));
+        DirectX::getContext()->Unmap(particlesBuffer.Get(), 0);
+    };
+
+    void dispatch(int numWorkgroups) override
+    {
+        DirectX::getContext()->Dispatch(numWorkgroups, 1, 1);
+        
+        // Can actually release the verticesBuffer and SRV now: used only for binding, which occurs just once.
+        verticesBuffer.Reset();
+        verticesSRV.Reset();
+    };
+
+    const ComPtr<ID3D11ShaderResourceView>& getParticlesSRV() const { return particlesSRV; }
+    const ComPtr<ID3D11ShaderResourceView>& getVertStartIdxSRV() const { return vertStartIdxSRV; }
+    const ComPtr<ID3D11ShaderResourceView>& getNumVerticesSRV() const { return numVerticesSRV; };
+    const ComPtr<ID3D11ShaderResourceView>& getLocalRestPositionsSRV() const { return localRestPositionsSRV; };
 
 private:
+    ComPtr<ID3D11Buffer> particlesBuffer; 
     ComPtr<ID3D11Buffer> verticesBuffer;
     ComPtr<ID3D11Buffer> vertStartIdxBuffer;       // for each voxel (workgroup), the start index of the vertices in the vertex buffer
     ComPtr<ID3D11Buffer> numVerticesBuffer;        // for each voxel (workgroup), how many vertices are in it
     ComPtr<ID3D11Buffer> localRestPositionsBuffer; // the local (relative to voxel corner v0) rest positions of each vertex
     ComPtr<ID3D11ShaderResourceView> particlesSRV;
     ComPtr<ID3D11ShaderResourceView> verticesSRV;
-    ComPtr<ID3D11ShaderResourceView> vertStartIdxUAV;
-    ComPtr<ID3D11ShaderResourceView> numVerticesUAV;
+    ComPtr<ID3D11ShaderResourceView> vertStartIdxSRV;
+    ComPtr<ID3D11ShaderResourceView> numVerticesSRV;
+    ComPtr<ID3D11ShaderResourceView> localRestPositionsSRV; // Owned by this class, but used by the transformVertices compute shader
     ComPtr<ID3D11UnorderedAccessView> localRestPositionsUAV;
 
     void bind() override
     {
         DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
 
-        ID3D11ShaderResourceView* srvs[] = { particlesSRV.Get(), verticesSRV.Get(), vertStartIdxUAV.Get(), numVerticesUAV.Get() };
+        ID3D11ShaderResourceView* srvs[] = { particlesSRV.Get(), verticesSRV.Get(), vertStartIdxSRV.Get(), numVerticesSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
         ID3D11UnorderedAccessView* uavs[] = { localRestPositionsUAV.Get() };
@@ -42,11 +62,28 @@ private:
 
     };
 
-    void initializeBuffers(const float* vertices, int numVerts, const std::vector<uint>& vertStartIds, const std::vector<uint>& numVertices) {
+    void initializeBuffers(int numParticles, const float* vertices, int numVerts, const std::vector<uint>& vertStartIds, const std::vector<uint>& numVertices) {
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SUBRESOURCE_DATA initData = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    
+        // Initialize particlesBuffer and its SRV
+        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+        bufferDesc.ByteWidth = numParticles * sizeof(glm::vec4); // glm::vec4 for alignment
+        bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+        bufferDesc.StructureByteStride = sizeof(glm::vec4); // Size of each element in the buffer
+    
+        DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &particlesBuffer);
+    
+        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+        srvDesc.Buffer.FirstElement = 0;
+        srvDesc.Buffer.NumElements = numParticles;
+    
+        DirectX::getDevice()->CreateShaderResourceView(particlesBuffer.Get(), &srvDesc, &particlesSRV);
 
         // Initialize verticesBuffer and its SRV
         bufferDesc.Usage = D3D11_USAGE_IMMUTABLE; // since this data is going to be set on buffer creation and never changed
@@ -64,6 +101,8 @@ private:
         srvDesc.Buffer.FirstElement = 0;
         srvDesc.Buffer.NumElements = numVerts;
 
+        DirectX::getDevice()->CreateShaderResourceView(verticesBuffer.Get(), &srvDesc, &verticesSRV);
+
         // Initialize vertStartIdxBuffer and its SRV
         bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
         bufferDesc.ByteWidth = sizeof(uint) * static_cast<UINT>(vertStartIds.size());
@@ -79,7 +118,7 @@ private:
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
         srvDesc.Buffer.FirstElement = 0;
         srvDesc.Buffer.NumElements = static_cast<UINT>(vertStartIds.size());
-        DirectX::getDevice()->CreateShaderResourceView(vertStartIdxBuffer.Get(), &srvDesc, &vertStartIdxUAV);
+        DirectX::getDevice()->CreateShaderResourceView(vertStartIdxBuffer.Get(), &srvDesc, &vertStartIdxSRV);
 
         // Initialize numVerticesBuffer and its SRV
         bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
@@ -96,9 +135,9 @@ private:
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
         srvDesc.Buffer.FirstElement = 0;
         srvDesc.Buffer.NumElements = static_cast<UINT>(numVertices.size());
-        DirectX::getDevice()->CreateShaderResourceView(numVerticesBuffer.Get(), &srvDesc, &numVerticesUAV);
+        DirectX::getDevice()->CreateShaderResourceView(numVerticesBuffer.Get(), &srvDesc, &numVerticesSRV);
 
-        // Initialize localRestPositionsBuffer and its UAV (Structured Buffer)
+        // Initialize localRestPositionsBuffer and its UAV, and an SRV (for the transformVertices compute shader)
         bufferDesc.Usage = D3D11_USAGE_DEFAULT; // Allow GPU write access
         bufferDesc.ByteWidth = numVerts * sizeof(float) * 4;
         bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
@@ -112,7 +151,28 @@ private:
         uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
         uavDesc.Buffer.FirstElement = 0;
         uavDesc.Buffer.NumElements = numVerts;
+
+        DirectX::getDevice()->CreateUnorderedAccessView(localRestPositionsBuffer.Get(), &uavDesc, &localRestPositionsUAV);
+
+        srvDesc.Format = DXGI_FORMAT_UNKNOWN; // Structured buffer, no format
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+        srvDesc.Buffer.FirstElement = 0;
+        srvDesc.Buffer.NumElements = numVerts;
+
+        DirectX::getDevice()->CreateShaderResourceView(localRestPositionsBuffer.Get(), &srvDesc, &localRestPositionsSRV);
     }
 
+    void tearDown() override
+    {
+        ComputeShader::tearDown();
+        particlesBuffer.Reset();
+        vertStartIdxBuffer.Reset();
+        numVerticesBuffer.Reset();
+        localRestPositionsBuffer.Reset();
+        particlesSRV.Reset();
+        vertStartIdxSRV.Reset();
+        numVerticesSRV.Reset();
+        localRestPositionsUAV.Reset();
+    };
 
 };
