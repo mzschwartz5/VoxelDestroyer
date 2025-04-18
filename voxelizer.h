@@ -6,6 +6,7 @@
 #include <maya/MPointArray.h>
 #include <maya/MFnMesh.h>
 #include <vector>
+#include "glm/glm.hpp"
 
 // See https://michael-schwarz.com/research/publ/files/vox-siga10.pdf
 // "Surface voxelization" for a mathematical explanation of the below fields / how they're used.
@@ -27,13 +28,20 @@ struct Triangle {
     double d_ei_yz_solid[3]; // Edge distances for the yz plane (for solid voxelization)
 };
 
-struct Voxel {
-    bool occupied = false; // contains some part (surface or interior) of the underlying mesh
-    bool isSurface = false;
-    uint32_t mortonCode = UINT32_MAX;
-    int filteredIndex;    // what the index of this voxel would be if we filtered out unoccupied voxels.
-    MPointArray vertices; // vertices owned by this voxel (to be transformed during the PBD (VGS) simulation)
-    MPointArray corners;  // ordered according to the VGS expectations
+struct Voxels {
+    std::vector<bool> occupied; // contains some part (surface or interior) of the underlying mesh
+    std::vector<bool> isSurface;
+    std::vector<glm::vec3> corners;  // ordered according to the VGS expectations
+    std::vector<uint> vertStartIdx;    // Each voxel owns a number of vertices contained within (including the corners)
+    std::vector<uint> numVerts;
+    int totalVerts = 0; // total number of vertices in the voxelized mesh
+    
+    int size() const { return static_cast<int>(occupied.size()); }
+    void resize(int size) {
+        occupied.resize(size, false);
+        isSurface.resize(size, false);
+        // The other vectors do not get resized because they are populated per occupied voxel, not the entire grid.
+    }
 };
 
 class Voxelizer {
@@ -42,7 +50,7 @@ public:
     Voxelizer() = default;
     ~Voxelizer() = default;
 
-    std::vector<Voxel> voxelizeSelectedMesh(
+    Voxels voxelizeSelectedMesh(
         float gridEdgeLength,
         float voxelSize,
         MPoint gridCenter,
@@ -67,7 +75,7 @@ private:
         float gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
         float voxelSize,                        // edge length of a single voxel
         MPoint gridCenter,                      // center of the grid in world space
-        std::vector<Voxel>& voxels
+        Voxels& voxels
     );
 
     void getInteriorVoxels(
@@ -75,7 +83,7 @@ private:
         float gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
         float voxelSize,                        // edge length of a single voxel
         MPoint gridCenter,                      // center of the grid in world space
-        std::vector<Voxel>& voxels               // output array of voxels (true = occupied, false = empty)
+        Voxels& voxels               // output array of voxels (true = occupied, false = empty)
     );
 
     bool doesTriangleOverlapVoxel(
@@ -95,7 +103,7 @@ private:
     );
 
     MDagPath createVoxels(
-        std::vector<Voxel>& occupiedVoxels,
+        Voxels& occupiedVoxels,
         float gridEdgeLength, 
         float voxelSize,       
         MPoint gridCenter,      
@@ -105,7 +113,8 @@ private:
     MObject addVoxelToMesh(
         const MPoint& voxelMin, // min corner of the voxel
         float voxelSize,        // edge length of a single voxel
-        Voxel& voxel,
+        bool isSurface,
+        Voxels& voxels,
         MFnMesh& originalSurface
     );
 };

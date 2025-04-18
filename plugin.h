@@ -15,7 +15,8 @@
 #include "constants.h"
 #include <memory>
 #include "directx/compute/computeshader.h"
-#include "directx/compute/updatevoxelbasescompute.h"
+#include "directx/compute/transformverticescompute.h"
+#include "directx/compute/bindverticescompute.h"
 
 // Making most functions and members static so we can bind methods to the timeChanged event
 // and access data during the special standalone intialize and uninitialize functions
@@ -46,7 +47,9 @@ private:
 
 	// Shaders
 	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
-	static std::unique_ptr<UpdateVoxelBasesCompute> updateVoxelBasesCompute;
-	static int updateVoxelBasesNumWorkgroups;
+	static int transformVerticesNumWorkgroups;
+	static std::unique_ptr<TransformVerticesCompute> transformVerticesCompute;
+	static std::unique_ptr<BindVerticesCompute> bindVerticesCompute;
+
 
 };
