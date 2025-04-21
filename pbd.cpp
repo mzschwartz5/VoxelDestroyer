@@ -5,7 +5,7 @@
 PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
 
-    std::vector<uint> voxelIndices; //right type?
+    std::vector<uint> voxelIndices(voxels.corners.size()); //right type?
     std::iota(voxelIndices.begin(), voxelIndices.end(), 0); // fill with 0, 1, 2, ..., size-1
 
     //sort the index array by the corresponding voxel's morton code - will this work if there are non-occupied indices?
@@ -70,7 +70,7 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
         }
     }
 
-    for (const auto& corners : voxels.corners) {
+    for (const auto& corners : sorted_corners) {
         for (const auto& position : corners.corners) {
             particles.positions.push_back(vec4(position, 0.0f));
             particles.oldPositions.push_back(vec4(position, 0.0f));

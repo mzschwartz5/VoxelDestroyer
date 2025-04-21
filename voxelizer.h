@@ -49,6 +49,11 @@ struct Voxels {
         occupied.resize(size, false);
         isSurface.resize(size, false);
         // The other vectors do not get resized because they are populated per occupied voxel, not the entire grid.
+
+		mortonCodes.resize(size, UINT32_MAX);
+        //temp
+		/*vertStartIdx.resize(size, 0);
+		numVerts.resize(size, 0);*/
     }
 };
 
