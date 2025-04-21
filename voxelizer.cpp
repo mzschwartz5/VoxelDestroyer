@@ -41,6 +41,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
         voxels
     );
 
+    //crash here
     voxelizedMeshPath = createVoxels(
         voxels,
         gridEdgeLength,
@@ -329,6 +330,7 @@ MDagPath Voxelizer::createVoxels(
         for (int y = 0; y < voxelsPerEdge; ++y) {
             for (int z = 0; z < voxelsPerEdge; ++z) {
                 int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
+				//this line crashes
                 if (!overlappedVoxels.occupied[index]) continue;
 
                 MPoint voxelMin = MPoint(
@@ -468,5 +470,6 @@ MObject Voxelizer::addVoxelToMesh(
     // Set the vert start idx and number of verts for the voxel
     voxels.numVerts.push_back(cubeMeshFn.numVertices());
     voxels.totalVerts += cubeMeshFn.numVertices();
+
     return cube;
 }

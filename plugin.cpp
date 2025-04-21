@@ -40,6 +40,8 @@ void plugin::simulate(void* clientData) {
 // Plugin doIt function
 MStatus plugin::doIt(const MArgList& argList)
 {
+	MGlobal::displayInfo("VoxelDestroyer command executed.");
+
 	MStatus status;
 	float voxelSize = 0.1f;
 	float gridEdgeLength = 1.0f;
