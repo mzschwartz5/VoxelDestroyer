@@ -2,15 +2,82 @@
 #include <maya/MGlobal.h>
 #include <float.h>
 
-PBD::PBD(const std::vector<vec3>& positions, float voxelSize) {
+PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
 
-    for (const auto& position : positions) {
-        particles.positions.push_back(vec4(position, 0.0f));
-        particles.oldPositions.push_back(vec4(position, 0.0f));
-        particles.velocities.push_back(vec4(0.0f));
-        particles.w.push_back(1.0f);
-        particles.numParticles++;
+    std::vector<uint> voxelIndices; //right type?
+    std::iota(voxelIndices.begin(), voxelIndices.end(), 0); // fill with 0, 1, 2, ..., size-1
+
+    //sort the index array by the corresponding voxel's morton code - will this work if there are non-occupied indices?
+    std::sort(voxelIndices.begin(), voxelIndices.end(), [&voxels](int a, int b) {
+        return voxels.mortonCodes[a] < voxels.mortonCodes[b];
+        });
+
+    //reorder voxels arrays
+    std::vector<uint> originalVoxelIdxToSortedVoxelIdx(voxelIndices.size()); //right type?
+    std::vector<uint> sorted_vertStartIdx(voxelIndices.size());
+    std::vector<VoxelPositions> sorted_corners(voxelIndices.size());
+    for (size_t i = 0; i < voxelIndices.size(); ++i) {
+        sorted_vertStartIdx[i] = voxels.vertStartIdx[voxelIndices[i]];
+        sorted_corners[i] = voxels.corners[voxelIndices[i]];
+
+        originalVoxelIdxToSortedVoxelIdx[voxelIndices[i]] = i;
+    }
+
+    std::vector<FaceConstraint> faceConstraints;
+
+    int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
+    for (int x = 0; x < voxelsPerEdge - 1; x++) {
+        for (int y = 0; y < voxelsPerEdge - 1; y++) {
+            for (int z = 0; z < voxelsPerEdge - 1; z++) {
+                int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
+                if (!voxels.occupied[index]) continue;
+
+                int rightNeighborIndex = (x + 1) * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
+                int topNeighborIndex = x * voxelsPerEdge * voxelsPerEdge + (y + 1) * voxelsPerEdge + z;
+                int backNeighborIndex = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + (z + 1);
+
+                if (voxels.occupied[rightNeighborIndex]) {
+                    //make a face constraint
+                    FaceConstraint newConstraint;
+                    newConstraint.voxelOneIdx = sorted_vertStartIdx[originalVoxelIdxToSortedVoxelIdx[index]];
+                    newConstraint.voxelTwoIdx = sorted_vertStartIdx[originalVoxelIdxToSortedVoxelIdx[rightNeighborIndex]];
+                    newConstraint.compressionLimit = -FLT_MAX;
+                    newConstraint.tensionLimit = FLT_MAX;
+                    addFaceConstraint(newConstraint, 0);
+                }
+
+                if (voxels.occupied[topNeighborIndex]) {
+                    //make a face constraint
+                    FaceConstraint newConstraint;
+                    newConstraint.voxelOneIdx = sorted_vertStartIdx[originalVoxelIdxToSortedVoxelIdx[index]];
+                    newConstraint.voxelTwoIdx = sorted_vertStartIdx[originalVoxelIdxToSortedVoxelIdx[topNeighborIndex]];
+                    newConstraint.compressionLimit = -FLT_MAX;
+                    newConstraint.tensionLimit = FLT_MAX;
+                    addFaceConstraint(newConstraint, 1);
+                }
+
+                if (voxels.occupied[backNeighborIndex]) {
+                    //make a face constraint
+                    FaceConstraint newConstraint;
+                    newConstraint.voxelOneIdx = sorted_vertStartIdx[originalVoxelIdxToSortedVoxelIdx[index]];
+                    newConstraint.voxelTwoIdx = sorted_vertStartIdx[originalVoxelIdxToSortedVoxelIdx[backNeighborIndex]];
+                    newConstraint.compressionLimit = -FLT_MAX;
+                    newConstraint.tensionLimit = FLT_MAX;
+                    addFaceConstraint(newConstraint, 2);
+                }
+            }
+        }
+    }
+
+    for (const auto& corners : voxels.corners) {
+        for (const auto& position : corners.corners) {
+            particles.positions.push_back(vec4(position, 0.0f));
+            particles.oldPositions.push_back(vec4(position, 0.0f));
+            particles.velocities.push_back(vec4(0.0f));
+            particles.w.push_back(1.0f);
+            particles.numParticles++;
+        }
     }
 
     setRadiusAndVolumeFromLength(voxelSize);

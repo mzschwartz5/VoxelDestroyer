@@ -1,8 +1,13 @@
 #pragma once
+
 #include "glm/glm.hpp"
+#include "voxelizer.h"
+
 #include <algorithm>
 #include <vector>
 #include <array>
+#include <numeric>
+
 using glm::vec3;
 using glm::vec4;
 
@@ -15,18 +20,18 @@ struct Particles
     int numParticles{ 0 };
 };
 
-//struct FaceConstraint {
-//    int voxelOneIdx;
-//    int voxelTwoIdx;
-//    float tensionLimit;
-//	float compressionLimit;
-//};
+struct FaceConstraint {
+    int voxelOneIdx;
+    int voxelTwoIdx;
+    float tensionLimit;
+	float compressionLimit;
+};
 
 class PBD
 {
 public:
     PBD() = default;
-    PBD(const std::vector<vec3>& positions, float voxelSize);
+    PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength);
     ~PBD() = default;
     const Particles& simulateStep();
     void simulateSubstep();
@@ -35,7 +40,7 @@ public:
 
 private:
     Particles particles;
-    //std::array<std::vector<FaceConstraint>, 3> faceConstraints; //0 = x, 1 = y, 2 = z
+    std::array<std::vector<FaceConstraint>, 3> faceConstraints; //0 = x, 1 = y, 2 = z
     int substeps = 10;
     float timeStep;
 
@@ -57,4 +62,6 @@ private:
         PARTICLE_RADIUS = edge_length * 0.25f;
         VOXEL_REST_VOLUME = edge_length * edge_length * edge_length;
     }
+
+    void addFaceConstraint(FaceConstraint constraint, int axis) { faceConstraints[axis].push_back(constraint); };
 };
