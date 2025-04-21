@@ -6,6 +6,8 @@
 #include <maya/MPointArray.h>
 #include <maya/MFnMesh.h>
 #include <vector>
+
+#include "utils.h"
 #include "glm/glm.hpp"
 
 // See https://michael-schwarz.com/research/publ/files/vox-siga10.pdf
@@ -28,13 +30,19 @@ struct Triangle {
     double d_ei_yz_solid[3]; // Edge distances for the yz plane (for solid voxelization)
 };
 
+struct VoxelPositions {
+	std::vector<glm::vec3> corners; // 8 corners of the voxel
+};
+
 struct Voxels {
     std::vector<bool> occupied; // contains some part (surface or interior) of the underlying mesh
     std::vector<bool> isSurface;
-    std::vector<glm::vec3> corners;  // ordered according to the VGS expectations
+    std::vector<VoxelPositions> corners;  // ordered according to the VGS expectations
     std::vector<uint> vertStartIdx;    // Each voxel owns a number of vertices contained within (including the corners)
     std::vector<uint> numVerts;
     int totalVerts = 0; // total number of vertices in the voxelized mesh
+
+    std::vector<uint32_t> mortonCodes;
     
     int size() const { return static_cast<int>(occupied.size()); }
     void resize(int size) {

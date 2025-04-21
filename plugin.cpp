@@ -49,8 +49,9 @@ MStatus plugin::doIt(const MArgList& argList)
 {
 	MStatus status;
 	float voxelSize = 0.1f;
+	float gridEdgeLength = 1.0f;
 	Voxels voxels = voxelizer.voxelizeSelectedMesh(
-		1.0f, //size of the grid
+		gridEdgeLength, //size of the grid
 		voxelSize, // voxel size
 		MPoint(0.0f, 3.0f, 0.0f), // grid center
 		plugin::voxelizedMeshDagPath,
@@ -83,10 +84,11 @@ MStatus plugin::doIt(const MArgList& argList)
 	);
 	plugin::transformVerticesNumWorkgroups = voxels.size();
 	
+	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
+
 	MGlobal::displayInfo("Transform vertices compute shader initialized.");
 
-	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
-	plugin::pbdSimulator = PBD(voxels.corners, voxelSize);
+	plugin::pbdSimulator = PBD(voxels, voxelSize, gridEdgeLength);
 
 	MGlobal::displayInfo("PBD particles initialized.");
 	return status;

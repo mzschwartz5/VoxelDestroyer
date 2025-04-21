@@ -192,9 +192,14 @@ void Voxelizer::getSurfaceVoxels(
                     int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
                     
                     MVector voxelMinCorner(MVector(x, y, z) * voxelSize + gridMin);
-                    if (!doesTriangleOverlapVoxel(tri, voxelMinCorner)) continue;
+                    if (!doesTriangleOverlapVoxel(tri, voxelMinCorner)) {
+                        //is this the right spot for this?
+                        voxels.mortonCodes[index] = UINT32_MAX;
+                        continue;
+                    }
                     voxels.occupied[index] = true;
                     voxels.isSurface[index] = true;
+                    voxels.mortonCodes[index] = Utils::toMortonCode(x, y, z);
                 }
             }
         }
@@ -261,6 +266,7 @@ void Voxelizer::getInteriorVoxels(
                 for (int x = xVoxelMin; x < voxelsPerEdge; ++x) {
                     int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
                     voxels.occupied[index] = !voxels.occupied[index];
+                    voxels.mortonCodes[index] = Utils::toMortonCode(x, y, z);
                 }
             }
         }
@@ -408,13 +414,16 @@ MObject Voxelizer::addVoxelToMesh(
     cubeVertices.append(MPoint(voxelMin.x, voxelMax.y, voxelMax.z));
     cubeVertices.append(voxelMax);
 
+    VoxelPositions newPositions;
     for (int i = 0; i < 8; ++i) {
-        voxels.corners.push_back(glm::vec3(
-            cubeVertices[i].x,
-            cubeVertices[i].y,
-            cubeVertices[i].z
-        ));
+		newPositions.corners[i] = glm::vec3(
+			cubeVertices[i].x,
+			cubeVertices[i].y,
+			cubeVertices[i].z
+		);
     }
+
+    voxels.corners.push_back(newPositions);
 
     MIntArray faceCounts;
     MIntArray faceConnects;
