@@ -49,7 +49,7 @@ private:
 
     void solveVGS(int start_idx, unsigned int iter_count);
 
-    //void solveFaceConstraint(FaceConstraint& faceConstraint, int axis);
+    void solveFaceConstraint(FaceConstraint& faceConstraint, int axis);
 
     vec4 project(vec4 x, vec4 y);
 
