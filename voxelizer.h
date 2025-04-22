@@ -6,6 +6,7 @@
 #include <maya/MPointArray.h>
 #include <maya/MFnMesh.h>
 #include <vector>
+#include <array>
 
 #include "utils.h"
 #include "glm/glm.hpp"
@@ -31,7 +32,7 @@ struct Triangle {
 };
 
 struct VoxelPositions {
-	std::vector<glm::vec3> corners; // 8 corners of the voxel
+    std::array<glm::vec3, 8> corners;
 };
 
 struct Voxels {

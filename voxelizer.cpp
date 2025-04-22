@@ -330,7 +330,6 @@ MDagPath Voxelizer::createVoxels(
         for (int y = 0; y < voxelsPerEdge; ++y) {
             for (int z = 0; z < voxelsPerEdge; ++z) {
                 int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
-				//this line crashes
                 if (!overlappedVoxels.occupied[index]) continue;
 
                 MPoint voxelMin = MPoint(
@@ -417,6 +416,7 @@ MObject Voxelizer::addVoxelToMesh(
     cubeVertices.append(voxelMax);
 
     VoxelPositions newPositions;
+    newPositions.corners = std::array<glm::vec3, 8>();
     for (int i = 0; i < 8; ++i) {
 		newPositions.corners[i] = glm::vec3(
 			cubeVertices[i].x,
