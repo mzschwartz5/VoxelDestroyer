@@ -21,50 +21,51 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
         sorted_vertStartIdx[i] = voxels.vertStartIdx[voxelIndices[i]];
         sorted_corners[i] = voxels.corners[i];
 
-        originalToSortedVoxelIdx[voxelIndices[i]] = i;
+        //originalToSortedVoxelIdx[voxelIndices[i]] = i;
+        originalToSortedVoxelIdx[i] = voxelIndices[i];
     }
 
-    std::vector<FaceConstraint> faceConstraints;
-
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
-    for (int x = 0; x < voxelsPerEdge - 1; x++) {
-        for (int y = 0; y < voxelsPerEdge - 1; y++) {
-            for (int z = 0; z < voxelsPerEdge - 1; z++) {
+    for (int x = 0; x < voxelsPerEdge; x++) {
+        for (int y = 0; y < voxelsPerEdge; y++) {
+            for (int z = 0; z < voxelsPerEdge; z++) {
                 int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
                 if (!voxels.occupied[index]) continue;
 
-                int rightNeighborIndex = (x + 1) * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
-                int topNeighborIndex = x * voxelsPerEdge * voxelsPerEdge + (y + 1) * voxelsPerEdge + z;
-                int backNeighborIndex = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + (z + 1);
-
-                if (voxels.occupied[rightNeighborIndex]) {
-                    //make a face constraint
-                    FaceConstraint newConstraint;
-                    newConstraint.voxelOneIdx = originalToSortedVoxelIdx[index];
-                    newConstraint.voxelTwoIdx = originalToSortedVoxelIdx[rightNeighborIndex];
-                    newConstraint.compressionLimit = -FLT_MAX;
-                    newConstraint.tensionLimit = FLT_MAX;
-                    addFaceConstraint(newConstraint, 0);
+                if (x < voxelsPerEdge - 1) {
+                    int rightNeighborIndex = (x + 1) * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
+                    if (voxels.occupied[rightNeighborIndex]) {
+                        FaceConstraint newConstraint;
+                        newConstraint.voxelOneIdx = originalToSortedVoxelIdx[index];
+                        newConstraint.voxelTwoIdx = originalToSortedVoxelIdx[rightNeighborIndex];
+                        newConstraint.compressionLimit = -FLT_MAX;
+                        newConstraint.tensionLimit = FLT_MAX;
+                        addFaceConstraint(newConstraint, 0);
+                    }
                 }
 
-                if (voxels.occupied[topNeighborIndex]) {
-                    //make a face constraint
-                    FaceConstraint newConstraint;
-                    newConstraint.voxelOneIdx = originalToSortedVoxelIdx[index];
-                    newConstraint.voxelTwoIdx = originalToSortedVoxelIdx[topNeighborIndex];
-                    newConstraint.compressionLimit = -FLT_MAX;
-                    newConstraint.tensionLimit = FLT_MAX;
-                    addFaceConstraint(newConstraint, 1);
+                if (y < voxelsPerEdge - 1) {
+                    int topNeighborIndex = x * voxelsPerEdge * voxelsPerEdge + (y + 1) * voxelsPerEdge + z;
+                    if (voxels.occupied[topNeighborIndex]) {
+                        FaceConstraint newConstraint;
+                        newConstraint.voxelOneIdx = originalToSortedVoxelIdx[index];
+                        newConstraint.voxelTwoIdx = originalToSortedVoxelIdx[topNeighborIndex];
+                        newConstraint.compressionLimit = -FLT_MAX;
+                        newConstraint.tensionLimit = FLT_MAX;
+                        addFaceConstraint(newConstraint, 1);
+                    }
                 }
 
-                if (voxels.occupied[backNeighborIndex]) {
-                    //make a face constraint
-                    FaceConstraint newConstraint;
-                    newConstraint.voxelOneIdx = originalToSortedVoxelIdx[index];
-                    newConstraint.voxelTwoIdx = originalToSortedVoxelIdx[backNeighborIndex];
-                    newConstraint.compressionLimit = -FLT_MAX;
-                    newConstraint.tensionLimit = FLT_MAX;
-                    addFaceConstraint(newConstraint, 2);
+                if (z < voxelsPerEdge - 1) {
+                    int backNeighborIndex = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + (z + 1);
+                    if (voxels.occupied[backNeighborIndex]) {
+                        FaceConstraint newConstraint;
+                        newConstraint.voxelOneIdx = originalToSortedVoxelIdx[index];
+                        newConstraint.voxelTwoIdx = originalToSortedVoxelIdx[backNeighborIndex];
+                        newConstraint.compressionLimit = -FLT_MAX;
+                        newConstraint.tensionLimit = FLT_MAX;
+                        addFaceConstraint(newConstraint, 2);
+                    }
                 }
             }
         }
@@ -104,14 +105,16 @@ void PBD::simulateSubstep() {
     }
 
     solveGroundCollision();
+
     for (int i = 0; i < particles.numParticles; i += 8) {
 		solveVGS(i, 3);
 	}
-    /*for (int i = 0; i < faceConstraints.size(); i++) {
+
+    for (int i = 0; i < faceConstraints.size(); i++) {
         for (auto& constraint : faceConstraints[i]) {
             solveFaceConstraint(constraint, i);
         }
-    }*/
+    }
 
     for (int i = 0; i < particles.numParticles; ++i)
     {
@@ -204,14 +207,14 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
     }
 }
 
-/*void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
+void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
     //check if constraint has already been broken
     if (faceConstraint.voxelOneIdx == -1 || faceConstraint.voxelTwoIdx == -1) {
         return;
     }
 
-    Voxel& voxelOne = voxels[faceConstraint.voxelOneIdx];
-    Voxel& voxelTwo = voxels[faceConstraint.voxelTwoIdx];
+    auto voxelOneStartIdx = faceConstraint.voxelOneIdx;
+    auto voxelTwoStartIdx = faceConstraint.voxelTwoIdx;
 
     std::array<vec3*, 4> faceOne; //midpoint particle positions for relevant face of voxel 1
     std::array<vec3*, 4> faceTwo; //midpoint particle positions for relevant face of voxel 2
@@ -221,47 +224,44 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
     std::array<int, 4> faceTwoIndices; //particle indices for relevant face of voxel 2
 
     //calculate centers
-    vec3 v1Center = (particles[voxelOne.particles[0]].position +
-        particles[voxelOne.particles[1]].position +
-        particles[voxelOne.particles[2]].position +
-        particles[voxelOne.particles[3]].position +
-        particles[voxelOne.particles[4]].position +
-        particles[voxelOne.particles[5]].position +
-        particles[voxelOne.particles[6]].position +
-        particles[voxelOne.particles[7]].position) / 8.0f;
+    vec3 v1Center = glm::vec3((particles.positions[voxelOneStartIdx + 0] +
+        particles.positions[voxelOneStartIdx + 1] +
+        particles.positions[voxelOneStartIdx + 2] +
+        particles.positions[voxelOneStartIdx + 3] +
+        particles.positions[voxelOneStartIdx + 4] +
+        particles.positions[voxelOneStartIdx + 5] +
+        particles.positions[voxelOneStartIdx + 6] +
+        particles.positions[voxelOneStartIdx + 7])) * 0.125f;
 
-    vec3 v2Center = (particles[voxelTwo.particles[0]].position +
-        particles[voxelTwo.particles[1]].position +
-        particles[voxelTwo.particles[2]].position +
-        particles[voxelTwo.particles[3]].position +
-        particles[voxelTwo.particles[4]].position +
-        particles[voxelTwo.particles[5]].position +
-        particles[voxelTwo.particles[6]].position +
-        particles[voxelTwo.particles[7]].position) / 8.0f;
+    vec3 v2Center = glm::vec3((particles.positions[voxelTwoStartIdx + 0] +
+        particles.positions[voxelTwoStartIdx + 1] +
+        particles.positions[voxelTwoStartIdx + 2] +
+        particles.positions[voxelTwoStartIdx + 3] +
+        particles.positions[voxelTwoStartIdx + 4] +
+        particles.positions[voxelTwoStartIdx + 5] +
+        particles.positions[voxelTwoStartIdx + 6] +
+        particles.positions[voxelTwoStartIdx + 7])) * 0.125f;
 
     //calculate midpoint positions for every vertex
     std::array<vec3, 8> v1MidPositions;
     std::array<vec3, 8> v2MidPositions;
 
     for (int i = 0; i < 8; i++) {
-        v1MidPositions[i] = (particles[voxelOne.particles[i]].position + v1Center) * 0.5f;
-        v2MidPositions[i] = (particles[voxelTwo.particles[i]].position + v2Center) * 0.5f;
+        v1MidPositions[i] = (glm::vec3(particles.positions[voxelOneStartIdx + i]) + v1Center) * 0.5f;
+        v2MidPositions[i] = (glm::vec3(particles.positions[voxelTwoStartIdx + i]) + v2Center) * 0.5f;
     }
 
-    //define face indices based on axis, matching the GPU implementation
+    //define face indices based on axis
     switch (axis) {
     case 0: //x-axis
-        //negative X face (voxel 1) to positive X face (voxel 2)
-        faceOneIndices = { 0, 2, 4, 6 }; //-X face indices
-        faceTwoIndices = { 1, 3, 5, 7 }; //+X face indices
+        faceOneIndices = { 1, 3, 5, 7 };
+        faceTwoIndices = { 0, 2, 4, 6 };
         break;
     case 1: //y-axis
-        //negative Y face (voxel 1) to positive Y face (voxel 2)
-        faceOneIndices = { 0, 1, 4, 5 }; //-Y face indices
-        faceTwoIndices = { 2, 3, 6, 7 }; //+Y face indices
+        faceOneIndices = { 2, 3, 6, 7 };
+        faceTwoIndices = { 0, 1, 4, 5 };
         break;
     case 2: //z-axis
-        //negative Z face (voxel 1) to positive Z face (voxel 2)
         faceOneIndices = { 0, 1, 2, 3 }; //-Z face indices
         faceTwoIndices = { 4, 5, 6, 7 }; //+Z face indices
         break;
@@ -271,12 +271,11 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
     for (int i = 0; i < 4; i++) {
         faceOne[i] = &v1MidPositions[faceOneIndices[i]];
         faceTwo[i] = &v2MidPositions[faceTwoIndices[i]];
-
-        faceOneW[i] = particles[voxelOne.particles[faceOneIndices[i]]].w;
-        faceTwoW[i] = particles[voxelTwo.particles[faceTwoIndices[i]]].w;
+        faceOneW[i] = particles.w[voxelOneStartIdx + faceOneIndices[i]];
+        faceTwoW[i] = particles.w[voxelTwoStartIdx + faceTwoIndices[i]];
     }
 
-    //check if constraint should be deleted (fracture check)
+    //check if constraint should be deleted
     bool enableFracture = true;
     if (enableFracture) {
         for (int i = 0; i < 4; i++) {
@@ -363,12 +362,12 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
         for (int i = 0; i < 4; i++) {
             if (faceOneW[i] != 0.0f) {
                 vec3 delta = *faceOne[i] - origFaceOne[i];
-                particles[voxelOne.particles[faceOneIndices[i]]].position += delta;
+				particles.positions[voxelOneStartIdx + faceOneIndices[i]] += glm::vec4(delta, 0.f);
             }
 
             if (faceTwoW[i] != 0.0f) {
                 vec3 delta = *faceTwo[i] - origFaceTwo[i];
-                particles[voxelTwo.particles[faceTwoIndices[i]]].position += delta;
+				particles.positions[voxelTwoStartIdx + faceTwoIndices[i]] += glm::vec4(delta, 0.f);
             }
         }
     } else {
@@ -449,14 +448,14 @@ void PBD::solveVGS(int start_idx, unsigned int iter_count) {
             for (int i = 0; i < 4; i++) {
                 if (faceOneW[i] != 0.0f) {
                     vec3 delta = *faceOne[i] - origFaceOne[i];
-                    particles[voxelOne.particles[faceOneIndices[i]]].position += delta;
+					particles.positions[voxelOneStartIdx + faceOneIndices[i]] += glm::vec4(delta, 0.f);
                 }
 
                 if (faceTwoW[i] != 0.0f) {
                     vec3 delta = *faceTwo[i] - origFaceTwo[i];
-                    particles[voxelTwo.particles[faceTwoIndices[i]]].position += delta;
+                    particles.positions[voxelTwoStartIdx + faceTwoIndices[i]] += glm::vec4(delta, 0.f);
                 }
             }
         }
     }
-}*/
+}
