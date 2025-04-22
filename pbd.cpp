@@ -5,7 +5,7 @@
 PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
 
-    std::vector<uint> voxelIndices(voxels.corners.size()); //right type?
+    std::vector<uint32_t> voxelIndices(voxels.corners.size()); //right type?
     std::iota(voxelIndices.begin(), voxelIndices.end(), 0); // fill with 0, 1, 2, ..., size-1
 
     //sort the index array by the corresponding voxel's morton code - will this work if there are non-occupied indices?
@@ -14,14 +14,14 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
         });
 
     //reorder voxels arrays
-    std::vector<uint> originalVoxelIdxToSortedVoxelIdx(voxelIndices.size()); //right type?
-    std::vector<uint> sorted_vertStartIdx(voxelIndices.size());
+    std::vector<uint32_t> originalToSortedVoxelIdx(voxelIndices.size()); //right type?
+    std::vector<uint32_t> sorted_vertStartIdx(voxelIndices.size());
     std::vector<VoxelPositions> sorted_corners(voxelIndices.size());
     for (size_t i = 0; i < voxelIndices.size(); ++i) {
         sorted_vertStartIdx[i] = voxels.vertStartIdx[voxelIndices[i]];
-        sorted_corners[i] = voxels.corners[voxelIndices[i]];
+        sorted_corners[i] = voxels.corners[i];
 
-        originalVoxelIdxToSortedVoxelIdx[voxelIndices[i]] = i;
+        originalToSortedVoxelIdx[voxelIndices[i]] = i;
     }
 
     std::vector<FaceConstraint> faceConstraints;
@@ -40,8 +40,8 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
                 if (voxels.occupied[rightNeighborIndex]) {
                     //make a face constraint
                     FaceConstraint newConstraint;
-                    newConstraint.voxelOneIdx = sorted_vertStartIdx[originalVoxelIdxToSortedVoxelIdx[index]];
-                    newConstraint.voxelTwoIdx = sorted_vertStartIdx[originalVoxelIdxToSortedVoxelIdx[rightNeighborIndex]];
+                    newConstraint.voxelOneIdx = originalToSortedVoxelIdx[index];
+                    newConstraint.voxelTwoIdx = originalToSortedVoxelIdx[rightNeighborIndex];
                     newConstraint.compressionLimit = -FLT_MAX;
                     newConstraint.tensionLimit = FLT_MAX;
                     addFaceConstraint(newConstraint, 0);
@@ -50,8 +50,8 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
                 if (voxels.occupied[topNeighborIndex]) {
                     //make a face constraint
                     FaceConstraint newConstraint;
-                    newConstraint.voxelOneIdx = sorted_vertStartIdx[originalVoxelIdxToSortedVoxelIdx[index]];
-                    newConstraint.voxelTwoIdx = sorted_vertStartIdx[originalVoxelIdxToSortedVoxelIdx[topNeighborIndex]];
+                    newConstraint.voxelOneIdx = originalToSortedVoxelIdx[index];
+                    newConstraint.voxelTwoIdx = originalToSortedVoxelIdx[topNeighborIndex];
                     newConstraint.compressionLimit = -FLT_MAX;
                     newConstraint.tensionLimit = FLT_MAX;
                     addFaceConstraint(newConstraint, 1);
@@ -60,8 +60,8 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
                 if (voxels.occupied[backNeighborIndex]) {
                     //make a face constraint
                     FaceConstraint newConstraint;
-                    newConstraint.voxelOneIdx = sorted_vertStartIdx[originalVoxelIdxToSortedVoxelIdx[index]];
-                    newConstraint.voxelTwoIdx = sorted_vertStartIdx[originalVoxelIdxToSortedVoxelIdx[backNeighborIndex]];
+                    newConstraint.voxelOneIdx = originalToSortedVoxelIdx[index];
+                    newConstraint.voxelTwoIdx = originalToSortedVoxelIdx[backNeighborIndex];
                     newConstraint.compressionLimit = -FLT_MAX;
                     newConstraint.tensionLimit = FLT_MAX;
                     addFaceConstraint(newConstraint, 2);
