@@ -25,8 +25,10 @@ public:
 
     void dispatch(int numWorkgroups) override
     {
+        bind();
         DirectX::getContext()->Dispatch(numWorkgroups, 1, 1);
-        
+        unbind();
+
         // Can actually release the verticesBuffer and SRV now: used only for binding, which occurs just once.
         verticesBuffer.Reset();
         verticesSRV.Reset();
@@ -87,11 +89,11 @@ private:
 
         // Initialize verticesBuffer and its SRV
         bufferDesc.Usage = D3D11_USAGE_IMMUTABLE; // since this data is going to be set on buffer creation and never changed
-        bufferDesc.ByteWidth = sizeof(float) * 4 * numVerts;
+        bufferDesc.ByteWidth = sizeof(float) * 3 * numVerts;
         bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
         bufferDesc.CPUAccessFlags = 0; // No CPU access needed
         bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-        bufferDesc.StructureByteStride = sizeof(float) * 4; // Size of each element in the buffer
+        bufferDesc.StructureByteStride = sizeof(float); // Size of each element in the buffer
 
         initData.pSysMem = vertices;
         DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &verticesBuffer);
@@ -99,7 +101,7 @@ private:
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
         srvDesc.Buffer.FirstElement = 0;
-        srvDesc.Buffer.NumElements = numVerts;
+        srvDesc.Buffer.NumElements = numVerts * 3;
 
         DirectX::getDevice()->CreateShaderResourceView(verticesBuffer.Get(), &srvDesc, &verticesSRV);
 
@@ -140,7 +142,7 @@ private:
         // Initialize localRestPositionsBuffer and its UAV, and an SRV (for the transformVertices compute shader)
         bufferDesc.Usage = D3D11_USAGE_DEFAULT; // Allow GPU write access
         bufferDesc.ByteWidth = numVerts * sizeof(float) * 4;
-        bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+        bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
         bufferDesc.CPUAccessFlags = 0;
         bufferDesc.StructureByteStride = sizeof(float) * 4; // Size of each element in the buffer (4 floats for each vertex)
         bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;

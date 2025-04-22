@@ -46,6 +46,7 @@ void main(
         }
 
         float4 localRestPosition = localRestPositions[vertexIdx];
-        transformedPositions[vertexIdx] = v0 + (localRestPosition.x * e0) + (localRestPosition.y * e1) + (localRestPosition.z * e2);
+        float4 transformedPos = v0 + (localRestPosition.x * e0) + (localRestPosition.y * e1) + (localRestPosition.z * e2);
+        transformedPositions[vertexIdx] = float4(transformedPos.x, transformedPos.y, transformedPos.z, 1.0f);
     }
 }

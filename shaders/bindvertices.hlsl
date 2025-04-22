@@ -1,5 +1,5 @@
 StructuredBuffer<float4> particles : register(t0); 
-StructuredBuffer<float4> vertices : register(t1);
+StructuredBuffer<float> vertices : register(t1);
 StructuredBuffer<uint> vertStartIds : register(t2);
 StructuredBuffer<uint> numVerts : register(t3);
 RWStructuredBuffer<float4> localRestPositions : register(u0);
@@ -31,8 +31,7 @@ void main(
             continue;
         }
 
-        float4 vertex = vertices[vertexIdx];
-        float4 localRestPosition = vertex - v0;
-        localRestPositions[vertexIdx] = localRestPosition;
+        float4 vertex = float4(vertices[3 * vertexIdx], vertices[3 * vertexIdx + 1], vertices[3 * vertexIdx + 2], 1.0f);
+        localRestPositions[vertexIdx] = vertex - v0;
     }
 }

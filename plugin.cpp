@@ -1,4 +1,5 @@
 #include "plugin.h"
+#include "glm/glm.hpp"
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -23,20 +24,12 @@ void plugin::simulate(void* clientData) {
 	const Particles& particles = plugin::pbdSimulator.simulateStep();
 
 	MFnMesh meshFn(plugin::voxelizedMeshDagPath);
-	MPointArray vertexArray;
-	meshFn.getPoints(vertexArray, MSpace::kWorld);
-
-	int idx = 0;
-	for (int i = 0; i < particles.numParticles; i++) {
-		vertexArray[idx] = MPoint(particles.positions[i].x, particles.positions[i].y, particles.positions[i].z);
-		idx++;
-	}
+	MFloatPointArray vertexArray;
 
 	// For rendering, we need to update each voxel with its new basis, which we'll use to transform all vertices owned by that voxel
 	bindVerticesCompute->updateParticleBuffer(particles.positions); // (owns the particles buffer)
 	transformVerticesCompute->dispatch(transformVerticesNumWorkgroups);
-	// Uncomment once the compute shaders are working as expected. Then remove the loop above and make vertexArray MFloatPointArray.
-	//transformVerticesCompute->copyTransformedVertsToCPU(vertexArray, meshFn.numVertices());
+	transformVerticesCompute->copyTransformedVertsToCPU(vertexArray, meshFn.numVertices());
 
 	meshFn.setPoints(vertexArray, MSpace::kWorld);
 	meshFn.updateSurface();
