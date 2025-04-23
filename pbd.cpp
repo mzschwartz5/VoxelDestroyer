@@ -262,8 +262,8 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
         faceTwoIndices = { 0, 1, 4, 5 };
         break;
     case 2: //z-axis
-        faceOneIndices = { 0, 1, 2, 3 }; //-Z face indices
-        faceTwoIndices = { 4, 5, 6, 7 }; //+Z face indices
+        faceOneIndices = { 0, 1, 2, 3 };
+        faceTwoIndices = { 4, 5, 6, 7 };
         break;
     }
 
@@ -408,7 +408,8 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
             if (axis == 0) V = -V; //hack from GPU code
 
             if (V < 0.0f) {
-                MGlobal::displayInfo("Constraint broken due to flipping");
+				std::string flipStr = "Constraint broken due to flipping on axis " + std::to_string(axis);
+                MGlobal::displayInfo(flipStr.c_str());
                 std::string vStr{ "Volume: " + std::to_string(V) };
                 MGlobal::displayInfo(vStr.c_str());
                 faceConstraint.voxelOneIdx = -1;
