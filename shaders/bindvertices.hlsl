@@ -4,8 +4,6 @@ StructuredBuffer<uint> vertStartIds : register(t2);
 StructuredBuffer<uint> numVerts : register(t3);
 RWStructuredBuffer<float4> localRestPositions : register(u0);
 
-groupshared float4 v0;
-
 /* Each workgroup represents a voxel. Each thread in the workgroup handles 
  * (numVerts / BIND_VERTICES_THREADS) vertices from the voxel and calculates the local rest position for each.
 */
@@ -16,10 +14,7 @@ void main(
     uint3 localThreadId : SV_GroupThreadID
 ) {
     uint v0_idx = groupId.x << 3; // index of the minimum corner of the voxel
-    if (localThreadId.x == 0) {
-        v0 = particles[v0_idx];
-    }
-    GroupMemoryBarrierWithGroupSync();
+    float4 v0 = particles[v0_idx];
 
     uint vertexStartIdx = vertStartIds[groupId.x];
     uint numVertsInVoxel = numVerts[groupId.x];

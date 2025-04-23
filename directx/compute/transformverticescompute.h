@@ -52,6 +52,17 @@ private:
         ID3D11UnorderedAccessView* uavs[] = { transformedVertsUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, 1, uavs, nullptr); // No need for initialCounts
     };
+
+    void unbind() override
+    {
+        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+
+        ID3D11ShaderResourceView* srvs[] = { nullptr, nullptr, nullptr, nullptr };
+        DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
+
+        ID3D11UnorderedAccessView* uavs[] = { nullptr };
+        DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
+    };
     
     void initializeBuffers(int numVerts) {
         D3D11_BUFFER_DESC bufferDesc = {};

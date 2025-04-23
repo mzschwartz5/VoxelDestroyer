@@ -64,6 +64,17 @@ private:
 
     };
 
+    void unbind() override
+    {
+        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+
+        ID3D11ShaderResourceView* srvs[] = { nullptr, nullptr, nullptr, nullptr };
+        DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
+
+        ID3D11UnorderedAccessView* uavs[] = { nullptr };
+        DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
+    };
+
     void initializeBuffers(int numParticles, const float* vertices, int numVerts, const std::vector<uint>& vertStartIds, const std::vector<uint>& numVertices) {
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SUBRESOURCE_DATA initData = {};

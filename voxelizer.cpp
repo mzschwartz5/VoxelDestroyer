@@ -451,10 +451,10 @@ MObject Voxelizer::addVoxelToMesh(
     // Could look into replacing the following with CGAL, which could be parallelized.
 
     // TEMPORARILY COMMENTED OUT - until we have code in place to transform the vertices within each voxel, just return the voxel itself.
-    // MObjectArray objsToIntersect;
-    // objsToIntersect.append(cubeMeshFn.object());
-    // objsToIntersect.append(originalMesh.object());
-    // cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect);
+    MObjectArray objsToIntersect;
+    objsToIntersect.append(cubeMeshFn.object());
+    objsToIntersect.append(originalMesh.object());
+    cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect);
 
     // Set the vert start idx and number of verts for the voxel
     voxels.numVerts.push_back(cubeMeshFn.numVertices());

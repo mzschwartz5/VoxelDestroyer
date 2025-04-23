@@ -53,6 +53,10 @@ MStatus plugin::doIt(const MArgList& argList)
 	
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
 
+	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
+	plugin::pbdSimulator = PBD(voxels.corners, voxelSize);
+	MGlobal::displayInfo("PBD particles initialized.");
+
 	// TODO: handle if doIt is called repeatedly... this will just create new buffers but not free old ones?
 	// Also need to make sure that this is called before updating the buffers in the callback...
 	// Calculate a local rest position for each vertex in every voxel.
@@ -63,6 +67,8 @@ MStatus plugin::doIt(const MArgList& argList)
 		voxels.vertStartIdx, 
 		voxels.numVerts
 	);
+
+	bindVerticesCompute->updateParticleBuffer(plugin::pbdSimulator.getParticles().positions);
 	bindVerticesCompute->dispatch(voxels.size());
 
 	MGlobal::displayInfo("Bind vertices compute shader dispatched.");
@@ -78,10 +84,6 @@ MStatus plugin::doIt(const MArgList& argList)
 	
 	MGlobal::displayInfo("Transform vertices compute shader initialized.");
 
-	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
-	plugin::pbdSimulator = PBD(voxels.corners, voxelSize);
-
-	MGlobal::displayInfo("PBD particles initialized.");
 	return status;
 }
 

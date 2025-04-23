@@ -4,14 +4,6 @@ StructuredBuffer<uint> numVerts : register(t2);
 StructuredBuffer<float4> localRestPositions : register(t3);
 RWStructuredBuffer<float4> transformedPositions : register(u0); 
 
-// Voxel minimum corner
-groupshared float4 v0;
-
-// New basis vectors of the voxel
-groupshared float4 e0;
-groupshared float4 e1;
-groupshared float4 e2;
-
 /*
 * Each workgroup represents a voxel. Each thread in the workgroup handles 
 * (numVerts / BIND_VERTICES_THREADS) vertices from the voxel and transforms them based on the deformed voxel's basis.
@@ -23,17 +15,14 @@ void main(
     uint3 localThreadId : SV_GroupThreadID
 ) {
     uint v0_idx = groupId.x << 3;
-    if (localThreadId.x == 0) {
-        v0 = particles[v0_idx];
-        float4 v1 = particles[v0_idx + 1];
-        float4 v2 = particles[v0_idx + 2];
-        float4 v4 = particles[v0_idx + 4];
+    float4 v0 = particles[v0_idx];
+    float4 v1 = particles[v0_idx + 1];
+    float4 v2 = particles[v0_idx + 2];
+    float4 v4 = particles[v0_idx + 4];
 
-        e0 = v1 - v0;
-        e1 = v2 - v0;
-        e2 = v4 - v0;
-    }
-    GroupMemoryBarrierWithGroupSync();
+    float4 e0 = normalize(v1 - v0);
+    float4 e1 = normalize(v2 - v0);
+    float4 e2 = normalize(v4 - v0);
 
     uint vertexStartIdx = vertStartIds[groupId.x];
     uint numVertsInVoxel = numVerts[groupId.x];
