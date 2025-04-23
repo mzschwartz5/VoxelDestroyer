@@ -64,4 +64,6 @@ private:
     }
 
     void addFaceConstraint(FaceConstraint constraint, int axis) { faceConstraints[axis].push_back(constraint); };
+
+    inline int get3DIndexFrom1D(int x, int y, int z, int voxelsPerEdge) { return x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z; }
 };
