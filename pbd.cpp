@@ -28,7 +28,7 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
     for (int x = 0; x < voxelsPerEdge; x++) {
         for (int y = 0; y < voxelsPerEdge; y++) {
-            for (int z = voxelsPerEdge - 1; z > 0; z--) {
+            for (int z = 0; z < voxelsPerEdge; z++) {
                 int index = get3DIndexFrom1D(x, y, z, voxelsPerEdge);
                 if (!voxels.occupied[index]) continue;
 
@@ -57,7 +57,7 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
                 }
 
                 if (z < voxelsPerEdge - 1) {
-                    int backNeighborIndex = get3DIndexFrom1D(x, y, z - 1, voxelsPerEdge);
+                    int backNeighborIndex = get3DIndexFrom1D(x, y, z + 1, voxelsPerEdge);
                     if (voxels.occupied[backNeighborIndex]) {
                         FaceConstraint newConstraint;
                         newConstraint.voxelOneIdx = index;
@@ -213,8 +213,8 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
         return;
     }
 
-    auto voxelOneStartIdx = faceConstraint.voxelOneIdx;
-    auto voxelTwoStartIdx = faceConstraint.voxelTwoIdx;
+    auto voxelOneStartIdx = faceConstraint.voxelOneIdx << 3;
+    auto voxelTwoStartIdx = faceConstraint.voxelTwoIdx << 3;
 
     std::array<vec3*, 4> faceOne; //midpoint particle positions for relevant face of voxel 1
     std::array<vec3*, 4> faceTwo; //midpoint particle positions for relevant face of voxel 2
@@ -262,8 +262,8 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
         faceTwoIndices = { 0, 1, 4, 5 };
         break;
     case 2: //z-axis
-        faceOneIndices = { 0, 1, 2, 3 };
-        faceTwoIndices = { 4, 5, 6, 7 };
+        faceOneIndices = { 4, 5, 6, 7 };
+        faceTwoIndices = { 0, 1, 2, 3 };
         break;
     }
 
@@ -275,22 +275,19 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
         faceTwoW[i] = particles.w[voxelTwoStartIdx + faceTwoIndices[i]];
     }
 
-    //check if constraint should be deleted
-    bool enableFracture = true;
-    if (enableFracture) {
-        for (int i = 0; i < 4; i++) {
-            vec3 u = *faceTwo[i] - *faceOne[i];
-            float L = glm::length(u);
-            float strain = (L - 2.0f * PARTICLE_RADIUS) / (2.0f * PARTICLE_RADIUS);
+    //check if constraint should be broken
+    for (int i = 0; i < 4; i++) {
+        vec3 u = *faceTwo[i] - *faceOne[i];
+        float L = glm::length(u);
+        float strain = (L - 2.0f * PARTICLE_RADIUS) / (2.0f * PARTICLE_RADIUS);
 
-            if (strain > faceConstraint.tensionLimit || strain < faceConstraint.compressionLimit) {
-                MGlobal::displayInfo("Constraint broken due to tension or compression");
-                std::string vStr{ "Strain: " + std::to_string(strain) };
-                MGlobal::displayInfo(vStr.c_str());
-                faceConstraint.voxelOneIdx = -1;
-                faceConstraint.voxelTwoIdx = -1;
-                return;
-            }
+        if (strain > faceConstraint.tensionLimit || strain < faceConstraint.compressionLimit) {
+            MGlobal::displayInfo("Constraint broken due to tension or compression");
+            std::string vStr{ "Strain: " + std::to_string(strain) };
+            MGlobal::displayInfo(vStr.c_str());
+            faceConstraint.voxelOneIdx = -1;
+            faceConstraint.voxelTwoIdx = -1;
+            return;
         }
     }
 
@@ -405,7 +402,7 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
 
             //check for flipping
             float V = glm::dot(glm::cross(u0, u1), u2);
-            if (axis == 0) V = -V; //hack from GPU code
+            if (axis == 1) V = -V; //hack from GPU code
 
             if (V < 0.0f) {
 				std::string flipStr = "Constraint broken due to flipping on axis " + std::to_string(axis);
