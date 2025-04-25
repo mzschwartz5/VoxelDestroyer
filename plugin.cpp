@@ -1,4 +1,5 @@
 #include "plugin.h"
+#include "glm/glm.hpp"
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -23,20 +24,12 @@ void plugin::simulate(void* clientData) {
 	const Particles& particles = plugin::pbdSimulator.simulateStep();
 
 	MFnMesh meshFn(plugin::voxelizedMeshDagPath);
-	MPointArray vertexArray;
-	meshFn.getPoints(vertexArray, MSpace::kWorld);
-
-	int idx = 0;
-	for (int i = 0; i < particles.numParticles; i++) {
-		vertexArray[idx] = MPoint(particles.positions[i].x, particles.positions[i].y, particles.positions[i].z);
-		idx++;
-	}
+	MFloatPointArray vertexArray;
 
 	// For rendering, we need to update each voxel with its new basis, which we'll use to transform all vertices owned by that voxel
 	bindVerticesCompute->updateParticleBuffer(particles.positions); // (owns the particles buffer)
 	transformVerticesCompute->dispatch(transformVerticesNumWorkgroups);
-	// Uncomment once the compute shaders are working as expected. Then remove the loop above and make vertexArray MFloatPointArray.
-	//transformVerticesCompute->copyTransformedVertsToCPU(vertexArray, meshFn.numVertices());
+	transformVerticesCompute->copyTransformedVertsToCPU(vertexArray, meshFn.numVertices());
 
 	meshFn.setPoints(vertexArray, MSpace::kWorld);
 	meshFn.updateSurface();
@@ -60,6 +53,10 @@ MStatus plugin::doIt(const MArgList& argList)
 	
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
 
+	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
+	plugin::pbdSimulator = PBD(voxels.corners, voxelSize);
+	MGlobal::displayInfo("PBD particles initialized.");
+
 	// TODO: handle if doIt is called repeatedly... this will just create new buffers but not free old ones?
 	// Also need to make sure that this is called before updating the buffers in the callback...
 	// Calculate a local rest position for each vertex in every voxel.
@@ -70,6 +67,8 @@ MStatus plugin::doIt(const MArgList& argList)
 		voxels.vertStartIdx, 
 		voxels.numVerts
 	);
+
+	bindVerticesCompute->updateParticleBuffer(plugin::pbdSimulator.getParticles().positions);
 	bindVerticesCompute->dispatch(voxels.size());
 
 	MGlobal::displayInfo("Bind vertices compute shader dispatched.");
@@ -85,10 +84,6 @@ MStatus plugin::doIt(const MArgList& argList)
 	
 	MGlobal::displayInfo("Transform vertices compute shader initialized.");
 
-	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
-	plugin::pbdSimulator = PBD(voxels.corners, voxelSize);
-
-	MGlobal::displayInfo("PBD particles initialized.");
 	return status;
 }
 
