@@ -33,6 +33,8 @@ public:
 
 	static void createVoxelGridDisplay();
 
+	static void createVoxelSimulationNode();
+
 	static MCallbackId getCallbackId() { return plugin::callbackId; }
 	static MStatus setCallbackId(MCallbackId id) { 
 		if (id == 0) return MStatus::kFailure;

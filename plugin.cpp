@@ -1,6 +1,8 @@
 #include "plugin.h"
 #include "glm/glm.hpp"
 #include <maya/MCommandResult.h>
+#include "voxelsimulationnode.h"
+#include <maya/MFnMessageAttribute.h>
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -56,6 +58,8 @@ MStatus plugin::doIt(const MArgList& argList)
 		status
 	);
 	MFnMesh voxelMeshFn(plugin::voxelizedMeshDagPath);
+
+	plugin::createVoxelSimulationNode();
 	
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
 
@@ -93,6 +97,48 @@ MStatus plugin::doIt(const MArgList& argList)
 	MGlobal::displayInfo("Transform vertices compute shader initialized.");
 
 	return status;
+}
+
+void plugin::createVoxelSimulationNode() {
+    MStatus status;
+
+    // Create the VoxelSimulationNode
+    MFnDependencyNode depNodeFn;
+    MObject voxelSimNode = depNodeFn.create(VoxelSimulationNode::id, &status);
+    if (status != MS::kSuccess) {
+        MGlobal::displayError("Failed to create VoxelSimulationNode: " + status.errorString());
+        return;
+    }
+
+    // Add a message attribute to the voxelized mesh's transform node
+    MFnDagNode dagNode(plugin::voxelizedMeshDagPath.transform(&status));
+    if (status != MS::kSuccess) {
+        MGlobal::displayError("Failed to get transform node: " + status.errorString());
+        return;
+    }
+
+    MFnMessageAttribute msgAttrFn;
+    MObject messageAttr;
+    if (!dagNode.hasAttribute("voxelSimulationNode")) {
+        messageAttr = msgAttrFn.create("voxelSimulationNode", "vsn", &status);
+        if (status != MS::kSuccess) {
+            MGlobal::displayError("Failed to create message attribute: " + status.errorString());
+            return;
+        }
+        dagNode.addAttribute(messageAttr);
+    } else {
+        messageAttr = dagNode.attribute("voxelSimulationNode", &status);
+    }
+
+    // Connect the VoxelSimulationNode to the transform node using the message attribute
+	MPlug meshPlug = dagNode.findPlug(messageAttr, false, &status);
+    MPlug simNodePlug = depNodeFn.findPlug("message", false, &status); // The default "message" attribute of the node
+    if (status == MS::kSuccess) {
+        MDGModifier dgModifier;
+        dgModifier.connect(simNodePlug, meshPlug);
+        dgModifier.doIt();
+    }
+
 }
 
 void plugin::createVoxelGridDisplay() {
@@ -146,6 +192,13 @@ EXPORT MStatus initializePlugin(MObject obj)
         "-command \"VoxelDestroyer\"`; "
     );
 
+	// Register the VoxelSimulationNode
+	status = plugin.registerNode("VoxelSimulationNode", VoxelSimulationNode::id, VoxelSimulationNode::creator, VoxelSimulationNode::initialize);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelSimulationNode");
+		return status;
+	}
+
 	return status;
 }
 
@@ -160,6 +213,11 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 
 	// Deregister the callback
 	MEventMessage::removeCallback(plugin::getCallbackId());
+
+	status = plugin.deregisterNode(VoxelSimulationNode::id);
+	if (!status) {
+		MGlobal::displayError("Failed to deregister VoxelSimulationNode");
+	}
 
 	MGlobal::executeCommand(
         "if (`shelfLayout -exists \"Custom\"`) { "
