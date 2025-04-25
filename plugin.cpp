@@ -1,5 +1,6 @@
 #include "plugin.h"
 #include "glm/glm.hpp"
+#include <maya/MCommandResult.h>
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -8,6 +9,7 @@ Voxelizer plugin::voxelizer = Voxelizer();
 PBD plugin::pbdSimulator = PBD();
 MCallbackId plugin::callbackId = 0;
 MDagPath plugin::voxelizedMeshDagPath = MDagPath();
+MString plugin::voxelGridDisplayName = "VoxelGridDisplay";
 
 // Compute shaders
 int plugin::transformVerticesNumWorkgroups = 0;
@@ -93,6 +95,27 @@ MStatus plugin::doIt(const MArgList& argList)
 	return status;
 }
 
+void plugin::createVoxelGridDisplay() {
+	MCommandResult commandResult;
+    MStatus status = MGlobal::executeCommand("polyCube -n " + plugin::voxelGridDisplayName + " -w 1 -h 1 -d 1 -ch 1;", commandResult);
+
+	// Get actual name from command result (can be different from the one we specified, if the name is already taken)
+	MStringArray resultArray;
+	commandResult.getResult(resultArray);
+	if (resultArray.length() > 0) {
+		plugin::voxelGridDisplayName = resultArray[0];
+	}
+
+	// Hide the cube in the outliner (user prefs may ignore this, but that's on them)
+	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".hiddenInOutliner\" true;");
+
+	// Display the cube in wireframe mode
+	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".overrideEnabled\" true;");
+	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".overrideShading\" 0;");
+
+	// Lock the node to prevent deletion
+	MGlobal::executeCommand("lockNode -lock true \"" + plugin::voxelGridDisplayName + "\";");
+}
 
 // Initialize Maya Plugin upon loading
 EXPORT MStatus initializePlugin(MObject obj)

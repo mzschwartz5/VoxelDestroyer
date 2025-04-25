@@ -31,6 +31,8 @@ public:
 	// A callback bound to the timeChanged event (e.g. moving the animation slider)
 	static void simulate(void* clientData);
 
+	static void createVoxelGridDisplay();
+
 	static MCallbackId getCallbackId() { return plugin::callbackId; }
 	static MStatus setCallbackId(MCallbackId id) { 
 		if (id == 0) return MStatus::kFailure;
@@ -44,6 +46,7 @@ private:
 	static Voxelizer voxelizer;
 	static PBD pbdSimulator;
 	static MDagPath voxelizedMeshDagPath;
+	static MString voxelGridDisplayName;
 
 	// Shaders
 	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
