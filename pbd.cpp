@@ -36,8 +36,8 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
                     int rightNeighborIndex = get3DIndexFrom1D(x + 1, y, z, voxelsPerEdge);
                     if (voxels.occupied[rightNeighborIndex]) {
                         FaceConstraint newConstraint;
-                        newConstraint.voxelOneIdx = index;
-                        newConstraint.voxelTwoIdx = rightNeighborIndex;
+                        newConstraint.voxelOneIdx = voxels.filteredIndex[index];
+                        newConstraint.voxelTwoIdx = voxels.filteredIndex[rightNeighborIndex];
                         newConstraint.compressionLimit = -FLT_MAX;
                         newConstraint.tensionLimit = FLT_MAX;
                         addFaceConstraint(newConstraint, 0);
@@ -48,8 +48,8 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
                     int topNeighborIndex = get3DIndexFrom1D(x, y + 1, z, voxelsPerEdge);
                     if (voxels.occupied[topNeighborIndex]) {
                         FaceConstraint newConstraint;
-                        newConstraint.voxelOneIdx = index;
-                        newConstraint.voxelTwoIdx = topNeighborIndex;
+                        newConstraint.voxelOneIdx = voxels.filteredIndex[index];
+                        newConstraint.voxelTwoIdx = voxels.filteredIndex[topNeighborIndex];
                         newConstraint.compressionLimit = -FLT_MAX;
                         newConstraint.tensionLimit = FLT_MAX;
                         addFaceConstraint(newConstraint, 1);
@@ -60,8 +60,8 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
                     int backNeighborIndex = get3DIndexFrom1D(x, y, z + 1, voxelsPerEdge);
                     if (voxels.occupied[backNeighborIndex]) {
                         FaceConstraint newConstraint;
-                        newConstraint.voxelOneIdx = index;
-                        newConstraint.voxelTwoIdx = backNeighborIndex;
+                        newConstraint.voxelOneIdx = voxels.filteredIndex[index];
+                        newConstraint.voxelTwoIdx = voxels.filteredIndex[backNeighborIndex];
                         newConstraint.compressionLimit = -FLT_MAX;
                         newConstraint.tensionLimit = FLT_MAX;
                         addFaceConstraint(newConstraint, 2);

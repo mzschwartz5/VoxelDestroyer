@@ -41,12 +41,14 @@ struct Voxels {
     std::vector<VoxelPositions> corners;  // ordered according to the VGS expectations
     std::vector<uint> vertStartIdx;    // Each voxel owns a number of vertices contained within (including the corners)
     std::vector<uint> numVerts;
+    std::vector<int> filteredIndex;
     int totalVerts = 0; // total number of vertices in the voxelized mesh
 
     std::vector<uint32_t> mortonCodes;
     
     int size() const { return static_cast<int>(occupied.size()); }
     void resize(int size) {
+        filteredIndex.resize(size, -1);
         occupied.resize(size, false);
         isSurface.resize(size, false);
         mortonCodes.resize(size, UINT32_MAX);
