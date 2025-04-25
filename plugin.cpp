@@ -136,6 +136,16 @@ EXPORT MStatus initializePlugin(MObject obj)
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
 	DirectX::initialize(MhInstPlugin);
 	
+	// Create a button in the custom shelf for the plugin
+    MGlobal::executeCommand(
+        "if (!`shelfLayout -exists \"Custom\"`) shelfLayout \"Custom\"; " // Ensure the "Custom" shelf exists
+        "string $shelfButton = `shelfButton -parent \"Custom\" "
+        "-label \"VoxelDestroyer\" "
+        "-annotation \"Run VoxelDestroyer Plugin\" "
+        "-image1 \"TypeSeparateMaterials_200.png\" " // Replace with a valid icon file
+        "-command \"VoxelDestroyer\"`; "
+    );
+
 	return status;
 }
 
@@ -150,6 +160,17 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 
 	// Deregister the callback
 	MEventMessage::removeCallback(plugin::getCallbackId());
+
+	MGlobal::executeCommand(
+        "if (`shelfLayout -exists \"Custom\"`) { "
+        "    string $buttons[] = `shelfLayout -query -childArray \"Custom\"`; "
+        "    for ($button in $buttons) { "
+        "        if (`shelfButton -query -label $button` == \"VoxelDestroyer\") { "
+        "            deleteUI -control $button; "
+        "        } "
+        "    } "
+        "}"
+    );
 
 	return status;
 }
