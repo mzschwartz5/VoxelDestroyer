@@ -31,7 +31,7 @@ class PBD
 {
 public:
     PBD() = default;
-    PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength);
+    PBD(Voxels& voxels, float voxelSize, float gridEdgeLength);
     ~PBD() = default;
     const Particles& simulateStep();
     void simulateSubstep();

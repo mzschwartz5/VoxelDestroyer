@@ -41,7 +41,6 @@ Voxels Voxelizer::voxelizeSelectedMesh(
         voxels
     );
 
-    //crash here
     voxelizedMeshPath = createVoxels(
         voxels,
         gridEdgeLength,
@@ -335,7 +334,7 @@ MDagPath Voxelizer::createVoxels(
                     z * voxelSize + gridMin.z
                 );
 
-                MObject voxel = addVoxelToMesh(voxelMin, voxelSize, overlappedVoxels.isSurface[index], overlappedVoxels, originalMesh, index);
+                MObject voxel = addVoxelToMesh(voxelMin, voxelSize, overlappedVoxels, originalMesh, index);
                 meshNamesConcatenated += " " + MFnMesh(voxel).name();
 
                 overlappedVoxels.numOccupied++;
@@ -384,12 +383,11 @@ int faceIndices[6][4] = {
 MObject Voxelizer::addVoxelToMesh(
     const MPoint& voxelMin,
     float voxelSize,
-    bool isSurface,
     Voxels& voxels,
     MFnMesh& originalMesh,
     int index
 ) {
-    voxels.vertStartIdx.push_back(voxels.totalVerts);
+    voxels.vertStartIdx[index] = voxels.totalVerts;
 
     MPointArray cubeVertices;
     MPoint voxelMax = MPoint(
@@ -452,8 +450,8 @@ MObject Voxelizer::addVoxelToMesh(
     );
 
     // only need to do the boolean intersection of surface voxels
-    if (!isSurface) {
-        voxels.numVerts.push_back(cubeVertices.length()); // should always be 8
+    if (!voxels.isSurface[index]) {
+        voxels.numVerts[index] = cubeVertices.length(); // should always be 8
         voxels.totalVerts += cubeVertices.length();
         return cube; 
     }
@@ -468,7 +466,7 @@ MObject Voxelizer::addVoxelToMesh(
     cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect);
 
     // Set the vert start idx and number of verts for the voxel
-    voxels.numVerts.push_back(cubeMeshFn.numVertices());
+    voxels.numVerts[index] = cubeMeshFn.numVertices();
     voxels.totalVerts += cubeMeshFn.numVertices();
 
     return cube;

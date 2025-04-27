@@ -53,6 +53,8 @@ struct Voxels {
         isSurface.resize(size, false);
         mortonCodes.resize(size, UINT32_MAX);
         corners.resize(size, VoxelPositions());
+		numVerts.resize(size, 0);
+		vertStartIdx.resize(size, -1);
     }
 };
 
@@ -125,7 +127,6 @@ private:
     MObject addVoxelToMesh(
         const MPoint& voxelMin, // min corner of the voxel
         float voxelSize,        // edge length of a single voxel
-        bool isSurface,
         Voxels& voxels,
         MFnMesh& originalSurface,
         int index

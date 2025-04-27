@@ -2,7 +2,7 @@
 #include <maya/MGlobal.h>
 #include <float.h>
 
-PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
+PBD::PBD(Voxels& voxels, float voxelSize, float gridEdgeLength) {
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
 
     std::vector<uint32_t> voxelIndices(voxels.size());
@@ -14,12 +14,22 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
         });
 
     //reorder voxels arrays
-    std::vector<VoxelPositions> sorted_corners(voxels.corners.size());
+    std::vector<VoxelPositions> sortedCorners(voxels.corners.size());
+    std::vector<uint32_t> sortedVertStartIdx(voxels.occupied.size());
+	std::vector<uint32_t> sortedNumVerts(voxels.occupied.size());
     std::vector<uint32_t> originalToSortedIdx(voxels.corners.size());
-    for (size_t i = 0; i < sorted_corners.size(); ++i) {
-        sorted_corners[i] = voxels.corners[voxelIndices[i]];
+
+    for (size_t i = 0; i < sortedCorners.size(); ++i) {
+        sortedCorners[i] = voxels.corners[voxelIndices[i]];
+		sortedVertStartIdx[i] = voxels.vertStartIdx[voxelIndices[i]];
+		sortedNumVerts[i] = voxels.numVerts[voxelIndices[i]];
 		originalToSortedIdx[voxelIndices[i]] = i;
     }
+
+    //update voxels with sorted info
+    voxels.corners = sortedCorners;
+	voxels.vertStartIdx = sortedVertStartIdx;
+	voxels.numVerts = sortedNumVerts;
 
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
     for (int x = 0; x < voxelsPerEdge; x++) {
@@ -68,7 +78,7 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
     }
 
     for (int i = 0; i < voxels.numOccupied; i++) {
-        for (const auto& position : sorted_corners[i].corners) {
+        for (const auto& position : voxels.corners[i].corners) {
             particles.positions.push_back(vec4(position, 0.0f));
             particles.oldPositions.push_back(vec4(position, 0.0f));
             particles.velocities.push_back(vec4(0.0f));
