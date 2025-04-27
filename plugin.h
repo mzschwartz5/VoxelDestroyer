@@ -8,12 +8,12 @@
 #include <maya/MFnMesh.h>
 #include <maya/MPointArray.h>
 #include <maya/MDagPath.h>
-#include "pbd.h"
+#include <memory>
 #include <vector>
+#include "pbd.h"
 #include "voxelizer.h"
 #include "directx/directx.h"
 #include "constants.h"
-#include <memory>
 #include "directx/compute/computeshader.h"
 #include "directx/compute/transformverticescompute.h"
 #include "directx/compute/bindverticescompute.h"

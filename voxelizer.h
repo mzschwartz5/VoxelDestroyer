@@ -6,6 +6,9 @@
 #include <maya/MPointArray.h>
 #include <maya/MFnMesh.h>
 #include <vector>
+#include <array>
+
+#include "utils.h"
 #include "glm/glm.hpp"
 
 // See https://michael-schwarz.com/research/publ/files/vox-siga10.pdf
@@ -28,19 +31,30 @@ struct Triangle {
     double d_ei_yz_solid[3]; // Edge distances for the yz plane (for solid voxelization)
 };
 
+struct VoxelPositions {
+    std::array<glm::vec3, 8> corners;
+};
+
 struct Voxels {
     std::vector<bool> occupied; // contains some part (surface or interior) of the underlying mesh
     std::vector<bool> isSurface;
-    std::vector<glm::vec3> corners;  // ordered according to the VGS expectations
+    std::vector<VoxelPositions> corners;  // ordered according to the VGS expectations
     std::vector<uint> vertStartIdx;    // Each voxel owns a number of vertices contained within (including the corners)
     std::vector<uint> numVerts;
     int totalVerts = 0; // total number of vertices in the voxelized mesh
+
+    std::vector<uint32_t> mortonCodes;
+
+    int numOccupied = 0;
     
     int size() const { return static_cast<int>(occupied.size()); }
     void resize(int size) {
         occupied.resize(size, false);
         isSurface.resize(size, false);
-        // The other vectors do not get resized because they are populated per occupied voxel, not the entire grid.
+        mortonCodes.resize(size, UINT32_MAX);
+        corners.resize(size, VoxelPositions());
+		numVerts.resize(size, 0);
+		vertStartIdx.resize(size, -1);
     }
 };
 
@@ -113,8 +127,8 @@ private:
     MObject addVoxelToMesh(
         const MPoint& voxelMin, // min corner of the voxel
         float voxelSize,        // edge length of a single voxel
-        bool isSurface,
         Voxels& voxels,
-        MFnMesh& originalSurface
+        MFnMesh& originalSurface,
+        int index
     );
 };
