@@ -193,11 +193,8 @@ void Voxelizer::getSurfaceVoxels(
                     int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
                     
                     MVector voxelMinCorner(MVector(x, y, z) * voxelSize + gridMin);
-                    if (!doesTriangleOverlapVoxel(tri, voxelMinCorner)) {
-                        //is this the right spot for this?
-                        voxels.mortonCodes[index] = UINT32_MAX;
-                        continue;
-                    }
+                    if (!doesTriangleOverlapVoxel(tri, voxelMinCorner)) continue;
+                    
                     voxels.occupied[index] = true;
                     voxels.isSurface[index] = true;
                     voxels.mortonCodes[index] = Utils::toMortonCode(x, y, z);
@@ -326,13 +323,11 @@ MDagPath Voxelizer::createVoxels(
 
     MString combinedMeshName = originalMesh.name() + "_voxelized";
     MString meshNamesConcatenated;
-    int filteredIndex = 0;
     for (int x = 0; x < voxelsPerEdge; ++x) {
         for (int y = 0; y < voxelsPerEdge; ++y) {
             for (int z = 0; z < voxelsPerEdge; ++z) {
                 int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
                 if (!overlappedVoxels.occupied[index]) continue;
-                overlappedVoxels.filteredIndex[index] = filteredIndex++;
 
                 MPoint voxelMin = MPoint(
                     x * voxelSize + gridMin.x,
@@ -340,8 +335,10 @@ MDagPath Voxelizer::createVoxels(
                     z * voxelSize + gridMin.z
                 );
 
-                MObject voxel = addVoxelToMesh(voxelMin, voxelSize, overlappedVoxels.isSurface[index], overlappedVoxels, originalMesh);
+                MObject voxel = addVoxelToMesh(voxelMin, voxelSize, overlappedVoxels.isSurface[index], overlappedVoxels, originalMesh, index);
                 meshNamesConcatenated += " " + MFnMesh(voxel).name();
+
+                overlappedVoxels.numOccupied++;
             }
         }
     }
@@ -389,7 +386,8 @@ MObject Voxelizer::addVoxelToMesh(
     float voxelSize,
     bool isSurface,
     Voxels& voxels,
-    MFnMesh& originalMesh
+    MFnMesh& originalMesh,
+    int index
 ) {
     voxels.vertStartIdx.push_back(voxels.totalVerts);
 
@@ -427,7 +425,7 @@ MObject Voxelizer::addVoxelToMesh(
 		);
     }
 
-    voxels.corners.push_back(newPositions);
+    voxels.corners[index] = newPositions;
 
     MIntArray faceCounts;
     MIntArray faceConnects;

@@ -5,39 +5,35 @@
 PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
 
-    //std::vector<uint32_t> voxelIndices(voxels.corners.size()); //right type?
-    //std::iota(voxelIndices.begin(), voxelIndices.end(), 0); // fill with 0, 1, 2, ..., size-1
+    std::vector<uint32_t> voxelIndices(voxels.size());
+    std::iota(voxelIndices.begin(), voxelIndices.end(), 0); // fill with 0, 1, 2, ..., size-1
 
-    ////sort the index array by the corresponding voxel's morton code - will this work if there are non-occupied indices?
-    //std::sort(voxelIndices.begin(), voxelIndices.end(), [&voxels](int a, int b) {
-    //    return voxels.mortonCodes[a] < voxels.mortonCodes[b];
-    //    });
+    //sort the index array by the corresponding voxel's morton code
+    std::sort(voxelIndices.begin(), voxelIndices.end(), [&voxels](int a, int b) {
+        return voxels.mortonCodes[a] < voxels.mortonCodes[b];
+        });
 
-    ////reorder voxels arrays
-    //std::vector<uint32_t> originalToSortedVoxelIdx(voxelIndices.size()); //right type?
-    //std::vector<uint32_t> sorted_vertStartIdx(voxelIndices.size());
-    //std::vector<VoxelPositions> sorted_corners(voxelIndices.size());
-    //for (size_t i = 0; i < voxelIndices.size(); ++i) {
-    //    sorted_vertStartIdx[i] = voxels.vertStartIdx[voxelIndices[i]];
-    //    sorted_corners[i] = voxels.corners[i];
-
-    //    //originalToSortedVoxelIdx[voxelIndices[i]] = i;
-    //    originalToSortedVoxelIdx[i] = voxelIndices[i];
-    //}
+    //reorder voxels arrays
+    std::vector<VoxelPositions> sorted_corners(voxels.corners.size());
+    std::vector<uint32_t> originalToSortedIdx(voxels.corners.size());
+    for (size_t i = 0; i < sorted_corners.size(); ++i) {
+        sorted_corners[i] = voxels.corners[voxelIndices[i]];
+		originalToSortedIdx[voxelIndices[i]] = i;
+    }
 
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
     for (int x = 0; x < voxelsPerEdge; x++) {
         for (int y = 0; y < voxelsPerEdge; y++) {
             for (int z = 0; z < voxelsPerEdge; z++) {
-                int index = get3DIndexFrom1D(x, y, z, voxelsPerEdge);
+                int index = get1DIndexFrom3D(x, y, z, voxelsPerEdge);
                 if (!voxels.occupied[index]) continue;
 
                 if (x < voxelsPerEdge - 1) {
-                    int rightNeighborIndex = get3DIndexFrom1D(x + 1, y, z, voxelsPerEdge);
+                    int rightNeighborIndex = get1DIndexFrom3D(x + 1, y, z, voxelsPerEdge);
                     if (voxels.occupied[rightNeighborIndex]) {
                         FaceConstraint newConstraint;
-                        newConstraint.voxelOneIdx = voxels.filteredIndex[index];
-                        newConstraint.voxelTwoIdx = voxels.filteredIndex[rightNeighborIndex];
+                        newConstraint.voxelOneIdx = originalToSortedIdx[index];
+                        newConstraint.voxelTwoIdx = originalToSortedIdx[rightNeighborIndex];
                         newConstraint.compressionLimit = -FLT_MAX;
                         newConstraint.tensionLimit = FLT_MAX;
                         addFaceConstraint(newConstraint, 0);
@@ -45,11 +41,11 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
                 }
 
                 if (y < voxelsPerEdge - 1) {
-                    int topNeighborIndex = get3DIndexFrom1D(x, y + 1, z, voxelsPerEdge);
+                    int topNeighborIndex = get1DIndexFrom3D(x, y + 1, z, voxelsPerEdge);
                     if (voxels.occupied[topNeighborIndex]) {
                         FaceConstraint newConstraint;
-                        newConstraint.voxelOneIdx = voxels.filteredIndex[index];
-                        newConstraint.voxelTwoIdx = voxels.filteredIndex[topNeighborIndex];
+                        newConstraint.voxelOneIdx = originalToSortedIdx[index];
+                        newConstraint.voxelTwoIdx = originalToSortedIdx[topNeighborIndex];
                         newConstraint.compressionLimit = -FLT_MAX;
                         newConstraint.tensionLimit = FLT_MAX;
                         addFaceConstraint(newConstraint, 1);
@@ -57,11 +53,11 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
                 }
 
                 if (z < voxelsPerEdge - 1) {
-                    int backNeighborIndex = get3DIndexFrom1D(x, y, z + 1, voxelsPerEdge);
+                    int backNeighborIndex = get1DIndexFrom3D(x, y, z + 1, voxelsPerEdge);
                     if (voxels.occupied[backNeighborIndex]) {
                         FaceConstraint newConstraint;
-                        newConstraint.voxelOneIdx = voxels.filteredIndex[index];
-                        newConstraint.voxelTwoIdx = voxels.filteredIndex[backNeighborIndex];
+                        newConstraint.voxelOneIdx = originalToSortedIdx[index];
+                        newConstraint.voxelTwoIdx = originalToSortedIdx[backNeighborIndex];
                         newConstraint.compressionLimit = -FLT_MAX;
                         newConstraint.tensionLimit = FLT_MAX;
                         addFaceConstraint(newConstraint, 2);
@@ -71,8 +67,8 @@ PBD::PBD(const Voxels& voxels, float voxelSize, float gridEdgeLength) {
         }
     }
 
-    for (const auto& corners : voxels.corners) {
-        for (const auto& position : corners.corners) {
+    for (int i = 0; i < voxels.numOccupied; i++) {
+        for (const auto& position : sorted_corners[i].corners) {
             particles.positions.push_back(vec4(position, 0.0f));
             particles.oldPositions.push_back(vec4(position, 0.0f));
             particles.velocities.push_back(vec4(0.0f));

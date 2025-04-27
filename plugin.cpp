@@ -43,8 +43,8 @@ MStatus plugin::doIt(const MArgList& argList)
 	MGlobal::displayInfo("VoxelDestroyer command executed.");
 
 	MStatus status;
-	float gridEdgeLength = 1.0f;
-	float numVoxelsPerEdge = 2.0f;
+	float gridEdgeLength = 3.0f;
+	float numVoxelsPerEdge = 5.0f;
 	float voxelSize = gridEdgeLength / numVoxelsPerEdge;
 	Voxels voxels = voxelizer.voxelizeSelectedMesh(
 		gridEdgeLength, //size of the grid
