@@ -1,0 +1,183 @@
+global proc VoxelizerMenu() {
+    if (`window -exists VoxelizerMenuWindow`) {
+        deleteUI VoxelizerMenuWindow;
+    }
+
+    string $voxelGridDisplayName = createVoxelGridDisplay();
+
+    window -title "Voxelizer Menu" VoxelizerMenuWindow;
+    formLayout VoxelizerMenuForm;
+
+    // Instruction text
+    string $instructionText = `text -label "Use fields below to control the voxelization, or scale the box in the viewport using the manipulators"`;
+
+    // Spacer for top padding
+    string $spacer = `separator -style "none"`;
+
+    // Position controls
+    string $positionField = `floatFieldGrp -numberOfFields 3 -label "Position:" -value1 0 -value2 0 -value3 0
+        -cc ("VoxelizerMenu_updatePosition(\"" + $voxelGridDisplayName + "\", #1, #2, #3)") 
+        -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50
+        - precision 2`;
+
+    // Scale controls
+    string $scaleField = `floatFieldGrp -numberOfFields 1 -label "Scale:" -value1 1
+        -cc ("VoxelizerMenu_updateScale(\"" + $voxelGridDisplayName + "\", #1)") 
+        -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50
+        - precision 2`;
+
+    // Subdivision controls
+    string $subdivField = `intSliderGrp -label "Voxels Per Edge:" -value 1 -field true -minValue 2 -maxValue 32
+        -cc ("VoxelizerMenu_updateSubdivisions(\"" + $voxelGridDisplayName + "\", #1)") 
+        -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50`;
+
+    // Buttons
+    string $cancelButton = `button -label "Cancel" -command ("VoxelizerMenu_close(\"" + $voxelGridDisplayName + "\")")`;
+    string $runButton = `button -label "Voxelize" -command (
+        "float $posX = `floatFieldGrp -query -value1 " + $positionField + "`; " +
+        "float $posY = `floatFieldGrp -query -value2 " + $positionField + "`; " +
+        "float $posZ = `floatFieldGrp -query -value3 " + $positionField + "`; " +
+        "float $scale = `floatFieldGrp -query -value1 " + $scaleField + "`; " +
+        "int $voxelsPerEdge = `intSliderGrp -query -value " + $subdivField + "`; " +
+        "VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", $posX, $posY, $posZ, $scale, $voxelsPerEdge);"
+    )`;
+
+    // Attach elements to form layout
+    formLayout -edit
+        -attachForm $instructionText "top" 10 -attachForm $instructionText "left" 20 -attachForm $instructionText "right" 20
+        -attachControl $spacer "top" 10 $instructionText
+        -attachForm $positionField "left" 20 -attachControl $positionField "top" 10 $spacer -attachForm $positionField "right" 20
+        -attachForm $scaleField "left" 20 -attachControl $scaleField "top" 10 $positionField -attachForm $scaleField "right" 20
+        -attachForm $subdivField "left" 20 -attachControl $subdivField "top" 10 $scaleField -attachForm $subdivField "right" 20
+        -attachForm $runButton "left" 20 -attachControl $runButton "top" 15 $subdivField
+        -attachForm $cancelButton "left" 80 -attachControl $cancelButton "top" 15 $subdivField
+        -attachForm $runButton "bottom" 10 -attachForm $cancelButton "bottom" 10
+        VoxelizerMenuForm;
+
+    showWindow VoxelizerMenuWindow;
+
+    // Detect when the window has closed and run the cancel function
+    scriptJob -uiDeleted VoxelizerMenuWindow ("VoxelizerMenu_close(\"" + $voxelGridDisplayName + "\")");
+
+    // Sync viewport changes to scale and translation with menu inputs
+    scriptJob -attributeChange ($voxelGridDisplayName + ".translate") ("VoxelizerMenu_syncPosition(\"" + $voxelGridDisplayName + "\", \"" + $positionField + "\")");
+    scriptJob -attributeChange ($voxelGridDisplayName + ".scaleX") ("VoxelizerMenu_syncScale(\"" + $voxelGridDisplayName + "\", \"" + $scaleField + "\")");
+}
+
+global proc VoxelizerMenu_run(string $cubeName, float $posX, float $posY, float $posZ, float $scale, int $voxelsPerEdge) {
+    // Construct the VoxelDestroyer command with the passed arguments
+    string $command = "VoxelDestroyer -px " + $posX + " -py " + $posY + " -pz " + $posZ +
+                      " -s " + $scale + " -v " + $voxelsPerEdge;
+
+    // Execute the command and handle errors
+    if (catch(eval($command))) {
+        warning("VoxelDestroyer failed.");
+    } else {
+        VoxelizerMenu_close($cubeName);
+    }
+}
+
+global proc string createVoxelGridDisplay() {
+    // Create a polyCube and store its name
+    string $voxelGridDisplay[] = `polyCube -n "VoxelGridDisplay" -w 1 -h 1 -d 1 -ch 1`;
+    string $voxelGridDisplayName = $voxelGridDisplay[0];
+
+
+    // Hide the cube in the outliner
+    setAttr ($voxelGridDisplayName + ".hiddenInOutliner") true;
+
+    // Display the cube in wireframe mode
+    setAttr ($voxelGridDisplayName + ".overrideEnabled") true;
+    setAttr ($voxelGridDisplayName + ".overrideShading") 0;
+
+    // Effectively lock Y and Z scaling and connect them to X to enforce uniform scaling
+    // Can't find a better way that allows Y and Z to continue to be moved
+    connectAttr ($voxelGridDisplayName + ".scaleX") ($voxelGridDisplayName + ".scaleY");
+    connectAttr ($voxelGridDisplayName + ".scaleX") ($voxelGridDisplayName + ".scaleZ");
+    
+    // Lock all attributes except translation and scaling
+    string $attributes[] = `listAttr -keyable -settable $voxelGridDisplayName`;
+    for ($attr in $attributes) {
+        if (!(`gmatch $attr "translate*"` || `gmatch $attr "scale*"`)) {
+            setAttr -lock true ($voxelGridDisplayName + "." + $attr);
+        }
+    }
+
+    // Lock the node to prevent deletion
+    lockNode -lock true $voxelGridDisplayName;
+
+    // Return the name of the created voxel grid
+    return $voxelGridDisplayName;
+}
+
+// Update position of the polyCube
+global proc VoxelizerMenu_updatePosition(string $cubeName, float $x, float $y, float $z) {
+    if (`objExists $cubeName`) {
+        setAttr ($cubeName + ".translateX") $x;
+        setAttr ($cubeName + ".translateY") $y;
+        setAttr ($cubeName + ".translateZ") $z;
+    } else {
+        warning("Voxel grid display does not exist.");
+    }
+}
+
+// Update scale of the polyCube
+global proc VoxelizerMenu_updateScale(string $cubeName, float $scale) {
+    if (`objExists $cubeName`) {
+        setAttr ($cubeName + ".scaleX") $scale;
+        setAttr ($cubeName + ".scaleY") $scale;
+        setAttr ($cubeName + ".scaleZ") $scale;
+    } else {
+        warning("Voxel grid display does not exist.");
+    }
+}
+
+// Update subdivisions of the polyCube
+global proc VoxelizerMenu_updateSubdivisions(string $cubeName, int $subdivs) {
+    if (`objExists $cubeName`) {
+        // Get the construction history node
+        string $history[] = `listHistory $cubeName`;
+        string $polyCubeNode[] = `ls -type "polyCube" $history`; // Ensure this is treated as an array
+        if (size($polyCubeNode) > 0) {
+            setAttr ($polyCubeNode[0] + ".subdivisionsWidth") $subdivs;
+            setAttr ($polyCubeNode[0] + ".subdivisionsHeight") $subdivs;
+            setAttr ($polyCubeNode[0] + ".subdivisionsDepth") $subdivs;
+        } else {
+            warning("No polyCube history node found.");
+        }
+    } else {
+        warning("Voxel grid display does not exist.");
+    }
+}
+
+// Cancel and delete the voxel grid
+global proc VoxelizerMenu_close(string $cubeName) {
+    if (`objExists $cubeName`) {
+        // Unlock the node if it is locked
+        lockNode -lock false $cubeName;
+        // Delete the node
+        delete $cubeName;
+    }
+    // Close the menu
+    if (`window -exists VoxelizerMenuWindow`) {
+        deleteUI VoxelizerMenuWindow;
+    }
+}
+
+// Sync position changes to the UI
+global proc VoxelizerMenu_syncPosition(string $cubeName, string $positionField) {
+    if (`objExists $cubeName`) {
+        float $x = `getAttr ($cubeName + ".translateX")`;
+        float $y = `getAttr ($cubeName + ".translateY")`;
+        float $z = `getAttr ($cubeName + ".translateZ")`;
+        floatFieldGrp -edit -value1 $x -value2 $y -value3 $z $positionField;
+    }
+}
+
+// Sync scale changes to the UI
+global proc VoxelizerMenu_syncScale(string $cubeName, string $scaleField) {
+    if (`objExists $cubeName`) {
+        float $scale = `getAttr ($cubeName + ".scaleX")`;
+        floatFieldGrp -edit -value1 $scale $scaleField;
+    }
+}

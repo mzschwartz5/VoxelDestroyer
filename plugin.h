@@ -2,6 +2,9 @@
 #include <maya/MArgList.h>
 #include <maya/MObject.h>
 #include <maya/MGlobal.h>
+#include <maya/MSyntax.h>
+#include <maya/MArgList.h>
+#include <maya/MArgDatabase.h>
 #include <maya/MPxCommand.h>
 #include <maya/MFnPlugin.h>
 #include <maya/MEventMessage.h>
@@ -18,6 +21,12 @@
 #include "directx/compute/transformverticescompute.h"
 #include "directx/compute/bindverticescompute.h"
 
+struct PluginArgs {
+	MPoint position{ 0.0f, 0.0f, 0.0f };
+	double scale{ 1.0f };
+	int voxelsPerEdge{ 10 };
+};
+
 // Making most functions and members static so we can bind methods to the timeChanged event
 // and access data during the special standalone intialize and uninitialize functions
 class plugin : public MPxCommand
@@ -26,14 +35,17 @@ public:
 	plugin() {};
 	// Called when the command ("VoxelDestroyer") is executed in Maya
 	virtual MStatus doIt(const MArgList& args);
+	PluginArgs parsePluginArgs(const MArgList& args);
 	// Called when the command is registered in Maya
 	static void* creator();
+	static MSyntax syntax();
 	// A callback bound to the timeChanged event (e.g. moving the animation slider)
 	static void simulate(void* clientData);
 
-	static void createVoxelGridDisplay();
-
 	static void createVoxelSimulationNode();
+	static void loadVoxelSimulationNodeEditorTemplate();
+	static void loadVoxelizerMenu();
+
 
 	static MCallbackId getCallbackId() { return plugin::callbackId; }
 	static MStatus setCallbackId(MCallbackId id) { 
@@ -48,13 +60,10 @@ private:
 	static Voxelizer voxelizer;
 	static PBD pbdSimulator;
 	static MDagPath voxelizedMeshDagPath;
-	static MString voxelGridDisplayName;
 
 	// Shaders
 	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
 	static int transformVerticesNumWorkgroups;
 	static std::unique_ptr<TransformVerticesCompute> transformVerticesCompute;
 	static std::unique_ptr<BindVerticesCompute> bindVerticesCompute;
-
-
 };

@@ -12,7 +12,6 @@ Voxelizer plugin::voxelizer = Voxelizer();
 PBD plugin::pbdSimulator = PBD();
 MCallbackId plugin::callbackId = 0;
 MDagPath plugin::voxelizedMeshDagPath = MDagPath();
-MString plugin::voxelGridDisplayName = "VoxelGridDisplay";
 
 // Compute shaders
 int plugin::transformVerticesNumWorkgroups = 0;
@@ -42,19 +41,29 @@ void plugin::simulate(void* clientData) {
 	MGlobal::executeCommand("refresh");
 }
 
+
+MSyntax plugin::syntax()
+{
+	MSyntax syntax;
+	syntax.addFlag("-px", "-positionX", MSyntax::kDouble);
+	syntax.addFlag("-py", "-positionY", MSyntax::kDouble);
+	syntax.addFlag("-pz", "-positionZ", MSyntax::kDouble);
+	syntax.addFlag("-s", "-scale", MSyntax::kDouble);
+	syntax.addFlag("-v", "-voxelsPerEdge", MSyntax::kLong);
+	return syntax;
+}
+
 // Plugin doIt function
 MStatus plugin::doIt(const MArgList& argList)
 {
-	MGlobal::displayInfo("VoxelDestroyer command executed.");
+	PluginArgs pluginArgs = parsePluginArgs(argList);
 
 	MStatus status;
-	float gridEdgeLength = 3.0f;
-	float numVoxelsPerEdge = 5.0f;
-	float voxelSize = gridEdgeLength / numVoxelsPerEdge;
+	float voxelSize = static_cast<float>(pluginArgs.scale / pluginArgs.voxelsPerEdge);
 	Voxels voxels = voxelizer.voxelizeSelectedMesh(
-		gridEdgeLength, //size of the grid
-		voxelSize, // voxel size
-		MPoint(0.0f, 3.0f, 0.0f), // grid center
+		static_cast<float>(pluginArgs.scale),
+		voxelSize,
+		pluginArgs.position,
 		plugin::voxelizedMeshDagPath,
 		status
 	);
@@ -65,7 +74,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
 
 	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
-	plugin::pbdSimulator = PBD(voxels, voxelSize, gridEdgeLength);
+	plugin::pbdSimulator = PBD(voxels, voxelSize, pluginArgs.scale);
 	MGlobal::displayInfo("PBD particles initialized.");
 
 	// TODO: handle if doIt is called repeatedly... this will just create new buffers but not free old ones?
@@ -98,6 +107,54 @@ MStatus plugin::doIt(const MArgList& argList)
 	MGlobal::displayInfo("Transform vertices compute shader initialized.");
 
 	return status;
+}
+
+PluginArgs plugin::parsePluginArgs(const MArgList& args) {
+	PluginArgs pluginArgs;
+	MStatus status;
+
+	MArgDatabase argData(syntax(), args, &status);
+	if (status != MS::kSuccess) {
+		MGlobal::displayError("Failed to parse arguments: " + status.errorString());
+		return pluginArgs;
+	}
+	
+	// Voxel grid center position
+	if (argData.isFlagSet("-px")) {
+		status = argData.getFlagArgument("-px", 0, pluginArgs.position.x);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get position X: " + status.errorString());
+		}
+	}
+	if (argData.isFlagSet("-py")) {
+		status = argData.getFlagArgument("-py", 0, pluginArgs.position.y);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get position Y: " + status.errorString());
+		}
+	}
+	if (argData.isFlagSet("-pz")) {
+		status = argData.getFlagArgument("-pz", 0, pluginArgs.position.z);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get position Z: " + status.errorString());
+		}
+	}
+
+	// Voxel grid edge length (scale)
+	if (argData.isFlagSet("-s")) {
+		status = argData.getFlagArgument("-s", 0, pluginArgs.scale);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get scale: " + status.errorString());
+		}
+	}
+	
+	// Number of voxels per edge
+	if (argData.isFlagSet("-v")) {
+		status = argData.getFlagArgument("-v", 0, pluginArgs.voxelsPerEdge);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get voxels per edge: " + status.errorString());
+		}
+	}
+	return pluginArgs;
 }
 
 void plugin::createVoxelSimulationNode() {
@@ -142,36 +199,9 @@ void plugin::createVoxelSimulationNode() {
 
 }
 
-void plugin::createVoxelGridDisplay() {
-	MCommandResult commandResult;
-    MStatus status = MGlobal::executeCommand("polyCube -n " + plugin::voxelGridDisplayName + " -w 1 -h 1 -d 1 -ch 1;", commandResult);
-
-	// Get actual name from command result (can be different from the one we specified, if the name is already taken)
-	MStringArray resultArray;
-	commandResult.getResult(resultArray);
-	if (resultArray.length() > 0) {
-		plugin::voxelGridDisplayName = resultArray[0];
-	}
-
-	// Hide the cube in the outliner (user prefs may ignore this, but that's on them)
-	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".hiddenInOutliner\" true;");
-
-	// Display the cube in wireframe mode
-	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".overrideEnabled\" true;");
-	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".overrideShading\" 0;");
-
-	// Lock rotation
-	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".rotateX\" 0;");
-	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".rotateY\" 0;");
-	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".rotateZ\" 0;");
-
-	// Lock the node to prevent deletion
-	MGlobal::executeCommand("lockNode -lock true \"" + plugin::voxelGridDisplayName + "\";");
-}
-
-void loadVoxelSimulationNodeEditorTemplate() {
+void plugin::loadVoxelSimulationNodeEditorTemplate() {
 	// Since plugins can't write to the scripts/AETemplates directory, which requires admin privileges, we need to load the template from the plugin resource.
-    HRSRC hRes = FindResource(MhInstPlugin, MAKEINTRESOURCE(IDR_AETEMPLATE1), L"AETEMPLATE");
+    HRSRC hRes = FindResource(MhInstPlugin, MAKEINTRESOURCE(IDR_MEL1), L"MEL");
     if (!hRes) {
         MGlobal::displayError("Failed to find AETEMPLATE resource.");
         return;
@@ -199,6 +229,36 @@ void loadVoxelSimulationNodeEditorTemplate() {
     }
 }
 
+// TODO - one utility function for all resource loading?
+void plugin::loadVoxelizerMenu() {
+	HRSRC hRes = FindResource(MhInstPlugin, MAKEINTRESOURCE(IDR_MEL2), L"MEL");
+	if (!hRes) {
+		MGlobal::displayError("Failed to find Voxelizer menu resource.");
+		return;
+	}
+
+	HGLOBAL hResData = LoadResource(MhInstPlugin, hRes);
+	if (!hResData) {
+		MGlobal::displayError("Failed to load Voxelizer menu resource.");
+		return;
+	}
+
+	DWORD resSize = SizeofResource(MhInstPlugin, hRes);
+	const char* resData = static_cast<const char*>(LockResource(hResData));
+	if (!resData || resSize == 0) {
+		MGlobal::displayError("Failed to lock Voxelizer menu resource.");
+		return;
+	}
+
+	MString melScript(resData, resSize);
+
+	// Execute the MEL script to load the Voxelizer menu into memory
+	MStatus status = MGlobal::executeCommand(melScript);
+	if (status != MS::kSuccess) {
+		MGlobal::displayError("Failed to execute Voxelizer menu MEL script: " + status.errorString());
+	}
+}
+
 // Initialize Maya Plugin upon loading
 EXPORT MStatus initializePlugin(MObject obj)
 {
@@ -217,7 +277,10 @@ EXPORT MStatus initializePlugin(MObject obj)
 	// Initialize DirectX
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
 	DirectX::initialize(MhInstPlugin);
-	
+
+	plugin::loadVoxelSimulationNodeEditorTemplate();
+	plugin::loadVoxelizerMenu();
+
 	// Create a button in the custom shelf for the plugin
 	MGlobal::executeCommand(
 		"if (!`shelfLayout -exists \"Custom\"`) shelfLayout \"Custom\"; " // Ensure the "Custom" shelf exists
@@ -234,7 +297,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 		"    -label \"VoxelDestroyer\" "
 		"    -annotation \"Run VoxelDestroyer Plugin\" "
 		"    -image1 \"TypeSeparateMaterials_200.png\" " 
-		"    -command \"VoxelDestroyer\"; "
+		"    -command \"VoxelizerMenu();\"; "
 		"}"
 	);
 
@@ -245,8 +308,6 @@ EXPORT MStatus initializePlugin(MObject obj)
 		MGlobal::displayError("Failed to register VoxelSimulationNode");
 		return status;
 	}
-
-	loadVoxelSimulationNodeEditorTemplate();
 
 	return status;
 }
