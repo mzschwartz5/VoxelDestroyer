@@ -54,7 +54,7 @@ inline void fromMortonCode(uint32_t mortonCode, uint32_t& x, uint32_t& y, uint32
  * Inputs: plugin instance, resource ID, and resource type
  * Outputs: resource data (output param) and size
 */
-DWORD loadResourceFile(HINSTANCE pluginInstance, int id, const wchar_t* type, void** resourceData) {
+inline DWORD loadResourceFile(HINSTANCE pluginInstance, int id, const wchar_t* type, void** resourceData) {
     HRSRC hResource = FindResource(pluginInstance, MAKEINTRESOURCE(id), type);
     if (!hResource) {
         MGlobal::displayError("Failed to find resource");
