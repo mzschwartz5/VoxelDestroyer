@@ -208,6 +208,8 @@ MDagPath plugin::getSelectedObject(const MPoint& voxelGridCenter, double voxelGr
 	MFnMesh meshFn(activeMeshDagPath);
 	MBoundingBox boundingBox = meshFn.boundingBox();
 	MPoint boundingBoxCenter = boundingBox.center();
+	MMatrix worldMatrix = activeMeshDagPath.inclusiveMatrix();
+	boundingBox.transformUsing(worldMatrix);
 
 	if (!isBoundingBoxOverlappingVoxelGrid(boundingBox, voxelGridCenter, voxelGridSize)) {
 		MGlobal::displayError("The selected mesh is not within the voxel grid.");
@@ -231,7 +233,7 @@ MDagPath plugin::findClosestObjectToVoxelGrid(const MPoint& voxelGridCenter, dou
         if (currentDagPath.node().hasFn(MFn::kTransform)) {
 			// Skip the grid display object by comparing the transform node name
 			if (currentDagPath.partialPathName() == gridDisplayName) continue;
-					
+
             // Get the shape node under the transform
             MDagPath shapeDagPath = currentDagPath;
             if (shapeDagPath.extendToShape() != MS::kSuccess || !shapeDagPath.node().hasFn(MFn::kMesh)) continue;
@@ -239,6 +241,8 @@ MDagPath plugin::findClosestObjectToVoxelGrid(const MPoint& voxelGridCenter, dou
             MFnMesh meshFn(shapeDagPath);
             MBoundingBox boundingBox = meshFn.boundingBox();
             MPoint boundingBoxCenter = boundingBox.center();
+			MMatrix worldMatrix = shapeDagPath.inclusiveMatrix();
+			boundingBox.transformUsing(worldMatrix);
             double distance = (MVector(boundingBoxCenter) - MVector(voxelGridCenter)).length();
 
             if (!isBoundingBoxOverlappingVoxelGrid(boundingBox, voxelGridCenter, voxelGridSize)) continue;
