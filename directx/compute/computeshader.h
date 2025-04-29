@@ -2,6 +2,7 @@
 #include "constants.h"
 #include <d3d11.h>
 #include <wrl/client.h>
+#include "../../utils.h"
 #include "../../resource.h"
 #include "../directx.h"
 using namespace Microsoft::WRL;
@@ -39,34 +40,14 @@ protected:
     ID3D11ComputeShader* shaderPtr = NULL;
 
     void load() {
-        // Locate the shader resource    
-        HRSRC hResource = FindResource(DirectX::getPluginInstance(), MAKEINTRESOURCE(id), L"SHADER");
-        if (!hResource) {
-            MGlobal::displayError("Failed to find shader resource");
+        void* data = nullptr;
+        DWORD size = Utils::loadResourceFile(DirectX::getPluginInstance(), id, L"SHADER", &data);
+
+        if (size == 0) {
+            MGlobal::displayError("Failed to load compute shader resource.");
             return;
         }
 
-        // Load the shader resource
-        HGLOBAL hResourceData = LoadResource(DirectX::getPluginInstance(), hResource);
-        if (!hResourceData) {
-            MGlobal::displayError("Failed to load shader resource");
-            return;
-        }
-        
-        // Lock the resource data
-        void* pResourceData = LockResource(hResourceData);
-        if (!pResourceData) {
-            MGlobal::displayError("Failed to lock shader resource");
-            return;
-        }
-
-        // Get the size of the resource
-        DWORD resourceSize = SizeofResource(DirectX::getPluginInstance(), hResource);
-        if (resourceSize == 0) {
-            MGlobal::displayError("Failed to get the size of the shader resource");
-            return;
-        }
-        
         // Replace the shader macros with the actual values
         const std::string bindVerticesThreadStr = std::to_string(BIND_VERTICES_THREADS);
         const std::string transformVerticesThreadsStr = std::to_string(TRANSFORM_VERTICES_THREADS);
@@ -78,7 +59,7 @@ protected:
 
         ID3D10Blob* pPSBuf = NULL;    
         ID3D10Blob* pErrorBlob = NULL;
-        HRESULT hr = D3DCompile(pResourceData, resourceSize, NULL, SHADER_MACROS, NULL, "main", "cs_5_0", 0, 0, &pPSBuf, &pErrorBlob);
+        HRESULT hr = D3DCompile(data, size, NULL, SHADER_MACROS, NULL, "main", "cs_5_0", 0, 0, &pPSBuf, &pErrorBlob);
 
         if (FAILED(hr)) {
             if (pErrorBlob) {

@@ -314,27 +314,14 @@ void plugin::createVoxelSimulationNode() {
 }
 
 void plugin::loadVoxelSimulationNodeEditorTemplate() {
-	// Since plugins can't write to the scripts/AETemplates directory, which requires admin privileges, we need to load the template from the plugin resource.
-    HRSRC hRes = FindResource(MhInstPlugin, MAKEINTRESOURCE(IDR_MEL1), L"MEL");
-    if (!hRes) {
-        MGlobal::displayError("Failed to find AETEMPLATE resource.");
-        return;
-    }
+	void* data = nullptr;
+	DWORD size = Utils::loadResourceFile(MhInstPlugin, IDR_MEL1, L"MEL", &data);
+	if (size == 0) {
+		MGlobal::displayError("Failed to load Voxelization editor template resource.");
+		return;
+	}
 
-    HGLOBAL hResData = LoadResource(MhInstPlugin, hRes);
-    if (!hResData) {
-        MGlobal::displayError("Failed to load AETEMPLATE resource.");
-        return;
-    }
-
-    DWORD resSize = SizeofResource(MhInstPlugin, hRes);
-    const char* resData = static_cast<const char*>(LockResource(hResData));
-    if (!resData || resSize == 0) {
-        MGlobal::displayError("Failed to lock AETEMPLATE resource.");
-        return;
-    }
-
-    MString melScript(resData, resSize);
+    MString melScript(static_cast<char*>(data), size);
 
     // Execute the MEL script to load the UI for the VoxelSimulationNode
     MStatus status = MGlobal::executeCommand(melScript);
@@ -343,28 +330,15 @@ void plugin::loadVoxelSimulationNodeEditorTemplate() {
     }
 }
 
-// TODO - one utility function for all resource loading?
 void plugin::loadVoxelizerMenu() {
-	HRSRC hRes = FindResource(MhInstPlugin, MAKEINTRESOURCE(IDR_MEL2), L"MEL");
-	if (!hRes) {
-		MGlobal::displayError("Failed to find Voxelizer menu resource.");
-		return;
-	}
-
-	HGLOBAL hResData = LoadResource(MhInstPlugin, hRes);
-	if (!hResData) {
+	void* data = nullptr;
+	DWORD size = Utils::loadResourceFile(MhInstPlugin, IDR_MEL2, L"MEL", &data);
+	if (size == 0) {
 		MGlobal::displayError("Failed to load Voxelizer menu resource.");
 		return;
 	}
 
-	DWORD resSize = SizeofResource(MhInstPlugin, hRes);
-	const char* resData = static_cast<const char*>(LockResource(hResData));
-	if (!resData || resSize == 0) {
-		MGlobal::displayError("Failed to lock Voxelizer menu resource.");
-		return;
-	}
-
-	MString melScript(resData, resSize);
+	MString melScript(static_cast<char*>(data), size);
 
 	// Execute the MEL script to load the Voxelizer menu into memory
 	MStatus status = MGlobal::executeCommand(melScript);
@@ -395,26 +369,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 	plugin::loadVoxelSimulationNodeEditorTemplate();
 	plugin::loadVoxelizerMenu();
 
-	// Create a button in the custom shelf for the plugin
-	MGlobal::executeCommand(
-		"if (!`shelfLayout -exists \"Custom\"`) shelfLayout \"Custom\"; " // Ensure the "Custom" shelf exists
-		"string $buttons[] = `shelfLayout -query -childArray \"Custom\"`; " // Get all buttons in the shelf
-		"int $exists = 0; "
-		"for ($button in $buttons) { "
-		"    if (`shelfButton -query -label $button` == \"VoxelDestroyer\") { "
-		"        $exists = 1; "
-		"        break; "
-		"    } "
-		"} "
-		"if (!$exists) { "
-		"    shelfButton -parent \"Custom\" "
-		"    -label \"VoxelDestroyer\" "
-		"    -annotation \"Run VoxelDestroyer Plugin\" "
-		"    -image1 \"TypeSeparateMaterials_200.png\" " 
-		"    -command \"VoxelizerMenu();\"; "
-		"}"
-	);
-
+	MGlobal::executeCommand("VoxelizerMenu_addToShelf");
 
 	// Register the VoxelSimulationNode
 	status = plugin.registerNode("VoxelSimulationNode", VoxelSimulationNode::id, VoxelSimulationNode::creator, VoxelSimulationNode::initialize);
@@ -443,16 +398,7 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 		MGlobal::displayError("Failed to deregister VoxelSimulationNode");
 	}
 
-	MGlobal::executeCommand(
-        "if (`shelfLayout -exists \"Custom\"`) { "
-        "    string $buttons[] = `shelfLayout -query -childArray \"Custom\"`; "
-        "    for ($button in $buttons) { "
-        "        if (`shelfButton -query -label $button` == \"VoxelDestroyer\") { "
-        "            deleteUI -control $button; "
-        "        } "
-        "    } "
-        "}"
-    );
+	MGlobal::executeCommand("VoxelizerMenu_removeFromShelf");
 
 	return status;
 }

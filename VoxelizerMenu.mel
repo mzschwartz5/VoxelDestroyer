@@ -86,7 +86,7 @@ global proc VoxelizerMenu_run(string $cubeName, float $posX, float $posY, float 
 
 global proc string createVoxelGridDisplay() {
     // Create a polyCube and store its name
-    string $voxelGridDisplay[] = `polyCube -n "VoxelGridDisplay" -w 1 -h 1 -d 1 -ch 1`;
+    string $voxelGridDisplay[] = `polyCube -n "VoxelGridDisplay" -w 1 -h 1 -d 1 -ch 1 -sx 2 -sy 2 -sz 2`;
     string $voxelGridDisplayName = $voxelGridDisplay[0];
 
 
@@ -185,5 +185,48 @@ global proc VoxelizerMenu_syncScale(string $cubeName, string $scaleField) {
     if (`objExists $cubeName`) {
         float $scale = `getAttr ($cubeName + ".scaleX")`;
         floatFieldGrp -edit -value1 $scale $scaleField;
+    }
+}
+
+global proc VoxelizerMenu_addToShelf() {
+    // Ensure the "Custom" shelf exists
+    if (!`shelfLayout -exists "Custom"`) {
+        shelfLayout "Custom";
+    }
+
+    // Get all buttons in the "Custom" shelf
+    string $buttons[] = `shelfLayout -query -childArray "Custom"`;
+
+    // Check if the "VoxelDestroyer" button already exists
+    int $exists = 0;
+    for ($button in $buttons) {
+        if (`shelfButton -query -label $button` == "VoxelDestroyer") {
+            $exists = 1;
+            break;
+        }
+    }
+
+    // Add the "VoxelDestroyer" button if it doesn't exist
+    if (!$exists) {
+        shelfButton -parent "Custom"
+            -label "VoxelDestroyer"
+            -annotation "Run VoxelDestroyer Plugin"
+            -image1 "TypeSeparateMaterials_200.png"
+            -command "VoxelizerMenu();";
+    }
+}
+
+global proc VoxelizerMenu_removeFromShelf() {
+    // Check if the "Custom" shelf exists
+    if (`shelfLayout -exists "Custom"`) {
+        // Get all buttons in the "Custom" shelf
+        string $buttons[] = `shelfLayout -query -childArray "Custom"`;
+
+        // Iterate through the buttons and remove the "VoxelDestroyer" button if it exists
+        for ($button in $buttons) {
+            if (`shelfButton -query -label $button` == "VoxelDestroyer") {
+                deleteUI -control $button;
+            }
+        }
     }
 }

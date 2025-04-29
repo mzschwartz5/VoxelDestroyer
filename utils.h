@@ -1,5 +1,6 @@
 #pragma once
-
+#include <maya/MGlobal.h>
+#include <windows.h>
 namespace Utils {
 
 // From: https://github.com/liamdon/fast-morton/blob/main/src/3d/mb/decode.ts
@@ -45,6 +46,40 @@ inline void fromMortonCode(uint32_t mortonCode, uint32_t& x, uint32_t& y, uint32
     x = compactBits(mortonCode);
     y = compactBits(mortonCode >> 1);
     z = compactBits(mortonCode >> 2);
+}
+
+/*
+ * Loads a resource file packaged with the plugin .mll. 
+ * 
+ * Inputs: plugin instance, resource ID, and resource type
+ * Outputs: resource data (output param) and size
+*/
+DWORD loadResourceFile(HINSTANCE pluginInstance, int id, const wchar_t* type, void** resourceData) {
+    HRSRC hResource = FindResource(pluginInstance, MAKEINTRESOURCE(id), type);
+    if (!hResource) {
+        MGlobal::displayError("Failed to find resource");
+        return 0;
+    }
+
+    HGLOBAL hResourceData = LoadResource(pluginInstance, hResource);
+    if (!hResourceData) {
+        MGlobal::displayError("Failed to load resource");
+        return 0;
+    }
+    
+    *resourceData = LockResource(hResourceData);
+    if (!*resourceData) {
+        MGlobal::displayError("Failed to lock resource");
+        return 0;
+    }
+
+    DWORD resourceSize = SizeofResource(pluginInstance, hResource);
+    if (resourceSize == 0) {
+        MGlobal::displayError("Failed to get the size of the resource");
+        return 0;
+    }
+
+    return resourceSize;
 }
 
 }

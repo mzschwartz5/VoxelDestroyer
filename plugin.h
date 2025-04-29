@@ -16,6 +16,7 @@
 #include <maya/MFnTransform.h>
 #include <maya/MVector.h>
 #include <maya/MItDag.h>
+#include "utils.h"
 #include "pbd.h"
 #include <vector>
 #include "pbd.h"
