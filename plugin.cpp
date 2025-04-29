@@ -3,6 +3,7 @@
 #include <maya/MCommandResult.h>
 #include "voxelsimulationnode.h"
 #include <maya/MFnMessageAttribute.h>
+#include <windows.h>
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -159,8 +160,43 @@ void plugin::createVoxelGridDisplay() {
 	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".overrideEnabled\" true;");
 	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".overrideShading\" 0;");
 
+	// Lock rotation
+	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".rotateX\" 0;");
+	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".rotateY\" 0;");
+	MGlobal::executeCommand("setAttr \"" + plugin::voxelGridDisplayName + ".rotateZ\" 0;");
+
 	// Lock the node to prevent deletion
 	MGlobal::executeCommand("lockNode -lock true \"" + plugin::voxelGridDisplayName + "\";");
+}
+
+void loadVoxelSimulationNodeEditorTemplate() {
+	// Since plugins can't write to the scripts/AETemplates directory, which requires admin privileges, we need to load the template from the plugin resource.
+    HRSRC hRes = FindResource(MhInstPlugin, MAKEINTRESOURCE(IDR_AETEMPLATE1), L"AETEMPLATE");
+    if (!hRes) {
+        MGlobal::displayError("Failed to find AETEMPLATE resource.");
+        return;
+    }
+
+    HGLOBAL hResData = LoadResource(MhInstPlugin, hRes);
+    if (!hResData) {
+        MGlobal::displayError("Failed to load AETEMPLATE resource.");
+        return;
+    }
+
+    DWORD resSize = SizeofResource(MhInstPlugin, hRes);
+    const char* resData = static_cast<const char*>(LockResource(hResData));
+    if (!resData || resSize == 0) {
+        MGlobal::displayError("Failed to lock AETEMPLATE resource.");
+        return;
+    }
+
+    MString melScript(resData, resSize);
+
+    // Execute the MEL script to load the UI for the VoxelSimulationNode
+    MStatus status = MGlobal::executeCommand(melScript);
+    if (status != MS::kSuccess) {
+        MGlobal::displayError("Failed to execute AETEMPLATE MEL script: " + status.errorString());
+    }
 }
 
 // Initialize Maya Plugin upon loading
@@ -183,14 +219,25 @@ EXPORT MStatus initializePlugin(MObject obj)
 	DirectX::initialize(MhInstPlugin);
 	
 	// Create a button in the custom shelf for the plugin
-    MGlobal::executeCommand(
-        "if (!`shelfLayout -exists \"Custom\"`) shelfLayout \"Custom\"; " // Ensure the "Custom" shelf exists
-        "string $shelfButton = `shelfButton -parent \"Custom\" "
-        "-label \"VoxelDestroyer\" "
-        "-annotation \"Run VoxelDestroyer Plugin\" "
-        "-image1 \"TypeSeparateMaterials_200.png\" " // Replace with a valid icon file
-        "-command \"VoxelDestroyer\"`; "
-    );
+	MGlobal::executeCommand(
+		"if (!`shelfLayout -exists \"Custom\"`) shelfLayout \"Custom\"; " // Ensure the "Custom" shelf exists
+		"string $buttons[] = `shelfLayout -query -childArray \"Custom\"`; " // Get all buttons in the shelf
+		"int $exists = 0; "
+		"for ($button in $buttons) { "
+		"    if (`shelfButton -query -label $button` == \"VoxelDestroyer\") { "
+		"        $exists = 1; "
+		"        break; "
+		"    } "
+		"} "
+		"if (!$exists) { "
+		"    shelfButton -parent \"Custom\" "
+		"    -label \"VoxelDestroyer\" "
+		"    -annotation \"Run VoxelDestroyer Plugin\" "
+		"    -image1 \"TypeSeparateMaterials_200.png\" " 
+		"    -command \"VoxelDestroyer\"; "
+		"}"
+	);
+
 
 	// Register the VoxelSimulationNode
 	status = plugin.registerNode("VoxelSimulationNode", VoxelSimulationNode::id, VoxelSimulationNode::creator, VoxelSimulationNode::initialize);
@@ -198,6 +245,8 @@ EXPORT MStatus initializePlugin(MObject obj)
 		MGlobal::displayError("Failed to register VoxelSimulationNode");
 		return status;
 	}
+
+	loadVoxelSimulationNodeEditorTemplate();
 
 	return status;
 }
