@@ -68,13 +68,12 @@ public:
         float gridEdgeLength,
         float voxelSize,
         MPoint gridCenter,
+        const MDagPath& selectedMeshDagPath,
         MDagPath& voxelizedMeshDagPath,
         MStatus& status
     );
 
 private:
-
-    MDagPath getSelectedMesh(MStatus& status);
 
     std::vector<Triangle> getTrianglesOfMesh(MFnMesh& mesh, float voxelSize, MStatus& status);
 

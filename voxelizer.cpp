@@ -9,6 +9,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     float gridEdgeLength,
     float voxelSize,
     MPoint gridCenter,
+    const MDagPath& selectedMeshPath,
     MDagPath& voxelizedMeshPath,
     MStatus& status
 ) {
@@ -17,7 +18,6 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     Voxels voxels;
     voxels.resize(voxelsPerEdge * voxelsPerEdge * voxelsPerEdge);
     
-    MDagPath selectedMeshPath = getSelectedMesh(status);
     MFnMesh selectedMesh(selectedMeshPath, &status);
     // This is what Maya does when you select a mesh and click Modify > Freeze Transformations
     // It's neceessary for the boolean operations to work correctly.
@@ -51,30 +51,6 @@ Voxels Voxelizer::voxelizeSelectedMesh(
 
     status = MS::kSuccess;
     return voxels;
-}
-
-MDagPath Voxelizer::getSelectedMesh(MStatus& status) {
-    // Get the current selection
-    MSelectionList selection;
-    MGlobal::getActiveSelectionList(selection);
-
-    // Check if the selection is empty
-    if (selection.isEmpty()) {
-        MGlobal::displayError("No mesh selected.");
-        status = MS::kFailure;
-        return MDagPath();
-    }
-
-    // Get the first selected item and ensure it's a mesh
-    MDagPath activeMeshDagPath;
-    status = selection.getDagPath(0, activeMeshDagPath);
-    if (status != MS::kSuccess || !activeMeshDagPath.hasFn(MFn::kMesh)) {
-        MGlobal::displayError("The selected item is not a mesh.");
-        status = MS::kFailure;
-        return MDagPath();
-    }
-
-    return activeMeshDagPath;
 }
 
 std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxelSize, MStatus& status) {
@@ -459,7 +435,6 @@ MObject Voxelizer::addVoxelToMesh(
     // Boolean'ing every cube with the mesh is SLOW. It's done serially. Would be much faster if in parallel, but Maya doesn't support (afaik).
     // Could look into replacing the following with CGAL, which could be parallelized.
 
-    // TEMPORARILY COMMENTED OUT - until we have code in place to transform the vertices within each voxel, just return the voxel itself.
     MObjectArray objsToIntersect;
     objsToIntersect.append(cubeMeshFn.object());
     objsToIntersect.append(originalMesh.object());

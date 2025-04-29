@@ -50,20 +50,38 @@ MSyntax plugin::syntax()
 	syntax.addFlag("-pz", "-positionZ", MSyntax::kDouble);
 	syntax.addFlag("-s", "-scale", MSyntax::kDouble);
 	syntax.addFlag("-v", "-voxelsPerEdge", MSyntax::kLong);
+	syntax.addFlag("-n", "-gridDisplayName", MSyntax::kString);
 	return syntax;
 }
 
 // Plugin doIt function
 MStatus plugin::doIt(const MArgList& argList)
 {
-	PluginArgs pluginArgs = parsePluginArgs(argList);
-
 	MStatus status;
+
+	PluginArgs pluginArgs = parsePluginArgs(argList);
+	MDagPath selectedMeshDagPath = getSelectedObject(pluginArgs.position, pluginArgs.scale);
+	// Fall back to finding the closest object to the voxel grid if nothing is selected
+	if (selectedMeshDagPath == MDagPath() || status != MS::kSuccess) {
+		selectedMeshDagPath = findClosestObjectToVoxelGrid(pluginArgs.position, pluginArgs.scale, pluginArgs.gridDisplayName);
+		if (selectedMeshDagPath == MDagPath()) {
+			MGlobal::displayError("No mesh found to voxelize.");
+			return MS::kFailure;
+		}
+
+		MSelectionList selectionList;
+		selectionList.add(selectedMeshDagPath);
+		MGlobal::setActiveSelectionList(selectionList);
+	}
+
+	MGlobal::displayInfo("Selected mesh: " + selectedMeshDagPath.fullPathName());
+
 	float voxelSize = static_cast<float>(pluginArgs.scale / pluginArgs.voxelsPerEdge);
 	Voxels voxels = voxelizer.voxelizeSelectedMesh(
 		static_cast<float>(pluginArgs.scale),
 		voxelSize,
 		pluginArgs.position,
+		selectedMeshDagPath,
 		plugin::voxelizedMeshDagPath,
 		status
 	);
@@ -154,7 +172,99 @@ PluginArgs plugin::parsePluginArgs(const MArgList& args) {
 			MGlobal::displayError("Failed to get voxels per edge: " + status.errorString());
 		}
 	}
+
+	if (argData.isFlagSet("-n")) {
+		status = argData.getFlagArgument("-n", 0, pluginArgs.gridDisplayName);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get grid display name: " + status.errorString());
+		}
+	}
+
 	return pluginArgs;
+}
+
+MDagPath plugin::getSelectedObject(const MPoint& voxelGridCenter, double voxelGridSize) {
+	MStatus status;
+    // Get the current selection
+    MSelectionList selection;
+    MGlobal::getActiveSelectionList(selection);
+
+    // Check if the selection is empty
+    if (selection.isEmpty()) {
+        MGlobal::displayWarning("No mesh selected.");
+        status = MS::kFailure;
+        return MDagPath();
+    }
+
+    // Get the first selected item and ensure it's a mesh
+    MDagPath activeMeshDagPath;
+    status = selection.getDagPath(0, activeMeshDagPath);
+    if (status != MS::kSuccess || !activeMeshDagPath.hasFn(MFn::kMesh)) {
+        MGlobal::displayError("The selected item is not a mesh.");
+        status = MS::kFailure;
+        return MDagPath();
+    }
+
+	MFnMesh meshFn(activeMeshDagPath);
+	MBoundingBox boundingBox = meshFn.boundingBox();
+	MPoint boundingBoxCenter = boundingBox.center();
+
+	if (!isBoundingBoxOverlappingVoxelGrid(boundingBox, voxelGridCenter, voxelGridSize)) {
+		MGlobal::displayError("The selected mesh is not within the voxel grid.");
+		status = MS::kFailure;
+		return MDagPath();
+	}
+
+    return activeMeshDagPath;
+}
+
+MDagPath plugin::findClosestObjectToVoxelGrid(const MPoint& voxelGridCenter, double voxelGridSize, MString gridDisplayName) {
+    MDagPath closestDagPath;
+    double closestDistance = std::numeric_limits<double>::max();
+
+    // Iterate through all DAG nodes in the scene
+    MItDag dagIterator(MItDag::kDepthFirst, MFn::kTransform);
+    for (; !dagIterator.isDone(); dagIterator.next()) {
+        MDagPath currentDagPath;
+        dagIterator.getPath(currentDagPath);
+
+        if (currentDagPath.node().hasFn(MFn::kTransform)) {
+			// Skip the grid display object by comparing the transform node name
+			if (currentDagPath.partialPathName() == gridDisplayName) continue;
+					
+            // Get the shape node under the transform
+            MDagPath shapeDagPath = currentDagPath;
+            if (shapeDagPath.extendToShape() != MS::kSuccess || !shapeDagPath.node().hasFn(MFn::kMesh)) continue;
+
+            MFnMesh meshFn(shapeDagPath);
+            MBoundingBox boundingBox = meshFn.boundingBox();
+            MPoint boundingBoxCenter = boundingBox.center();
+            double distance = (MVector(boundingBoxCenter) - MVector(voxelGridCenter)).length();
+
+            if (!isBoundingBoxOverlappingVoxelGrid(boundingBox, voxelGridCenter, voxelGridSize)) continue;
+
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestDagPath = currentDagPath; // Keep the transform node path
+            }
+        }
+    }
+
+    if (!closestDagPath.isValid()) {
+        MGlobal::displayWarning("No objects with meshes found in the scene.");
+    }
+
+    return closestDagPath;
+}
+
+bool plugin::isBoundingBoxOverlappingVoxelGrid(const MBoundingBox& objectBoundingBox, const MPoint& voxelGridCenter, double voxelGridSize) {
+	return (voxelGridCenter.x - voxelGridSize / 2.0 <= objectBoundingBox.max().x &&
+			voxelGridCenter.x + voxelGridSize / 2.0 >= objectBoundingBox.min().x &&
+			voxelGridCenter.y - voxelGridSize / 2.0 <= objectBoundingBox.max().y &&
+			voxelGridCenter.y + voxelGridSize / 2.0 >= objectBoundingBox.min().y &&
+			voxelGridCenter.z - voxelGridSize / 2.0 <= objectBoundingBox.max().z &&
+			voxelGridCenter.z + voxelGridSize / 2.0 >= objectBoundingBox.min().z
+	);
 }
 
 void plugin::createVoxelSimulationNode() {

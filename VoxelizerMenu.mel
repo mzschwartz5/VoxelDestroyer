@@ -33,14 +33,16 @@ global proc VoxelizerMenu() {
 
     // Buttons
     string $cancelButton = `button -label "Cancel" -command ("VoxelizerMenu_close(\"" + $voxelGridDisplayName + "\")")`;
-    string $runButton = `button -label "Voxelize" -command (
-        "float $posX = `floatFieldGrp -query -value1 " + $positionField + "`; " +
-        "float $posY = `floatFieldGrp -query -value2 " + $positionField + "`; " +
-        "float $posZ = `floatFieldGrp -query -value3 " + $positionField + "`; " +
-        "float $scale = `floatFieldGrp -query -value1 " + $scaleField + "`; " +
-        "int $voxelsPerEdge = `intSliderGrp -query -value " + $subdivField + "`; " +
-        "VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", $posX, $posY, $posZ, $scale, $voxelsPerEdge);"
-    )`;
+    string $runButton = `button -label "Voxelize" 
+        -annotation "Voxelizes a mesh in preparation for VGS simulation. Uses selected mesh or, if none selected, the closest mesh to the center of the grid bounds."
+        -command (
+            "float $posX = `floatFieldGrp -query -value1 " + $positionField + "`; " +
+            "float $posY = `floatFieldGrp -query -value2 " + $positionField + "`; " +
+            "float $posZ = `floatFieldGrp -query -value3 " + $positionField + "`; " +
+            "float $scale = `floatFieldGrp -query -value1 " + $scaleField + "`; " +
+            "int $voxelsPerEdge = `intSliderGrp -query -value " + $subdivField + "`; " +
+            "VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", $posX, $posY, $posZ, $scale, $voxelsPerEdge);"
+        )`;
 
     // Attach elements to form layout
     formLayout -edit
@@ -65,9 +67,14 @@ global proc VoxelizerMenu() {
 }
 
 global proc VoxelizerMenu_run(string $cubeName, float $posX, float $posY, float $posZ, float $scale, int $voxelsPerEdge) {
+    // Deselect the cube if it's currently selected, so it's not a voxelization target itself
+    if (`objExists $cubeName` && `objExists ($cubeName + ".visibility")`) {
+        select -deselect $cubeName;
+    }
+
     // Construct the VoxelDestroyer command with the passed arguments
     string $command = "VoxelDestroyer -px " + $posX + " -py " + $posY + " -pz " + $posZ +
-                      " -s " + $scale + " -v " + $voxelsPerEdge;
+                      " -s " + $scale + " -v " + $voxelsPerEdge + " -n \"" + $cubeName + "\"";
 
     // Execute the command and handle errors
     if (catch(eval($command))) {
@@ -123,10 +130,9 @@ global proc VoxelizerMenu_updatePosition(string $cubeName, float $x, float $y, f
 
 // Update scale of the polyCube
 global proc VoxelizerMenu_updateScale(string $cubeName, float $scale) {
+    // Only need to scale X, as Y and Z are connected
     if (`objExists $cubeName`) {
         setAttr ($cubeName + ".scaleX") $scale;
-        setAttr ($cubeName + ".scaleY") $scale;
-        setAttr ($cubeName + ".scaleZ") $scale;
     } else {
         warning("Voxel grid display does not exist.");
     }
