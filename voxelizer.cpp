@@ -172,7 +172,6 @@ void Voxelizer::getSurfaceVoxels(
                     
                     voxels.occupied[index] = true;
                     voxels.isSurface[index] = true;
-                    voxels.mortonCodes[index] = Utils::toMortonCode(x, y, z);
                 }
             }
         }
@@ -239,7 +238,6 @@ void Voxelizer::getInteriorVoxels(
                 for (int x = xVoxelMin; x < voxelsPerEdge; ++x) {
                     int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
                     voxels.occupied[index] = !voxels.occupied[index];
-                    voxels.mortonCodes[index] = Utils::toMortonCode(x, y, z);
                 }
             }
         }
@@ -314,6 +312,7 @@ MDagPath Voxelizer::createVoxels(
                 meshNamesConcatenated += " " + MFnMesh(voxel).name();
 
                 overlappedVoxels.numOccupied++;
+                overlappedVoxels.mortonCodes[index] = Utils::toMortonCode(x, y, z);
             }
         }
     }
@@ -434,7 +433,6 @@ MObject Voxelizer::addVoxelToMesh(
 
     // Boolean'ing every cube with the mesh is SLOW. It's done serially. Would be much faster if in parallel, but Maya doesn't support (afaik).
     // Could look into replacing the following with CGAL, which could be parallelized.
-
     MObjectArray objsToIntersect;
     objsToIntersect.append(cubeMeshFn.object());
     objsToIntersect.append(originalMesh.object());
