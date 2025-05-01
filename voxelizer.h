@@ -7,6 +7,7 @@
 #include <maya/MFnMesh.h>
 #include <vector>
 #include <array>
+#include <unordered_map>
 
 #include "utils.h"
 #include "glm/glm.hpp"
@@ -38,12 +39,16 @@ struct VoxelPositions {
 struct Voxels {
     std::vector<bool> occupied; // contains some part (surface or interior) of the underlying mesh
     std::vector<bool> isSurface;
+    std::vector<MObject> mayaObjects;   // the actual cube meshes
     std::vector<VoxelPositions> corners;  // ordered according to the VGS expectations
-    std::vector<uint> vertStartIdx;    // Each voxel owns a number of vertices contained within (including the corners)
+
+    std::vector<uint> vertStartIdx;     // Each voxel owns a number of vertices contained within (including the corners)
     std::vector<uint> numVerts;
     int totalVerts = 0; // total number of vertices in the voxelized mesh
 
     std::vector<uint32_t> mortonCodes;
+    // Answers the question: for a given voxel morton code, what is the index of the corresponding voxel in the sorted array of voxels?
+    std::unordered_map<uint32_t, uint32_t> mortonCodesToSortedIdx;
 
     int numOccupied = 0;
     
@@ -51,10 +56,11 @@ struct Voxels {
     void resize(int size) {
         occupied.resize(size, false);
         isSurface.resize(size, false);
-        mortonCodes.resize(size, UINT32_MAX);
+        mayaObjects.resize(size, MObject::kNullObj);
         corners.resize(size, VoxelPositions());
 		numVerts.resize(size, 0);
 		vertStartIdx.resize(size, -1);
+        mortonCodes.resize(size, UINT_MAX);                 
     }
 };
 
@@ -123,11 +129,21 @@ private:
         MFnMesh& originalSurface
     );
 
-    MObject addVoxelToMesh(
+    void addVoxelToMesh(
         const MPoint& voxelMin, // min corner of the voxel
         float voxelSize,        // edge length of a single voxel
         Voxels& voxels,
-        MFnMesh& originalSurface,
+        int index
+    );
+
+    Voxels sortVoxelsByMortonCode(
+        const Voxels& voxels
+    );
+
+    void intersectVoxelWithOriginalMesh(
+        Voxels& voxels,
+        MObject& cube,
+        MObject& originalMesh,
         int index
     );
 };

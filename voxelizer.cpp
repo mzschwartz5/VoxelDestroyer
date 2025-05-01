@@ -4,6 +4,7 @@
 #include <maya/MFnTransform.h>
 #include <algorithm>
 #include <maya/MFnSet.h>
+#include <numeric>
 
 Voxels Voxelizer::voxelizeSelectedMesh(
     float gridEdgeLength,
@@ -294,13 +295,13 @@ MDagPath Voxelizer::createVoxels(
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
     MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
 
-    MString combinedMeshName = originalMesh.name() + "_voxelized";
-    MString meshNamesConcatenated;
     for (int x = 0; x < voxelsPerEdge; ++x) {
         for (int y = 0; y < voxelsPerEdge; ++y) {
             for (int z = 0; z < voxelsPerEdge; ++z) {
                 int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
                 if (!overlappedVoxels.occupied[index]) continue;
+                
+                overlappedVoxels.mortonCodes[index] = Utils::toMortonCode(x, y, z);
 
                 MPoint voxelMin = MPoint(
                     x * voxelSize + gridMin.x,
@@ -308,13 +309,21 @@ MDagPath Voxelizer::createVoxels(
                     z * voxelSize + gridMin.z
                 );
 
-                MObject voxel = addVoxelToMesh(voxelMin, voxelSize, overlappedVoxels, originalMesh, index);
-                meshNamesConcatenated += " " + MFnMesh(voxel).name();
-
+                addVoxelToMesh(voxelMin, voxelSize, overlappedVoxels, index);
                 overlappedVoxels.numOccupied++;
-                overlappedVoxels.mortonCodes[index] = Utils::toMortonCode(x, y, z);
             }
         }
+    }
+
+    overlappedVoxels = sortVoxelsByMortonCode(overlappedVoxels);
+
+    MString combinedMeshName = originalMesh.name() + "_voxelized";
+    MString meshNamesConcatenated;
+    for (int i = 0; i < overlappedVoxels.numOccupied; ++i) {
+        MObject cube = overlappedVoxels.mayaObjects[i];
+        meshNamesConcatenated += " " + MFnMesh(cube).name();
+
+        intersectVoxelWithOriginalMesh(overlappedVoxels, cube, originalMesh.object(), i);
     }
 
     // Use MEL to combine all the voxels into one mesh
@@ -355,15 +364,12 @@ int faceIndices[6][4] = {
     {2, 3, 1, 0}  // Left
 };
 
-MObject Voxelizer::addVoxelToMesh(
+void Voxelizer::addVoxelToMesh(
     const MPoint& voxelMin,
     float voxelSize,
     Voxels& voxels,
-    MFnMesh& originalMesh,
     int index
 ) {
-    voxels.vertStartIdx[index] = voxels.totalVerts;
-
     MPointArray cubeVertices;
     MPoint voxelMax = MPoint(
         voxelMin.x + voxelSize,
@@ -424,23 +430,56 @@ MObject Voxelizer::addVoxelToMesh(
         cubeTransform
     );
 
-    // only need to do the boolean intersection of surface voxels
-    if (!voxels.isSurface[index]) {
-        voxels.numVerts[index] = cubeVertices.length(); // should always be 8
-        voxels.totalVerts += cubeVertices.length();
-        return cube; 
+    voxels.mayaObjects[index] = cube;
+}
+
+Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
+    // Note that the size of the sortedVoxels is equal to the number of occupied voxels. Thus, we're also filtering in this step.
+    Voxels sortedVoxels;
+    sortedVoxels.resize(voxels.numOccupied);
+
+    std::vector<uint32_t> voxelIndices(voxels.size());
+    std::iota(voxelIndices.begin(), voxelIndices.end(), 0); // fill with 0, 1, 2, ..., size-1
+
+    // Sort the index array by the corresponding voxel's morton code
+    std::sort(voxelIndices.begin(), voxelIndices.end(), [&voxels](int a, int b) {
+        return voxels.mortonCodes[a] < voxels.mortonCodes[b];
+    });
+
+    for (size_t i = 0; i < voxels.numOccupied; ++i) {
+        sortedVoxels.isSurface[i] = voxels.isSurface[voxelIndices[i]];
+        sortedVoxels.mayaObjects[i] = voxels.mayaObjects[voxelIndices[i]];
+        sortedVoxels.corners[i] = voxels.corners[voxelIndices[i]];
+        sortedVoxels.mortonCodes[i] = voxels.mortonCodes[voxelIndices[i]];
+        sortedVoxels.mortonCodesToSortedIdx[voxels.mortonCodes[voxelIndices[i]]] = static_cast<uint32_t>(i);
     }
 
-    // Boolean'ing every cube with the mesh is SLOW. It's done serially. Would be much faster if in parallel, but Maya doesn't support (afaik).
-    // Could look into replacing the following with CGAL, which could be parallelized.
+    sortedVoxels.numOccupied = voxels.numOccupied;
+
+    return sortedVoxels;
+}
+
+void Voxelizer::intersectVoxelWithOriginalMesh(
+    Voxels& voxels,
+    MObject& cube,
+    MObject& originalMesh,
+    int index
+) {
+    voxels.vertStartIdx[index] = voxels.totalVerts;
+
+    if (!voxels.isSurface[index]) {
+        voxels.numVerts[index] = 8;
+        voxels.totalVerts += 8;
+        return;
+    }
+
+    MFnMesh cubeMeshFn(cube);
+
     MObjectArray objsToIntersect;
-    objsToIntersect.append(cubeMeshFn.object());
-    objsToIntersect.append(originalMesh.object());
+    objsToIntersect.append(cube);
+    objsToIntersect.append(originalMesh);
     cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect);
 
-    // Set the vert start idx and number of verts for the voxel
     voxels.numVerts[index] = cubeMeshFn.numVertices();
     voxels.totalVerts += cubeMeshFn.numVertices();
-
-    return cube;
 }

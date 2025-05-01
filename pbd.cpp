@@ -1,82 +1,63 @@
 #include "pbd.h"
 #include <maya/MGlobal.h>
 #include <float.h>
+#include "utils.h"
 
-PBD::PBD(Voxels& voxels, float voxelSize, float gridEdgeLength) {
+PBD::PBD(const Voxels& voxels, float voxelSize) {
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
+    constructFaceToFaceConstraints(voxels);
+    createParticles(voxels);
+    setRadiusAndVolumeFromLength(voxelSize);
+}
 
-    std::vector<uint32_t> voxelIndices(voxels.size());
-    std::iota(voxelIndices.begin(), voxelIndices.end(), 0); // fill with 0, 1, 2, ..., size-1
+void PBD::constructFaceToFaceConstraints(const Voxels& voxels) {
+    for (int i = 0; i < voxels.numOccupied; i++) {
+        uint32_t x, y, z;
+        Utils::fromMortonCode(voxels.mortonCodes[i], x, y, z);
 
-    //sort the index array by the corresponding voxel's morton code
-    std::sort(voxelIndices.begin(), voxelIndices.end(), [&voxels](int a, int b) {
-        return voxels.mortonCodes[a] < voxels.mortonCodes[b];
-        });
+        int rightVoxelMortonCode = static_cast<int>(Utils::toMortonCode(x + 1, y, z));
+        int upVoxelMortonCode = static_cast<int>(Utils::toMortonCode(x, y + 1, z));
+        int frontVoxelMortonCode = static_cast<int>(Utils::toMortonCode(x, y, z + 1));
 
-    //reorder voxels arrays
-    std::vector<VoxelPositions> sortedCorners(voxels.corners.size());
-    std::vector<uint32_t> sortedVertStartIdx(voxels.occupied.size());
-	std::vector<uint32_t> sortedNumVerts(voxels.occupied.size());
-    std::vector<uint32_t> originalToSortedIdx(voxels.corners.size());
+        // Checks that the right voxel is in the grid and is occupied
+        if (voxels.mortonCodesToSortedIdx.find(rightVoxelMortonCode) != voxels.mortonCodesToSortedIdx.end()) {
+            int rightNeighborIndex = voxels.mortonCodesToSortedIdx.at(rightVoxelMortonCode);
 
-    for (size_t i = 0; i < sortedCorners.size(); ++i) {
-        sortedCorners[i] = voxels.corners[voxelIndices[i]];
-		sortedVertStartIdx[i] = voxels.vertStartIdx[voxelIndices[i]];
-		sortedNumVerts[i] = voxels.numVerts[voxelIndices[i]];
-		originalToSortedIdx[voxelIndices[i]] = i;
-    }
+            FaceConstraint newConstraint;
+            newConstraint.voxelOneIdx = i;
+            newConstraint.voxelTwoIdx = rightNeighborIndex;
+            newConstraint.compressionLimit = -FLT_MAX;
+            newConstraint.tensionLimit = FLT_MAX;
+            addFaceConstraint(newConstraint, 0);
+        }
 
-    //update voxels with sorted info
-    voxels.corners = sortedCorners;
-	voxels.vertStartIdx = sortedVertStartIdx;
-	voxels.numVerts = sortedNumVerts;
+        // Checks that the up voxel is in the grid and is occupied
+        if (voxels.mortonCodesToSortedIdx.find(upVoxelMortonCode) != voxels.mortonCodesToSortedIdx.end()) {
+            int upNeighborIndex = voxels.mortonCodesToSortedIdx.at(upVoxelMortonCode);
 
-    int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
-    for (int x = 0; x < voxelsPerEdge; x++) {
-        for (int y = 0; y < voxelsPerEdge; y++) {
-            for (int z = 0; z < voxelsPerEdge; z++) {
-                int index = get1DIndexFrom3D(x, y, z, voxelsPerEdge);
-                if (!voxels.occupied[index]) continue;
+            FaceConstraint newConstraint;
+            newConstraint.voxelOneIdx = i;
+            newConstraint.voxelTwoIdx = upNeighborIndex;
+            newConstraint.compressionLimit = -FLT_MAX;
+            newConstraint.tensionLimit = FLT_MAX;
+            addFaceConstraint(newConstraint, 1);
+        }
 
-                if (x < voxelsPerEdge - 1) {
-                    int rightNeighborIndex = get1DIndexFrom3D(x + 1, y, z, voxelsPerEdge);
-                    if (voxels.occupied[rightNeighborIndex]) {
-                        FaceConstraint newConstraint;
-                        newConstraint.voxelOneIdx = originalToSortedIdx[index];
-                        newConstraint.voxelTwoIdx = originalToSortedIdx[rightNeighborIndex];
-                        newConstraint.compressionLimit = -FLT_MAX;
-                        newConstraint.tensionLimit = FLT_MAX;
-                        addFaceConstraint(newConstraint, 0);
-                    }
-                }
+        // Checks that the front voxel is in the grid and is occupied
+        if (voxels.mortonCodesToSortedIdx.find(frontVoxelMortonCode) != voxels.mortonCodesToSortedIdx.end()) {
+            int frontNeighborIndex = voxels.mortonCodesToSortedIdx.at(frontVoxelMortonCode);
 
-                if (y < voxelsPerEdge - 1) {
-                    int topNeighborIndex = get1DIndexFrom3D(x, y + 1, z, voxelsPerEdge);
-                    if (voxels.occupied[topNeighborIndex]) {
-                        FaceConstraint newConstraint;
-                        newConstraint.voxelOneIdx = originalToSortedIdx[index];
-                        newConstraint.voxelTwoIdx = originalToSortedIdx[topNeighborIndex];
-                        newConstraint.compressionLimit = -FLT_MAX;
-                        newConstraint.tensionLimit = FLT_MAX;
-                        addFaceConstraint(newConstraint, 1);
-                    }
-                }
-
-                if (z < voxelsPerEdge - 1) {
-                    int backNeighborIndex = get1DIndexFrom3D(x, y, z + 1, voxelsPerEdge);
-                    if (voxels.occupied[backNeighborIndex]) {
-                        FaceConstraint newConstraint;
-                        newConstraint.voxelOneIdx = originalToSortedIdx[index];
-                        newConstraint.voxelTwoIdx = originalToSortedIdx[backNeighborIndex];
-                        newConstraint.compressionLimit = -FLT_MAX;
-                        newConstraint.tensionLimit = FLT_MAX;
-                        addFaceConstraint(newConstraint, 2);
-                    }
-                }
-            }
+            FaceConstraint newConstraint;
+            newConstraint.voxelOneIdx = i;
+            newConstraint.voxelTwoIdx = frontNeighborIndex;
+            newConstraint.compressionLimit = -FLT_MAX;
+            newConstraint.tensionLimit = FLT_MAX;
+            addFaceConstraint(newConstraint, 2);
         }
     }
+}
 
+void PBD::createParticles(const Voxels& voxels) {
     for (int i = 0; i < voxels.numOccupied; i++) {
         for (const auto& position : voxels.corners[i].corners) {
             particles.positions.push_back(vec4(position, 0.0f));
@@ -86,8 +67,6 @@ PBD::PBD(Voxels& voxels, float voxelSize, float gridEdgeLength) {
             particles.numParticles++;
         }
     }
-
-    setRadiusAndVolumeFromLength(voxelSize);
 }
 
 const Particles& PBD::simulateStep()
