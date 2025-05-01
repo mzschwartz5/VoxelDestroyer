@@ -31,7 +31,7 @@ class PBD
 {
 public:
     PBD() = default;
-    PBD(Voxels& voxels, float voxelSize, float gridEdgeLength);
+    PBD(const Voxels& voxels, float voxelSize);
     ~PBD() = default;
     const Particles& simulateStep();
     void simulateSubstep();
@@ -43,6 +43,10 @@ private:
     std::array<std::vector<FaceConstraint>, 3> faceConstraints; //0 = x, 1 = y, 2 = z
     int substeps = 10;
     float timeStep;
+
+    void constructFaceToFaceConstraints(const Voxels& voxels);
+
+    void createParticles(const Voxels& voxels);
 
     // Constraint solvers
     void solveGroundCollision();
@@ -64,6 +68,4 @@ private:
     }
 
     void addFaceConstraint(FaceConstraint constraint, int axis) { faceConstraints[axis].push_back(constraint); };
-
-    inline int get1DIndexFrom3D(int x, int y, int z, int voxelsPerEdge) { return x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z; }
 };
