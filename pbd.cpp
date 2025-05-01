@@ -2,7 +2,9 @@
 #include <maya/MGlobal.h>
 #include <float.h>
 
-PBD::PBD(Voxels& voxels, float voxelSize, float gridEdgeLength) {
+std::unique_ptr<VGSCompute> PBD::vgsCompute = nullptr;
+
+PBD::PBD(Voxels& voxels, float voxelSize, float gridEdgeLength, const ComPtr<ID3D11UnorderedAccessView>& particlesUAV) {
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
 
     std::vector<uint32_t> voxelIndices(voxels.size());
@@ -23,7 +25,7 @@ PBD::PBD(Voxels& voxels, float voxelSize, float gridEdgeLength) {
         sortedCorners[i] = voxels.corners[voxelIndices[i]];
 		sortedVertStartIdx[i] = voxels.vertStartIdx[voxelIndices[i]];
 		sortedNumVerts[i] = voxels.numVerts[voxelIndices[i]];
-		originalToSortedIdx[voxelIndices[i]] = i;
+		originalToSortedIdx[voxelIndices[i]] = uint32_t(i);
     }
 
     //update voxels with sorted info
@@ -88,6 +90,12 @@ PBD::PBD(Voxels& voxels, float voxelSize, float gridEdgeLength) {
     }
 
     setRadiusAndVolumeFromLength(voxelSize);
+
+    //initialize shaders
+    vgsCompute = std::make_unique<VGSCompute>(
+        particles.positions.size(),
+		particlesUAV
+    );
 }
 
 const Particles& PBD::simulateStep()
@@ -112,9 +120,14 @@ void PBD::simulateSubstep() {
 
     solveGroundCollision();
 
-    for (int i = 0; i < particles.numParticles; i += 8) {
-		solveVGS(i, 3);
-	}
+    //for (int i = 0; i < particles.numParticles; i += 8) {
+		//solveVGS(i, 3);    
+	//}
+
+	//vgsCompute->updatePositionBuffer(particles.positions);
+    vgsCompute->updateWeightsBuffer(particles.w);
+    vgsCompute->dispatch(particles.positions.size() >> 3);
+	//vgsCompute->copyTransformedPositionsToCPU(*particles.positions.data(), particles.numParticles);
 
     for (int i = 0; i < faceConstraints.size(); i++) {
         for (auto& constraint : faceConstraints[i]) {

@@ -51,5 +51,4 @@ private:
 	static std::unique_ptr<TransformVerticesCompute> transformVerticesCompute;
 	static std::unique_ptr<BindVerticesCompute> bindVerticesCompute;
 
-
 };

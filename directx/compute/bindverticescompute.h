@@ -35,6 +35,7 @@ public:
     };
 
     const ComPtr<ID3D11ShaderResourceView>& getParticlesSRV() const { return particlesSRV; }
+    const ComPtr<ID3D11UnorderedAccessView>& getParticlesUAV() const { return particlesUAV; }
     const ComPtr<ID3D11ShaderResourceView>& getVertStartIdxSRV() const { return vertStartIdxSRV; }
     const ComPtr<ID3D11ShaderResourceView>& getNumVerticesSRV() const { return numVerticesSRV; };
     const ComPtr<ID3D11ShaderResourceView>& getLocalRestPositionsSRV() const { return localRestPositionsSRV; };
@@ -51,6 +52,7 @@ private:
     ComPtr<ID3D11ShaderResourceView> numVerticesSRV;
     ComPtr<ID3D11ShaderResourceView> localRestPositionsSRV; // Owned by this class, but used by the transformVertices compute shader
     ComPtr<ID3D11UnorderedAccessView> localRestPositionsUAV;
+    ComPtr<ID3D11UnorderedAccessView> particlesUAV;
 
     void bind() override
     {
@@ -97,6 +99,23 @@ private:
         srvDesc.Buffer.NumElements = numParticles;
     
         DirectX::getDevice()->CreateShaderResourceView(particlesBuffer.Get(), &srvDesc, &particlesSRV);
+
+		// Initialize particlesBuffer UAV
+        bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        bufferDesc.ByteWidth = numParticles * sizeof(glm::vec4); // glm::vec4 for alignment
+        bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+        bufferDesc.CPUAccessFlags = 0;
+        bufferDesc.StructureByteStride = sizeof(glm::vec4);
+        bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+
+        DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &particlesBuffer);
+
+        uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+        uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+        uavDesc.Buffer.FirstElement = 0;
+        uavDesc.Buffer.NumElements = numParticles;
+
+        DirectX::getDevice()->CreateUnorderedAccessView(particlesBuffer.Get(), &uavDesc, &particlesUAV);
 
         // Initialize verticesBuffer and its SRV
         bufferDesc.Usage = D3D11_USAGE_IMMUTABLE; // since this data is going to be set on buffer creation and never changed
@@ -186,6 +205,7 @@ private:
         vertStartIdxSRV.Reset();
         numVerticesSRV.Reset();
         localRestPositionsUAV.Reset();
+        particlesUAV.Reset();
     };
 
 };

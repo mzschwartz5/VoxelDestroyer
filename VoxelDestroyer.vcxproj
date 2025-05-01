@@ -131,13 +131,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="plugin.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="pbd.h" />
     <ClInclude Include="directx\directx.h" />
     <ClInclude Include="utils.h" />
+    <ClInclude Include="vgscompute.h" />
     <ClInclude Include="voxelizer.h" />
-    <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\transformVerticesCompute.h" />
     <ClInclude Include="directx\compute\bindverticescompute.h" />
     <ClInclude Include="constants.h" />

@@ -58,7 +58,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
 
 	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
-	plugin::pbdSimulator = PBD(voxels, voxelSize, gridEdgeLength);
+	plugin::pbdSimulator = PBD(voxels, voxelSize, gridEdgeLength, bindVerticesCompute->getParticlesUAV());
 	MGlobal::displayInfo("PBD particles initialized.");
 
 	// TODO: handle if doIt is called repeatedly... this will just create new buffers but not free old ones?

@@ -2,6 +2,7 @@
 
 #include "glm/glm.hpp"
 #include "voxelizer.h"
+#include "vgscompute.h"
 
 #include <algorithm>
 #include <vector>
@@ -31,7 +32,7 @@ class PBD
 {
 public:
     PBD() = default;
-    PBD(Voxels& voxels, float voxelSize, float gridEdgeLength);
+    PBD(Voxels& voxels, float voxelSize, float gridEdgeLength, const ComPtr<ID3D11UnorderedAccessView>& particlesUAV);
     ~PBD() = default;
     const Particles& simulateStep();
     void simulateSubstep();
@@ -43,6 +44,8 @@ private:
     std::array<std::vector<FaceConstraint>, 3> faceConstraints; //0 = x, 1 = y, 2 = z
     int substeps = 10;
     float timeStep;
+
+    static std::unique_ptr<VGSCompute> vgsCompute;
 
     // Constraint solvers
     void solveGroundCollision();
