@@ -142,6 +142,7 @@
     <ClInclude Include="directx\compute\transformVerticesCompute.h" />
     <ClInclude Include="directx\compute\bindverticescompute.h" />
     <ClInclude Include="constants.h" />
+    <ClInclude Include="directx\compute\vgscompute.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="plugin.cpp" />

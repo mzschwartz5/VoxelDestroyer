@@ -11,6 +11,7 @@
 #include "directx/compute/computeshader.h"
 #include "directx/compute/transformverticescompute.h"
 #include "directx/compute/bindverticescompute.h"
+#include "directx/compute/vgscompute.h"
 
 using glm::vec3;
 using glm::vec4;
@@ -53,6 +54,7 @@ private:
 	int transformVerticesNumWorkgroups;
 	std::unique_ptr<TransformVerticesCompute> transformVerticesCompute;
 	std::unique_ptr<BindVerticesCompute> bindVerticesCompute;
+    std::unique_ptr<VGSCompute> vgsCompute;
     
     void simulateSubstep();
 
