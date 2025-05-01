@@ -326,6 +326,14 @@ MDagPath Voxelizer::createVoxels(
         intersectVoxelWithOriginalMesh(overlappedVoxels, cube, originalMesh.object(), i);
     }
 
+    return finalizeVoxelMesh(combinedMeshName, meshNamesConcatenated, originalMesh);
+}
+
+MDagPath Voxelizer::finalizeVoxelMesh(
+    const MString& combinedMeshName,
+    const MString& meshNamesConcatenated,
+    const MFnMesh& originalMesh
+) {
     // Use MEL to combine all the voxels into one mesh
     MGlobal::executeCommand(MString("polyUnite -ch 0 -mergeUVSets 1 -name ") + combinedMeshName + " " + meshNamesConcatenated, false, true);
 

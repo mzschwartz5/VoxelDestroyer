@@ -146,4 +146,14 @@ private:
         MObject& originalMesh,
         int index
     );
+
+    /*
+     * Take the boolean voxel pieces of the mesh and combine them. Other book keeping items like transferring attributes,
+     * assigning shading groups, and deleting history are also done here.
+     */
+    MDagPath finalizeVoxelMesh(
+        const MString& combinedMeshName,
+        const MString& meshNamesConcatenated,
+        const MFnMesh& originalMesh
+    );
 };
