@@ -7,6 +7,10 @@
 #include <vector>
 #include <array>
 #include <numeric>
+#include <memory>
+#include "directx/compute/computeshader.h"
+#include "directx/compute/transformverticescompute.h"
+#include "directx/compute/bindverticescompute.h"
 
 using glm::vec3;
 using glm::vec4;
@@ -31,18 +35,26 @@ class PBD
 {
 public:
     PBD() = default;
-    PBD(const Voxels& voxels, float voxelSize);
     ~PBD() = default;
-    const Particles& simulateStep();
-    void simulateSubstep();
-
+    void initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath);
+    void simulateStep();
+    void updateMeshVertices();
+    
 	Particles getParticles() const { return particles; }
-
+    
 private:
     Particles particles;
     std::array<std::vector<FaceConstraint>, 3> faceConstraints; //0 = x, 1 = y, 2 = z
     int substeps = 10;
     float timeStep;
+    MDagPath meshDagPath;
+    // Shaders
+	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
+	int transformVerticesNumWorkgroups;
+	std::unique_ptr<TransformVerticesCompute> transformVerticesCompute;
+	std::unique_ptr<BindVerticesCompute> bindVerticesCompute;
+    
+    void simulateSubstep();
 
     void constructFaceToFaceConstraints(const Voxels& voxels);
 

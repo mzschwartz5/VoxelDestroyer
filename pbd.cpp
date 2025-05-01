@@ -3,11 +3,41 @@
 #include <float.h>
 #include "utils.h"
 
-PBD::PBD(const Voxels& voxels, float voxelSize) {
+void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath) {
+    this->meshDagPath = meshDagPath;
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
     constructFaceToFaceConstraints(voxels);
     createParticles(voxels);
     setRadiusAndVolumeFromLength(voxelSize);
+
+    MStatus status;
+	MFnMesh voxelMeshFn(meshDagPath);
+
+	// Calculate a local rest position for each vertex in every voxel.
+	bindVerticesCompute = std::make_unique<BindVerticesCompute>(
+		static_cast<int>(voxels.size()) * 8, // 8 particles per voxel
+		voxelMeshFn.getRawPoints(&status),
+		voxelMeshFn.numVertices(&status),
+		voxels.vertStartIdx, 
+		voxels.numVerts
+	);
+
+	bindVerticesCompute->updateParticleBuffer(particles.positions);
+	bindVerticesCompute->dispatch(voxels.size());
+
+	MGlobal::displayInfo("Bind vertices compute shader dispatched.");
+
+	transformVerticesCompute = std::make_unique<TransformVerticesCompute>(
+		voxelMeshFn.numVertices(&status),
+		bindVerticesCompute->getParticlesSRV(), 			
+		bindVerticesCompute->getVertStartIdxSRV(), 
+		bindVerticesCompute->getNumVerticesSRV(), 
+		bindVerticesCompute->getLocalRestPositionsSRV()
+	);
+	transformVerticesNumWorkgroups = voxels.size();
+
+	MGlobal::displayInfo("Transform vertices compute shader initialized.");
+
 }
 
 void PBD::constructFaceToFaceConstraints(const Voxels& voxels) {
@@ -69,14 +99,25 @@ void PBD::createParticles(const Voxels& voxels) {
     }
 }
 
-const Particles& PBD::simulateStep()
+void PBD::simulateStep()
 {
     for (int i = 0; i < substeps; i++)
     {
         simulateSubstep();
     }
+}
 
-    return particles;
+void PBD::updateMeshVertices() {
+	MFnMesh meshFn(meshDagPath);
+	MFloatPointArray vertexArray;
+
+	// For rendering, we need to update each voxel with its new basis, which we'll use to transform all vertices owned by that voxel
+	bindVerticesCompute->updateParticleBuffer(particles.positions); // (owns the particles buffer)
+	transformVerticesCompute->dispatch(transformVerticesNumWorkgroups);
+	transformVerticesCompute->copyTransformedVertsToCPU(vertexArray, meshFn.numVertices());
+
+	meshFn.setPoints(vertexArray, MSpace::kWorld);
+	meshFn.updateSurface();
 }
 
 void PBD::simulateSubstep() {
