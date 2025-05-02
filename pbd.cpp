@@ -2,6 +2,7 @@
 #include <maya/MGlobal.h>
 #include <float.h>
 #include "utils.h"
+#include "constants.h"
 
 void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath) {
     this->meshDagPath = meshDagPath;
@@ -139,7 +140,8 @@ void PBD::simulateSubstep() {
     solveGroundCollision();
 
     bindVerticesCompute->updateParticleBuffer(particles.positions);
-    vgsCompute->dispatch(particles.numParticles >> 3);
+    int numVgsWorkgroups = ((particles.numParticles >> 3) + VGS_THREADS + 1) / (VGS_THREADS); 
+    vgsCompute->dispatch(numVgsWorkgroups);
     vgsCompute->copyTransformedPositionsToCPU(particles.positions, bindVerticesCompute->getParticlesBuffer(), particles.numParticles);
 
     for (int i = 0; i < faceConstraints.size(); i++) {

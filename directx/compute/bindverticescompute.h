@@ -117,11 +117,7 @@ private:
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
         bufferDesc.MiscFlags = 0;
 
-        HRESULT hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &particlesStagingBuffer);
-        if (FAILED(hr)) {
-            MGlobal::displayError(MString() + "Failed to create particles staging buffer" + GetErrorMessage(hr).c_str());
-            return;
-        }
+        DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &particlesStagingBuffer);
 
         // Initialize verticesBuffer and its SRV
         bufferDesc.Usage = D3D11_USAGE_IMMUTABLE; // since this data is going to be set on buffer creation and never changed

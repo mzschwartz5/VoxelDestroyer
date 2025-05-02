@@ -13,7 +13,7 @@ float3 project(float3 v, float3 onto)
     return onto * (dot(v, onto) / dot(onto, onto));
 }
 
-[numthreads(1, 1, 1)]
+[numthreads(VGS_THREADS, 1, 1)]
 void main(
     uint3 globalThreadId : SV_DispatchThreadID,
     uint3 groupId : SV_GroupID,
