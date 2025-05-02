@@ -23,9 +23,7 @@
 #include "voxelizer.h"
 #include "directx/directx.h"
 #include "constants.h"
-#include "directx/compute/computeshader.h"
-#include "directx/compute/transformverticescompute.h"
-#include "directx/compute/bindverticescompute.h"
+
 
 struct PluginArgs {
 	MPoint position{ 0.0f, 0.0f, 0.0f };
@@ -72,10 +70,4 @@ private:
 	static Voxelizer voxelizer;
 	static PBD pbdSimulator;
 	static MDagPath voxelizedMeshDagPath;
-
-	// Shaders
-	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
-	static int transformVerticesNumWorkgroups;
-	static std::unique_ptr<TransformVerticesCompute> transformVerticesCompute;
-	static std::unique_ptr<BindVerticesCompute> bindVerticesCompute;
 };

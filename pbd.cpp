@@ -2,12 +2,69 @@
 #include <maya/MGlobal.h>
 #include <float.h>
 #include "utils.h"
+#include "constants.h"
 
-PBD::PBD(const Voxels& voxels, float voxelSize) {
+void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath) {
+    this->meshDagPath = meshDagPath;
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
     constructFaceToFaceConstraints(voxels);
     createParticles(voxels);
     setRadiusAndVolumeFromLength(voxelSize);
+
+    MStatus status;
+	MFnMesh voxelMeshFn(meshDagPath);
+
+	// Calculate a local rest position for each vertex in every voxel.
+	bindVerticesCompute = std::make_unique<BindVerticesCompute>(
+		static_cast<int>(voxels.size()) * 8, // 8 particles per voxel
+		voxelMeshFn.getRawPoints(&status),
+		voxelMeshFn.numVertices(&status),
+        particles.positions,
+		voxels.vertStartIdx, 
+		voxels.numVerts
+	);
+	bindVerticesCompute->dispatch(voxels.size());
+
+	MGlobal::displayInfo("Bind vertices compute shader dispatched.");
+
+	transformVerticesCompute = std::make_unique<TransformVerticesCompute>(
+		voxelMeshFn.numVertices(&status),
+		bindVerticesCompute->getParticlesSRV(), 			
+		bindVerticesCompute->getVertStartIdxSRV(), 
+		bindVerticesCompute->getNumVerticesSRV(), 
+		bindVerticesCompute->getLocalRestPositionsSRV()
+	);
+	transformVerticesNumWorkgroups = voxels.size();
+
+	MGlobal::displayInfo("Transform vertices compute shader initialized.");
+
+    vgsCompute = std::make_unique<VGSCompute>(
+        particles.numParticles,
+        particles.w.data(),
+        bindVerticesCompute->getParticlesUAV()
+    );
+
+	faceConstraintsCompute = std::make_unique<FaceConstraintsCompute>(
+		faceConstraints,
+		bindVerticesCompute->getParticlesUAV(),
+		vgsCompute->getWeightsSRV()
+	);
+
+    preVGSCompute = std::make_unique<PreVGSCompute>(
+        particles.numParticles,
+        particles.oldPositions.data(),
+        particles.velocities.data(),
+        vgsCompute->getWeightsSRV(),
+        bindVerticesCompute->getParticlesUAV()
+    );
+
+    postVGSCompute = std::make_unique<PostVGSCompute>(
+        vgsCompute->getWeightsSRV(),
+        bindVerticesCompute->getParticlesSRV(),
+        preVGSCompute->getOldPositionsSRV(),
+        preVGSCompute->getVelocitiesUAV()
+    );
+
 }
 
 void PBD::constructFaceToFaceConstraints(const Voxels& voxels) {
@@ -69,127 +126,50 @@ void PBD::createParticles(const Voxels& voxels) {
     }
 }
 
-const Particles& PBD::simulateStep()
+void PBD::simulateStep()
 {
     for (int i = 0; i < substeps; i++)
     {
         simulateSubstep();
     }
+}
 
-    return particles;
+void PBD::updateMeshVertices() {
+	MFnMesh meshFn(meshDagPath);
+	MFloatPointArray vertexArray;
+
+	// For rendering, we need to update each voxel with its new basis, which we'll use to transform all vertices owned by that voxel
+	transformVerticesCompute->dispatch(transformVerticesNumWorkgroups);
+	transformVerticesCompute->copyTransformedVertsToCPU(vertexArray, meshFn.numVertices());
+
+	meshFn.setPoints(vertexArray, MSpace::kWorld);
+	meshFn.updateSurface();
 }
 
 void PBD::simulateSubstep() {
-    // Iterate over all particles and apply gravity
-    for (int i = 0; i < particles.numParticles; ++i)
-    {
-        if (particles.w[i] == 0.0f) continue;
-        particles.velocities[i] += vec4(0.0f, -10.0f, 0.0f, 0.0f) * timeStep;
-        particles.oldPositions[i] = particles.positions[i];
-        particles.positions[i] += particles.velocities[i] * timeStep;
-    }
+    int numPreAndPostVgsComputeWorkgroups = (particles.numParticles + VGS_THREADS + 1) / (VGS_THREADS);
+    preVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);
 
-    solveGroundCollision();
-
-    for (int i = 0; i < particles.numParticles; i += 8) {
-		solveVGS(i, 3);
-	}
-
+    int numVgsWorkgroups = ((particles.numParticles >> 3) + VGS_THREADS + 1) / (VGS_THREADS); 
+    vgsCompute->dispatch(numVgsWorkgroups);
+    
+    // Because FTF is still happening on the CPU, we need to copy the positions back, do the computations, and then copy the positions back to the GPU.
+    vgsCompute->copyTransformedPositionsToCPU(particles.positions, bindVerticesCompute->getParticlesBuffer(), particles.numParticles);
     for (int i = 0; i < faceConstraints.size(); i++) {
-        for (auto& constraint : faceConstraints[i]) {
+        /*for (auto& constraint : faceConstraints[i]) {
             solveFaceConstraint(constraint, i);
-        }
+        }*/
+        faceConstraintsCompute->updateAxis(i);
+		faceConstraintsCompute->dispatch(((faceConstraints.size()) + VGS_THREADS + 1) / (VGS_THREADS));
+        vgsCompute->copyTransformedPositionsToCPU(particles.positions, bindVerticesCompute->getParticlesBuffer(), particles.numParticles);
     }
+    bindVerticesCompute->updateParticleBuffer(particles.positions);
 
-    for (int i = 0; i < particles.numParticles; ++i)
-    {
-        if (particles.w[i] == 0.0f) continue;
-        particles.velocities[i] = (particles.positions[i] - particles.oldPositions[i]) / timeStep;
-    }
-}
-
-void PBD::solveGroundCollision()
-{
-    for (int i = 0; i < particles.numParticles; ++i)
-    {
-        if (particles.w[i] == 0.0f) continue;
-
-        if (particles.positions[i].y < 0.0f)
-        {
-            particles.positions[i] = particles.oldPositions[i];
-            particles.positions[i].y = 0.0f;
-        }
-    }
+    postVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);
 }
 
 vec4 PBD::project(vec4 x, vec4 y) {
     return (glm::dot(y, x) / glm::dot(y, y)) * y;
-}
-
-void PBD::solveVGS(int start_idx, unsigned int iter_count) {
-    for (unsigned int i = 0; i < iter_count; i++) {
-        vec4& p0 = particles.positions[start_idx];
-        vec4& p1 = particles.positions[start_idx + 1];
-		vec4& p2 = particles.positions[start_idx + 2];
-		vec4& p3 = particles.positions[start_idx + 3];
-		vec4& p4 = particles.positions[start_idx + 4];
-		vec4& p5 = particles.positions[start_idx + 5];
-		vec4& p6 = particles.positions[start_idx + 6];
-		vec4& p7 = particles.positions[start_idx + 7];
-
-		vec4 centroid = p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7;
-		centroid *= 0.125f;
-
-		vec4 v0 = ((p1 - p0) + (p3 - p2) + (p5 - p4) + (p7 - p6)) * 0.25f;
-        vec4 v1 = ((p2 - p0) + (p3 - p1) + (p6 - p4) + (p7 - p5)) * 0.25f;
-        vec4 v2 = ((p4 - p0) + (p5 - p1) + (p6 - p2) + (p7 - p3)) * 0.25f;
-        
-        vec4 u0 = v0 - RELAXATION * (project(v0, v1) + project(v0, v2));
-        vec4 u1 = v1 - RELAXATION * (project(v1, v2) + project(v1, v0));
-        vec4 u2 = v2 - RELAXATION * (project(v2, v0) + project(v2, v1));
-
-        u0 = glm::normalize(u0) * ((1.f - BETA) * PARTICLE_RADIUS + (BETA * glm::length(v0)  * 0.5f));
-		u1 = glm::normalize(u1) * ((1.f - BETA) * PARTICLE_RADIUS + (BETA * glm::length(v1) * 0.5f));
-		u2 = glm::normalize(u2) * ((1.f - BETA) * PARTICLE_RADIUS + (BETA * glm::length(v2) * 0.5f));
-		
-        float volume = glm::dot(glm::cross(vec3(u0), vec3(u1)), vec3(u2));
-        float mult = 0.5f * glm::pow((VOXEL_REST_VOLUME / volume), 1.0f / 3.0f);
-
-        u0 *= mult;
-        u1 *= mult;
-        u2 *= mult;
-
-		if (particles.w[start_idx] != 0.0f) {
-            p0 = centroid - u0 - u1 - u2;
-		}
-
-        if (particles.w[start_idx + 1] != 0.0f) {
-            p1 = centroid + u0 - u1 - u2;
-        }
-
-		if (particles.w[start_idx + 2] != 0.0f) {
-			p2 = centroid - u0 + u1 - u2;
-		}
-
-        if (particles.w[start_idx + 3] != 0.0f) {
-            p3 = centroid + u0 + u1 - u2;
-        }
-
-		if (particles.w[start_idx + 4] != 0.0f) {
-			p4 = centroid - u0 - u1 + u2;
-		}
-        if (particles.w[start_idx + 5] != 0.0f) {
-            p5 = centroid + u0 - u1 + u2;
-        }
-
-		if (particles.w[start_idx + 6] != 0.0f) {
-			p6 = centroid - u0 + u1 + u2;
-		}
-
-        if (particles.w[start_idx + 7] != 0.0f) {
-            p7 = centroid + u0 + u1 + u2;
-        }
-    }
 }
 
 void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {

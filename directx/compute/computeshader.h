@@ -51,9 +51,11 @@ protected:
         // Replace the shader macros with the actual values
         const std::string bindVerticesThreadStr = std::to_string(BIND_VERTICES_THREADS);
         const std::string transformVerticesThreadsStr = std::to_string(TRANSFORM_VERTICES_THREADS);
+        const std::string vgsThreadsStr = std::to_string(VGS_THREADS);
         D3D_SHADER_MACRO SHADER_MACROS[] = {
             { "BIND_VERTICES_THREADS", bindVerticesThreadStr.c_str() },
             { "TRANSFORM_VERTICES_THREADS", transformVerticesThreadsStr.c_str() },
+            { "VGS_THREADS", vgsThreadsStr.c_str() },
             { NULL, NULL } // Terminate the array
         };
 

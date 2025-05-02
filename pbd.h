@@ -7,6 +7,14 @@
 #include <vector>
 #include <array>
 #include <numeric>
+#include <memory>
+#include "directx/compute/computeshader.h"
+#include "directx/compute/transformverticescompute.h"
+#include "directx/compute/bindverticescompute.h"
+#include "directx/compute/vgscompute.h"
+#include "directx/compute/prevgscompute.h"
+#include "directx/compute/postvgscompute.h"
+#include "directx/compute/faceconstraintscompute.h"
 
 using glm::vec3;
 using glm::vec4;
@@ -20,38 +28,45 @@ struct Particles
     int numParticles{ 0 };
 };
 
-struct FaceConstraint {
-    int voxelOneIdx;
-    int voxelTwoIdx;
-    float tensionLimit;
-	float compressionLimit;
-};
+//struct FaceConstraint {
+//    int voxelOneIdx;
+//    int voxelTwoIdx;
+//    float tensionLimit;
+//	float compressionLimit;
+//};
 
 class PBD
 {
 public:
     PBD() = default;
-    PBD(const Voxels& voxels, float voxelSize);
     ~PBD() = default;
-    const Particles& simulateStep();
-    void simulateSubstep();
-
+    void initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath);
+    void simulateStep();
+    void updateMeshVertices();
+    
 	Particles getParticles() const { return particles; }
-
+    
 private:
     Particles particles;
     std::array<std::vector<FaceConstraint>, 3> faceConstraints; //0 = x, 1 = y, 2 = z
     int substeps = 10;
     float timeStep;
+    MDagPath meshDagPath;
+    // Shaders
+	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
+	int transformVerticesNumWorkgroups;
+	std::unique_ptr<TransformVerticesCompute> transformVerticesCompute;
+	std::unique_ptr<BindVerticesCompute> bindVerticesCompute;
+    std::unique_ptr<VGSCompute> vgsCompute;
+	std::unique_ptr<FaceConstraintsCompute> faceConstraintsCompute;
+    std::unique_ptr<PreVGSCompute> preVGSCompute;
+    std::unique_ptr<PostVGSCompute> postVGSCompute;
+    
+    void simulateSubstep();
 
     void constructFaceToFaceConstraints(const Voxels& voxels);
 
     void createParticles(const Voxels& voxels);
-
-    // Constraint solvers
-    void solveGroundCollision();
-
-    void solveVGS(int start_idx, unsigned int iter_count);
 
     void solveFaceConstraint(FaceConstraint& faceConstraint, int axis);
 

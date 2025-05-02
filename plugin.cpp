@@ -9,14 +9,9 @@
 #define EXPORT __declspec(dllexport)
 
 Voxelizer plugin::voxelizer = Voxelizer();
-PBD plugin::pbdSimulator = PBD();
+PBD plugin::pbdSimulator{};
 MCallbackId plugin::callbackId = 0;
 MDagPath plugin::voxelizedMeshDagPath = MDagPath();
-
-// Compute shaders
-int plugin::transformVerticesNumWorkgroups = 0;
-std::unique_ptr<TransformVerticesCompute> plugin::transformVerticesCompute = nullptr;
-std::unique_ptr<BindVerticesCompute> plugin::bindVerticesCompute = nullptr;
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -25,22 +20,10 @@ void* plugin::creator()
 }
 
 void plugin::simulate(void* clientData) {
-	const Particles& particles = plugin::pbdSimulator.simulateStep();
-
-	MFnMesh meshFn(plugin::voxelizedMeshDagPath);
-	MFloatPointArray vertexArray;
-
-	// For rendering, we need to update each voxel with its new basis, which we'll use to transform all vertices owned by that voxel
-	bindVerticesCompute->updateParticleBuffer(particles.positions); // (owns the particles buffer)
-	transformVerticesCompute->dispatch(transformVerticesNumWorkgroups);
-	transformVerticesCompute->copyTransformedVertsToCPU(vertexArray, meshFn.numVertices());
-
-	meshFn.setPoints(vertexArray, MSpace::kWorld);
-	meshFn.updateSurface();
-
+	plugin::pbdSimulator.simulateStep();
+	plugin::pbdSimulator.updateMeshVertices();
 	MGlobal::executeCommand("refresh");
 }
-
 
 MSyntax plugin::syntax()
 {
@@ -85,44 +68,14 @@ MStatus plugin::doIt(const MArgList& argList)
 		plugin::voxelizedMeshDagPath,
 		status
 	);
-	MFnMesh voxelMeshFn(plugin::voxelizedMeshDagPath);
 
 	plugin::createVoxelSimulationNode();
 	
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
 
 	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
-	plugin::pbdSimulator = PBD(voxels, voxelSize);
+	plugin::pbdSimulator.initialize(voxels, voxelSize, plugin::voxelizedMeshDagPath);
 	MGlobal::displayInfo("PBD particles initialized.");
-
-	// TODO: handle if doIt is called repeatedly... this will just create new buffers but not free old ones?
-	// Also need to make sure that this is called before updating the buffers in the callback...
-	// Calculate a local rest position for each vertex in every voxel.
-	plugin::bindVerticesCompute = std::make_unique<BindVerticesCompute>(
-		static_cast<int>(voxels.size()) * 8, // 8 particles per voxel
-		voxelMeshFn.getRawPoints(&status),
-		voxelMeshFn.numVertices(&status),
-		voxels.vertStartIdx, 
-		voxels.numVerts
-	);
-
-	bindVerticesCompute->updateParticleBuffer(plugin::pbdSimulator.getParticles().positions);
-	bindVerticesCompute->dispatch(voxels.size());
-
-	MGlobal::displayInfo("Bind vertices compute shader dispatched.");
-
-	plugin::transformVerticesCompute = std::make_unique<TransformVerticesCompute>(
-		voxelMeshFn.numVertices(&status),
-		bindVerticesCompute->getParticlesSRV(), 			
-		bindVerticesCompute->getVertStartIdxSRV(), 
-		bindVerticesCompute->getNumVerticesSRV(), 
-		bindVerticesCompute->getLocalRestPositionsSRV()
-	);
-	plugin::transformVerticesNumWorkgroups = voxels.size();
-	
-	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
-
-	MGlobal::displayInfo("Transform vertices compute shader initialized.");
 
 	return status;
 }

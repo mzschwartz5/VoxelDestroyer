@@ -62,6 +62,18 @@
     <ClInclude Include="directx\compute\bindverticescompute.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="directx\compute\vgscompute.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="directx\compute\prevgscompute.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="directx\compute\postvgscompute.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="directx\compute\faceconstraintscompute.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resources.rc">
@@ -69,6 +81,8 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="AEVoxelSimulationNodeTemplate.py" />
     <None Include="AEVoxelSimulationNodeTemplate.mel" />
+    <None Include="VoxelizerMenu.mel" />
   </ItemGroup>
 </Project>

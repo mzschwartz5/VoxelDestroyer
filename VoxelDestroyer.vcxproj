@@ -131,6 +131,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="directx\compute\faceconstraintscompute.h" />
     <ClInclude Include="plugin.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="pbd.h" />
@@ -138,10 +139,13 @@
     <ClInclude Include="utils.h" />
     <ClInclude Include="voxelizer.h" />
     <ClInclude Include="voxelsimulationode.h" />
+    <ClInclude Include="constants.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\transformVerticesCompute.h" />
     <ClInclude Include="directx\compute\bindverticescompute.h" />
-    <ClInclude Include="constants.h" />
+    <ClInclude Include="directx\compute\vgscompute.h" />
+    <ClInclude Include="directx\compute\prevgscompute.h" />
+    <ClInclude Include="directx\compute\postvgscompute.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="plugin.cpp" />
@@ -153,7 +157,9 @@
     <ResourceCompile Include="resources.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="AEVoxelSimulationNodeTemplate.mel" />
     <None Include="AEVoxelSimulationNodeTemplate.py" />
+    <None Include="VoxelizerMenu.mel" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
