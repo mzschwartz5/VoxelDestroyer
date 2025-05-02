@@ -9,11 +9,12 @@ public:
         int numParticles,
         const float* vertices, 
         int numVerts,
+        const std::vector<glm::vec4>& particles,
         const std::vector<uint>& vertStartIds,
         const std::vector<uint>& numVertices
     ) : ComputeShader(IDR_SHADER2)
     {
-        initializeBuffers(numParticles, vertices, numVerts, vertStartIds, numVertices);
+        initializeBuffers(numParticles, particles, vertices, numVerts, vertStartIds, numVertices);
     };
 
     void updateParticleBuffer(const std::vector<glm::vec4>& particles) {
@@ -80,7 +81,7 @@ private:
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
     };
 
-    void initializeBuffers(int numParticles, const float* vertices, int numVerts, const std::vector<uint>& vertStartIds, const std::vector<uint>& numVertices) {
+    void initializeBuffers(int numParticles, const std::vector<glm::vec4>& particles, const float* vertices, int numVerts, const std::vector<uint>& vertStartIds, const std::vector<uint>& numVertices) {
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SUBRESOURCE_DATA initData = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -94,7 +95,8 @@ private:
         bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
         bufferDesc.StructureByteStride = sizeof(glm::vec4); // Size of each element in the buffer
     
-        DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &particlesBuffer);
+        initData.pSysMem = particles.data();
+        DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &particlesBuffer);
     
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;

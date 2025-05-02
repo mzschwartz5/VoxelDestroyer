@@ -19,11 +19,10 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 		static_cast<int>(voxels.size()) * 8, // 8 particles per voxel
 		voxelMeshFn.getRawPoints(&status),
 		voxelMeshFn.numVertices(&status),
+        particles.positions,
 		voxels.vertStartIdx, 
 		voxels.numVerts
 	);
-
-	bindVerticesCompute->updateParticleBuffer(particles.positions);
 	bindVerticesCompute->dispatch(voxels.size());
 
 	MGlobal::displayInfo("Bind vertices compute shader dispatched.");
@@ -43,6 +42,21 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         particles.numParticles,
         particles.w.data(),
         bindVerticesCompute->getParticlesUAV()
+    );
+
+    preVGSCompute = std::make_unique<PreVGSCompute>(
+        particles.numParticles,
+        particles.oldPositions.data(),
+        particles.velocities.data(),
+        vgsCompute->getWeightsSRV(),
+        bindVerticesCompute->getParticlesUAV()
+    );
+
+    postVGSCompute = std::make_unique<PostVGSCompute>(
+        vgsCompute->getWeightsSRV(),
+        bindVerticesCompute->getParticlesSRV(),
+        preVGSCompute->getOldPositionsSRV(),
+        preVGSCompute->getVelocitiesUAV()
     );
 
 }
@@ -119,7 +133,6 @@ void PBD::updateMeshVertices() {
 	MFloatPointArray vertexArray;
 
 	// For rendering, we need to update each voxel with its new basis, which we'll use to transform all vertices owned by that voxel
-	bindVerticesCompute->updateParticleBuffer(particles.positions); // (owns the particles buffer)
 	transformVerticesCompute->dispatch(transformVerticesNumWorkgroups);
 	transformVerticesCompute->copyTransformedVertsToCPU(vertexArray, meshFn.numVertices());
 
@@ -128,47 +141,22 @@ void PBD::updateMeshVertices() {
 }
 
 void PBD::simulateSubstep() {
-    // Iterate over all particles and apply gravity
-    for (int i = 0; i < particles.numParticles; ++i)
-    {
-        if (particles.w[i] == 0.0f) continue;
-        particles.velocities[i] += vec4(0.0f, -10.0f, 0.0f, 0.0f) * timeStep;
-        particles.oldPositions[i] = particles.positions[i];
-        particles.positions[i] += particles.velocities[i] * timeStep;
-    }
+    int numPreAndPostVgsComputeWorkgroups = (particles.numParticles + VGS_THREADS + 1) / (VGS_THREADS);
+    preVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);
 
-    solveGroundCollision();
-
-    bindVerticesCompute->updateParticleBuffer(particles.positions);
     int numVgsWorkgroups = ((particles.numParticles >> 3) + VGS_THREADS + 1) / (VGS_THREADS); 
     vgsCompute->dispatch(numVgsWorkgroups);
+    
+    // Because FTF is still happening on the CPU, we need to copy the positions back, do the computations, and then copy the positions back to the GPU.
     vgsCompute->copyTransformedPositionsToCPU(particles.positions, bindVerticesCompute->getParticlesBuffer(), particles.numParticles);
-
     for (int i = 0; i < faceConstraints.size(); i++) {
         for (auto& constraint : faceConstraints[i]) {
             solveFaceConstraint(constraint, i);
         }
     }
+    bindVerticesCompute->updateParticleBuffer(particles.positions);
 
-    for (int i = 0; i < particles.numParticles; ++i)
-    {
-        if (particles.w[i] == 0.0f) continue;
-        particles.velocities[i] = (particles.positions[i] - particles.oldPositions[i]) / timeStep;
-    }
-}
-
-void PBD::solveGroundCollision()
-{
-    for (int i = 0; i < particles.numParticles; ++i)
-    {
-        if (particles.w[i] == 0.0f) continue;
-
-        if (particles.positions[i].y < 0.0f)
-        {
-            particles.positions[i] = particles.oldPositions[i];
-            particles.positions[i].y = 0.0f;
-        }
-    }
+    postVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);
 }
 
 vec4 PBD::project(vec4 x, vec4 y) {
