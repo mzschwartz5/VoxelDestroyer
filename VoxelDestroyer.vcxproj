@@ -131,6 +131,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="directx\compute\faceconstraintscompute.h" />
     <ClInclude Include="plugin.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="pbd.h" />
@@ -156,7 +157,9 @@
     <ResourceCompile Include="resources.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="AEVoxelSimulationNodeTemplate.mel" />
     <None Include="AEVoxelSimulationNodeTemplate.py" />
+    <None Include="VoxelizerMenu.mel" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

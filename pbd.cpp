@@ -44,6 +44,12 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         bindVerticesCompute->getParticlesUAV()
     );
 
+	faceConstraintsCompute = std::make_unique<FaceConstraintsCompute>(
+		faceConstraints,
+		bindVerticesCompute->getParticlesUAV(),
+		vgsCompute->getWeightsSRV()
+	);
+
     preVGSCompute = std::make_unique<PreVGSCompute>(
         particles.numParticles,
         particles.oldPositions.data(),
@@ -150,9 +156,12 @@ void PBD::simulateSubstep() {
     // Because FTF is still happening on the CPU, we need to copy the positions back, do the computations, and then copy the positions back to the GPU.
     vgsCompute->copyTransformedPositionsToCPU(particles.positions, bindVerticesCompute->getParticlesBuffer(), particles.numParticles);
     for (int i = 0; i < faceConstraints.size(); i++) {
-        for (auto& constraint : faceConstraints[i]) {
+        /*for (auto& constraint : faceConstraints[i]) {
             solveFaceConstraint(constraint, i);
-        }
+        }*/
+        faceConstraintsCompute->updateAxis(i);
+		faceConstraintsCompute->dispatch(((faceConstraints.size()) + VGS_THREADS + 1) / (VGS_THREADS));
+        vgsCompute->copyTransformedPositionsToCPU(particles.positions, bindVerticesCompute->getParticlesBuffer(), particles.numParticles);
     }
     bindVerticesCompute->updateParticleBuffer(particles.positions);
 

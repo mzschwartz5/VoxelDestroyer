@@ -14,6 +14,7 @@
 #include "directx/compute/vgscompute.h"
 #include "directx/compute/prevgscompute.h"
 #include "directx/compute/postvgscompute.h"
+#include "directx/compute/faceconstraintscompute.h"
 
 using glm::vec3;
 using glm::vec4;
@@ -27,12 +28,12 @@ struct Particles
     int numParticles{ 0 };
 };
 
-struct FaceConstraint {
-    int voxelOneIdx;
-    int voxelTwoIdx;
-    float tensionLimit;
-	float compressionLimit;
-};
+//struct FaceConstraint {
+//    int voxelOneIdx;
+//    int voxelTwoIdx;
+//    float tensionLimit;
+//	float compressionLimit;
+//};
 
 class PBD
 {
@@ -57,6 +58,7 @@ private:
 	std::unique_ptr<TransformVerticesCompute> transformVerticesCompute;
 	std::unique_ptr<BindVerticesCompute> bindVerticesCompute;
     std::unique_ptr<VGSCompute> vgsCompute;
+	std::unique_ptr<FaceConstraintsCompute> faceConstraintsCompute;
     std::unique_ptr<PreVGSCompute> preVGSCompute;
     std::unique_ptr<PostVGSCompute> postVGSCompute;
     
@@ -65,11 +67,6 @@ private:
     void constructFaceToFaceConstraints(const Voxels& voxels);
 
     void createParticles(const Voxels& voxels);
-
-    // Constraint solvers
-    void solveGroundCollision();
-
-    void solveVGS(int start_idx, unsigned int iter_count);
 
     void solveFaceConstraint(FaceConstraint& faceConstraint, int axis);
 
