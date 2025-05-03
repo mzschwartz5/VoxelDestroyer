@@ -38,6 +38,8 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 
 	MGlobal::displayInfo("Transform vertices compute shader initialized.");
 
+    setSimValuesFromUI(meshDagPath);
+
     voxelSimInfo[0] = glm::vec4(RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME);
     voxelSimInfo[1] = glm::vec4(3.0, 0, 0, 0); //iter count, axis, padding, padding
 
@@ -165,7 +167,7 @@ void PBD::simulateSubstep() {
             solveFaceConstraint(constraint, i);
         }*/
         updateAxis(i);
-		faceConstraintsCompute->dispatch(((faceConstraints.size()) + VGS_THREADS + 1) / (VGS_THREADS));
+		faceConstraintsCompute->dispatch(int(((faceConstraints.size()) + VGS_THREADS + 1) / (VGS_THREADS)));
         vgsCompute->copyTransformedPositionsToCPU(particles.positions, bindVerticesCompute->getParticlesBuffer(), particles.numParticles);
     }
     bindVerticesCompute->updateParticleBuffer(particles.positions);
@@ -425,5 +427,61 @@ void PBD::solveFaceConstraint(FaceConstraint& faceConstraint, int axis) {
                 }
             }
         }
+    }
+}
+
+void PBD::setSimValuesFromUI(const MDagPath& dagPath) {
+    MStatus status;
+
+    MFnDagNode dagNode(dagPath, &status);
+
+    if (status == MS::kSuccess && dagNode.hasAttribute("voxelSimulationNode")) {
+        MGlobal::displayInfo("Found mesh with voxelSimulationNode: " + dagNode.name());
+
+        // Get the connected VoxelSimulationNode
+        MPlug voxelSimNodePlug = dagNode.findPlug("voxelSimulationNode", false, &status);
+        if (status != MS::kSuccess) {
+            MGlobal::displayError("Failed to find voxelSimulationNode plug.");
+            return;
+        }
+
+        MPlugArray connectedPlugs;
+        voxelSimNodePlug.connectedTo(connectedPlugs, true, false, &status);
+        if (status != MS::kSuccess || connectedPlugs.length() == 0) {
+            MGlobal::displayError("No VoxelSimulationNode connected to the mesh.");
+            return;
+        }
+
+        MObject voxelSimNodeObj = connectedPlugs[0].node();
+        MFnDependencyNode voxelSimNodeFn(voxelSimNodeObj, &status);
+        if (status != MS::kSuccess) {
+            MGlobal::displayError("Failed to access the VoxelSimulationNode.");
+            return;
+        }
+
+        // Retrieve the relaxation and edgeUniformity attributes
+        MPlug relaxationPlug = voxelSimNodeFn.findPlug("relaxation", false, &status);
+        if (status != MS::kSuccess) {
+            MGlobal::displayError("Failed to find relaxation attribute.");
+            return;
+        }
+
+        MPlug edgeUniformityPlug = voxelSimNodeFn.findPlug("edgeUniformity", false, &status);
+        if (status != MS::kSuccess) {
+            MGlobal::displayError("Failed to find edgeUniformity attribute.");
+            return;
+        }
+
+        float relaxationValue;
+        float edgeUniformityValue;
+
+        relaxationPlug.getValue(relaxationValue);
+        edgeUniformityPlug.getValue(edgeUniformityValue);
+
+        // Display the values
+        RELAXATION = relaxationValue;
+        MGlobal::displayInfo("Set relaxation to: " + MString() + relaxationValue);
+		BETA = edgeUniformityValue;
+        MGlobal::displayInfo("Set edge uniformity to: " + MString() + edgeUniformityValue);
     }
 }

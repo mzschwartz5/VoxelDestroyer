@@ -16,6 +16,17 @@
 #include "directx/compute/postvgscompute.h"
 #include "directx/compute/faceconstraintscompute.h"
 
+#include <maya/MGlobal.h>
+#include <maya/MSelectionList.h>
+#include <maya/MDagPath.h>
+#include <maya/MFnDagNode.h>
+#include <maya/MFnDependencyNode.h>
+#include <maya/MPlug.h>
+#include <maya/MStatus.h>
+#include <maya/MPlugArray.h>
+#include <maya/MItDag.h>
+#include <maya/MFnMesh.h>
+
 using glm::vec3;
 using glm::vec4;
 
@@ -65,6 +76,8 @@ private:
 
     void solveFaceConstraint(FaceConstraint& faceConstraint, int axis);
 
+    void setSimValuesFromUI(const MDagPath& dagPath);
+
     vec4 project(vec4 x, vec4 y);
 
     float BETA{ 0.99f };
@@ -80,7 +93,7 @@ private:
     void addFaceConstraint(FaceConstraint constraint, int axis) { faceConstraints[axis].push_back(constraint); };
 
     void updateAxis(int axis) {
-        voxelSimInfo[1][1] = axis;
+        voxelSimInfo[1][1] = float(axis);
         faceConstraintsCompute->updateVoxelSimInfo(voxelSimInfo);
     }
 };
