@@ -38,16 +38,21 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 
 	MGlobal::displayInfo("Transform vertices compute shader initialized.");
 
+    voxelSimInfo[0] = glm::vec4(RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME);
+    voxelSimInfo[1] = glm::vec4(3.0, 0, 0, 0); //iter count, axis, padding, padding
+
     vgsCompute = std::make_unique<VGSCompute>(
         particles.numParticles,
         particles.w.data(),
+        voxelSimInfo,
         bindVerticesCompute->getParticlesUAV()
     );
 
 	faceConstraintsCompute = std::make_unique<FaceConstraintsCompute>(
 		faceConstraints,
 		bindVerticesCompute->getParticlesUAV(),
-		vgsCompute->getWeightsSRV()
+		vgsCompute->getWeightsSRV(),
+        vgsCompute->getVoxelSimInfoBuffer()
 	);
 
     preVGSCompute = std::make_unique<PreVGSCompute>(
@@ -159,7 +164,7 @@ void PBD::simulateSubstep() {
         /*for (auto& constraint : faceConstraints[i]) {
             solveFaceConstraint(constraint, i);
         }*/
-        faceConstraintsCompute->updateAxis(i);
+        updateAxis(i);
 		faceConstraintsCompute->dispatch(((faceConstraints.size()) + VGS_THREADS + 1) / (VGS_THREADS));
         vgsCompute->copyTransformedPositionsToCPU(particles.positions, bindVerticesCompute->getParticlesBuffer(), particles.numParticles);
     }

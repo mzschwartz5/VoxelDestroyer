@@ -9,10 +9,11 @@ public:
     VGSCompute(
         int numPositions,
         const float* weights,
+        std::array<glm::vec4, 2> voxelSimInfo,
 		const ComPtr<ID3D11UnorderedAccessView>& positionsUAV
 	) : ComputeShader(IDR_SHADER3), positionsUAV(positionsUAV)
     {
-        initializeBuffers(numPositions, weights);
+        initializeBuffers(numPositions, weights, voxelSimInfo);
     };
 
     void copyTransformedPositionsToCPU(std::vector<glm::vec4>& updatedPositions, const ComPtr<ID3D11Buffer>& positionsBuffer, int numPositions) {
@@ -39,6 +40,7 @@ public:
     };
 
     const ComPtr<ID3D11ShaderResourceView>& getWeightsSRV() const { return weightsSRV; }
+    const ComPtr<ID3D11Buffer>& getVoxelSimInfoBuffer() const { return voxelSimInfoBuffer; }
 
 private:
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
@@ -47,6 +49,8 @@ private:
     ComPtr<ID3D11ShaderResourceView> weightsSRV;
 
     ComPtr<ID3D11Buffer> stagingPositionsBuffer;
+
+    ComPtr<ID3D11Buffer> voxelSimInfoBuffer;
     
     void bind() override
     {
@@ -57,6 +61,9 @@ private:
 
 		ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get() };
 		DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
+
+        ID3D11Buffer* cbvs[] = { voxelSimInfoBuffer.Get() };
+        DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
     void unbind() override
@@ -68,9 +75,12 @@ private:
 
         ID3D11UnorderedAccessView* uavs[] = { nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
+
+        ID3D11Buffer* cbvs[] = { nullptr };
+        DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
-    void initializeBuffers(int numParticles, const float* weights) {
+    void initializeBuffers(int numParticles, const float* weights, std::array<glm::vec4, 2> voxelSimInfo) {
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SUBRESOURCE_DATA initData = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -102,6 +112,18 @@ private:
         bufferDesc.StructureByteStride = sizeof(float) * 4; // Vec4 for positions
 
         DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &stagingPositionsBuffer);
+
+        //Initialize constant buffer
+        bufferDesc.Usage = D3D11_USAGE_DYNAMIC; // Dynamic for CPU updates
+        bufferDesc.ByteWidth = sizeof(std::array<glm::vec4, 2>);  // Size of the constant buffer
+        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; // Bind as a constant buffer
+        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // Allow CPU writes
+        bufferDesc.MiscFlags = 0;
+        initData.pSysMem = voxelSimInfo.data();
+        HRESULT hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &voxelSimInfoBuffer);
+        if (FAILED(hr)) {
+            MGlobal::displayError("Failed to create constant buffer.");
+        }
     }
 
     void tearDown() override

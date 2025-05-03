@@ -28,13 +28,6 @@ struct Particles
     int numParticles{ 0 };
 };
 
-//struct FaceConstraint {
-//    int voxelOneIdx;
-//    int voxelTwoIdx;
-//    float tensionLimit;
-//	float compressionLimit;
-//};
-
 class PBD
 {
 public:
@@ -52,6 +45,8 @@ private:
     int substeps = 10;
     float timeStep;
     MDagPath meshDagPath;
+    std::array<glm::vec4, 2> voxelSimInfo;
+
     // Shaders
 	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
 	int transformVerticesNumWorkgroups;
@@ -83,4 +78,9 @@ private:
     }
 
     void addFaceConstraint(FaceConstraint constraint, int axis) { faceConstraints[axis].push_back(constraint); };
+
+    void updateAxis(int axis) {
+        voxelSimInfo[1][1] = axis;
+        faceConstraintsCompute->updateVoxelSimInfo(voxelSimInfo);
+    }
 };

@@ -1,12 +1,18 @@
-// Constants
-#define RELAXATION 0.25f
-#define BETA 0.8f
-#define PARTICLE_RADIUS 0.125f
-#define VOXEL_REST_VOLUME 0.125f
-#define ITER_COUNT 3
 
 RWStructuredBuffer<float4> positions : register(u0);
 StructuredBuffer<float> weights : register(t0);
+
+cbuffer VoxelSimBuffer : register(b0)
+{
+    float RELAXATION;
+    float BETA;
+    float PARTICLE_RADIUS;
+    float VOXEL_REST_VOLUME;
+    float ITER_COUNT;
+    float AXIS;
+    float PADDING_1;
+    float PADDING_2;
+};
 
 float3 project(float3 v, float3 onto)
 {
