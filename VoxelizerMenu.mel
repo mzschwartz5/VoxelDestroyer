@@ -3,7 +3,8 @@ global proc VoxelizerMenu() {
         deleteUI VoxelizerMenuWindow;
     }
 
-    string $voxelGridDisplayName = createVoxelGridDisplay();
+    float $bbox[] = getBoundingBoxCenterAndExtentOfSelectedObj();
+    string $voxelGridDisplayName = createVoxelGridDisplay($bbox[0], $bbox[1], $bbox[2], $bbox[3]);
 
     window -title "Voxelizer Menu" VoxelizerMenuWindow;
     formLayout VoxelizerMenuForm;
@@ -15,13 +16,13 @@ global proc VoxelizerMenu() {
     string $spacer = `separator -style "none"`;
 
     // Position controls
-    string $positionField = `floatFieldGrp -numberOfFields 3 -label "Position:" -value1 0 -value2 0 -value3 0
+    string $positionField = `floatFieldGrp -numberOfFields 3 -label "Position:" -value1 $bbox[0] -value2 $bbox[1] -value3 $bbox[2]
         -cc ("VoxelizerMenu_updatePosition(\"" + $voxelGridDisplayName + "\", #1, #2, #3)") 
         -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50
         - precision 2`;
 
     // Scale controls
-    string $scaleField = `floatFieldGrp -numberOfFields 1 -label "Scale:" -value1 1
+    string $scaleField = `floatFieldGrp -numberOfFields 1 -label "Scale:" -value1 $bbox[3]
         -cc ("VoxelizerMenu_updateScale(\"" + $voxelGridDisplayName + "\", #1)") 
         -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50
         - precision 2`;
@@ -84,11 +85,43 @@ global proc VoxelizerMenu_run(string $cubeName, float $posX, float $posY, float 
     }
 }
 
-global proc string createVoxelGridDisplay() {
+global proc float[] getBoundingBoxCenterAndExtentOfSelectedObj() {
+    float $result[] = { 0, 0, 0, 1 };
+    
+    string $selection[] = `ls -selection`;
+    if (size($selection) > 0) {
+        // The bounding box of an object is not axis aligned if the object is rotated.
+        // To get the correct bounding box, we need to unrotate the object first, then restore it after.
+        float $originalRotation[] = `xform -q -ws -rotation $selection[0]`;
+        xform -ws -rotation 0 0 0 $selection[0];
+        float $bbox[] = `xform -q -ws -bb $selection[0]`;
+        xform -ws -rotation $originalRotation[0] $originalRotation[1] $originalRotation[2] $selection[0];
+
+        float $bboxMin[] = { $bbox[0], $bbox[1], $bbox[2] };
+        float $bboxMax[] = { $bbox[3], $bbox[4], $bbox[5] };
+
+        // Calculate the center of the bounding box
+        $result[0] = ($bboxMin[0] + $bboxMax[0]) / 2;
+        $result[1] = ($bboxMin[1] + $bboxMax[1]) / 2;
+        $result[2] = ($bboxMin[2] + $bboxMax[2]) / 2;
+
+        // Calculate the extents of the bounding box
+        float $extentX = abs($bboxMax[0] - $bboxMin[0]);
+        float $extentY = abs($bboxMax[1] - $bboxMin[1]);
+        float $extentZ = abs($bboxMax[2] - $bboxMin[2]);
+
+        $result[3] = Voxelizer_max(Voxelizer_max($extentX, $extentY), $extentZ);
+    }
+
+    return $result;
+}
+
+global proc string createVoxelGridDisplay(float $x, float $y, float $z, float $maxExtent) {
     // Create a polyCube and store its name
     string $voxelGridDisplay[] = `polyCube -n "VoxelGridDisplay" -w 1 -h 1 -d 1 -ch 1 -sx 2 -sy 2 -sz 2`;
     string $voxelGridDisplayName = $voxelGridDisplay[0];
-
+    scale $maxExtent $maxExtent $maxExtent $voxelGridDisplayName;
+    move $x $y $z $voxelGridDisplayName;
 
     // Hide the cube in the outliner
     setAttr ($voxelGridDisplayName + ".hiddenInOutliner") true;
@@ -229,4 +262,8 @@ global proc VoxelizerMenu_removeFromShelf() {
             }
         }
     }
+}
+
+global proc float Voxelizer_max(float $a, float $b) {
+    return ($a > $b) ? $a : $b;
 }
