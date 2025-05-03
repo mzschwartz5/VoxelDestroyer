@@ -17,14 +17,6 @@ public:
         initializeBuffers(numParticles, particles, vertices, numVerts, vertStartIds, numVertices);
     };
 
-    void updateParticleBuffer(const std::vector<glm::vec4>& particles) {
-        D3D11_MAPPED_SUBRESOURCE mappedResource;
-        DirectX::getContext()->Map(particlesStagingBuffer.Get(), 0, D3D11_MAP_WRITE, 0, &mappedResource);
-        memcpy(mappedResource.pData, particles.data(), particles.size() * sizeof(glm::vec4));
-        DirectX::getContext()->Unmap(particlesStagingBuffer.Get(), 0);
-        DirectX::getContext()->CopyResource(particlesBuffer.Get(), particlesStagingBuffer.Get());
-    };
-
     void dispatch(int numWorkgroups) override
     {
         bind();
@@ -41,11 +33,9 @@ public:
     const ComPtr<ID3D11ShaderResourceView>& getNumVerticesSRV() const { return numVerticesSRV; };
     const ComPtr<ID3D11ShaderResourceView>& getLocalRestPositionsSRV() const { return localRestPositionsSRV; };
     const ComPtr<ID3D11UnorderedAccessView>& getParticlesUAV() const { return particlesUAV; };
-    const ComPtr<ID3D11Buffer>& getParticlesBuffer() const { return particlesBuffer; };
 
 private:
     ComPtr<ID3D11Buffer> particlesBuffer; 
-    ComPtr<ID3D11Buffer> particlesStagingBuffer;
     ComPtr<ID3D11Buffer> verticesBuffer;
     ComPtr<ID3D11Buffer> vertStartIdxBuffer;       // for each voxel (workgroup), the start index of the vertices in the vertex buffer
     ComPtr<ID3D11Buffer> numVerticesBuffer;        // for each voxel (workgroup), how many vertices are in it
@@ -111,15 +101,6 @@ private:
         uavDesc.Buffer.NumElements = numParticles;
 
         DirectX::getDevice()->CreateUnorderedAccessView(particlesBuffer.Get(), &uavDesc, &particlesUAV);
-
-        // Create the particles staging buffer
-        bufferDesc.Usage = D3D11_USAGE_STAGING;
-        bufferDesc.ByteWidth = numParticles * sizeof(glm::vec4);
-        bufferDesc.BindFlags = 0;
-        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        bufferDesc.MiscFlags = 0;
-
-        DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &particlesStagingBuffer);
 
         // Initialize verticesBuffer and its SRV
         bufferDesc.Usage = D3D11_USAGE_IMMUTABLE; // since this data is going to be set on buffer creation and never changed

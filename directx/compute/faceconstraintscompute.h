@@ -154,6 +154,12 @@ private:
     void tearDown() override
     {
         ComputeShader::tearDown();
+		xConstraintsBuffer.Reset();
+		xConstraintsUAV.Reset();
+		yConstraintsBuffer.Reset();
+		yConstraintsUAV.Reset();
+		zConstraintsBuffer.Reset();
+		zConstraintsUAV.Reset();
     };
 
 };

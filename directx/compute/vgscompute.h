@@ -16,22 +16,6 @@ public:
         initializeBuffers(numPositions, weights, voxelSimInfo);
     };
 
-    void copyTransformedPositionsToCPU(std::vector<glm::vec4>& updatedPositions, const ComPtr<ID3D11Buffer>& positionsBuffer, int numPositions) {
-        DirectX::getContext()->CopyResource(stagingPositionsBuffer.Get(), positionsBuffer.Get());
-
-        D3D11_MAPPED_SUBRESOURCE mappedPositions;
-        HRESULT hr = DirectX::getContext()->Map(stagingPositionsBuffer.Get(), 0, D3D11_MAP_READ, 0, &mappedPositions);
-
-        if (SUCCEEDED(hr)) {
-            glm::vec4* positionsData = reinterpret_cast<glm::vec4*>(mappedPositions.pData);
-            updatedPositions.assign(positionsData, positionsData + numPositions);
-            DirectX::getContext()->Unmap(stagingPositionsBuffer.Get(), 0);
-        }
-        else {
-            MGlobal::displayError("Failed to map positionsBuffer for CPU readback.");
-        }
-    }
-
     void dispatch(int numWorkgroups) override
     {
         bind();
@@ -58,14 +42,10 @@ public:
     const ComPtr<ID3D11Buffer>& getVoxelSimInfoBuffer() const { return voxelSimInfoBuffer; }
 
 private:
-    ComPtr<ID3D11UnorderedAccessView> positionsUAV;
-
+    ComPtr<ID3D11Buffer> voxelSimInfoBuffer;
     ComPtr<ID3D11Buffer> weightsBuffer;
     ComPtr<ID3D11ShaderResourceView> weightsSRV;
-
-    ComPtr<ID3D11Buffer> stagingPositionsBuffer;
-
-    ComPtr<ID3D11Buffer> voxelSimInfoBuffer;
+    ComPtr<ID3D11UnorderedAccessView> positionsUAV;
     
     void bind() override
     {
@@ -118,16 +98,6 @@ private:
 
         DirectX::getDevice()->CreateShaderResourceView(weightsBuffer.Get(), &srvDesc, &weightsSRV);
 
-        // Initalize staging buffer
-        bufferDesc.Usage = D3D11_USAGE_STAGING;
-        bufferDesc.ByteWidth = numParticles * sizeof(float) * 4; // Vec4 for positions
-        bufferDesc.BindFlags = 0;
-        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-        bufferDesc.MiscFlags = 0;
-        bufferDesc.StructureByteStride = sizeof(float) * 4; // Vec4 for positions
-
-        DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &stagingPositionsBuffer);
-
         //Initialize constant buffer
         bufferDesc.Usage = D3D11_USAGE_DYNAMIC; // Dynamic for CPU updates
         bufferDesc.ByteWidth = sizeof(std::array<glm::vec4, 2>);  // Size of the constant buffer
@@ -146,6 +116,7 @@ private:
         ComputeShader::tearDown();
         weightsBuffer.Reset();
         weightsSRV.Reset();
+        voxelSimInfoBuffer.Reset();
     };
 
 };
