@@ -159,13 +159,10 @@ void PBD::simulateSubstep() {
     int numVgsWorkgroups = ((particles.numParticles >> 3) + VGS_THREADS + 1) / (VGS_THREADS); 
     vgsCompute->dispatch(numVgsWorkgroups);
     
-    vgsCompute->copyTransformedPositionsToCPU(particles.positions, bindVerticesCompute->getParticlesBuffer(), particles.numParticles);
     for (int i = 0; i < faceConstraints.size(); i++) {
         updateAxis(i);
 		faceConstraintsCompute->dispatch(int(((faceConstraints.size()) + VGS_THREADS + 1) / (VGS_THREADS)));
-        vgsCompute->copyTransformedPositionsToCPU(particles.positions, bindVerticesCompute->getParticlesBuffer(), particles.numParticles);
     }
-    bindVerticesCompute->updateParticleBuffer(particles.positions);
 
     postVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);
 }
