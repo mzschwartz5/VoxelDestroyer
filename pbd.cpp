@@ -71,7 +71,6 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         preVGSCompute->getOldPositionsSRV(),
         preVGSCompute->getVelocitiesUAV()
     );
-
 }
 
 void PBD::constructFaceToFaceConstraints(const Voxels& voxels) {
@@ -180,53 +179,57 @@ void PBD::setSimValuesFromUI(const MDagPath& dagPath) {
 
     MFnDagNode dagNode(dagPath, &status);
 
-    if (status == MS::kSuccess && dagNode.hasAttribute("voxelSimulationNode")) {
-        MGlobal::displayInfo("Found mesh with voxelSimulationNode: " + dagNode.name());
+    if (status != MS::kSuccess || !dagNode.hasAttribute("voxelSimulationNode")) {
+        MGlobal::displayInfo("Failed to find voxelSimulationNode: " + dagNode.name());
 
-        // Get the connected VoxelSimulationNode
-        MPlug voxelSimNodePlug = dagNode.findPlug("voxelSimulationNode", false, &status);
-        if (status != MS::kSuccess) {
-            MGlobal::displayError("Failed to find voxelSimulationNode plug.");
-            return;
-        }
-
-        MPlugArray connectedPlugs;
-        voxelSimNodePlug.connectedTo(connectedPlugs, true, false, &status);
-        if (status != MS::kSuccess || connectedPlugs.length() == 0) {
-            MGlobal::displayError("No VoxelSimulationNode connected to the mesh.");
-            return;
-        }
-
-        MObject voxelSimNodeObj = connectedPlugs[0].node();
-        MFnDependencyNode voxelSimNodeFn(voxelSimNodeObj, &status);
-        if (status != MS::kSuccess) {
-            MGlobal::displayError("Failed to access the VoxelSimulationNode.");
-            return;
-        }
-
-        // Retrieve the relaxation and edgeUniformity attributes
-        MPlug relaxationPlug = voxelSimNodeFn.findPlug("relaxation", false, &status);
-        if (status != MS::kSuccess) {
-            MGlobal::displayError("Failed to find relaxation attribute.");
-            return;
-        }
-
-        MPlug edgeUniformityPlug = voxelSimNodeFn.findPlug("edgeUniformity", false, &status);
-        if (status != MS::kSuccess) {
-            MGlobal::displayError("Failed to find edgeUniformity attribute.");
-            return;
-        }
-
-        float relaxationValue;
-        float edgeUniformityValue;
-
-        relaxationPlug.getValue(relaxationValue);
-        edgeUniformityPlug.getValue(edgeUniformityValue);
-
-        // Display the values
-        RELAXATION = relaxationValue;
-        MGlobal::displayInfo("Set relaxation to: " + MString() + relaxationValue);
-		BETA = edgeUniformityValue;
-        MGlobal::displayInfo("Set edge uniformity to: " + MString() + edgeUniformityValue);
+        return;
     }
+
+    MGlobal::displayInfo("Found mesh with voxelSimulationNode: " + dagNode.name());
+
+    // Get the connected VoxelSimulationNode
+    MPlug voxelSimNodePlug = dagNode.findPlug("voxelSimulationNode", false, &status);
+    if (status != MS::kSuccess) {
+        MGlobal::displayError("Failed to find voxelSimulationNode plug.");
+        return;
+    }
+
+    MPlugArray connectedPlugs;
+    voxelSimNodePlug.connectedTo(connectedPlugs, true, false, &status);
+    if (status != MS::kSuccess || connectedPlugs.length() == 0) {
+        MGlobal::displayError("No VoxelSimulationNode connected to the mesh.");
+        return;
+    }
+
+    MObject voxelSimNodeObj = connectedPlugs[0].node();
+    MFnDependencyNode voxelSimNodeFn(voxelSimNodeObj, &status);
+    if (status != MS::kSuccess) {
+        MGlobal::displayError("Failed to access the VoxelSimulationNode.");
+        return;
+    }
+
+    // Retrieve the relaxation and edgeUniformity attributes
+    MPlug relaxationPlug = voxelSimNodeFn.findPlug("relaxation", false, &status);
+    if (status != MS::kSuccess) {
+        MGlobal::displayError("Failed to find relaxation attribute.");
+        return;
+    }
+
+    MPlug edgeUniformityPlug = voxelSimNodeFn.findPlug("edgeUniformity", false, &status);
+    if (status != MS::kSuccess) {
+        MGlobal::displayError("Failed to find edgeUniformity attribute.");
+        return;
+    }
+
+    float relaxationValue;
+    float edgeUniformityValue;
+
+    relaxationPlug.getValue(relaxationValue);
+    edgeUniformityPlug.getValue(edgeUniformityValue);
+
+    // Display the values
+    RELAXATION = relaxationValue;
+    MGlobal::displayInfo("Set relaxation to: " + MString() + relaxationValue + " for " + dagPath.fullPathName());
+	BETA = edgeUniformityValue;
+    MGlobal::displayInfo("Set edge uniformity to: " + MString() + edgeUniformityValue + " for " + dagPath.fullPathName());
 }

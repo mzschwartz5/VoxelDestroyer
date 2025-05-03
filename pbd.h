@@ -92,6 +92,6 @@ private:
 
     void updateAxis(int axis) {
         voxelSimInfo[1][1] = float(axis);
-        faceConstraintsCompute->updateVoxelSimInfo(voxelSimInfo);
+        vgsCompute->updateVoxelSimInfo(voxelSimInfo);
     }
 };

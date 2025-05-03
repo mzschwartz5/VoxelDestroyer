@@ -39,6 +39,21 @@ public:
         unbind();
     };
 
+    void updateVoxelSimInfo(std::array<glm::vec4, 2> newInfo) {
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        HRESULT hr = DirectX::getContext()->Map(voxelSimInfoBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        if (SUCCEEDED(hr))
+        {
+            // Copy the flag to the constant buffer
+            memcpy(mappedResource.pData, &newInfo, sizeof(std::array<glm::vec4, 2>));
+            DirectX::getContext()->Unmap(voxelSimInfoBuffer.Get(), 0);
+        }
+        else
+        {
+            MGlobal::displayError("Failed to map constant buffer.");
+        }
+    }
+
     const ComPtr<ID3D11ShaderResourceView>& getWeightsSRV() const { return weightsSRV; }
     const ComPtr<ID3D11Buffer>& getVoxelSimInfoBuffer() const { return voxelSimInfoBuffer; }
 
