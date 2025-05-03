@@ -16,8 +16,9 @@ public:
     FaceConstraintsCompute(
         const std::array<std::vector<FaceConstraint>, 3>& constraints,
         const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
-		const ComPtr<ID3D11ShaderResourceView>& weightsSRV
-    ) : ComputeShader(IDR_SHADER4), positionsUAV(positionsUAV), weightsSRV(weightsSRV)
+		const ComPtr<ID3D11ShaderResourceView>& weightsSRV,
+        const ComPtr<ID3D11Buffer>& voxelSimInfoBuffer
+    ) : ComputeShader(IDR_SHADER4), positionsUAV(positionsUAV), weightsSRV(weightsSRV), voxelSimInfoBuffer(voxelSimInfoBuffer)
     {
         initializeBuffers(constraints);
     };
@@ -30,21 +31,6 @@ public:
     };
 
     const ComPtr<ID3D11ShaderResourceView>& getWeightsSRV() const { return weightsSRV; }
-
-    void updateAxis(int newAxis) {
-        D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = DirectX::getContext()->Map(constantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-        if (SUCCEEDED(hr))
-        {
-            // Copy the flag to the constant buffer
-            memcpy(mappedResource.pData, &newAxis, sizeof(int));
-            DirectX::getContext()->Unmap(constantBuffer.Get(), 0);
-        }
-        else
-        {
-            MGlobal::displayError("Failed to map constant buffer.");
-        }
-    }
 
 private:
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
@@ -59,7 +45,7 @@ private:
 	ComPtr<ID3D11UnorderedAccessView> zConstraintsUAV;
 	ComPtr<ID3D11Buffer> zConstraintsBuffer;
 
-    ComPtr<ID3D11Buffer> constantBuffer;
+    ComPtr<ID3D11Buffer> voxelSimInfoBuffer;
 
     void bind() override
     {
@@ -71,7 +57,7 @@ private:
         ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), xConstraintsUAV.Get(), yConstraintsUAV.Get(), zConstraintsUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
-        ID3D11Buffer* cbvs[] = { constantBuffer.Get() };
+        ID3D11Buffer* cbvs[] = { voxelSimInfoBuffer.Get() };
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
@@ -93,26 +79,15 @@ private:
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SUBRESOURCE_DATA initData = {};
 
-        bufferDesc.Usage = D3D11_USAGE_DYNAMIC; // Dynamic for CPU updates
-        bufferDesc.ByteWidth = 16;    // Size of the constant buffer
-        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; // Bind as a constant buffer
-        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // Allow CPU writes
-        bufferDesc.MiscFlags = 0;
-
-        HRESULT hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &constantBuffer);
-        if (FAILED(hr)) {
-            MGlobal::displayError("Failed to create constant buffer.");
-        }
-
 		// Initialize X constraints buffer and its UAV
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        bufferDesc.ByteWidth = sizeof(FaceConstraint) * constraints[0].size();
+        bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[0].size());
 		bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
 		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[0].data();
-		hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &xConstraintsBuffer);
+		HRESULT hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &xConstraintsBuffer);
 		if (FAILED(hr)) {
 			MGlobal::displayError("Failed to create constraints buffer.");
 		}
@@ -122,7 +97,7 @@ private:
         uavDesc.Format = DXGI_FORMAT_UNKNOWN;
         uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
         uavDesc.Buffer.FirstElement = 0;
-        uavDesc.Buffer.NumElements = constraints[0].size();
+        uavDesc.Buffer.NumElements = UINT(constraints[0].size());
 		hr = DirectX::getDevice()->CreateUnorderedAccessView(xConstraintsBuffer.Get(), &uavDesc, &xConstraintsUAV);
 		if (FAILED(hr)) {
 			MGlobal::displayError("Failed to create X constraints UAV.");
@@ -130,7 +105,7 @@ private:
 
 		// Initialize Y constraints buffer and its UAv
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-		bufferDesc.ByteWidth = sizeof(FaceConstraint) * constraints[1].size();
+		bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[1].size());
 		bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
 		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
@@ -145,7 +120,7 @@ private:
 		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
 		uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
 		uavDesc.Buffer.FirstElement = 0;
-		uavDesc.Buffer.NumElements = constraints[1].size();
+		uavDesc.Buffer.NumElements = UINT(constraints[1].size());
 		hr = DirectX::getDevice()->CreateUnorderedAccessView(yConstraintsBuffer.Get(), &uavDesc, &yConstraintsUAV);
 		if (FAILED(hr)) {
 			MGlobal::displayError("Failed to create Y constraints UAV.");
@@ -153,7 +128,7 @@ private:
 
 		// Initialize Z constraints buffer and its UAV
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-		bufferDesc.ByteWidth = sizeof(FaceConstraint) * constraints[2].size();
+		bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[2].size());
 		bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
 		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
@@ -168,7 +143,7 @@ private:
 		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
 		uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
 		uavDesc.Buffer.FirstElement = 0;
-		uavDesc.Buffer.NumElements = constraints[2].size();
+		uavDesc.Buffer.NumElements = UINT(constraints[2].size());
 		hr = DirectX::getDevice()->CreateUnorderedAccessView(zConstraintsBuffer.Get(), &uavDesc, &zConstraintsUAV);
         if (FAILED(hr)) {
             MGlobal::displayError("Failed to create Z constraints UAV.");

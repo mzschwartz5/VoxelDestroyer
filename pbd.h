@@ -16,6 +16,17 @@
 #include "directx/compute/postvgscompute.h"
 #include "directx/compute/faceconstraintscompute.h"
 
+#include <maya/MGlobal.h>
+#include <maya/MSelectionList.h>
+#include <maya/MDagPath.h>
+#include <maya/MFnDagNode.h>
+#include <maya/MFnDependencyNode.h>
+#include <maya/MPlug.h>
+#include <maya/MStatus.h>
+#include <maya/MPlugArray.h>
+#include <maya/MItDag.h>
+#include <maya/MFnMesh.h>
+
 using glm::vec3;
 using glm::vec4;
 
@@ -27,13 +38,6 @@ struct Particles
     std::vector<float> w; // inverse mass
     int numParticles{ 0 };
 };
-
-//struct FaceConstraint {
-//    int voxelOneIdx;
-//    int voxelTwoIdx;
-//    float tensionLimit;
-//	float compressionLimit;
-//};
 
 class PBD
 {
@@ -52,6 +56,8 @@ private:
     int substeps = 10;
     float timeStep;
     MDagPath meshDagPath;
+    std::array<glm::vec4, 2> voxelSimInfo;
+
     // Shaders
 	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
 	int transformVerticesNumWorkgroups;
@@ -68,7 +74,7 @@ private:
 
     void createParticles(const Voxels& voxels);
 
-    void solveFaceConstraint(FaceConstraint& faceConstraint, int axis);
+    void setSimValuesFromUI(const MDagPath& dagPath);
 
     vec4 project(vec4 x, vec4 y);
 
@@ -83,4 +89,9 @@ private:
     }
 
     void addFaceConstraint(FaceConstraint constraint, int axis) { faceConstraints[axis].push_back(constraint); };
+
+    void updateAxis(int axis) {
+        voxelSimInfo[1][1] = float(axis);
+        vgsCompute->updateVoxelSimInfo(voxelSimInfo);
+    }
 };

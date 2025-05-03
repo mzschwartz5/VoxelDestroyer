@@ -1,9 +1,3 @@
-// Constants
-#define RELAXATION 0.25f
-#define BETA 0.8f
-#define PARTICLE_RADIUS 0.125f
-#define VOXEL_REST_VOLUME 0.125f
-#define ITER_COUNT 3
 
 // Face constraint structure
 struct FaceConstraint {
@@ -13,10 +7,16 @@ struct FaceConstraint {
     float compressionLimit;
 };
 
-// Constant buffer for the axis parameter
-cbuffer AxisBuffer : register(b0)
+cbuffer VoxelSimBuffer : register(b0)
 {
-    int axis;
+    float RELAXATION;
+    float BETA;
+    float PARTICLE_RADIUS;
+    float VOXEL_REST_VOLUME;
+    float ITER_COUNT;
+    float AXIS;
+    float PADDING_1;
+    float PADDING_2;
 };
 
 RWStructuredBuffer<float4> positions : register(u0);
@@ -68,10 +68,10 @@ void main(
 
     // Get the constraint data from the buffer
     FaceConstraint constraint;
-	if (axis == 0) {
+	if (AXIS == 0) {
         constraint = xConstraints[constraintIdx];
 	}
-	else if (axis == 1) {
+	else if (AXIS == 1) {
 		constraint = yConstraints[constraintIdx];
 	}
 	else {
@@ -97,12 +97,12 @@ void main(
     uint faceTwoIndices[4];
 
     // Define face indices based on axis
-    if (axis == 0) // x-axis
+    if (AXIS == 0) // x-axis
     {
         faceOneIndices[0] = 1; faceOneIndices[1] = 3; faceOneIndices[2] = 5; faceOneIndices[3] = 7;
         faceTwoIndices[0] = 0; faceTwoIndices[1] = 2; faceTwoIndices[2] = 4; faceTwoIndices[3] = 6;
     }
-    else if (axis == 1) // y-axis
+    else if (AXIS == 1) // y-axis
     {
         faceOneIndices[0] = 2; faceOneIndices[1] = 3; faceOneIndices[2] = 6; faceOneIndices[3] = 7;
         faceTwoIndices[0] = 0; faceTwoIndices[1] = 1; faceTwoIndices[2] = 4; faceTwoIndices[3] = 5;
@@ -219,7 +219,7 @@ void main(
         }
 
         // Calculate normal vector based on axis
-        if (axis == 0 || axis == 2)
+        if (AXIS == 0 || AXIS == 2)
         {
             u0 = cross(u1, u2);
         }
@@ -309,7 +309,7 @@ void main(
 
             // Check for flipping
             float V = dot(cross(u0, u1), u2);
-            if (axis == 1) V = -V; // Hack from GPU code
+            if (AXIS == 1) V = -V; // Hack from GPU code
 
             if (V < 0.0f)
             {
