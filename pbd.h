@@ -74,8 +74,6 @@ private:
 
     void createParticles(const Voxels& voxels);
 
-    void solveFaceConstraint(FaceConstraint& faceConstraint, int axis);
-
     void setSimValuesFromUI(const MDagPath& dagPath);
 
     vec4 project(vec4 x, vec4 y);
