@@ -4,6 +4,8 @@
 #include <maya/MFnTransform.h>
 #include <algorithm>
 #include <maya/MFnSet.h>
+#include <maya/MItMeshPolygon.h>
+#include <maya/MFloatPointArray.h>
 #include <numeric>
 
 Voxels Voxelizer::voxelizeSelectedMesh(
@@ -286,7 +288,7 @@ double Voxelizer::getTriangleVoxelCenterIntercept(
 }
 
 MDagPath Voxelizer::createVoxels(
-    Voxels& overlappedVoxels ,
+    Voxels& overlappedVoxels,
     float gridEdgeLength, 
     float voxelSize,       
     MPoint gridCenter,      
@@ -326,28 +328,35 @@ MDagPath Voxelizer::createVoxels(
         intersectVoxelWithOriginalMesh(overlappedVoxels, cube, originalMesh.object(), i);
     }
 
-    return finalizeVoxelMesh(combinedMeshName, meshNamesConcatenated, originalMesh);
+    return finalizeVoxelMesh(combinedMeshName, meshNamesConcatenated, originalMesh, voxelSize);
 }
 
 MDagPath Voxelizer::finalizeVoxelMesh(
     const MString& combinedMeshName,
     const MString& meshNamesConcatenated,
-    const MFnMesh& originalMesh
+    const MFnMesh& originalMesh,
+    float voxelSize
 ) {
+    MStatus status;
     // Use MEL to combine all the voxels into one mesh
     MGlobal::executeCommand(MString("polyUnite -ch 0 -mergeUVSets 1 -name ") + combinedMeshName + " " + meshNamesConcatenated, false, true);
-
-    // Use MEL to transferAttributes the normals from the original mesh to the new voxelized/combined one
-    MGlobal::executeCommand(MString("select -r ") + originalMesh.name(), false, true); // Select the original mesh first
-    MGlobal::executeCommand(MString("select -add ") + combinedMeshName, false, true);  // Then select the new combined mesh
-    MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
-    MGlobal::executeCommand("delete -ch " + combinedMeshName + ";"); // Delete the history of the combined mesh to decouple it from the original mesh
+    MGlobal::executeCommand(MString("select -r ") + combinedMeshName, false, true);
+    MGlobal::executeCommand("polySetToFaceNormal;", false, true);
 
     // Retrieve the MObject of the resulting mesh
     MSelectionList resultSelectionList;
     resultSelectionList.add(combinedMeshName);
     MObject resultMeshObject;
     resultSelectionList.getDependNode(0, resultMeshObject);
+    MDagPath resultMeshDagPath;
+    MDagPath::getAPathTo(resultMeshObject, resultMeshDagPath);
+    MFnMesh resultMeshFn(resultMeshDagPath, &status);
+
+    // Use MEL to transferAttributes the normals from the original mesh to the new voxelized/combined one
+    MGlobal::executeCommand(MString("select -r ") + originalMesh.name(), false, true); // Select the original mesh first
+    selectSurfaceFaces(resultMeshFn, combinedMeshName, voxelSize);
+    MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
+    MGlobal::executeCommand("delete -ch " + combinedMeshName + ";"); // Delete the history of the combined mesh to decouple it from the original mesh
 
     // Add the initial shading group to the combined mesh
     // TODO: apply the shading group of the original mesh to the combined mesh
@@ -358,9 +367,34 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MFnSet shadingGroupFn(shadingGroup);
     shadingGroupFn.addMember(resultMeshObject);
 
-    MDagPath resultMeshDagPath;
-    MDagPath::getAPathTo(resultMeshObject, resultMeshDagPath);
     return resultMeshDagPath;
+}
+
+void Voxelizer::selectSurfaceFaces(MFnMesh& meshFn, const MString& meshName, float voxelSize) {
+    float maxDistance = 1.73f * 1.1f * voxelSize; // 1.73 is the diagonal of a cube with edge length 1.0
+    MMeshIsectAccelParams accelParams = MFnMesh::autoUniformGridParams();
+    MItMeshPolygon faceIter(meshFn.object());
+
+    MString faceSelectionCommand = "select -add ";
+    while (!faceIter.isDone()) {
+        MVector normal;
+        faceIter.getNormal(normal, MSpace::kWorld);
+        MPoint faceCenter = faceIter.center(MSpace::kWorld);
+        MPoint raySource = faceCenter + normal * 0.01; // Offset slightly along the normal
+        MVector rayDirection = normal;
+
+        MFloatPoint hitPoint;
+        bool hit = meshFn.anyIntersection(raySource, rayDirection, nullptr, nullptr, false, MSpace::kWorld, maxDistance, false, &accelParams, hitPoint, nullptr, nullptr, nullptr, nullptr, nullptr);
+
+        if (!hit) {
+            faceSelectionCommand += meshName + ".f[" + faceIter.index() + "] ";
+        }
+        
+        faceIter.next();
+    }
+
+    MGlobal::executeCommand(faceSelectionCommand, false, true);
+    return;
 }
 
 int faceIndices[6][4] = {
