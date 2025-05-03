@@ -10,7 +10,7 @@
 
 Voxelizer plugin::voxelizer = Voxelizer();
 PBD plugin::pbdSimulator{};
-MCallbackId plugin::callbackId = 0;
+std::unordered_map<std::string, MCallbackId> plugin::callbacks;
 MDagPath plugin::voxelizedMeshDagPath = MDagPath();
 
 // Maya Plugin creator function
@@ -23,6 +23,14 @@ void plugin::simulate(void* clientData) {
 	plugin::pbdSimulator.simulateStep();
 	plugin::pbdSimulator.updateMeshVertices();
 	MGlobal::executeCommand("refresh");
+}
+
+void plugin::onPlaybackChange(bool state, void* clientData) {
+	if (state) {
+		MGlobal::displayInfo("Playback started.");
+	} else {
+		MGlobal::displayInfo("Playback stopped.");
+	}
 }
 
 MSyntax plugin::syntax()
@@ -311,11 +319,11 @@ EXPORT MStatus initializePlugin(MObject obj)
 	if (!status)
 		status.perror("registerCommand failed");
 
-	status = plugin::setCallbackId(MEventMessage::addEventCallback("timeChanged", plugin::simulate));
-	if (!status) {
-		MGlobal::displayError("Failed to register callback");
-		return status;
-	}
+	MCallbackId timeChangedCallbackId = MEventMessage::addEventCallback("timeChanged", plugin::simulate);
+	plugin::setCallbackId("timeChanged", timeChangedCallbackId);
+
+	MCallbackId playbackChangeCallbackId = MConditionMessage::addConditionCallback("playingBack", plugin::onPlaybackChange);
+	plugin::setCallbackId("playingBack", playbackChangeCallbackId);
 
 	// Initialize DirectX
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
@@ -345,8 +353,9 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	if (!status)
 		status.perror("deregisterCommand failed");
 
-	// Deregister the callback
-	MEventMessage::removeCallback(plugin::getCallbackId());
+	// Deregister the callbacks
+	MEventMessage::removeCallback(plugin::getCallbackId("timeChanged"));
+	MConditionMessage::removeCallback(plugin::getCallbackId("playingBack"));
 
 	status = plugin.deregisterNode(VoxelSimulationNode::id);
 	if (!status) {
