@@ -2,17 +2,22 @@
 #include <maya/MPxContext.h>
 #include <maya/MViewport2Renderer.h>
 #include <maya/MGlobal.h>
+#include "pbd.h"
 
 class VoxelDragContext : public MPxContext
 {
 public:
-    VoxelDragContext() : MPxContext(), dragging(false), mouseButton(0), pickedObject(MObject::kNullObj) {
+    VoxelDragContext(PBD* pbdSimulator) : MPxContext(), pbdSimulator(pbdSimulator), dragging(false), mouseButton(0), pickedObject(MObject::kNullObj) {
         setTitleString("Voxel Simulation Tool");
     }
     
     virtual void toolOnSetup(MEvent &event) override {
         MPxContext::toolOnSetup(event);
-        MGlobal::displayInfo("Voxel Simulation Tool activated.");
+
+        if (!pbdSimulator) {
+            MGlobal::displayError("PBD simulator not initialized.");
+            return;
+        }
     }
 
     virtual void toolOffCleanup() override {
@@ -20,8 +25,6 @@ public:
     }
 
     virtual MStatus doPress(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
-        MGlobal::displayInfo("Voxel Simulation Tool pressed.");
-
         if (event.mouseButton() == MEvent::kLeftMouse) {
             MPoint hitPoint;
             if (pickObjectUnderCursor(event, pickedObject, hitPoint)) {
@@ -33,7 +36,6 @@ public:
     }
 
     virtual MStatus doDrag(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
-        MGlobal::displayInfo("Voxel Simulation Tool dragging.");
         if (!dragging) return MS::kSuccess;
 
         MPoint newWorldPoint;
@@ -41,20 +43,12 @@ public:
             updateSimulatedObjectPosition(newWorldPoint);
         }
 
-        // Optionally, draw feedback in the viewport
-        drawFeedback(drawMgr, context);
-
         return MS::kSuccess;
     }
 
     virtual MStatus doRelease(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
-        MGlobal::displayInfo("Voxel Simulation Tool released.");
         dragging = false;
         pickedObject = MObject::kNullObj;
-        return MS::kSuccess;
-    }
-
-    virtual MStatus drawFeedback(MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
         return MS::kSuccess;
     }
 
@@ -63,6 +57,7 @@ private:
     MPoint worldDragStart;
     bool dragging = false;
     MObject pickedObject;
+    PBD* pbdSimulator = nullptr;
 
     bool pickObjectUnderCursor(MEvent& event, MObject& outObject, MPoint& worldPoint) {
         short x, y;

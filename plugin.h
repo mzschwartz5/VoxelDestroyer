@@ -48,8 +48,7 @@ public:
 	static void* creator();
 	static MSyntax syntax();
 	// A callback bound to the timeChanged event (e.g. moving the animation slider)
-	static void simulate(void* clientData);
-	static void onPlaybackChange(bool state, void* clientData);
+	static void simulate(float elapsedTime, float lastTime, void* clientData);
 	
 	// Compare the center of an object's bounding box to the center of the voxel grid
 	// to determine the closest object to the voxel grid (used as a fallback if nothing selected)
@@ -70,9 +69,9 @@ public:
 	static void setCallbackId(std::string callbackName, MCallbackId id) { 
 		callbacks[callbackName] = id;
 	}
-
+	
 	static PBD pbdSimulator;
-
+	
 private:
 	static Voxelizer voxelizer;
 	static MDagPath voxelizedMeshDagPath;

@@ -47,7 +47,7 @@ public:
     void initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath);
     void simulateStep();
     void updateMeshVertices();
-    
+
 	Particles getParticles() const { return particles; }
 
 	void setRelaxation(float relaxation) { RELAXATION = relaxation; }
@@ -66,6 +66,8 @@ public:
         simInfo = glm::vec4(GRAVITY_STRENGTH, GROUND_COLLISION_ENABLED, GROUND_COLLISION_Y, TIMESTEP);
         preVGSCompute->updateSimConstants(&simInfo);
     }
+
+    bool isInitialized() const { return initialized; }
     
 private:
     Particles particles;
@@ -76,6 +78,7 @@ private:
 
     std::array<glm::vec4, 2> vgsInfo;
     glm::vec4 simInfo;
+    bool initialized = false;
 
     // Shaders
 	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.

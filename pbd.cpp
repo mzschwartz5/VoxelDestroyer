@@ -74,6 +74,8 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         preVGSCompute->getOldPositionsSRV(),
         preVGSCompute->getVelocitiesUAV()
     );
+
+    initialized = true;
 }
 
 void PBD::constructFaceToFaceConstraints(const Voxels& voxels,

@@ -5,6 +5,7 @@
 #include <maya/MFnMessageAttribute.h>
 #include <windows.h>
 #include "voxeldragcontextcommand.h"
+#include <maya/MTimerMessage.h>
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -20,18 +21,12 @@ void* plugin::creator()
 	return new plugin;
 }
 
-void plugin::simulate(void* clientData) {
+void plugin::simulate(float elapsedTime, float lastTime, void* clientData) {
+	if (!plugin::pbdSimulator.isInitialized()) return;
+
 	plugin::pbdSimulator.simulateStep();
 	plugin::pbdSimulator.updateMeshVertices();
 	MGlobal::executeCommand("refresh");
-}
-
-void plugin::onPlaybackChange(bool isPlayingBack, void* clientData) {
-	if (isPlayingBack) {
-		MGlobal::executeCommand("setToolTo voxelDragContextCommand1");
-	} else {
-		MGlobal::executeCommand("setToolTo selectSuperContext");
-	}
 }
 
 MSyntax plugin::syntax()
@@ -320,11 +315,8 @@ EXPORT MStatus initializePlugin(MObject obj)
 	if (!status)
 		status.perror("registerCommand failed");
 
-	MCallbackId timeChangedCallbackId = MEventMessage::addEventCallback("timeChanged", plugin::simulate);
-	plugin::setCallbackId("timeChanged", timeChangedCallbackId);
-
-	MCallbackId playbackChangeCallbackId = MConditionMessage::addConditionCallback("playingBack", plugin::onPlaybackChange);
-	plugin::setCallbackId("playingBack", playbackChangeCallbackId);
+	MCallbackId drawCallbackId = MTimerMessage::addTimerCallback(1.0f / 60.0f, plugin::simulate, NULL, &status);
+	plugin::setCallbackId("drawCallback", drawCallbackId);
 
 	// Initialize DirectX
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
@@ -342,6 +334,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	VoxelDragContextCommand::setPBD(&plugin::pbdSimulator);
 	status = plugin.registerContextCommand("voxelDragContextCommand", VoxelDragContextCommand::creator);
 	if (!status) {
 		MGlobal::displayError("Failed to register VoxelDragContextCommand");
@@ -366,8 +359,7 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 		status.perror("deregisterContextCommand failed");
 
 	// Deregister the callbacks
-	MEventMessage::removeCallback(plugin::getCallbackId("timeChanged"));
-	MConditionMessage::removeCallback(plugin::getCallbackId("playingBack"));
+	MEventMessage::removeCallback(plugin::getCallbackId("drawCallback"));
 
 	status = plugin.deregisterNode(VoxelSimulationNode::id);
 	if (!status) {
