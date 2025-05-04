@@ -63,7 +63,7 @@ void main(
 	else if (AXIS == 1) {
 		constraint = yConstraints[constraintIdx];
 	}
-	else {
+	else if (AXIS == 2) {
 		constraint = zConstraints[constraintIdx];
 	}
     
@@ -93,7 +93,7 @@ void main(
         faceOneIndices[0] = 2; faceOneIndices[1] = 3; faceOneIndices[2] = 6; faceOneIndices[3] = 7;
         faceTwoIndices[0] = 0; faceTwoIndices[1] = 1; faceTwoIndices[2] = 4; faceTwoIndices[3] = 5;
     }
-    else // z-axis
+    else if (AXIS == 2) // z-axis
     {
         faceOneIndices[0] = 4; faceOneIndices[1] = 5; faceOneIndices[2] = 6; faceOneIndices[3] = 7;
         faceTwoIndices[0] = 0; faceTwoIndices[1] = 1; faceTwoIndices[2] = 2; faceTwoIndices[3] = 3;
@@ -154,7 +154,7 @@ void main(
         float L = length(u);
         float strain = (L - 2.0f * PARTICLE_RADIUS) / (2.0f * PARTICLE_RADIUS);
 
-        // Assuming tension/compression limits, adjust based on your actual values
+        // Assuming tension/compression limits
         float tensionLimit = constraint.tensionLimit;
         float compressionLimit = constraint.compressionLimit;
 
