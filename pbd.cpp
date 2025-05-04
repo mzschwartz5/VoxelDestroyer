@@ -38,7 +38,7 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 
 	MGlobal::displayInfo("Transform vertices compute shader initialized.");
 
-    //setSimValuesFromUI(meshDagPath);
+    //setSimValuesFromUI();
 
     vgsInfo[0] = glm::vec4(RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME);
     vgsInfo[1] = glm::vec4(3.0, 0, FTF_RELAXATION, FTF_BETA); //iter count, axis, padding, padding
@@ -175,10 +175,10 @@ void PBD::simulateSubstep() {
     postVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);
 }
 
-void PBD::setSimValuesFromUI(const MDagPath& dagPath) {
+void PBD::setSimValuesFromUI() {
     MStatus status;
 
-    MFnDagNode dagNode(dagPath, &status);
+    MFnDagNode dagNode(meshDagPath, &status);
 
     if (status != MS::kSuccess || !dagNode.hasAttribute("voxelSimulationNode")) {
         MGlobal::displayInfo("Failed to find voxelSimulationNode: " + dagNode.name());
@@ -254,15 +254,15 @@ void PBD::setSimValuesFromUI(const MDagPath& dagPath) {
 
     // Display the values
     RELAXATION = relaxationValue;
-    MGlobal::displayInfo("Set relaxation to: " + MString() + relaxationValue + " for " + dagPath.fullPathName());
+    MGlobal::displayInfo("Set relaxation to: " + MString() + relaxationValue + " for " + meshDagPath.fullPathName());
 	BETA = edgeUniformityValue;
-    MGlobal::displayInfo("Set edge uniformity to: " + MString() + edgeUniformityValue + " for " + dagPath.fullPathName());
+    MGlobal::displayInfo("Set edge uniformity to: " + MString() + edgeUniformityValue + " for " + meshDagPath.fullPathName());
 	GRAVITY_STRENGTH = gravityStrengthValue;
-	MGlobal::displayInfo("Set gravity strength to: " + MString() + gravityStrengthValue + " for " + dagPath.fullPathName());
+	MGlobal::displayInfo("Set gravity strength to: " + MString() + gravityStrengthValue + " for " + meshDagPath.fullPathName());
 	FTF_RELAXATION = faceToFaceRelaxationValue;
-	MGlobal::displayInfo("Set face to face relaxation to: " + MString() + faceToFaceRelaxationValue + " for " + dagPath.fullPathName());
+	MGlobal::displayInfo("Set face to face relaxation to: " + MString() + faceToFaceRelaxationValue + " for " + meshDagPath.fullPathName());
 	FTF_BETA = faceToFaceEdgeUniformityValue;
-	MGlobal::displayInfo("Set face to face edge uniformity to: " + MString() + faceToFaceEdgeUniformityValue + " for " + dagPath.fullPathName());
+	MGlobal::displayInfo("Set face to face edge uniformity to: " + MString() + faceToFaceEdgeUniformityValue + " for " + meshDagPath.fullPathName());
 
 	// Update the simulation values
     updateVGSInfo();

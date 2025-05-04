@@ -39,6 +39,15 @@ struct Particles
     int numParticles{ 0 };
 };
 
+struct DragValues
+{
+    short mouseX{ 0 };
+    short mouseY{ 0 };
+    short distX{ 0 };
+    short distY{ 0 };
+    float dragRadius{ 0.0f };
+};
+
 class PBD
 {
 public:
@@ -68,6 +77,10 @@ public:
     }
 
     bool isInitialized() const { return initialized; }
+    void setIsDragging(bool isDragging) { this->isDragging = isDragging; }
+    void updateDragValues(const DragValues& dragValues) {
+        this->dragValues = dragValues;
+    }
     
 private:
     Particles particles;
@@ -79,6 +92,8 @@ private:
     std::array<glm::vec4, 2> vgsInfo;
     glm::vec4 simInfo;
     bool initialized = false;
+    bool isDragging = false;
+    DragValues dragValues;
 
     // Shaders
 	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
@@ -99,7 +114,7 @@ private:
 
     void createParticles(const Voxels& voxels);
 
-    void setSimValuesFromUI(const MDagPath& dagPath);
+    void setSimValuesFromUI();
 
     float BETA{ 0.99f };
     float PARTICLE_RADIUS{ 0.1f };
