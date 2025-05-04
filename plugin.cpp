@@ -14,6 +14,7 @@ Voxelizer plugin::voxelizer = Voxelizer();
 PBD plugin::pbdSimulator{};
 std::unordered_map<std::string, MCallbackId> plugin::callbacks;
 MDagPath plugin::voxelizedMeshDagPath = MDagPath();
+VoxelRendererOverride* plugin::voxelRendererOverride = nullptr;
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -81,6 +82,8 @@ MStatus plugin::doIt(const MArgList& argList)
 
 
 	plugin::createVoxelSimulationNode();
+	VoxelDragContextCommand::setPBD(&plugin::pbdSimulator);
+	VoxelRendererOverride::setPBD(&plugin::pbdSimulator);
 
 	return status;
 }
@@ -306,6 +309,16 @@ void plugin::loadVoxelizerMenu() {
 	}
 }
 
+MString plugin::getActiveModelPanel() {
+	MString result;
+	MGlobal::executeCommand("playblast -ae", result);
+
+	// Parse the result to get the active model panel name (result is in form MainPane|viewPanes|modelPanel4|modelPanel4|modelPanel4)
+	MStringArray parts;
+	result.split('|', parts);
+	return parts[parts.length() - 1];
+}
+
 // Initialize Maya Plugin upon loading
 EXPORT MStatus initializePlugin(MObject obj)
 {
@@ -314,6 +327,17 @@ EXPORT MStatus initializePlugin(MObject obj)
 	status = plugin.registerCommand("VoxelDestroyer", plugin::creator);
 	if (!status)
 		status.perror("registerCommand failed");
+
+	plugin::voxelRendererOverride = new VoxelRendererOverride("VoxelRendererOverride");
+	status = MRenderer::theRenderer()->registerOverride(plugin::voxelRendererOverride);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelRendererOverride: " + status.errorString());
+		return status;
+	}
+
+	// TODO: potentially make this more robust / only allow in perspective panel?
+	MString activeModelPanel = plugin::getActiveModelPanel();
+	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
 
 	MCallbackId drawCallbackId = MTimerMessage::addTimerCallback(1.0f / 60.0f, plugin::simulate, NULL, &status);
 	plugin::setCallbackId("drawCallback", drawCallbackId);
@@ -334,7 +358,6 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
-	VoxelDragContextCommand::setPBD(&plugin::pbdSimulator);
 	status = plugin.registerContextCommand("voxelDragContextCommand", VoxelDragContextCommand::creator);
 	if (!status) {
 		MGlobal::displayError("Failed to register VoxelDragContextCommand");
@@ -351,6 +374,9 @@ EXPORT MStatus initializePlugin(MObject obj)
 EXPORT MStatus uninitializePlugin(MObject obj)
 {
 	MGlobal::executeCommand("VoxelizerMenu_removeFromShelf");
+	MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);
+	delete plugin::voxelRendererOverride;
+	plugin::voxelRendererOverride = nullptr;
 
 	MStatus status;
 	MFnPlugin plugin(obj);

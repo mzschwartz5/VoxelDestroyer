@@ -81,6 +81,8 @@ public:
     void updateDragValues(const DragValues& dragValues) {
         this->dragValues = dragValues;
     }
+    void updateDepthResourceHandle(void* depthResourceHandle) {
+    }
     
 private:
     Particles particles;

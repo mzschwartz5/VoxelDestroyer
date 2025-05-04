@@ -144,14 +144,16 @@
     <ClInclude Include="voxelizer.h" />
     <ClInclude Include="voxeldragcontext.h" />
     <ClInclude Include="voxeldragcontextcommand.h" />
+    <ClInclude Include="voxelrendereroverride.h" />
     <ClInclude Include="constants.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
-    <ClInclude Include="directx\compute\transformVerticesCompute.h" />
+    <ClInclude Include="directx\compute\transformverticescompute.h" />
     <ClInclude Include="directx\compute\bindverticescompute.h" />
     <ClInclude Include="directx\compute\vgscompute.h" />
     <ClInclude Include="directx\compute\prevgscompute.h" />
     <ClInclude Include="directx\compute\postvgscompute.h" />
     <ClInclude Include="voxelsimulationnode.h" />
+    <ClInclude Include="directx\compute\dragparticlescompute.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="plugin.cpp" />

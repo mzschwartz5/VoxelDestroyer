@@ -26,6 +26,9 @@
 #include <maya/MConditionMessage.h>
 #include <unordered_map>
 #include <string>
+#include "voxelrendereroverride.h"
+#include <maya/MViewport2Renderer.h>
+using namespace MHWRender;
 
 
 struct PluginArgs {
@@ -59,6 +62,7 @@ public:
 	static void createVoxelSimulationNode();
 	static void loadVoxelSimulationNodeEditorTemplate();
 	static void loadVoxelizerMenu();
+	static MString getActiveModelPanel();
 
 	static MCallbackId getCallbackId(std::string callbackName) { 
 		auto it = callbacks.find(callbackName); 
@@ -71,6 +75,7 @@ public:
 	}
 	
 	static PBD pbdSimulator;
+	static VoxelRendererOverride* voxelRendererOverride;
 	
 private:
 	static Voxelizer voxelizer;
