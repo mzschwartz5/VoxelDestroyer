@@ -83,7 +83,7 @@ private:
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
         bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[0].size());
 		bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		bufferDesc.CPUAccessFlags = 0;
 		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[0].data();
@@ -92,7 +92,7 @@ private:
 			MGlobal::displayError("Failed to create constraints buffer.");
 		}
 
-		// Create the SRV for the X constraints buffer
+		// Create the UAV for the X constraints buffer
 		D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         uavDesc.Format = DXGI_FORMAT_UNKNOWN;
         uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
@@ -103,11 +103,11 @@ private:
 			MGlobal::displayError("Failed to create X constraints UAV.");
 		}
 
-		// Initialize Y constraints buffer and its UAv
+		// Initialize Y constraints buffer and its UAV
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 		bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[1].size());
 		bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		bufferDesc.CPUAccessFlags = 0;
 		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[1].data();
@@ -116,7 +116,7 @@ private:
             MGlobal::displayError("Failed to create constraints buffer.");
         }
 
-		// Create the SRV for the Y constraints buffer
+		// Create the UAV for the Y constraints buffer
 		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
 		uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
 		uavDesc.Buffer.FirstElement = 0;
@@ -130,7 +130,7 @@ private:
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 		bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[2].size());
 		bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		bufferDesc.CPUAccessFlags = 0;
 		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[2].data();
@@ -139,7 +139,7 @@ private:
 			MGlobal::displayError("Failed to create constraints buffer.");
 		}
 
-		// Create the SRV for the Z constraints buffer
+		// Create the UAV for the Z constraints buffer
 		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
 		uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
 		uavDesc.Buffer.FirstElement = 0;

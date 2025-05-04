@@ -7,7 +7,7 @@
 void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath) {
     this->meshDagPath = meshDagPath;
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
-    constructFaceToFaceConstraints(voxels);
+    constructFaceToFaceConstraints(voxels, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX);
     createParticles(voxels);
     setRadiusAndVolumeFromLength(voxelSize);
 
@@ -40,13 +40,13 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 
     setSimValuesFromUI(meshDagPath);
 
-    voxelSimInfo[0] = glm::vec4(RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME);
-    voxelSimInfo[1] = glm::vec4(3.0, 0, 0, 0); //iter count, axis, padding, padding
+    vgsInfo[0] = glm::vec4(RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME);
+    vgsInfo[1] = glm::vec4(3.0, 0, FTF_RELAXATION, FTF_BETA); //iter count, axis, padding, padding
 
     vgsCompute = std::make_unique<VGSCompute>(
         particles.numParticles,
         particles.w.data(),
-        voxelSimInfo,
+        vgsInfo,
         bindVerticesCompute->getParticlesUAV()
     );
 
@@ -57,10 +57,13 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         vgsCompute->getVoxelSimInfoBuffer()
 	);
 
+	simInfo = glm::vec4(GRAVITY_ENABLED, GROUND_COLLISION_ENABLED, GROUND_COLLISION_Y, 0.0f);
+
     preVGSCompute = std::make_unique<PreVGSCompute>(
         particles.numParticles,
         particles.oldPositions.data(),
         particles.velocities.data(),
+		&simInfo,
         vgsCompute->getWeightsSRV(),
         bindVerticesCompute->getParticlesUAV()
     );
@@ -73,7 +76,10 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
     );
 }
 
-void PBD::constructFaceToFaceConstraints(const Voxels& voxels) {
+void PBD::constructFaceToFaceConstraints(const Voxels& voxels,
+    float xTension, float xCompression,
+    float yTension, float yCompression,
+    float zTension, float zCompression) {
     for (int i = 0; i < voxels.numOccupied; i++) {
         uint32_t x, y, z;
         Utils::fromMortonCode(voxels.mortonCodes[i], x, y, z);
@@ -89,8 +95,8 @@ void PBD::constructFaceToFaceConstraints(const Voxels& voxels) {
             FaceConstraint newConstraint;
             newConstraint.voxelOneIdx = i;
             newConstraint.voxelTwoIdx = rightNeighborIndex;
-            newConstraint.compressionLimit = -FLT_MAX;
-            newConstraint.tensionLimit = FLT_MAX;
+            newConstraint.compressionLimit = xCompression;
+            newConstraint.tensionLimit = xTension;
             addFaceConstraint(newConstraint, 0);
         }
 
@@ -101,8 +107,8 @@ void PBD::constructFaceToFaceConstraints(const Voxels& voxels) {
             FaceConstraint newConstraint;
             newConstraint.voxelOneIdx = i;
             newConstraint.voxelTwoIdx = upNeighborIndex;
-            newConstraint.compressionLimit = -FLT_MAX;
-            newConstraint.tensionLimit = FLT_MAX;
+            newConstraint.compressionLimit = yCompression;
+            newConstraint.tensionLimit = yTension;
             addFaceConstraint(newConstraint, 1);
         }
 
@@ -113,8 +119,8 @@ void PBD::constructFaceToFaceConstraints(const Voxels& voxels) {
             FaceConstraint newConstraint;
             newConstraint.voxelOneIdx = i;
             newConstraint.voxelTwoIdx = frontNeighborIndex;
-            newConstraint.compressionLimit = -FLT_MAX;
-            newConstraint.tensionLimit = FLT_MAX;
+            newConstraint.compressionLimit = zCompression;
+            newConstraint.tensionLimit = zTension;
             addFaceConstraint(newConstraint, 2);
         }
     }
@@ -161,14 +167,10 @@ void PBD::simulateSubstep() {
     
     for (int i = 0; i < faceConstraints.size(); i++) {
         updateAxis(i);
-		faceConstraintsCompute->dispatch(int(((faceConstraints.size()) + VGS_THREADS + 1) / (VGS_THREADS)));
+		faceConstraintsCompute->dispatch(int(((faceConstraints[i].size()) + VGS_THREADS + 1) / (VGS_THREADS)));
     }
 
     postVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);
-}
-
-vec4 PBD::project(vec4 x, vec4 y) {
-    return (glm::dot(y, x) / glm::dot(y, y)) * y;
 }
 
 void PBD::setSimValuesFromUI(const MDagPath& dagPath) {
