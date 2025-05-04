@@ -138,6 +138,8 @@
     <ClInclude Include="directx\directx.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="voxelizer.h" />
+    <ClInclude Include="voxeldragcontext.h" />
+    <ClInclude Include="voxeldragcontextcommand.h" />
     <ClInclude Include="constants.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\transformVerticesCompute.h" />

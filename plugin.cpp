@@ -4,6 +4,7 @@
 #include "voxelsimulationnode.h"
 #include <maya/MFnMessageAttribute.h>
 #include <windows.h>
+#include "voxeldragcontextcommand.h"
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -25,11 +26,11 @@ void plugin::simulate(void* clientData) {
 	MGlobal::executeCommand("refresh");
 }
 
-void plugin::onPlaybackChange(bool state, void* clientData) {
-	if (state) {
-		MGlobal::displayInfo("Playback started.");
+void plugin::onPlaybackChange(bool isPlayingBack, void* clientData) {
+	if (isPlayingBack) {
+		MGlobal::executeCommand("setToolTo voxelDragContextCommand1");
 	} else {
-		MGlobal::displayInfo("Playback stopped.");
+		MGlobal::executeCommand("setToolTo selectSuperContext");
 	}
 }
 
@@ -341,6 +342,13 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	status = plugin.registerContextCommand("voxelDragContextCommand", VoxelDragContextCommand::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelDragContextCommand");
+		return status;
+	}
+	MGlobal::executeCommand("voxelDragContextCommand");
+
 	return status;
 }
 
@@ -352,6 +360,10 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	status = plugin.deregisterCommand("VoxelDestroyer");
 	if (!status)
 		status.perror("deregisterCommand failed");
+
+	status = plugin.deregisterContextCommand("voxelDragContextCommand");
+	if (!status)
+		status.perror("deregisterContextCommand failed");
 
 	// Deregister the callbacks
 	MEventMessage::removeCallback(plugin::getCallbackId("timeChanged"));
