@@ -78,17 +78,17 @@ void main(
 )
 {
     uint constraintIdx = globalThreadId.x;
-	int currentAxis = (int)AXIS;
+	int currentAxis = int(AXIS);
 
     // Get the constraint data from the buffer
     FaceConstraint constraint;
 	if (currentAxis == 0) {
         constraint = xConstraints[constraintIdx];
 	}
-	else if (currentAxis == 1.f) {
+	else if (currentAxis == 1) {
 		constraint = yConstraints[constraintIdx];
 	}
-	else if (currentAxis == 2.f) {
+	else if (currentAxis == 2) {
 		constraint = zConstraints[constraintIdx];
 	}
 
