@@ -107,8 +107,8 @@ private:
         vgsCompute->updateVoxelSimInfo(vgsInfo);
     }
 
-    void updateSimInfo(float ge, float gce, float gcy, float ts) {
-        simInfo = glm::vec4(ge, gce, gcy, ts);
+    void updateSimInfo(float gs, float gce, float gcy, float ts) {
+        simInfo = glm::vec4(gs, gce, gcy, ts);
 		vgsCompute->updateVoxelSimInfo(vgsInfo);
     }
 };
