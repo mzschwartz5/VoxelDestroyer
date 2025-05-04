@@ -38,7 +38,7 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 
 	MGlobal::displayInfo("Transform vertices compute shader initialized.");
 
-    setSimValuesFromUI(meshDagPath);
+    //setSimValuesFromUI(meshDagPath);
 
     vgsInfo[0] = glm::vec4(RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME);
     vgsInfo[1] = glm::vec4(3.0, 0, FTF_RELAXATION, FTF_BETA); //iter count, axis, padding, padding
@@ -220,15 +220,49 @@ void PBD::setSimValuesFromUI(const MDagPath& dagPath) {
         return;
     }
 
+	MPlug gravityStrengthPlug = voxelSimNodeFn.findPlug("gravityStrength", false, &status);
+	if (status != MS::kSuccess) {
+		MGlobal::displayError("Failed to find gravityStrength attribute.");
+		return;
+	}
+
+	MPlug faceToFaceRelaxationPlug = voxelSimNodeFn.findPlug("faceToFaceRelaxation", false, &status);
+	if (status != MS::kSuccess) {
+		MGlobal::displayError("Failed to find faceToFaceRelaxation attribute.");
+		return;
+	}
+
+	MPlug faceToFaceEdgeUniformityPlug = voxelSimNodeFn.findPlug("faceToFaceEdgeUniformity", false, &status);
+	if (status != MS::kSuccess) {
+		MGlobal::displayError("Failed to find faceToFaceEdgeUniformity attribute.");
+		return;
+	}
+
     float relaxationValue;
     float edgeUniformityValue;
+	float gravityStrengthValue;
+	float faceToFaceRelaxationValue;
+	float faceToFaceEdgeUniformityValue;
 
     relaxationPlug.getValue(relaxationValue);
     edgeUniformityPlug.getValue(edgeUniformityValue);
+	gravityStrengthPlug.getValue(gravityStrengthValue);
+	faceToFaceRelaxationPlug.getValue(faceToFaceRelaxationValue);
+	faceToFaceEdgeUniformityPlug.getValue(faceToFaceEdgeUniformityValue);
 
     // Display the values
     RELAXATION = relaxationValue;
     MGlobal::displayInfo("Set relaxation to: " + MString() + relaxationValue + " for " + dagPath.fullPathName());
 	BETA = edgeUniformityValue;
     MGlobal::displayInfo("Set edge uniformity to: " + MString() + edgeUniformityValue + " for " + dagPath.fullPathName());
+	GRAVITY_STRENGTH = gravityStrengthValue;
+	MGlobal::displayInfo("Set gravity strength to: " + MString() + gravityStrengthValue + " for " + dagPath.fullPathName());
+	FTF_RELAXATION = faceToFaceRelaxationValue;
+	MGlobal::displayInfo("Set face to face relaxation to: " + MString() + faceToFaceRelaxationValue + " for " + dagPath.fullPathName());
+	FTF_BETA = faceToFaceEdgeUniformityValue;
+	MGlobal::displayInfo("Set face to face edge uniformity to: " + MString() + faceToFaceEdgeUniformityValue + " for " + dagPath.fullPathName());
+
+	// Update the simulation values
+    updateVGSInfo();
+	updateSimInfo();
 }

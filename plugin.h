@@ -65,9 +65,10 @@ public:
 		return MStatus::kSuccess;
 	}
 
+	static PBD pbdSimulator;
+
 private:
 	static MCallbackId callbackId;
 	static Voxelizer voxelizer;
-	static PBD pbdSimulator;
 	static MDagPath voxelizedMeshDagPath;
 };

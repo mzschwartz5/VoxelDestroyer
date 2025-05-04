@@ -4,6 +4,9 @@ global proc AEVoxelSimulationNodeTemplate(string $nodeName)
 
     editorTemplate -label "Relaxation" -addControl "relaxation" ;
     editorTemplate -label "Edge Uniformity" -addControl "edgeUniformity";
+    editorTemplate -label "Face to Face Relaxation" -addControl "faceToFaceRelaxation";
+    editorTemplate -label "Face to Face Edge Uniformity" -addControl "faceToFaceEdgeUniformity";
+    editorTemplate -label "Gravity Strength" -addControl "gravityStrength";
 
     editorTemplate -suppress "frozen";
     editorTemplate -suppress "caching";

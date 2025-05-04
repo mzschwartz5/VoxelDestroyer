@@ -49,6 +49,23 @@ public:
     void updateMeshVertices();
     
 	Particles getParticles() const { return particles; }
+
+	void setRelaxation(float relaxation) { RELAXATION = relaxation; }
+	void setBeta(float beta) { BETA = beta; }
+	void setFTFRelaxation(float relaxation) { FTF_RELAXATION = relaxation; }
+	void setFTFBeta(float beta) { FTF_BETA = beta; }
+	void setGravityStrength(float strength) { GRAVITY_STRENGTH = strength; }
+
+    void updateVGSInfo() {
+        vgsInfo[0] = glm::vec4(RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME);
+        vgsInfo[1] = glm::vec4(3.0, 0.0, FTF_RELAXATION, FTF_BETA);
+        vgsCompute->updateVoxelSimInfo(vgsInfo);
+    }
+
+    void updateSimInfo() {
+        simInfo = glm::vec4(GRAVITY_STRENGTH, GROUND_COLLISION_ENABLED, GROUND_COLLISION_Y, TIMESTEP);
+        preVGSCompute->updateSimConstants(&simInfo);
+    }
     
 private:
     Particles particles;
@@ -105,10 +122,5 @@ private:
     void updateAxis(int axis) {
         vgsInfo[1][1] = float(axis);
         vgsCompute->updateVoxelSimInfo(vgsInfo);
-    }
-
-    void updateSimInfo(float gs, float gce, float gcy, float ts) {
-        simInfo = glm::vec4(gs, gce, gcy, ts);
-		vgsCompute->updateVoxelSimInfo(vgsInfo);
     }
 };

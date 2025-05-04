@@ -68,14 +68,15 @@ MStatus plugin::doIt(const MArgList& argList)
 		plugin::voxelizedMeshDagPath,
 		status
 	);
-
-	plugin::createVoxelSimulationNode();
 	
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
 
 	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
 	plugin::pbdSimulator.initialize(voxels, voxelSize, plugin::voxelizedMeshDagPath);
 	MGlobal::displayInfo("PBD particles initialized.");
+
+
+	plugin::createVoxelSimulationNode();
 
 	return status;
 }
@@ -234,6 +235,7 @@ void plugin::createVoxelSimulationNode() {
         MGlobal::displayError("Failed to create VoxelSimulationNode: " + status.errorString());
         return;
     }
+
 
     // Add a message attribute to the voxelized mesh's transform node
     MFnDagNode dagNode(plugin::voxelizedMeshDagPath.transform(&status));
