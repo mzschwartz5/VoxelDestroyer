@@ -147,7 +147,6 @@ void main(
     }
 
     // Check if constraint should be broken due to tension/compression
-    bool breakConstraint = false;
     for (int i = 0; i < 4; i++)
     {
         float3 u = faceTwo[i] - faceOne[i];
@@ -160,16 +159,9 @@ void main(
 
         if (strain > tensionLimit || strain < compressionLimit)
         {
-            breakConstraint = true;
+            breakConstraint(constraintIdx);
             break;
         }
-    }
-
-    if (breakConstraint)
-    {
-        //THIS IS BROKEN
-        //breakConstraint(constraintIdx);
-        return;
     }
 
     // Calculate midpoint face center
@@ -225,8 +217,8 @@ void main(
         if (V < 0.0f)
         {
             // Break constraint due to volume inversion
-            // THIS IS BROKEN
-            //breakConstraint(constraintIdx);
+            // THIS IS BROKEN - we should never get here
+            breakConstraint(constraintIdx);
             return;
         }
 
@@ -301,7 +293,8 @@ void main(
             if (V < 0.0f)
             {
                 // Break constraint due to flipping
-                //breakConstraint(constraintIdx);
+                // this is also broken...
+                breakConstraint(constraintIdx);
                 return;
             }
 
