@@ -57,7 +57,7 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         vgsCompute->getVoxelSimInfoBuffer()
 	);
 
-	simInfo = glm::vec4(GRAVITY_ENABLED, GROUND_COLLISION_ENABLED, GROUND_COLLISION_Y, 0.0f);
+	simInfo = glm::vec4(GRAVITY_STRENGTH, GROUND_COLLISION_ENABLED, GROUND_COLLISION_Y, TIMESTEP);
 
     preVGSCompute = std::make_unique<PreVGSCompute>(
         particles.numParticles,

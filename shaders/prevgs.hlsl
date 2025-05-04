@@ -1,4 +1,3 @@
-#define TIMESTEP 0.00166666666666667f // (60FPS with 10 substeps)
 
 StructuredBuffer<float> weights : register(t0);
 RWStructuredBuffer<float4> positions : register(u0);
@@ -7,10 +6,10 @@ RWStructuredBuffer<float4> velocities : register(u2);
 
 cbuffer VoxelSimBuffer : register(b0)
 {
-    float GRAVITY_ENABLED;
+    float GRAVITY_STRENGTH;
     float GROUND_ENABLED;
     float GROUND_Y;
-    float PADDING;
+    float TIMESTEP;
 };
 
 [numthreads(VGS_THREADS, 1, 1)]
@@ -24,7 +23,7 @@ void main(uint3 gId : SV_DispatchThreadID)
 
     oldPositions[gId.x] = positions[gId.x];
     // TODO: it may be possible to do this velocity update at the end of the PBD step, and not have to bind it to this shader.
-    if (GRAVITY_ENABLED == 1.f) velocities[gId.x] += float4(0, -10.0, 0, 0) * TIMESTEP; // Gravity
+    velocities[gId.x] += float4(0, GRAVITY_STRENGTH, 0, 0) * TIMESTEP; // Gravity
     positions[gId.x] += velocities[gId.x] * TIMESTEP; // Update position
 
     // For now, lump ground collision into this shader

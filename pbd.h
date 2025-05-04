@@ -90,9 +90,10 @@ private:
     float FTF_BETA{ 0.f };
     float FTF_RELAXATION{ 0.75f };
 
-	float GRAVITY_ENABLED{ 1.f };
+	float GRAVITY_STRENGTH { -10.f };
 	float GROUND_COLLISION_ENABLED{ 1.f };
 	float GROUND_COLLISION_Y{ 0.f };
+    float TIMESTEP{ 0.00166666666666667f };
 
     void setRadiusAndVolumeFromLength(float edge_length) {
         PARTICLE_RADIUS = edge_length * 0.25f;
@@ -106,8 +107,8 @@ private:
         vgsCompute->updateVoxelSimInfo(vgsInfo);
     }
 
-    void updateSimInfo(float ge, float gce, float gcy) {
-        simInfo = glm::vec4(ge, gce, gcy, 0.0f);
+    void updateSimInfo(float ge, float gce, float gcy, float ts) {
+        simInfo = glm::vec4(ge, gce, gcy, ts);
 		vgsCompute->updateVoxelSimInfo(vgsInfo);
     }
 };
