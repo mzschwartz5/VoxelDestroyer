@@ -15,8 +15,8 @@ cbuffer VoxelSimBuffer : register(b0)
     float VOXEL_REST_VOLUME;
     float ITER_COUNT;
     float AXIS;
-    float PADDING_1;
-    float PADDING_2;
+    float FTF_RELAXATION;
+    float FTF_BETA;
 };
 
 RWStructuredBuffer<float4> positions : register(u0);
@@ -25,39 +25,28 @@ RWStructuredBuffer<FaceConstraint> yConstraints : register(u2);
 RWStructuredBuffer<FaceConstraint> zConstraints : register(u3);
 StructuredBuffer<float> weights : register(t0);
 
-// Helper functions
-float3 cross(float3 a, float3 b)
-{
-    return float3(
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x
-    );
-}
-
-float dot(float3 a, float3 b)
-{
-    return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-float length(float3 v)
-{
-    return sqrt(dot(v, v));
-}
-
-float3 normalize(float3 v)
-{
-    float len = length(v);
-    return len > 1e-6f ? v / len : float3(0, 0, 0);
-}
-
 float3 project(float3 u, float3 v)
 {
     const float eps = 1e-12f;
     return dot(v, u) / (dot(u, u) + eps) * u;
 }
 
-[numthreads(256, 1, 1)]
+void breakConstraint(int constraintIdx) {
+    if (AXIS == 0) {
+        xConstraints[constraintIdx].voxelOneIdx = -1;
+        xConstraints[constraintIdx].voxelTwoIdx = -1;
+    }
+    else if (AXIS == 1) {
+        yConstraints[constraintIdx].voxelOneIdx = -1;
+        yConstraints[constraintIdx].voxelTwoIdx = -1;
+    }
+    else if (AXIS == 2) {
+        zConstraints[constraintIdx].voxelOneIdx = -1;
+        zConstraints[constraintIdx].voxelTwoIdx = -1;
+    }
+}
+
+[numthreads(VGS_THREADS, 1, 1)]
 void main(
     uint3 globalThreadId : SV_DispatchThreadID,
     uint3 groupId : SV_GroupID,
@@ -74,16 +63,13 @@ void main(
 	else if (AXIS == 1) {
 		constraint = yConstraints[constraintIdx];
 	}
-	else {
+	else if (AXIS == 2) {
 		constraint = zConstraints[constraintIdx];
 	}
     
-
-    // Extract voxel indices from the constraint
     int voxelOneIdx = constraint.voxelOneIdx;
     int voxelTwoIdx = constraint.voxelTwoIdx;
 
-    // Check if constraint is broken
     if (voxelOneIdx == -1 || voxelTwoIdx == -1)
     {
         return;
@@ -107,7 +93,7 @@ void main(
         faceOneIndices[0] = 2; faceOneIndices[1] = 3; faceOneIndices[2] = 6; faceOneIndices[3] = 7;
         faceTwoIndices[0] = 0; faceTwoIndices[1] = 1; faceTwoIndices[2] = 4; faceTwoIndices[3] = 5;
     }
-    else // z-axis
+    else if (AXIS == 2) // z-axis
     {
         faceOneIndices[0] = 4; faceOneIndices[1] = 5; faceOneIndices[2] = 6; faceOneIndices[3] = 7;
         faceTwoIndices[0] = 0; faceTwoIndices[1] = 1; faceTwoIndices[2] = 2; faceTwoIndices[3] = 3;
@@ -161,28 +147,21 @@ void main(
     }
 
     // Check if constraint should be broken due to tension/compression
-    bool breakConstraint = false;
     for (int i = 0; i < 4; i++)
     {
         float3 u = faceTwo[i] - faceOne[i];
         float L = length(u);
         float strain = (L - 2.0f * PARTICLE_RADIUS) / (2.0f * PARTICLE_RADIUS);
 
-        // Assuming tension/compression limits, adjust based on your actual values
+        // Assuming tension/compression limits
         float tensionLimit = constraint.tensionLimit;
         float compressionLimit = constraint.compressionLimit;
 
         if (strain > tensionLimit || strain < compressionLimit)
         {
-            breakConstraint = true;
+            breakConstraint(constraintIdx);
             break;
         }
-    }
-
-    if (breakConstraint)
-    {
-        // Mark constraint as broken in your data structure
-        return;
     }
 
     // Calculate midpoint face center
@@ -238,6 +217,8 @@ void main(
         if (V < 0.0f)
         {
             // Break constraint due to volume inversion
+            // THIS IS BROKEN - we should never get here
+            breakConstraint(constraintIdx);
             return;
         }
 
@@ -279,8 +260,6 @@ void main(
     else
     {
         // No static voxels - apply iterative shape preservation
-        float alpha = 0.9f;
-        float alphaLen = 0.9f;
 
         for (int iter = 0; iter < ITER_COUNT; iter++)
         {
@@ -303,9 +282,9 @@ void main(
             centerOfVoxels *= 0.125f;
 
             // Apply orthogonalization
-            float3 u0 = dp[0] - alpha * (project(dp[1], dp[0]) + project(dp[2], dp[0]));
-            float3 u1 = dp[1] - alpha * (project(dp[0], dp[1]) + project(dp[2], dp[1]));
-            float3 u2 = dp[2] - alpha * (project(dp[0], dp[2]) + project(dp[1], dp[2]));
+            float3 u0 = dp[0] - FTF_RELAXATION * (project(dp[1], dp[0]) + project(dp[2], dp[0]));
+            float3 u1 = dp[1] - FTF_RELAXATION * (project(dp[0], dp[1]) + project(dp[2], dp[1]));
+            float3 u2 = dp[2] - FTF_RELAXATION * (project(dp[0], dp[2]) + project(dp[1], dp[2]));
 
             // Check for flipping
             float V = dot(cross(u0, u1), u2);
@@ -314,6 +293,8 @@ void main(
             if (V < 0.0f)
             {
                 // Break constraint due to flipping
+                // this is also broken...
+                breakConstraint(constraintIdx);
                 return;
             }
 
@@ -323,10 +304,10 @@ void main(
 
             float r_v = pow(PARTICLE_RADIUS * PARTICLE_RADIUS * PARTICLE_RADIUS / (lenp.x * lenp.y * lenp.z), 0.3333f);
 
-            // Scale change in position based on alpha
-            dp[0] = u0 / lenu.x * lerp(PARTICLE_RADIUS, lenp.x * r_v, alphaLen);
-            dp[1] = u1 / lenu.y * lerp(PARTICLE_RADIUS, lenp.y * r_v, alphaLen);
-            dp[2] = u2 / lenu.z * lerp(PARTICLE_RADIUS, lenp.z * r_v, alphaLen);
+            // Scale change in position based on beta
+            dp[0] = u0 / lenu.x * lerp(PARTICLE_RADIUS, lenp.x * r_v, FTF_BETA);
+            dp[1] = u1 / lenu.y * lerp(PARTICLE_RADIUS, lenp.y * r_v, FTF_BETA);
+            dp[2] = u2 / lenu.z * lerp(PARTICLE_RADIUS, lenp.z * r_v, FTF_BETA);
 
             // Save original midpoint positions
             float3 origFaceOne[4];

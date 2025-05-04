@@ -56,9 +56,6 @@
     <ClInclude Include="utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="voxelsimulationode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="directx\compute\bindverticescompute.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -72,6 +69,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="directx\compute\faceconstraintscompute.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="voxelsimulationnode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

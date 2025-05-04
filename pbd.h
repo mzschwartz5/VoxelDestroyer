@@ -49,6 +49,23 @@ public:
     void updateMeshVertices();
     
 	Particles getParticles() const { return particles; }
+
+	void setRelaxation(float relaxation) { RELAXATION = relaxation; }
+	void setBeta(float beta) { BETA = beta; }
+	void setFTFRelaxation(float relaxation) { FTF_RELAXATION = relaxation; }
+	void setFTFBeta(float beta) { FTF_BETA = beta; }
+	void setGravityStrength(float strength) { GRAVITY_STRENGTH = strength; }
+
+    void updateVGSInfo() {
+        vgsInfo[0] = glm::vec4(RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME);
+        vgsInfo[1] = glm::vec4(3.0, 0.0, FTF_RELAXATION, FTF_BETA);
+        vgsCompute->updateVoxelSimInfo(vgsInfo);
+    }
+
+    void updateSimInfo() {
+        simInfo = glm::vec4(GRAVITY_STRENGTH, GROUND_COLLISION_ENABLED, GROUND_COLLISION_Y, TIMESTEP);
+        preVGSCompute->updateSimConstants(&simInfo);
+    }
     
 private:
     Particles particles;
@@ -56,7 +73,9 @@ private:
     int substeps = 10;
     float timeStep;
     MDagPath meshDagPath;
-    std::array<glm::vec4, 2> voxelSimInfo;
+
+    std::array<glm::vec4, 2> vgsInfo;
+    glm::vec4 simInfo;
 
     // Shaders
 	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
@@ -70,18 +89,28 @@ private:
     
     void simulateSubstep();
 
-    void constructFaceToFaceConstraints(const Voxels& voxels);
+    void constructFaceToFaceConstraints(const Voxels& voxels, 
+        float xTension, float xCompression,
+        float yTension, float yCompression,
+        float zTension, float zCompression);
 
     void createParticles(const Voxels& voxels);
 
     void setSimValuesFromUI(const MDagPath& dagPath);
 
-    vec4 project(vec4 x, vec4 y);
-
     float BETA{ 0.99f };
     float PARTICLE_RADIUS{ 0.1f };
+
     float RELAXATION{ 0.5f };
     float VOXEL_REST_VOLUME{ 1.0f };
+
+    float FTF_BETA{ 0.f };
+    float FTF_RELAXATION{ 0.75f };
+
+	float GRAVITY_STRENGTH { -10.f };
+	float GROUND_COLLISION_ENABLED{ 1.f };
+	float GROUND_COLLISION_Y{ 0.f };
+    float TIMESTEP{ 0.00166666666666667f };
 
     void setRadiusAndVolumeFromLength(float edge_length) {
         PARTICLE_RADIUS = edge_length * 0.25f;
@@ -91,7 +120,7 @@ private:
     void addFaceConstraint(FaceConstraint constraint, int axis) { faceConstraints[axis].push_back(constraint); };
 
     void updateAxis(int axis) {
-        voxelSimInfo[1][1] = float(axis);
-        vgsCompute->updateVoxelSimInfo(voxelSimInfo);
+        vgsInfo[1][1] = float(axis);
+        vgsCompute->updateVoxelSimInfo(vgsInfo);
     }
 };

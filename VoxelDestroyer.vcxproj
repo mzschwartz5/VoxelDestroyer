@@ -138,7 +138,6 @@
     <ClInclude Include="directx\directx.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="voxelizer.h" />
-    <ClInclude Include="voxelsimulationode.h" />
     <ClInclude Include="constants.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\transformVerticesCompute.h" />
@@ -146,6 +145,7 @@
     <ClInclude Include="directx\compute\vgscompute.h" />
     <ClInclude Include="directx\compute\prevgscompute.h" />
     <ClInclude Include="directx\compute\postvgscompute.h" />
+    <ClInclude Include="voxelsimulationnode.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="plugin.cpp" />
