@@ -15,8 +15,8 @@ cbuffer VoxelSimBuffer : register(b0)
     float VOXEL_REST_VOLUME;
     float ITER_COUNT;
     float AXIS;
-    float PADDING_1;
-    float PADDING_2;
+    float FTF_RELAXATION;
+    float FTF_BETA;
 };
 
 RWStructuredBuffer<float4> positions : register(u0);
@@ -57,6 +57,19 @@ float3 project(float3 u, float3 v)
     return dot(v, u) / (dot(u, u) + eps) * u;
 }
 
+void breakConstraint(int constraintIdx, int currentAxis) {
+    if (currentAxis == 0) {
+        xConstraints[constraintIdx].voxelOneIdx = -1;
+        xConstraints[constraintIdx].voxelTwoIdx = -1;
+    } else if (currentAxis == 1) {
+        yConstraints[constraintIdx].voxelOneIdx = -1;
+        yConstraints[constraintIdx].voxelTwoIdx = -1;
+    } else if (currentAxis == 2) {
+        zConstraints[constraintIdx].voxelOneIdx = -1;
+		zConstraints[constraintIdx].voxelTwoIdx = -1;
+    }
+}
+
 [numthreads(256, 1, 1)]
 void main(
     uint3 globalThreadId : SV_DispatchThreadID,
@@ -65,19 +78,19 @@ void main(
 )
 {
     uint constraintIdx = globalThreadId.x;
+	int currentAxis = (int)AXIS;
 
     // Get the constraint data from the buffer
     FaceConstraint constraint;
-	if (AXIS == 0) {
+	if (currentAxis == 0) {
         constraint = xConstraints[constraintIdx];
 	}
-	else if (AXIS == 1) {
+	else if (currentAxis == 1.f) {
 		constraint = yConstraints[constraintIdx];
 	}
-	else {
+	else if (currentAxis == 2.f) {
 		constraint = zConstraints[constraintIdx];
 	}
-    
 
     // Extract voxel indices from the constraint
     int voxelOneIdx = constraint.voxelOneIdx;
@@ -97,17 +110,17 @@ void main(
     uint faceTwoIndices[4];
 
     // Define face indices based on axis
-    if (AXIS == 0) // x-axis
+    if (currentAxis == 0) // x-axis
     {
         faceOneIndices[0] = 1; faceOneIndices[1] = 3; faceOneIndices[2] = 5; faceOneIndices[3] = 7;
         faceTwoIndices[0] = 0; faceTwoIndices[1] = 2; faceTwoIndices[2] = 4; faceTwoIndices[3] = 6;
     }
-    else if (AXIS == 1) // y-axis
+    else if (currentAxis == 1) // y-axis
     {
         faceOneIndices[0] = 2; faceOneIndices[1] = 3; faceOneIndices[2] = 6; faceOneIndices[3] = 7;
         faceTwoIndices[0] = 0; faceTwoIndices[1] = 1; faceTwoIndices[2] = 4; faceTwoIndices[3] = 5;
     }
-    else // z-axis
+    else if (currentAxis == 2) // z-axis
     {
         faceOneIndices[0] = 4; faceOneIndices[1] = 5; faceOneIndices[2] = 6; faceOneIndices[3] = 7;
         faceTwoIndices[0] = 0; faceTwoIndices[1] = 1; faceTwoIndices[2] = 2; faceTwoIndices[3] = 3;
@@ -181,8 +194,7 @@ void main(
 
     if (breakConstraint)
     {
-        voxelOneIdx = -1;
-        voxelTwoIdx = -1;
+        breakConstraint(constraintIdx, currentAxis);
         return;
     }
 
@@ -220,7 +232,7 @@ void main(
         }
 
         // Calculate normal vector based on axis
-        if (AXIS == 0 || AXIS == 2)
+        if (currentAxis == 0 || currentAxis == 2)
         {
             u0 = cross(u1, u2);
         }
@@ -239,6 +251,7 @@ void main(
         if (V < 0.0f)
         {
             // Break constraint due to volume inversion
+            breakConstraint(constraintIdx, currentAxis);
             return;
         }
 
@@ -280,8 +293,8 @@ void main(
     else
     {
         // No static voxels - apply iterative shape preservation
-        float alpha = 0.9f;
-        float alphaLen = 0.9f;
+        float alpha = FTF_RELAXATION;
+        float alphaLen = FTF_BETA;
 
         for (int iter = 0; iter < ITER_COUNT; iter++)
         {
@@ -310,13 +323,12 @@ void main(
 
             // Check for flipping
             float V = dot(cross(u0, u1), u2);
-            if (AXIS == 1) V = -V; // Hack from GPU code
+            if (currentAxis == 1) V = -V; // Hack from GPU code
 
             if (V < 0.0f)
             {
                 // Break constraint due to flipping
-                voxelOneIdx = -1;
-				voxelTwoIdx = -1;
+                breakConstraint(constraintIdx, currentAxis);
                 return;
             }
 

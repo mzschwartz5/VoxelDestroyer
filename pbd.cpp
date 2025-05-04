@@ -41,7 +41,7 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
     setSimValuesFromUI(meshDagPath);
 
     voxelSimInfo[0] = glm::vec4(RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME);
-    voxelSimInfo[1] = glm::vec4(3.0, 0, 0, 0); //iter count, axis, padding, padding
+    voxelSimInfo[1] = glm::vec4(3.0, 0, FTF_RELAXATION, FTF_BETA); //iter count, axis, padding, padding
 
     vgsCompute = std::make_unique<VGSCompute>(
         particles.numParticles,
@@ -161,7 +161,9 @@ void PBD::simulateSubstep() {
     
     for (int i = 0; i < faceConstraints.size(); i++) {
         updateAxis(i);
-		faceConstraintsCompute->dispatch(int(((faceConstraints.size()) + VGS_THREADS + 1) / (VGS_THREADS)));
+		int ftfSizeInt = int(faceConstraints[i].size());
+		int numFtfWorkgroups = (ftfSizeInt + VGS_THREADS + 1) / (VGS_THREADS);
+        faceConstraintsCompute->dispatch(numFtfWorkgroups);
     }
 
     postVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);

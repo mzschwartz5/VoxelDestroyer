@@ -78,10 +78,14 @@ private:
 
     vec4 project(vec4 x, vec4 y);
 
-    float BETA{ 0.99f };
-    float PARTICLE_RADIUS{ 0.1f };
     float RELAXATION{ 0.5f };
+    float BETA{ 0.99f };
+
+    float PARTICLE_RADIUS{ 0.1f };
     float VOXEL_REST_VOLUME{ 1.0f };
+
+    float FTF_RELAXATION{ 0.9f };
+	float FTF_BETA{ 0.99f };
 
     void setRadiusAndVolumeFromLength(float edge_length) {
         PARTICLE_RADIUS = edge_length * 0.25f;
