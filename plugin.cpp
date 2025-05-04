@@ -341,6 +341,8 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 	MGlobal::executeCommand("voxelDragContextCommand");
+	// TODO: remove after testing. Move to button call.
+	MGlobal::executeCommand("setToolTo voxelDragContextCommand1");
 
 	return status;
 }
@@ -348,6 +350,8 @@ EXPORT MStatus initializePlugin(MObject obj)
 // Cleanup Plugin upon unloading
 EXPORT MStatus uninitializePlugin(MObject obj)
 {
+	MGlobal::executeCommand("VoxelizerMenu_removeFromShelf");
+
 	MStatus status;
 	MFnPlugin plugin(obj);
 	status = plugin.deregisterCommand("VoxelDestroyer");
@@ -365,8 +369,6 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	if (!status) {
 		MGlobal::displayError("Failed to deregister VoxelSimulationNode");
 	}
-
-	MGlobal::executeCommand("VoxelizerMenu_removeFromShelf");
 
 	return status;
 }
