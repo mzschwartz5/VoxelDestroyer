@@ -181,7 +181,8 @@ void main(
 
     if (breakConstraint)
     {
-        // Mark constraint as broken in your data structure
+        voxelOneIdx = -1;
+        voxelTwoIdx = -1;
         return;
     }
 
@@ -314,6 +315,8 @@ void main(
             if (V < 0.0f)
             {
                 // Break constraint due to flipping
+                voxelOneIdx = -1;
+				voxelTwoIdx = -1;
                 return;
             }
 

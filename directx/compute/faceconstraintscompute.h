@@ -83,7 +83,7 @@ private:
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
         bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[0].size());
 		bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		bufferDesc.CPUAccessFlags = 0;
 		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[0].data();
@@ -107,7 +107,7 @@ private:
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 		bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[1].size());
 		bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		bufferDesc.CPUAccessFlags = 0;
 		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[1].data();
@@ -130,7 +130,7 @@ private:
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 		bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[2].size());
 		bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		bufferDesc.CPUAccessFlags = 0;
 		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[2].data();
