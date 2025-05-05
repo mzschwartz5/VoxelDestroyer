@@ -4,14 +4,17 @@
 #include "voxelsimulationnode.h"
 #include <maya/MFnMessageAttribute.h>
 #include <windows.h>
+#include "voxeldragcontextcommand.h"
+#include <maya/MTimerMessage.h>
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
 
 Voxelizer plugin::voxelizer = Voxelizer();
 PBD plugin::pbdSimulator{};
-MCallbackId plugin::callbackId = 0;
+std::unordered_map<std::string, MCallbackId> plugin::callbacks;
 MDagPath plugin::voxelizedMeshDagPath = MDagPath();
+VoxelRendererOverride* plugin::voxelRendererOverride = nullptr;
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -19,7 +22,9 @@ void* plugin::creator()
 	return new plugin;
 }
 
-void plugin::simulate(void* clientData) {
+void plugin::simulate(float elapsedTime, float lastTime, void* clientData) {
+	if (!plugin::pbdSimulator.isInitialized()) return;
+
 	plugin::pbdSimulator.simulateStep();
 	plugin::pbdSimulator.updateMeshVertices();
 	MGlobal::executeCommand("refresh");
@@ -77,6 +82,13 @@ MStatus plugin::doIt(const MArgList& argList)
 
 
 	plugin::createVoxelSimulationNode();
+		
+	VoxelDragContextCommand::setPBD(&plugin::pbdSimulator);
+	VoxelRendererOverride::setPBD(&plugin::pbdSimulator);
+
+	MGlobal::executeCommand("voxelDragContextCommand");
+	// TODO: remove after testing. Move to button call.
+	MGlobal::executeCommand("setToolTo voxelDragContextCommand1");
 
 	return status;
 }
@@ -302,6 +314,16 @@ void plugin::loadVoxelizerMenu() {
 	}
 }
 
+MString plugin::getActiveModelPanel() {
+	MString result;
+	MGlobal::executeCommand("playblast -ae", result);
+
+	// Parse the result to get the active model panel name (result is in form MainPane|viewPanes|modelPanel4|modelPanel4|modelPanel4)
+	MStringArray parts;
+	result.split('|', parts);
+	return parts[parts.length() - 1];
+}
+
 // Initialize Maya Plugin upon loading
 EXPORT MStatus initializePlugin(MObject obj)
 {
@@ -311,11 +333,19 @@ EXPORT MStatus initializePlugin(MObject obj)
 	if (!status)
 		status.perror("registerCommand failed");
 
-	status = plugin::setCallbackId(MEventMessage::addEventCallback("timeChanged", plugin::simulate));
+	plugin::voxelRendererOverride = new VoxelRendererOverride("VoxelRendererOverride");
+	status = MRenderer::theRenderer()->registerOverride(plugin::voxelRendererOverride);
 	if (!status) {
-		MGlobal::displayError("Failed to register callback");
+		MGlobal::displayError("Failed to register VoxelRendererOverride: " + status.errorString());
 		return status;
 	}
+
+	// TODO: potentially make this more robust / only allow in perspective panel?
+	MString activeModelPanel = plugin::getActiveModelPanel();
+	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
+
+	MCallbackId drawCallbackId = MTimerMessage::addTimerCallback(1.0f / 60.0f, plugin::simulate, NULL, &status);
+	plugin::setCallbackId("drawCallback", drawCallbackId);
 
 	// Initialize DirectX
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
@@ -333,27 +363,40 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	status = plugin.registerContextCommand("voxelDragContextCommand", VoxelDragContextCommand::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelDragContextCommand");
+		return status;
+	}
+
 	return status;
 }
 
 // Cleanup Plugin upon unloading
 EXPORT MStatus uninitializePlugin(MObject obj)
 {
+	MGlobal::executeCommand("VoxelizerMenu_removeFromShelf");
+	MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);
+	delete plugin::voxelRendererOverride;
+	plugin::voxelRendererOverride = nullptr;
+
 	MStatus status;
 	MFnPlugin plugin(obj);
 	status = plugin.deregisterCommand("VoxelDestroyer");
 	if (!status)
 		status.perror("deregisterCommand failed");
 
-	// Deregister the callback
-	MEventMessage::removeCallback(plugin::getCallbackId());
+	status = plugin.deregisterContextCommand("voxelDragContextCommand");
+	if (!status)
+		status.perror("deregisterContextCommand failed");
+
+	// Deregister the callbacks
+	MEventMessage::removeCallback(plugin::getCallbackId("drawCallback"));
 
 	status = plugin.deregisterNode(VoxelSimulationNode::id);
 	if (!status) {
 		MGlobal::displayError("Failed to deregister VoxelSimulationNode");
 	}
-
-	MGlobal::executeCommand("VoxelizerMenu_removeFromShelf");
 
 	return status;
 }

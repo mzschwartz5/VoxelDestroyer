@@ -23,6 +23,12 @@
 #include "voxelizer.h"
 #include "directx/directx.h"
 #include "constants.h"
+#include <maya/MConditionMessage.h>
+#include <unordered_map>
+#include <string>
+#include "voxelrendereroverride.h"
+#include <maya/MViewport2Renderer.h>
+using namespace MHWRender;
 
 
 struct PluginArgs {
@@ -45,7 +51,7 @@ public:
 	static void* creator();
 	static MSyntax syntax();
 	// A callback bound to the timeChanged event (e.g. moving the animation slider)
-	static void simulate(void* clientData);
+	static void simulate(float elapsedTime, float lastTime, void* clientData);
 	
 	// Compare the center of an object's bounding box to the center of the voxel grid
 	// to determine the closest object to the voxel grid (used as a fallback if nothing selected)
@@ -56,19 +62,23 @@ public:
 	static void createVoxelSimulationNode();
 	static void loadVoxelSimulationNodeEditorTemplate();
 	static void loadVoxelizerMenu();
+	static MString getActiveModelPanel();
 
-	static MCallbackId getCallbackId() { return plugin::callbackId; }
-	static MStatus setCallbackId(MCallbackId id) { 
-		if (id == 0) return MStatus::kFailure;
-		
-		plugin::callbackId = id; 
-		return MStatus::kSuccess;
+	static MCallbackId getCallbackId(std::string callbackName) { 
+		auto it = callbacks.find(callbackName); 
+		if (it != callbacks.end()) return it->second; 
+		return 0; 
 	}
 
+	static void setCallbackId(std::string callbackName, MCallbackId id) { 
+		callbacks[callbackName] = id;
+	}
+	
 	static PBD pbdSimulator;
-
+	static VoxelRendererOverride* voxelRendererOverride;
+	
 private:
-	static MCallbackId callbackId;
 	static Voxelizer voxelizer;
 	static MDagPath voxelizedMeshDagPath;
+	static std::unordered_map<std::string, MCallbackId> callbacks;
 };

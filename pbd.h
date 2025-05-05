@@ -15,6 +15,7 @@
 #include "directx/compute/prevgscompute.h"
 #include "directx/compute/postvgscompute.h"
 #include "directx/compute/faceconstraintscompute.h"
+#include "directx/compute/dragparticlescompute.h"
 
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
@@ -26,6 +27,7 @@
 #include <maya/MPlugArray.h>
 #include <maya/MItDag.h>
 #include <maya/MFnMesh.h>
+#include <maya/MMatrix.h>
 
 using glm::vec3;
 using glm::vec4;
@@ -47,7 +49,7 @@ public:
     void initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath);
     void simulateStep();
     void updateMeshVertices();
-    
+
 	Particles getParticles() const { return particles; }
 
 	void setRelaxation(float relaxation) { RELAXATION = relaxation; }
@@ -66,6 +68,26 @@ public:
         simInfo = glm::vec4(GRAVITY_STRENGTH, GROUND_COLLISION_ENABLED, GROUND_COLLISION_Y, TIMESTEP);
         preVGSCompute->updateSimConstants(&simInfo);
     }
+
+    bool isInitialized() const { return initialized; }
+    
+    void setIsDragging(bool isDragging) { this->isDragging = isDragging; }
+    
+    void updateDragValues(const DragValues& dragValues) {
+        dragParticlesCompute->updateDragValues(dragValues);
+    }
+    
+    void updateDepthResourceHandle(void* depthResourceHandle) {
+        if (dragParticlesCompute == nullptr) {
+            return;
+        }
+
+        dragParticlesCompute->updateDepthBuffer(depthResourceHandle);
+    }
+
+    void updateCameraMatrices(MMatrix viewProjMatrix, MMatrix invViewProjMatrix, int viewportWidth, int viewportHeight) {
+        dragParticlesCompute->updateCameraMatrices({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), mayaMatrixToGlm(viewProjMatrix), mayaMatrixToGlm(invViewProjMatrix)});
+    }
     
 private:
     Particles particles;
@@ -76,6 +98,8 @@ private:
 
     std::array<glm::vec4, 2> vgsInfo;
     glm::vec4 simInfo;
+    bool initialized = false;
+    bool isDragging = false;
 
     // Shaders
 	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
@@ -86,6 +110,7 @@ private:
 	std::unique_ptr<FaceConstraintsCompute> faceConstraintsCompute;
     std::unique_ptr<PreVGSCompute> preVGSCompute;
     std::unique_ptr<PostVGSCompute> postVGSCompute;
+    std::unique_ptr<DragParticlesCompute> dragParticlesCompute;
     
     void simulateSubstep();
 
@@ -96,7 +121,7 @@ private:
 
     void createParticles(const Voxels& voxels);
 
-    void setSimValuesFromUI(const MDagPath& dagPath);
+    void setSimValuesFromUI();
 
     float BETA{ 0.99f };
     float PARTICLE_RADIUS{ 0.1f };
@@ -122,5 +147,14 @@ private:
     void updateAxis(int axis) {
         vgsInfo[1][1] = float(axis);
         vgsCompute->updateVoxelSimInfo(vgsInfo);
+    }
+
+    inline glm::mat4 mayaMatrixToGlm(const MMatrix& matrix) {
+        return glm::mat4(
+            matrix(0, 0), matrix(1, 0), matrix(2, 0), matrix(3, 0),
+            matrix(0, 1), matrix(1, 1), matrix(2, 1), matrix(3, 1),
+            matrix(0, 2), matrix(1, 2), matrix(2, 2), matrix(3, 2),
+            matrix(0, 3), matrix(1, 3), matrix(2, 3), matrix(3, 3)
+        );
     }
 };
