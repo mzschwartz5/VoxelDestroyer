@@ -50,7 +50,11 @@ public:
             return MS::kSuccess;
         }
 
-        pbdSimulator->updateDragValues({ dragX, dragY, distX, distY, selectRadius });
+        // For the PBD simulation, we want the distance dragged *since the last time this event fired*.
+        // And we want to pass the position of the mouse *before* this drag event.
+        distX = dragX - mouseX;
+        distY = dragY - mouseY;
+        pbdSimulator->updateDragValues({ mouseX, mouseY, distX, distY, selectRadius });
 
         // Only update the circle position if we're not resizing it.
         mouseX = dragX;

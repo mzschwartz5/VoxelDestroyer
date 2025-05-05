@@ -76,7 +76,8 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
     );
 
     dragParticlesCompute = std::make_unique<DragParticlesCompute>(
-        bindVerticesCompute->getParticlesUAV()
+        bindVerticesCompute->getParticlesUAV(),
+        preVGSCompute->getOldPositionsSRV()
     );
 
     initialized = true;
@@ -168,9 +169,12 @@ void PBD::simulateSubstep() {
     int numPreAndPostVgsComputeWorkgroups = (particles.numParticles + VGS_THREADS + 1) / (VGS_THREADS);
     preVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);
 
-    dragParticlesCompute->dispatch(1);
-
     int numVgsWorkgroups = ((particles.numParticles >> 3) + VGS_THREADS + 1) / (VGS_THREADS); 
+
+    if (isDragging) {
+        dragParticlesCompute->dispatch(numVgsWorkgroups);
+    }
+
     vgsCompute->dispatch(numVgsWorkgroups);
     
     for (int i = 0; i < faceConstraints.size(); i++) {

@@ -2,6 +2,7 @@
 #include <maya/MViewport2Renderer.h>
 #include <maya/MRenderTargetManager.h>
 #include <maya/MGlobal.h>
+#include <maya/MMatrix.h>
 #include "pbd.h"
 using namespace MHWRender;
 
@@ -32,7 +33,14 @@ public:
             return MStatus::kFailure;
         }
 
+        MMatrix viewProjMatrix = mFrameContext->getMatrix(MFrameContext::kViewProjMtx);
+        MMatrix invViewProjMatrix = mFrameContext->getMatrix(MFrameContext::kViewProjInverseMtx);
+
+        int viewPortWidth, viewPortHeight, viewPortOriginX, viewPortOriginY;
+        mFrameContext->getViewportDimensions(viewPortOriginX, viewPortOriginY, viewPortWidth, viewPortHeight);
+
         if (pbdSimulator) {
+            pbdSimulator->updateCameraMatrices(viewProjMatrix, invViewProjMatrix, viewPortWidth, viewPortHeight);
             pbdSimulator->updateDepthResourceHandle(depthTarget->resourceHandle());
         } 
         

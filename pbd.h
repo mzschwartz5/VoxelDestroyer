@@ -27,6 +27,7 @@
 #include <maya/MPlugArray.h>
 #include <maya/MItDag.h>
 #include <maya/MFnMesh.h>
+#include <maya/MMatrix.h>
 
 using glm::vec3;
 using glm::vec4;
@@ -38,15 +39,6 @@ struct Particles
     std::vector<vec4> velocities;
     std::vector<float> w; // inverse mass
     int numParticles{ 0 };
-};
-
-struct DragValues
-{
-    short mouseX{ 0 };
-    short mouseY{ 0 };
-    short distX{ 0 };
-    short distY{ 0 };
-    float dragRadius{ 0.0f };
 };
 
 class PBD
@@ -78,16 +70,23 @@ public:
     }
 
     bool isInitialized() const { return initialized; }
+    
     void setIsDragging(bool isDragging) { this->isDragging = isDragging; }
+    
     void updateDragValues(const DragValues& dragValues) {
-        this->dragValues = dragValues;
+        dragParticlesCompute->updateDragValues(dragValues);
     }
+    
     void updateDepthResourceHandle(void* depthResourceHandle) {
         if (dragParticlesCompute == nullptr) {
             return;
         }
 
         dragParticlesCompute->updateDepthBuffer(depthResourceHandle);
+    }
+
+    void updateCameraMatrices(MMatrix viewProjMatrix, MMatrix invViewProjMatrix, int viewportWidth, int viewportHeight) {
+        dragParticlesCompute->updateCameraMatrices({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), mayaMatrixToGlm(viewProjMatrix), mayaMatrixToGlm(invViewProjMatrix)});
     }
     
 private:
@@ -101,7 +100,6 @@ private:
     glm::vec4 simInfo;
     bool initialized = false;
     bool isDragging = false;
-    DragValues dragValues;
 
     // Shaders
 	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
@@ -149,5 +147,14 @@ private:
     void updateAxis(int axis) {
         vgsInfo[1][1] = float(axis);
         vgsCompute->updateVoxelSimInfo(vgsInfo);
+    }
+
+    inline glm::mat4 mayaMatrixToGlm(const MMatrix& matrix) {
+        return glm::mat4(
+            matrix(0, 0), matrix(1, 0), matrix(2, 0), matrix(3, 0),
+            matrix(0, 1), matrix(1, 1), matrix(2, 1), matrix(3, 1),
+            matrix(0, 2), matrix(1, 2), matrix(2, 2), matrix(3, 2),
+            matrix(0, 3), matrix(1, 3), matrix(2, 3), matrix(3, 3)
+        );
     }
 };
