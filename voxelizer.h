@@ -154,9 +154,9 @@ private:
     MDagPath finalizeVoxelMesh(
         const MString& combinedMeshName,
         const MString& meshNamesConcatenated,
-        const MFnMesh& originalMesh,
+        const MString& originalMesh,
         float voxelSize
     );
 
-    void selectSurfaceFaces(MFnMesh& mesh, const MString& meshName, float voxelSize);
+    MString selectSurfaceFaces(MFnMesh& mesh, const MString& meshName, float voxelSize, MString& interiorFaces);
 };
