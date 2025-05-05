@@ -5,9 +5,13 @@
 #include "pbd.h"
 using namespace MHWRender;
 
+/**
+ * Note: to actually activate a render override, you need to register it and THEN select it from the renderer drop down menu in Maya.
+ * There *is* a way to programmatically switch to the override via MEL (see plugin.cpp).
+ */
 class VoxelRendererOverride : public MRenderOverride {
 public:
-    VoxelRendererOverride(const MString& name) : MRenderOverride(name), mWidth(0), mHeight(0), name(name) {}
+    VoxelRendererOverride(const MString& name) : MRenderOverride(name), name(name) {}
 
     static void setPBD(PBD* pbd) {
         pbdSimulator = pbd;
@@ -33,12 +37,10 @@ public:
         unsigned int width = desc.width();
         unsigned int height = desc.height();
 
-        if (width != mWidth || height != mHeight) {
-            mWidth = width;
-            mHeight = height;
+        if (pbdSimulator) {
             pbdSimulator->updateDepthResourceHandle(depthTarget->resourceHandle());
-        }
-
+        } 
+        
         return MStatus::kSuccess;
     }
 
@@ -52,6 +54,5 @@ public:
 
 private:
     inline static PBD* pbdSimulator = nullptr;
-    unsigned int mWidth, mHeight;
     MString name;
 };

@@ -82,8 +82,13 @@ MStatus plugin::doIt(const MArgList& argList)
 
 
 	plugin::createVoxelSimulationNode();
+		
 	VoxelDragContextCommand::setPBD(&plugin::pbdSimulator);
 	VoxelRendererOverride::setPBD(&plugin::pbdSimulator);
+
+	MGlobal::executeCommand("voxelDragContextCommand");
+	// TODO: remove after testing. Move to button call.
+	MGlobal::executeCommand("setToolTo voxelDragContextCommand1");
 
 	return status;
 }
@@ -363,9 +368,6 @@ EXPORT MStatus initializePlugin(MObject obj)
 		MGlobal::displayError("Failed to register VoxelDragContextCommand");
 		return status;
 	}
-	MGlobal::executeCommand("voxelDragContextCommand");
-	// TODO: remove after testing. Move to button call.
-	MGlobal::executeCommand("setToolTo voxelDragContextCommand1");
 
 	return status;
 }

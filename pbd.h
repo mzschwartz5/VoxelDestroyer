@@ -15,6 +15,7 @@
 #include "directx/compute/prevgscompute.h"
 #include "directx/compute/postvgscompute.h"
 #include "directx/compute/faceconstraintscompute.h"
+#include "directx/compute/dragparticlescompute.h"
 
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
@@ -82,6 +83,11 @@ public:
         this->dragValues = dragValues;
     }
     void updateDepthResourceHandle(void* depthResourceHandle) {
+        if (dragParticlesCompute == nullptr) {
+            return;
+        }
+
+        dragParticlesCompute->updateDepthBuffer(depthResourceHandle);
     }
     
 private:
@@ -106,6 +112,7 @@ private:
 	std::unique_ptr<FaceConstraintsCompute> faceConstraintsCompute;
     std::unique_ptr<PreVGSCompute> preVGSCompute;
     std::unique_ptr<PostVGSCompute> postVGSCompute;
+    std::unique_ptr<DragParticlesCompute> dragParticlesCompute;
     
     void simulateSubstep();
 
