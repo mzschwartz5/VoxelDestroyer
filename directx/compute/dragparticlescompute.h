@@ -19,9 +19,14 @@ public:
             MGlobal::displayError("Invalid depth resource handle.");
             return;
         }
+        
+        ID3D11DepthStencilView* newDepthStencilView = static_cast<ID3D11DepthStencilView*>(depthResourceHandle);
+        if (newDepthStencilView == depthStencilView) {
+            return; 
+        }
+        depthStencilView = newDepthStencilView;        
 
-        ID3D11DepthStencilView* depthStencilView = static_cast<ID3D11DepthStencilView*>(depthResourceHandle);
-
+        // Get the underlying resource from the depth stencil view, so we can create a shader resource view for it.
         ID3D11Resource* resource = nullptr;
         depthStencilView->GetResource(&resource);
         if (!resource) {
@@ -58,6 +63,7 @@ private:
     ComPtr<ID3D11UnorderedAccessView> particlesUAV;
     ComPtr<ID3D11SamplerState> samplerState;
     ComPtr<ID3D11ShaderResourceView> depthSRV;
+    ID3D11DepthStencilView* depthStencilView;
 
     void bind() override
     {

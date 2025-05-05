@@ -32,11 +32,6 @@ public:
             return MStatus::kFailure;
         }
 
-        MRenderTargetDescription desc; 
-        depthTarget->targetDescription(desc);
-        unsigned int width = desc.width();
-        unsigned int height = desc.height();
-
         if (pbdSimulator) {
             pbdSimulator->updateDepthResourceHandle(depthTarget->resourceHandle());
         } 
