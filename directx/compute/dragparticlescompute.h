@@ -7,12 +7,11 @@
 
 struct DragValues
 {   
-    int mouseX{ 0 };
-    int mouseY{ 0 };
-    int distX{ 0 };
-    int distY{ 0 };
+    int lastX{ 0 };
+    int lastY{ 0 };
+    int currX{ 0 };
+    int currY{ 0 };
     float dragRadius{ 0.0f };
-    float padding{ 0.0f };
 };
 
 struct CameraMatrices
@@ -25,6 +24,7 @@ struct CameraMatrices
 
 struct ConstantBuffer{
     DragValues dragValues;
+    float dragStrength{ 30.0f };
     CameraMatrices cameraMatrices;
 };
 
@@ -72,6 +72,7 @@ public:
     {
         ConstantBuffer cb{
             dragValues,
+            30.0f, // drag strength, hardcoded for now (TODO: wire up to sim constants)
             cameraMatrices
         };
 

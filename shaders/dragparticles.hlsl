@@ -4,12 +4,12 @@ Texture2D<float> depthBuffer : register(t1);
 
 cbuffer DragValues : register(b0)
 {
-    int mouseX;
-    int mouseY;
-    int dragX;
-    int dragY;
+    int lastMouseX;
+    int lastMouseY;
+    int currMouseX;
+    int currMouseY;
     float selectRadius;
-    float padding;
+    float dragStrength;
     float viewportWidth;
     float viewportHeight;
     float4x4 viewProj;
@@ -24,7 +24,7 @@ cbuffer DragValues : register(b0)
 void main( uint3 gId : SV_DispatchThreadID )
 {
     // Sample the depth buffer at a specific location
-    float depthValue = depthBuffer.Load(int3(mouseX, mouseY, 0));
+    float depthValue = depthBuffer.Load(int3(lastMouseX, lastMouseY, 0));
 
     // Calculate the voxel's center from the average position of the 8 voxel particles
     uint start_idx = gId.x << 3;
@@ -50,7 +50,7 @@ void main( uint3 gId : SV_DispatchThreadID )
     if (depthValue < pixelSpaceVoxelCenter.z) return;
 
     // Also compare the distance from the mouse to the voxel center
-    float2 mousePos = float2(mouseX, mouseY);
+    float2 mousePos = float2(lastMouseX, lastMouseY);
     float2 voxelPos = float2(pixelSpaceVoxelCenter.x, pixelSpaceVoxelCenter.y);
     float2 diff = mousePos - voxelPos;
     float dist = length(diff);
@@ -58,27 +58,21 @@ void main( uint3 gId : SV_DispatchThreadID )
     if (dist > selectRadius) return; 
 
     // OK: the voxel is visible and within the selection radius. Move its particles by the drag amount in world space.
-    // To do this, we'll reverse-project the drag vector to world space, and then apply it to each particle.
-    float4 drag = float4(
-        depthValue * 2.0f * ((mouseX + dragX) / viewportWidth) - 1.0f, 
-        depthValue * 2.0f * ((mouseY + dragY) / viewportHeight) - 1.0f, 
-        depthValue, 
-        1.0f
-    );
-    
-    float4 dragWorld = mul(drag, invViewProj);
+    // To do this, we'll reverse-project the mouse start/end points to world space, get the difference, and apply it to each particle.
+    float2 mouseStartNDC = float2((lastMouseX / viewportWidth) * 2.0f - 1.0f,
+                                  (lastMouseY / viewportHeight) * 2.0f - 1.0f);
+    float4 mouseStartClip = float4(mouseStartNDC, depthValue, 1.0f);
+    float4 mouseStartWorld = mul(mouseStartClip, invViewProj);
 
-    float4 mouseStart = float4(
-        depthValue * 2.0f * ((mouseX) / viewportWidth) - 1.0f,
-        depthValue * 2.0f * ((mouseY) / viewportHeight) - 1.0f,
-        depthValue,
-        1.0f
-    );
+    float2 mouseEndNDC = float2((currMouseX / viewportWidth) * 2.0f - 1.0f,
+                                (currMouseY / viewportHeight) * 2.0f - 1.0f);
+    float4 mouseEndClip = float4(mouseEndNDC, depthValue, 1.0f);
+    float4 mouseEndWorld = mul(mouseEndClip, invViewProj);
 
-    float4 mouseStartWorld = mul(mouseStart, invViewProj);
-
-    float4 dragWorldDiff = dragWorld - mouseStartWorld;
+    float4 dragWorldDiff = mouseEndWorld - mouseStartWorld;
     dragWorldDiff.w = 0.0f; // Ignore the w component
+
+    dragWorldDiff *= dragStrength;
 
     particles[start_idx] = p0 + dragWorldDiff;
     particles[start_idx + 1] = p1 + dragWorldDiff;
