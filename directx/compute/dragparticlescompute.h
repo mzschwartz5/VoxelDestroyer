@@ -24,7 +24,7 @@ struct CameraMatrices
 
 struct ConstantBuffer{
     DragValues dragValues;
-    float dragStrength{ 20.0f };
+    float dragStrength{ 3.0f };
     CameraMatrices cameraMatrices;
 };
 
@@ -74,7 +74,7 @@ public:
 
         ConstantBuffer cb{
             dragValues,
-            20.0f, // drag strength, hardcoded for now (TODO: wire up to sim constants)
+            3.0f, // drag strength, hardcoded for now (TODO: wire up to sim constants)
             cameraMatrices
         };
 

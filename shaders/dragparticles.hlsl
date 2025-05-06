@@ -28,16 +28,15 @@ void main( uint3 gId : SV_DispatchThreadID )
 
     // Calculate the voxel's center from the average position of the 8 voxel particles
     uint start_idx = gId.x << 3;
-    float4 p0 = oldParticles[start_idx];
-    float4 p1 = oldParticles[start_idx + 1];
-    float4 p2 = oldParticles[start_idx + 2];
-    float4 p3 = oldParticles[start_idx + 3];
-    float4 p4 = oldParticles[start_idx + 4];
-    float4 p5 = oldParticles[start_idx + 5];
-    float4 p6 = oldParticles[start_idx + 6];
-    float4 p7 = oldParticles[start_idx + 7];
+    float4 oldPositions[8];
+    float4 voxelCenter = float4(0.0f, 0.0f, 0.0f, 0.0f);
+    [unroll]
+    for (int i = 0; i < 8; ++i)
+    {
+        oldPositions[i] = oldParticles[start_idx + i];
+        voxelCenter += oldPositions[i];
+    }
 
-    float4 voxelCenter = p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7;
     voxelCenter *= 0.125f;
     voxelCenter.w = 1.0f;
 
@@ -51,41 +50,45 @@ void main( uint3 gId : SV_DispatchThreadID )
     if (depthValue < pixelSpaceVoxelCenter.z) return;
 
     // Also compare the distance from the mouse to the voxel center
-    float2 mousePos = float2(lastMouseX, lastMouseY);
-    float2 voxelPos = float2(pixelSpaceVoxelCenter.x, pixelSpaceVoxelCenter.y);
-    float2 diff = mousePos - voxelPos;
+    float2 lastMousePos = float2(lastMouseX, lastMouseY);
+    float2 diff = lastMousePos - float2(pixelSpaceVoxelCenter.x, pixelSpaceVoxelCenter.y);
     float dist = length(diff);
 
     // We want to take into account the size of the voxel when determining if it's within the selection radius.
-    // Approximate its size by the average of two diagonal particles, and then account for perspective.
-    float voxelSize = length(p0 - p7);
+    // Approximate its size by the average of two diagonal particles, and then account for perspective since we're comparing in screen space.
+    float voxelSize = length(oldPositions[0] - oldPositions[7]);
     float perspectiveVoxelSize = voxelSize / voxelCameraDepth;
 
     if (dist > selectRadius + perspectiveVoxelSize) return; 
 
-    // OK: the voxel is visible and within the selection radius. Move its particles by the drag amount in world space.
-    // To do this, we'll reverse-project the mouse start/end points to world space, get the difference, and apply it to each particle.
-    float2 mouseStartNDC = float2((lastMouseX / viewportWidth) * 2.0f - 1.0f,
-                                  (lastMouseY / viewportHeight) * 2.0f - 1.0f);
-    float4 mouseStartClip = float4(mouseStartNDC, pixelSpaceVoxelCenter.z, 1.0f);
-    float4 mouseStartWorld = mul(mouseStartClip, invViewProj);
+    // OK: the voxel is visible and within the selection radius. Move its particles by dragging each in screen space,
+    // then converting back to world space to write to the particles buffer.
+    float2 currMousePos = float2(currMouseX, currMouseY);
+    float2 screenDragAmount = currMousePos - lastMousePos;
 
-    float2 mouseEndNDC = float2((currMouseX / viewportWidth) * 2.0f - 1.0f,
-                                (currMouseY / viewportHeight) * 2.0f - 1.0f);
-    float4 mouseEndClip = float4(mouseEndNDC, pixelSpaceVoxelCenter.z, 1.0f);
-    float4 mouseEndWorld = mul(mouseEndClip, invViewProj);
+    [unroll]
+    for (int j = 0; j < 8; ++j)
+    {
+        float4 oldPos = oldPositions[j];
+        float4 oldPosScreen = mul(oldPos, viewProj);
+        float oldCameraDepth = oldPosScreen.w;
+        oldPosScreen /= oldPosScreen.w;
+        oldPosScreen.x = (oldPosScreen.x + 1.0f) * 0.5f * viewportWidth;
+        oldPosScreen.y = (oldPosScreen.y + 1.0f) * 0.5f * viewportHeight;
 
-    float4 dragWorldDiff = mouseEndWorld - mouseStartWorld;
-    dragWorldDiff.w = 0.0f; // Ignore the w component
+        oldPosScreen.x += dragStrength * screenDragAmount.x;
+        oldPosScreen.y += dragStrength * screenDragAmount.y;
 
-    dragWorldDiff *= dragStrength;
+        oldPosScreen.x = clamp(oldPosScreen.x, 0.0f, viewportWidth - 1.0f);
+        oldPosScreen.y = clamp(oldPosScreen.y, 0.0f, viewportHeight - 1.0f);
 
-    particles[start_idx] = p0 + dragWorldDiff;
-    particles[start_idx + 1] = p1 + dragWorldDiff;
-    particles[start_idx + 2] = p2 + dragWorldDiff;
-    particles[start_idx + 3] = p3 + dragWorldDiff;
-    particles[start_idx + 4] = p4 + dragWorldDiff;
-    particles[start_idx + 5] = p5 + dragWorldDiff;
-    particles[start_idx + 6] = p6 + dragWorldDiff;
-    particles[start_idx + 7] = p7 + dragWorldDiff;
+        // Convert back to world space
+        oldPosScreen.x = (oldPosScreen.x / viewportWidth) * 2.0f - 1.0f;
+        oldPosScreen.y = (oldPosScreen.y / viewportHeight) * 2.0f - 1.0f;
+        float4 newPosClip = oldCameraDepth * float4(oldPosScreen.xyz, 1.0f);
+        float4 newPosWorld = mul(newPosClip, invViewProj);
+        newPosWorld.w = 1.0f;
+
+        particles[start_idx + j] = newPosWorld;
+    }
 }
