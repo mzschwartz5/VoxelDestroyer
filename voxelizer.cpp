@@ -331,7 +331,11 @@ MDagPath Voxelizer::createVoxels(
         intersectVoxelWithOriginalMesh(overlappedVoxels, cube, originalMesh.object(), i);
     }
 
-    return finalizeVoxelMesh(combinedMeshName, meshNamesConcatenated, originalMeshName, voxelSize);
+    MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(combinedMeshName, meshNamesConcatenated, originalMeshName, voxelSize);
+    // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh
+    MGlobal::executeCommand("delete " + originalMeshName, false, true); // Delete the original mesh to clean up the scene
+
+    return finalizedVoxelMeshDagPath;
 }
 
 MDagPath Voxelizer::finalizeVoxelMesh(
@@ -386,7 +390,8 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     // MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + interiorFaces, false, true); // Add the non-surface faces to the initial shading group
 
     MGlobal::executeCommand("delete -ch " + combinedMeshName + ";"); // Delete the history of the combined mesh to decouple it from the original mesh
-    
+    MGlobal::executeCommand("select -cl;", false, true);
+
     return resultMeshDagPath;
 }
 

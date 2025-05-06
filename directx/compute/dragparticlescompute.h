@@ -24,7 +24,7 @@ struct CameraMatrices
 
 struct ConstantBuffer{
     DragValues dragValues;
-    float dragStrength{ 30.0f };
+    float dragStrength{ 20.0f };
     CameraMatrices cameraMatrices;
 };
 
@@ -70,9 +70,11 @@ public:
 
     void updateDragValues(const DragValues& dragValues)
     {
+        this->dragValues = dragValues;
+
         ConstantBuffer cb{
             dragValues,
-            30.0f, // drag strength, hardcoded for now (TODO: wire up to sim constants)
+            20.0f, // drag strength, hardcoded for now (TODO: wire up to sim constants)
             cameraMatrices
         };
 
@@ -104,6 +106,13 @@ public:
         bind();
         DirectX::getContext()->Dispatch(threadGroupCount, 1, 1); 
         unbind();
+
+        // Reset drag values (because mouse drag event isn't called every frame, only when the mouse is moved)
+        if (dragValues.currX != dragValues.lastX || dragValues.currY != dragValues.lastY) {
+            dragValues.lastX = dragValues.currX;
+            dragValues.lastY = dragValues.currY;
+            updateDragValues(dragValues);
+        }
     };
 
 private:
@@ -113,6 +122,7 @@ private:
     ComPtr<ID3D11Buffer> constantBuffer;
     ID3D11DepthStencilView* depthStencilView;
     CameraMatrices cameraMatrices;
+    DragValues dragValues;
 
     void bind() override
     {

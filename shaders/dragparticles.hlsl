@@ -42,6 +42,7 @@ void main( uint3 gId : SV_DispatchThreadID )
     voxelCenter.w = 1.0f;
 
     float4 pixelSpaceVoxelCenter = mul(voxelCenter, viewProj);
+    float voxelCameraDepth = pixelSpaceVoxelCenter.w; // Before perspective divide, this is the camera-space depth of the voxel center
     pixelSpaceVoxelCenter /= pixelSpaceVoxelCenter.w; // Perspective divide
     pixelSpaceVoxelCenter.x = (pixelSpaceVoxelCenter.x + 1.0f) * 0.5f * viewportWidth;
     pixelSpaceVoxelCenter.y = (pixelSpaceVoxelCenter.y + 1.0f) * 0.5f * viewportHeight;
@@ -55,18 +56,23 @@ void main( uint3 gId : SV_DispatchThreadID )
     float2 diff = mousePos - voxelPos;
     float dist = length(diff);
 
-    if (dist > selectRadius) return; 
+    // We want to take into account the size of the voxel when determining if it's within the selection radius.
+    // Approximate its size by the average of two diagonal particles, and then account for perspective.
+    float voxelSize = length(p0 - p7);
+    float perspectiveVoxelSize = voxelSize / voxelCameraDepth;
+
+    if (dist > selectRadius + perspectiveVoxelSize) return; 
 
     // OK: the voxel is visible and within the selection radius. Move its particles by the drag amount in world space.
     // To do this, we'll reverse-project the mouse start/end points to world space, get the difference, and apply it to each particle.
     float2 mouseStartNDC = float2((lastMouseX / viewportWidth) * 2.0f - 1.0f,
                                   (lastMouseY / viewportHeight) * 2.0f - 1.0f);
-    float4 mouseStartClip = float4(mouseStartNDC, depthValue, 1.0f);
+    float4 mouseStartClip = float4(mouseStartNDC, pixelSpaceVoxelCenter.z, 1.0f);
     float4 mouseStartWorld = mul(mouseStartClip, invViewProj);
 
     float2 mouseEndNDC = float2((currMouseX / viewportWidth) * 2.0f - 1.0f,
                                 (currMouseY / viewportHeight) * 2.0f - 1.0f);
-    float4 mouseEndClip = float4(mouseEndNDC, depthValue, 1.0f);
+    float4 mouseEndClip = float4(mouseEndNDC, pixelSpaceVoxelCenter.z, 1.0f);
     float4 mouseEndWorld = mul(mouseEndClip, invViewProj);
 
     float4 dragWorldDiff = mouseEndWorld - mouseStartWorld;

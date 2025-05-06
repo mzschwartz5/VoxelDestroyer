@@ -7,7 +7,7 @@
 void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath) {
     this->meshDagPath = meshDagPath;
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
-    constructFaceToFaceConstraints(voxels, 0.0001f, -FLT_MAX, FLT_MAX, -FLT_MAX, 0.0001f, -FLT_MAX);
+    constructFaceToFaceConstraints(voxels, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX);
     createParticles(voxels);
     setRadiusAndVolumeFromLength(voxelSize);
 
