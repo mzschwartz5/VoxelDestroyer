@@ -74,7 +74,7 @@ public:
     void setIsDragging(bool isDragging) { this->isDragging = isDragging; }
     
     void updateDragValues(const DragValues& dragValues) {
-        dragParticlesCompute->updateDragValues(dragValues);
+        dragParticlesCompute->updateDragValues(dragValues, isDragging);
     }
     
     void updateDepthResourceHandle(void* depthResourceHandle) {

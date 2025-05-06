@@ -35,10 +35,10 @@ public:
         event.getPosition(mouseX, mouseY);
         screenDragStartX = mouseX;
         screenDragStartY = mouseY;
-        pbdSimulator->updateDragValues({ mouseX, mouseY, mouseX, mouseY, selectRadius });
-
+        
         isDragging = true;
         pbdSimulator->setIsDragging(isDragging);
+        pbdSimulator->updateDragValues({ mouseX, mouseY, mouseX, mouseY, selectRadius });
         return MS::kSuccess;
     }
 
@@ -66,8 +66,10 @@ public:
     virtual MStatus doRelease(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
         event.getPosition(mouseX, mouseY);
 
+
         isDragging = false;
         pbdSimulator->setIsDragging(isDragging);
+        pbdSimulator->updateDragValues({ mouseX, mouseY,  mouseX, mouseY, selectRadius });
         return MS::kSuccess;
     }
 

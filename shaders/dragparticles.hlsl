@@ -9,7 +9,7 @@ cbuffer DragValues : register(b0)
     int currMouseX;
     int currMouseY;
     float selectRadius;
-    float dragStrength;
+    float padding;
     float viewportWidth;
     float viewportHeight;
     float4x4 viewProj;
@@ -76,10 +76,6 @@ void main( uint3 gId : SV_DispatchThreadID )
 
     float4 dragWorldDiff = mouseEndWorld - mouseStartWorld;
     dragWorldDiff.w = 0.0f; // Ignore the w component
-
-    // It's not clear to me exactly why this is necessary. The idea is for the particles to perfectly follow the mouse, but they lag behind a little.
-    // The drag strength helps, but can overshoot as well. My theory is that the simulation and the UI are not in sync, leading to lag behind.
-    dragWorldDiff *= dragStrength;
 
     particles[start_idx] = p0 + dragWorldDiff;
     particles[start_idx + 1] = p1 + dragWorldDiff;

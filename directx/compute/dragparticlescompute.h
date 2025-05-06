@@ -14,6 +14,7 @@ struct DragValues
     int currX{ 0 };
     int currY{ 0 };
     float dragRadius{ 0.0f };
+    float padding{ 0.0f };
 };
 
 struct CameraMatrices
@@ -26,7 +27,6 @@ struct CameraMatrices
 
 struct ConstantBuffer{
     DragValues dragValues;
-    float dragStrength{ 3.0f };
     CameraMatrices cameraMatrices;
 };
 
@@ -70,13 +70,26 @@ public:
         }
     };
 
-    void updateDragValues(const DragValues& dragValues)
+    void updateDragValues(const DragValues& dragValues, bool isDragging)
     {
-        this->dragValues = dragValues;
+        // Accumulate the drag values (e.g. update current position but not last) 
+        // This accounts for mouse events potentially occuring at a higher frame rate than the simulation.
+        this->dragValues.currX = dragValues.currX;
+        this->dragValues.currY = dragValues.currY;
+        this->dragValues.dragRadius = dragValues.dragRadius;
 
+        // And if we just started dragging, update the last pos as well so we don't "remember" the last position from the previous drag.
+        if (!wasDragging && isDragging) {
+            this->dragValues.lastX = dragValues.lastX;
+            this->dragValues.lastY = dragValues.lastY;
+        }
+        wasDragging = isDragging;
+    }
+
+    void copyConstantBufferToGPU()
+    {
         ConstantBuffer cb{
             dragValues,
-            3.0f, // drag strength, hardcoded for now (TODO: wire up to sim constants)
             cameraMatrices
         };
 
@@ -104,16 +117,17 @@ public:
         if (!depthSRV) {
             return;
         }
+        
+        copyConstantBufferToGPU();
 
         bind();
         DirectX::getContext()->Dispatch(threadGroupCount, 1, 1); 
         unbind();
 
-        // Reset drag values (because mouse drag event isn't called every frame, only when the mouse is moved)
+        // Reset drag values (because mouse drag event isn't called every frame, only when the mouse is moved).
         if (dragValues.currX != dragValues.lastX || dragValues.currY != dragValues.lastY) {
             dragValues.lastX = dragValues.currX;
             dragValues.lastY = dragValues.currY;
-            updateDragValues(dragValues);
         }
     };
 
@@ -125,6 +139,7 @@ private:
     ID3D11DepthStencilView* depthStencilView;
     CameraMatrices cameraMatrices;
     DragValues dragValues;
+    bool wasDragging = false;
 
     void bind() override
     {
