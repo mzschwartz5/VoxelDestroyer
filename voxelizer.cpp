@@ -319,7 +319,10 @@ MDagPath Voxelizer::createVoxels(
 
     overlappedVoxels = sortVoxelsByMortonCode(overlappedVoxels);
 
-    MString combinedMeshName = originalMesh.name() + "_voxelized";
+    MDagPath transformPath = originalMesh.dagPath();
+    transformPath.pop(); // Move up to the transform node
+    MString originalMeshName = transformPath.partialPathName();
+    MString combinedMeshName = originalMeshName + "_voxelized";
     MString meshNamesConcatenated;
     for (int i = 0; i < overlappedVoxels.numOccupied; ++i) {
         MObject cube = overlappedVoxels.mayaObjects[i];
@@ -328,13 +331,17 @@ MDagPath Voxelizer::createVoxels(
         intersectVoxelWithOriginalMesh(overlappedVoxels, cube, originalMesh.object(), i);
     }
 
-    return finalizeVoxelMesh(combinedMeshName, meshNamesConcatenated, originalMesh, voxelSize);
+    MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(combinedMeshName, meshNamesConcatenated, originalMeshName, voxelSize);
+    // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh
+    MGlobal::executeCommand("delete " + originalMeshName, false, true); // Delete the original mesh to clean up the scene
+
+    return finalizedVoxelMeshDagPath;
 }
 
 MDagPath Voxelizer::finalizeVoxelMesh(
     const MString& combinedMeshName,
     const MString& meshNamesConcatenated,
-    const MFnMesh& originalMesh,
+    const MString& originalMeshName,
     float voxelSize
 ) {
     MStatus status;
@@ -353,28 +360,47 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MFnMesh resultMeshFn(resultMeshDagPath, &status);
 
     // Use MEL to transferAttributes the normals from the original mesh to the new voxelized/combined one
-    MGlobal::executeCommand(MString("select -r ") + originalMesh.name(), false, true); // Select the original mesh first
-    selectSurfaceFaces(resultMeshFn, combinedMeshName, voxelSize);
+    MString interiorFaces;
+    MGlobal::executeCommand(MString("select -r ") + originalMeshName, false, true); // Select the original mesh first
+    MString surfaceFaces = selectSurfaceFaces(resultMeshFn, combinedMeshName, voxelSize, interiorFaces);
     MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
-    MGlobal::executeCommand("delete -ch " + combinedMeshName + ";"); // Delete the history of the combined mesh to decouple it from the original mesh
 
-    // Add the initial shading group to the combined mesh
-    // TODO: apply the shading group of the original mesh to the combined mesh
-    MObject shadingGroup;
-    MSelectionList shadingGroupSelectionList;
-    MGlobal::getSelectionListByName("initialShadingGroup", shadingGroupSelectionList);
-    shadingGroupSelectionList.getDependNode(0, shadingGroup);
-    MFnSet shadingGroupFn(shadingGroup);
-    shadingGroupFn.addMember(resultMeshObject);
+    // Add a shading group to the new mesh
+    // Retrieve the shading groups assigned to the original mesh and assign the first one to the surface faces of the new mesh
+    MString melCmd;
+    melCmd += "string $sourceObject = \"" + originalMeshName + "\";\n";
+    melCmd += "string $targetObject = \"" + combinedMeshName + "\";\n";
+    melCmd += "string $shapes[] = `listRelatives -s $sourceObject`;\n";
+    melCmd += "string $connections[] = `listConnections $shapes[0]`;\n";
+    melCmd += "string $shadingGroup = \"\";\n";
+    melCmd += "for ($conn in $connections) {\n";
+    melCmd += "    if (`nodeType $conn` == \"shadingEngine\") {\n";
+    melCmd += "        $shadingGroup = $conn;\n";
+    melCmd += "        break;\n";
+    melCmd += "    }\n";
+    melCmd += "}\n";
+    melCmd += "if ($shadingGroup != \"\") {\n";
+    melCmd += "    sets -e -forceElement $shadingGroup $targetObject;\n";
+    melCmd += "} else {\n";
+    melCmd += "    warning(\"No shading group found on \" + $sourceObject);\n";
+    melCmd += "}\n";
+
+    MGlobal::executeCommand(melCmd, false, true);
+
+    // MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + interiorFaces, false, true); // Add the non-surface faces to the initial shading group
+
+    MGlobal::executeCommand("delete -ch " + combinedMeshName + ";"); // Delete the history of the combined mesh to decouple it from the original mesh
+    MGlobal::executeCommand("select -cl;", false, true);
 
     return resultMeshDagPath;
 }
 
-void Voxelizer::selectSurfaceFaces(MFnMesh& meshFn, const MString& meshName, float voxelSize) {
+MString Voxelizer::selectSurfaceFaces(MFnMesh& meshFn, const MString& meshName, float voxelSize, MString& interiorFaces) {
     float maxDistance = 1.73f * 1.1f * voxelSize; // 1.73 is the diagonal of a cube with edge length 1.0
     MMeshIsectAccelParams accelParams = MFnMesh::autoUniformGridParams();
     MItMeshPolygon faceIter(meshFn.object());
 
+    MString surfaceFaces = "";
     MString faceSelectionCommand = "select -add ";
     while (!faceIter.isDone()) {
         MVector normal;
@@ -387,14 +413,15 @@ void Voxelizer::selectSurfaceFaces(MFnMesh& meshFn, const MString& meshName, flo
         bool hit = meshFn.anyIntersection(raySource, rayDirection, nullptr, nullptr, false, MSpace::kWorld, maxDistance, false, &accelParams, hitPoint, nullptr, nullptr, nullptr, nullptr, nullptr);
 
         if (!hit) {
-            faceSelectionCommand += meshName + ".f[" + faceIter.index() + "] ";
+            surfaceFaces += meshName + ".f[" + faceIter.index() + "] ";
         }
         
+        interiorFaces += meshName + ".f[" + faceIter.index() + "] ";
         faceIter.next();
     }
 
-    MGlobal::executeCommand(faceSelectionCommand, false, true);
-    return;
+    MGlobal::executeCommand(faceSelectionCommand + surfaceFaces, false, true);
+    return surfaceFaces;
 }
 
 int faceIndices[6][4] = {

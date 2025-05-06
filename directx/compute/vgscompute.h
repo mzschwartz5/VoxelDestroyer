@@ -13,6 +13,7 @@ public:
 		const ComPtr<ID3D11UnorderedAccessView>& positionsUAV
 	) : ComputeShader(IDR_SHADER3), positionsUAV(positionsUAV)
     {
+        // TODO: weights should just be the unused 4th float component of the particle positions
         initializeBuffers(numPositions, weights, voxelSimInfo);
     };
 

@@ -21,6 +21,8 @@ public:
             return;
         }
 
+        setImage("TypeSeparateMaterials_200.png", MPxContext::kImage1);
+
         M3dView view = M3dView::active3dView();
         viewportWidth = view.portWidth();
     }
@@ -33,9 +35,10 @@ public:
         event.getPosition(mouseX, mouseY);
         screenDragStartX = mouseX;
         screenDragStartY = mouseY;
+        
+        isDragging = true;
+        pbdSimulator->setIsDragging(isDragging);
         pbdSimulator->updateDragValues({ mouseX, mouseY, mouseX, mouseY, selectRadius });
-
-        pbdSimulator->setIsDragging(true);
         return MS::kSuccess;
     }
 
@@ -63,7 +66,10 @@ public:
     virtual MStatus doRelease(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
         event.getPosition(mouseX, mouseY);
 
-        pbdSimulator->setIsDragging(false);
+
+        isDragging = false;
+        pbdSimulator->setIsDragging(isDragging);
+        pbdSimulator->updateDragValues({ mouseX, mouseY,  mouseX, mouseY, selectRadius });
         return MS::kSuccess;
     }
 
@@ -78,7 +84,8 @@ public:
         drawMgr.beginDrawable();
     
         // Set color and line width
-        drawMgr.setColor(MColor(0.5f, 0.5f, 0.5f));
+        isDragging ? drawMgr.setColor(MColor(0.5f, 1.0f, 0.5f)) : drawMgr.setColor(MColor(0.5f, 0.5f, 0.5f));
+        isDragging ? drawMgr.setLineStyle(MHWRender::MUIDrawManager::kSolid) : drawMgr.setLineStyle(MHWRender::MUIDrawManager::kShortDashed);
         drawMgr.setLineWidth(2.0f);
     
         // Draw a circle at the mouse position
@@ -92,6 +99,7 @@ public:
 
 private:
     int viewportWidth;
+    bool isDragging = false;
     short mouseX, mouseY;
     short screenDragStartX, screenDragStartY;
     short mouseButton;

@@ -80,15 +80,14 @@ MStatus plugin::doIt(const MArgList& argList)
 	plugin::pbdSimulator.initialize(voxels, voxelSize, plugin::voxelizedMeshDagPath);
 	MGlobal::displayInfo("PBD particles initialized.");
 
-
 	plugin::createVoxelSimulationNode();
 		
 	VoxelDragContextCommand::setPBD(&plugin::pbdSimulator);
 	VoxelRendererOverride::setPBD(&plugin::pbdSimulator);
 
-	MGlobal::executeCommand("voxelDragContextCommand");
-	// TODO: remove after testing. Move to button call.
-	MGlobal::executeCommand("setToolTo voxelDragContextCommand1");
+	MString contextName;
+	MGlobal::executeCommand("voxelDragContextCommand", contextName);
+	MGlobal::executeCommand("setToolTo " + contextName);
 
 	return status;
 }
