@@ -18,6 +18,7 @@ std::unordered_map<std::string, MCallbackId> plugin::callbacks;
 MDagPath plugin::voxelizedMeshDagPath = MDagPath();
 VoxelRendererOverride* plugin::voxelRendererOverride = nullptr;
 bool plugin::isPlaying = false;
+MString plugin::mouseInteractionCommandName = "voxelDragContextCommand1";
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -42,6 +43,7 @@ MSyntax plugin::syntax()
 	syntax.addFlag("-s", "-scale", MSyntax::kDouble);
 	syntax.addFlag("-v", "-voxelsPerEdge", MSyntax::kLong);
 	syntax.addFlag("-n", "-gridDisplayName", MSyntax::kString);
+	syntax.addFlag("-t", "-type", MSyntax::kLong);
 	return syntax;
 }
 
@@ -61,10 +63,12 @@ void plugin::onPlaybackChange(bool state, void* clientData) {
 		MCallbackId drawCallbackId = MTimerMessage::addTimerCallback(static_cast<float>(timePerFrame), plugin::simulate, NULL, &status);
 		plugin::setCallbackId("drawCallback", drawCallbackId);
 		isPlaying = true;
+		MGlobal::executeCommand("setToolTo " + plugin::mouseInteractionCommandName);
 	} else {
 		MTimerMessage::removeCallback(plugin::getCallbackId("drawCallback"));
 		plugin::setCallbackId("drawCallback", 0);
 		isPlaying = false;
+		MGlobal::executeCommand("setToolTo selectSuperContext");
 	}
 }
 
@@ -107,10 +111,15 @@ MStatus plugin::doIt(const MArgList& argList)
 		pluginArgs.position,
 		selectedMeshDagPath,
 		plugin::voxelizedMeshDagPath,
+		pluginArgs.voxelizeSurface,
+		pluginArgs.voxelizeInterior,
+		pluginArgs.simulate,
 		status
 	);
 	
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
+
+	if (!pluginArgs.simulate) return status;
 
 	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
 	plugin::pbdSimulator.initialize(voxels, voxelSize, plugin::voxelizedMeshDagPath);
@@ -121,10 +130,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	VoxelDragContextCommand::setPBD(&plugin::pbdSimulator);
 	VoxelRendererOverride::setPBD(&plugin::pbdSimulator);
 
-	MString contextName;
-	MGlobal::executeCommand("voxelDragContextCommand", contextName);
-	MGlobal::executeCommand("setToolTo " + contextName);
-
+	MGlobal::executeCommand("voxelDragContextCommand", plugin::mouseInteractionCommandName);
 	return status;
 }
 
@@ -179,6 +185,18 @@ PluginArgs plugin::parsePluginArgs(const MArgList& args) {
 		if (status != MS::kSuccess) {
 			MGlobal::displayError("Failed to get grid display name: " + status.errorString());
 		}
+	}
+
+	if (argData.isFlagSet("-t")) {
+		int type;
+		status = argData.getFlagArgument("-t", 0, type);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get type: " + status.errorString());
+		}
+
+		pluginArgs.voxelizeSurface = (type & 0x1) != 0;
+		pluginArgs.voxelizeInterior = (type & 0x2) != 0;
+		pluginArgs.simulate = (type & 0x4) != 0;
 	}
 
 	return pluginArgs;

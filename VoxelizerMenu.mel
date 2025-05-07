@@ -16,44 +16,44 @@ global proc VoxelizerMenu() {
     string $spacer = `separator -style "none"`;
 
     // Position controls
-    string $positionField = `floatFieldGrp -numberOfFields 3 -label "Position:" -value1 $bbox[0] -value2 $bbox[1] -value3 $bbox[2]
+    string $positionField = `floatFieldGrp -numberOfFields 3 -label "Position: " -value1 $bbox[0] -value2 $bbox[1] -value3 $bbox[2]
         -cc ("VoxelizerMenu_updatePosition(\"" + $voxelGridDisplayName + "\", #1, #2, #3)") 
         -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50
         - precision 2`;
 
     // Scale controls
-    string $scaleField = `floatFieldGrp -numberOfFields 1 -label "Scale:" -value1 $bbox[3]
+    string $scaleField = `floatFieldGrp -numberOfFields 1 -label "Scale: " -value1 $bbox[3]
         -cc ("VoxelizerMenu_updateScale(\"" + $voxelGridDisplayName + "\", #1)") 
         -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50
         - precision 2`;
 
     // Subdivision controls
-    string $subdivField = `intSliderGrp -label "Voxels Per Edge:" -value 1 -field true -minValue 2 -maxValue 32
+    string $subdivField = `intSliderGrp -label "Voxels Per Edge: " -value 1 -field true -minValue 2 -maxValue 32
         -cc ("VoxelizerMenu_updateSubdivisions(\"" + $voxelGridDisplayName + "\", #1)") 
         -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50`;
+
+    string $surfaceCheckbox = `checkBox -label "Surface" -value true`;
+    string $solidCheckbox = `checkBox -label "Solid" -value true`;
+    string $simulatedCheckbox = `checkBox -label "Simulated" -value true`;
 
     // Buttons
     string $cancelButton = `button -label "Cancel" -command ("VoxelizerMenu_close(\"" + $voxelGridDisplayName + "\")")`;
     string $runButton = `button -label "Voxelize" 
         -annotation "Voxelizes a mesh in preparation for VGS simulation. Uses selected mesh or, if none selected, the closest mesh to the center of the grid bounds."
-        -command (
-            "float $posX = `floatFieldGrp -query -value1 " + $positionField + "`; " +
-            "float $posY = `floatFieldGrp -query -value2 " + $positionField + "`; " +
-            "float $posZ = `floatFieldGrp -query -value3 " + $positionField + "`; " +
-            "float $scale = `floatFieldGrp -query -value1 " + $scaleField + "`; " +
-            "int $voxelsPerEdge = `intSliderGrp -query -value " + $subdivField + "`; " +
-            "VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", $posX, $posY, $posZ, $scale, $voxelsPerEdge);"
-        )`;
+        -command ("VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", \"" + $positionField + "\", \"" + $scaleField + "\", \"" + $subdivField + "\", \"" + $surfaceCheckbox + "\", \"" + $solidCheckbox + "\", \"" + $simulatedCheckbox + "\")")`;
 
-    // Attach elements to form layout
+    // Attach elements to form layout 
     formLayout -edit
         -attachForm $instructionText "top" 10 -attachForm $instructionText "left" 20 -attachForm $instructionText "right" 20
         -attachControl $spacer "top" 10 $instructionText
         -attachForm $positionField "left" 20 -attachControl $positionField "top" 10 $spacer -attachForm $positionField "right" 20
         -attachForm $scaleField "left" 20 -attachControl $scaleField "top" 10 $positionField -attachForm $scaleField "right" 20
         -attachForm $subdivField "left" 20 -attachControl $subdivField "top" 10 $scaleField -attachForm $subdivField "right" 20
-        -attachForm $runButton "left" 20 -attachControl $runButton "top" 15 $subdivField
-        -attachForm $cancelButton "left" 80 -attachControl $cancelButton "top" 15 $subdivField
+        -attachForm $surfaceCheckbox "left" 20 -attachControl $surfaceCheckbox "top" 10 $subdivField
+        -attachControl $solidCheckbox "left" 10 $surfaceCheckbox -attachControl $solidCheckbox "top" 10 $subdivField
+        -attachControl $simulatedCheckbox "left" 10 $solidCheckbox -attachControl $simulatedCheckbox "top" 10 $subdivField
+        -attachForm $runButton "left" 20 -attachControl $runButton "top" 15 $simulatedCheckbox
+        -attachForm $cancelButton "left" 80 -attachControl $cancelButton "top" 15 $simulatedCheckbox
         -attachForm $runButton "bottom" 10 -attachForm $cancelButton "bottom" 10
         VoxelizerMenuForm;
 
@@ -67,15 +67,26 @@ global proc VoxelizerMenu() {
     scriptJob -attributeChange ($voxelGridDisplayName + ".scaleX") ("VoxelizerMenu_syncScale(\"" + $voxelGridDisplayName + "\", \"" + $scaleField + "\")");
 }
 
-global proc VoxelizerMenu_run(string $cubeName, float $posX, float $posY, float $posZ, float $scale, int $voxelsPerEdge) {
+global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $scaleField, string $subdivField, string $surfaceCheckbox, string $solidCheckbox, string $simulatedCheckbox) {
+    float $posX = `floatFieldGrp -query -value1 $positionField`;
+    float $posY = `floatFieldGrp -query -value2 $positionField`;
+    float $posZ = `floatFieldGrp -query -value3 $positionField`;
+    float $scale = `floatFieldGrp -query -value1 $scaleField`;
+    int $voxelsPerEdge = `intSliderGrp -query -value $subdivField`;
+    int $surface = `checkBox -query -value $surfaceCheckbox`;
+    int $solid = `checkBox -query -value $solidCheckbox`;
+    int $simulated = `checkBox -query -value $simulatedCheckbox`;
+    
     // Deselect the cube if it's currently selected, so it's not a voxelization target itself
     if (`objExists $cubeName` && `objExists ($cubeName + ".visibility")`) {
         select -deselect $cubeName;
     }
 
+    int $type = $surface + ($solid * 2) + ($simulated * 4); // Convert checkboxes to a single integer
+
     // Construct the VoxelDestroyer command with the passed arguments
     string $command = "VoxelDestroyer -px " + $posX + " -py " + $posY + " -pz " + $posZ +
-                      " -s " + $scale + " -v " + $voxelsPerEdge + " -n \"" + $cubeName + "\"";
+                      " -s " + $scale + " -v " + $voxelsPerEdge + " -n \"" + $cubeName + "\"" + " -t " + $type + ";";
 
     // Execute the command and handle errors
     if (catch(eval($command))) {

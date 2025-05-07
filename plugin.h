@@ -36,6 +36,9 @@ struct PluginArgs {
 	double scale{ 1.0f };
 	int voxelsPerEdge{ 10 };
 	MString gridDisplayName{ "VoxelGridDisplay" };
+	bool voxelizeSurface{ false };
+	bool voxelizeInterior{ false };
+	bool simulate{ false };
 };
 
 // Making most functions and members static so we can bind methods to the timeChanged event
@@ -89,4 +92,5 @@ private:
 	static MDagPath voxelizedMeshDagPath;
 	static std::unordered_map<std::string, MCallbackId> callbacks;
 	static bool isPlaying;
+	static MString mouseInteractionCommandName;
 };
