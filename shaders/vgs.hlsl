@@ -1,4 +1,3 @@
-
 RWStructuredBuffer<float4> positions : register(u0);
 StructuredBuffer<float> weights : register(t0);
 
@@ -16,7 +15,8 @@ cbuffer VoxelSimBuffer : register(b0)
 
 float3 project(float3 v, float3 onto)
 {
-    return onto * (dot(v, onto) / dot(onto, onto));
+    const float eps = 1e-12f;
+    return onto * (dot(v, onto) / (dot(onto, onto) + eps));
 }
 
 [numthreads(VGS_THREADS, 1, 1)]
@@ -29,71 +29,90 @@ void main(
     uint voxel_idx = globalThreadId.x;
     uint start_idx = voxel_idx << 3;
 
-    // Each thread in the group will contribute to the constraint solving
     for (uint i = 0; i < ITER_COUNT; i++)
     {
         // Load positions
-        float4 p0 = positions[start_idx];
-        float4 p1 = positions[start_idx + 1];
-        float4 p2 = positions[start_idx + 2];
-        float4 p3 = positions[start_idx + 3];
-        float4 p4 = positions[start_idx + 4];
-        float4 p5 = positions[start_idx + 5];
-        float4 p6 = positions[start_idx + 6];
-        float4 p7 = positions[start_idx + 7];
+        float4 p[8];
+        [unroll]
+        for (int j = 0; j < 8; ++j)
+            p[j] = positions[start_idx + j];
 
         // Calculate centroid
-        float4 center = p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7;
+        float4 center = float4(0, 0, 0, 0);
+        [unroll]
+        for (int j = 0; j < 8; ++j)
+            center += p[j];
         center *= 0.125f;
 
         // Calculate basis vectors
-        float4 v0 = ((p1 - p0) + (p3 - p2) + (p5 - p4) + (p7 - p6)) * 0.25f;
-        float4 v1 = ((p2 - p0) + (p3 - p1) + (p6 - p4) + (p7 - p5)) * 0.25f;
-        float4 v2 = ((p4 - p0) + (p5 - p1) + (p6 - p2) + (p7 - p3)) * 0.25f;
+        float3 v0 = ((p[1] - p[0]) + (p[3] - p[2]) + (p[5] - p[4]) + (p[7] - p[6])) * 0.25f;
+        float3 v1 = ((p[2] - p[0]) + (p[3] - p[1]) + (p[6] - p[4]) + (p[7] - p[5])) * 0.25f;
+        float3 v2 = ((p[4] - p[0]) + (p[5] - p[1]) + (p[6] - p[2]) + (p[7] - p[3])) * 0.25f;
 
-        // Apply Gram-Schmidt orthogonalization - CORRECTED to match CPU implementation
-        float3 u0 = v0.xyz - RELAXATION * (project(v0.xyz, v1.xyz) + project(v0.xyz, v2.xyz));
-        float3 u1 = v1.xyz - RELAXATION * (project(v1.xyz, v2.xyz) + project(v1.xyz, v0.xyz)); // Changed from u0 to v0.xyz
-        float3 u2 = v2.xyz - RELAXATION * (project(v2.xyz, v0.xyz) + project(v2.xyz, v1.xyz)); // Changed from u0/u1 to v0.xyz/v1.xyz
+        // Gram-Schmidt Orthogonalization
+        float3 u0 = v0 - RELAXATION * (project(v0, v1) + project(v0, v2));
+        float3 u1 = v1 - RELAXATION * (project(v1, v0) + project(v1, v2));
+        float3 u2 = v2 - RELAXATION * (project(v2, v0) + project(v2, v1));
 
-        // Normalize and scale
-        u0 = normalize(u0) * ((1.0f - BETA) * PARTICLE_RADIUS + (BETA * length(v0.xyz) * 0.5f));
-        u1 = normalize(u1) * ((1.0f - BETA) * PARTICLE_RADIUS + (BETA * length(v1.xyz) * 0.5f));
-        u2 = normalize(u2) * ((1.0f - BETA) * PARTICLE_RADIUS + (BETA * length(v2.xyz) * 0.5f));
+        // Safe normalization
+        const float small = 1e-8f;
+        float len0 = max(length(u0), small);
+        float len1 = max(length(u1), small);
+        float len2 = max(length(u2), small);
 
-        // Volume preservation
+        u0 = u0 / len0;
+        u1 = u1 / len1;
+        u2 = u2 / len2;
+
+        // Apply scaling
+        u0 *= ((1.0f - BETA) * PARTICLE_RADIUS + BETA * length(v0) * 0.5f);
+        u1 *= ((1.0f - BETA) * PARTICLE_RADIUS + BETA * length(v1) * 0.5f);
+        u2 *= ((1.0f - BETA) * PARTICLE_RADIUS + BETA * length(v2) * 0.5f);
+
+        // Compute volume
         float volume = dot(cross(u0, u1), u2);
-        float mult = 0.5f * pow((VOXEL_REST_VOLUME / volume), 1.0f / 3.0f);
+
+        // Flip one axis if volume is negative (to prevent inversion)
+        if (volume < 0.0f)
+        {
+            // Flip the shortest axis
+            float3 lens = float3(len0, len1, len2);
+            int minAxis = (lens.x <= lens.y && lens.x <= lens.z) ? 0 :
+                (lens.y <= lens.x && lens.y <= lens.z) ? 1 : 2;
+
+            if (minAxis == 0) u0 = -u0;
+            else if (minAxis == 1) u1 = -u1;
+            else u2 = -u2;
+
+            volume = -volume;
+        }
+
+        // Clamp volume to avoid division by zero
+        volume = max(volume, small);
+
+        float mult = 0.5f * pow(VOXEL_REST_VOLUME / volume, 1.0f / 3.0f);
 
         u0 *= mult;
         u1 *= mult;
         u2 *= mult;
 
-        // Update positions based on weights - CORRECTED to match CPU implementation
-        if (weights[start_idx] != 0.0f) {
-            positions[start_idx] = center - float4(u0, 0.0f) - float4(u1, 0.0f) - float4(u2, 0.0f);
-        }
-        if (weights[start_idx + 1] != 0.0f) {
-            positions[start_idx + 1] = center + float4(u0, 0.0f) - float4(u1, 0.0f) - float4(u2, 0.0f);
-        }
-        if (weights[start_idx + 2] != 0.0f) {
-            positions[start_idx + 2] = center - float4(u0, 0.0f) + float4(u1, 0.0f) - float4(u2, 0.0f);
-        }
-        if (weights[start_idx + 3] != 0.0f) {
-            positions[start_idx + 3] = center + float4(u0, 0.0f) + float4(u1, 0.0f) - float4(u2, 0.0f);
-        }
-        if (weights[start_idx + 4] != 0.0f) {
-            positions[start_idx + 4] = center - float4(u0, 0.0f) - float4(u1, 0.0f) + float4(u2, 0.0f);
-        }
-        if (weights[start_idx + 5] != 0.0f) {
-            positions[start_idx + 5] = center + float4(u0, 0.0f) - float4(u1, 0.0f) + float4(u2, 0.0f);
-        }
-        if (weights[start_idx + 6] != 0.0f) {
-            positions[start_idx + 6] = center - float4(u0, 0.0f) + float4(u1, 0.0f) + float4(u2, 0.0f);
-        }
-        if (weights[start_idx + 7] != 0.0f)
+        // Apply updated positions
+        float4 offsets[8] = {
+            -float4(u0 + u1 + u2, 0.0f),
+             float4(u0 - u1 - u2, 0.0f),
+            -float4(u0 - u1 + u2, 0.0f),
+             float4(u0 + u1 - u2, 0.0f),
+            -float4(u0 + u1 - u2, 0.0f),
+             float4(u0 - u1 + u2, 0.0f),
+            -float4(u0 - u1 - u2, 0.0f),
+             float4(u0 + u1 + u2, 0.0f)
+        };
+
+        [unroll]
+        for (int j = 0; j < 8; ++j)
         {
-            positions[start_idx + 7] = center + float4(u0, 0.0f) + float4(u1, 0.0f) + float4(u2, 0.0f);
+            if (weights[start_idx + j] != 0.0f)
+                positions[start_idx + j] = center + offsets[j];
         }
     }
 }
