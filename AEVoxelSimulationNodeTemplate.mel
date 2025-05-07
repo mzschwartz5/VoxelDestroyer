@@ -7,6 +7,12 @@ global proc AEVoxelSimulationNodeTemplate(string $nodeName)
     editorTemplate -label "Face to Face Relaxation" -addControl "faceToFaceRelaxation";
     editorTemplate -label "Face to Face Edge Uniformity" -addControl "faceToFaceEdgeUniformity";
     editorTemplate -label "Gravity Strength" -addControl "gravityStrength";
+    editorTemplate -label "X Constraints Tension" -addControl "xTension";
+    editorTemplate -label "X Constraints Compression" -addControl "xCompression";
+    editorTemplate -label "Y Constraints Tension" -addControl "yTension";
+    editorTemplate -label "Y Constraints Compression" -addControl "yCompression";
+    editorTemplate -label "Z Constraints Tension" -addControl "zTension";
+    editorTemplate -label "Z Constraints Compression" -addControl "zCompression";
 
     editorTemplate -suppress "frozen";
     editorTemplate -suppress "caching";

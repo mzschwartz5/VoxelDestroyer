@@ -98,37 +98,19 @@ void PBD::constructFaceToFaceConstraints(const Voxels& voxels,
         // Checks that the right voxel is in the grid and is occupied
         if (voxels.mortonCodesToSortedIdx.find(rightVoxelMortonCode) != voxels.mortonCodesToSortedIdx.end()) {
             int rightNeighborIndex = voxels.mortonCodesToSortedIdx.at(rightVoxelMortonCode);
-
-            FaceConstraint newConstraint;
-            newConstraint.voxelOneIdx = i;
-            newConstraint.voxelTwoIdx = rightNeighborIndex;
-            newConstraint.compressionLimit = xCompression;
-            newConstraint.tensionLimit = xTension;
-            addFaceConstraint(newConstraint, 0);
+            addFaceConstraint(i, rightNeighborIndex, xTension, xCompression, 0);
         }
 
         // Checks that the up voxel is in the grid and is occupied
         if (voxels.mortonCodesToSortedIdx.find(upVoxelMortonCode) != voxels.mortonCodesToSortedIdx.end()) {
             int upNeighborIndex = voxels.mortonCodesToSortedIdx.at(upVoxelMortonCode);
-
-            FaceConstraint newConstraint;
-            newConstraint.voxelOneIdx = i;
-            newConstraint.voxelTwoIdx = upNeighborIndex;
-            newConstraint.compressionLimit = yCompression;
-            newConstraint.tensionLimit = yTension;
-            addFaceConstraint(newConstraint, 1);
+            addFaceConstraint(i, upNeighborIndex, yTension, yCompression, 1);
         }
 
         // Checks that the front voxel is in the grid and is occupied
         if (voxels.mortonCodesToSortedIdx.find(frontVoxelMortonCode) != voxels.mortonCodesToSortedIdx.end()) {
             int frontNeighborIndex = voxels.mortonCodesToSortedIdx.at(frontVoxelMortonCode);
-
-            FaceConstraint newConstraint;
-            newConstraint.voxelOneIdx = i;
-            newConstraint.voxelTwoIdx = frontNeighborIndex;
-            newConstraint.compressionLimit = zCompression;
-            newConstraint.tensionLimit = zTension;
-            addFaceConstraint(newConstraint, 2);
+            addFaceConstraint(i, frontNeighborIndex, zTension, zCompression, 2);
         }
     }
 }
@@ -179,7 +161,7 @@ void PBD::simulateSubstep() {
     
     for (int i = 0; i < faceConstraints.size(); i++) {
         updateAxis(i);
-		faceConstraintsCompute->dispatch(int(((faceConstraints[i].size()) + VGS_THREADS + 1) / (VGS_THREADS)));
+		faceConstraintsCompute->dispatch(int(((faceConstraints[i].voxelOneIdx.size()) + VGS_THREADS + 1) / (VGS_THREADS)));
     }
 
     postVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);

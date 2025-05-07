@@ -88,10 +88,24 @@ public:
     void updateCameraMatrices(MMatrix viewProjMatrix, MMatrix invViewProjMatrix, int viewportWidth, int viewportHeight) {
         dragParticlesCompute->updateCameraMatrices({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), mayaMatrixToGlm(viewProjMatrix), mayaMatrixToGlm(invViewProjMatrix)});
     }
+
+    void updateTensionOnAxis(int axis, float newTension) {
+		for (int i = 0; i < faceConstraints[axis].tensionLimit.size(); i++) {
+			faceConstraints[axis].tensionLimit[i] = newTension;
+		}
+		faceConstraintsCompute->updateLimits(axis, faceConstraints[axis].tensionLimit, faceConstraints[axis].compressionLimit);
+    }
+
+	void updateCompressionOnAxis(int axis, float newCompression) {
+		for (int i = 0; i < faceConstraints[axis].compressionLimit.size(); i++) {
+			faceConstraints[axis].compressionLimit[i] = newCompression;
+		}
+		faceConstraintsCompute->updateLimits(axis, faceConstraints[axis].tensionLimit, faceConstraints[axis].compressionLimit);
+	}
     
 private:
     Particles particles;
-    std::array<std::vector<FaceConstraint>, 3> faceConstraints; //0 = x, 1 = y, 2 = z
+    std::array<FaceConstraints, 3> faceConstraints; //0 = x, 1 = y, 2 = z
     int substeps = 10;
     float timeStep;
     MDagPath meshDagPath;
@@ -142,7 +156,12 @@ private:
         VOXEL_REST_VOLUME = edge_length * edge_length * edge_length;
     }
 
-    void addFaceConstraint(FaceConstraint constraint, int axis) { faceConstraints[axis].push_back(constraint); };
+    void addFaceConstraint(int voxelOneIdx, int voxelTwoIdx, float tension, float compression, int axis) { 
+        faceConstraints[axis].voxelOneIdx.push_back(voxelOneIdx);
+        faceConstraints[axis].voxelTwoIdx.push_back(voxelTwoIdx);
+        faceConstraints[axis].tensionLimit.push_back(tension);
+        faceConstraints[axis].compressionLimit.push_back(compression);
+    };
 
     void updateAxis(int axis) {
         vgsInfo[1][1] = float(axis);

@@ -23,6 +23,14 @@ public:
     static MObject faceToFaceRelaxationAttr;
     static MObject faceToFaceEdgeUniformityAttr;
 
+    //attribs for tension and compression on each axis
+	static MObject xTensionAttr;
+	static MObject xCompressionAttr;
+	static MObject yTensionAttr;
+	static MObject yCompressionAttr;
+	static MObject zTensionAttr;
+	static MObject zCompressionAttr;
+
     // Output attribute
     static MObject outputAttr;
 
@@ -82,6 +90,55 @@ public:
         status = addAttribute(gravityStrengthAttr);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
+		// Tension and Compression attributes for each axis
+		xTensionAttr = nAttr.create("xTension", "xt", MFnNumericData::kFloat, 0.5, &status);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+		nAttr.setKeyable(true);
+		nAttr.setMin(0.0f);
+		nAttr.setMax(10000.0f);
+		status = addAttribute(xTensionAttr);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+
+		xCompressionAttr = nAttr.create("xCompression", "xc", MFnNumericData::kFloat, -0.5, &status);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+		nAttr.setKeyable(true);
+		nAttr.setMin(-10000.0f);
+		nAttr.setMax(0.0f);
+		status = addAttribute(xCompressionAttr);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+
+		yTensionAttr = nAttr.create("yTension", "yt", MFnNumericData::kFloat, 0.5, &status);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+		nAttr.setKeyable(true);
+		nAttr.setMin(0.0f);
+		nAttr.setMax(10000.0f);
+		status = addAttribute(yTensionAttr);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+
+		yCompressionAttr = nAttr.create("yCompression", "yc", MFnNumericData::kFloat, -0.5, &status);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+		nAttr.setKeyable(true);
+		nAttr.setMin(-10000.0f);
+		nAttr.setMax(0.0f);
+		status = addAttribute(yCompressionAttr);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+		
+        zTensionAttr = nAttr.create("zTension", "zt", MFnNumericData::kFloat, 0.5, &status);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+		nAttr.setKeyable(true);
+		nAttr.setMin(0.0f);
+		nAttr.setMax(10000.0f);
+		status = addAttribute(zTensionAttr);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+		
+        zCompressionAttr = nAttr.create("zCompression", "zc", MFnNumericData::kFloat, -0.5, &status);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+		nAttr.setKeyable(true);
+		nAttr.setMin(-10000.0f);
+		nAttr.setMax(0.0f);
+		status = addAttribute(zCompressionAttr);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
+
         // Output attribute - this will be used to trigger compute
         outputAttr = nAttr.create("output", "out", MFnNumericData::kFloat, 0.0, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
@@ -96,6 +153,12 @@ public:
         attributeAffects(gravityStrengthAttr, outputAttr);
         attributeAffects(faceToFaceRelaxationAttr, outputAttr);
         attributeAffects(faceToFaceEdgeUniformityAttr, outputAttr);
+		attributeAffects(xTensionAttr, outputAttr);
+		attributeAffects(xCompressionAttr, outputAttr);
+		attributeAffects(yTensionAttr, outputAttr);
+		attributeAffects(yCompressionAttr, outputAttr);
+		attributeAffects(zTensionAttr, outputAttr);
+		attributeAffects(zCompressionAttr, outputAttr);
 
         return MS::kSuccess;
     }
@@ -164,6 +227,30 @@ public:
             float value = plug.asFloat();
             node->pbdInstance->setFTFBeta(value);
         }
+        else if (plug.attribute() == xTensionAttr) {
+            float value = plug.asFloat();
+            node->pbdInstance->updateTensionOnAxis(0, value);
+        }
+		else if (plug.attribute() == xCompressionAttr) {
+			float value = plug.asFloat();
+			node->pbdInstance->updateCompressionOnAxis(0, value);
+		}
+		else if (plug.attribute() == yTensionAttr) {
+			float value = plug.asFloat();
+			node->pbdInstance->updateTensionOnAxis(1, value);
+		}
+		else if (plug.attribute() == yCompressionAttr) {
+			float value = plug.asFloat();
+			node->pbdInstance->updateCompressionOnAxis(1, value);
+		}
+		else if (plug.attribute() == zTensionAttr) {
+			float value = plug.asFloat();
+			node->pbdInstance->updateTensionOnAxis(2, value);
+		}
+		else if (plug.attribute() == zCompressionAttr) {
+			float value = plug.asFloat();
+			node->pbdInstance->updateCompressionOnAxis(2, value);
+		}
 
         // Update simulation info after any attribute change
         node->pbdInstance->updateSimInfo();
@@ -194,4 +281,10 @@ MObject VoxelSimulationNode::edgeUniformityAttr;
 MObject VoxelSimulationNode::gravityStrengthAttr;
 MObject VoxelSimulationNode::faceToFaceRelaxationAttr;
 MObject VoxelSimulationNode::faceToFaceEdgeUniformityAttr;
+MObject VoxelSimulationNode::xTensionAttr;
+MObject VoxelSimulationNode::xCompressionAttr;
+MObject VoxelSimulationNode::yTensionAttr;
+MObject VoxelSimulationNode::yCompressionAttr;
+MObject VoxelSimulationNode::zTensionAttr;
+MObject VoxelSimulationNode::zCompressionAttr;
 MObject VoxelSimulationNode::outputAttr;

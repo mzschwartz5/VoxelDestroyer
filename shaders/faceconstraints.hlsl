@@ -1,12 +1,4 @@
 
-// Face constraint structure
-struct FaceConstraint {
-    int voxelOneIdx;
-    int voxelTwoIdx;
-    float tensionLimit;
-    float compressionLimit;
-};
-
 cbuffer VoxelSimBuffer : register(b0)
 {
     float RELAXATION;
@@ -20,10 +12,19 @@ cbuffer VoxelSimBuffer : register(b0)
 };
 
 RWStructuredBuffer<float4> positions : register(u0);
-RWStructuredBuffer<FaceConstraint> xConstraints : register(u1);
-RWStructuredBuffer<FaceConstraint> yConstraints : register(u2);
-RWStructuredBuffer<FaceConstraint> zConstraints : register(u3);
+RWStructuredBuffer<int> xVoxelOneIdx : register(u1);
+RWStructuredBuffer<int> xVoxelTwoIdx : register(u2);
+RWStructuredBuffer<int> yVoxelOneIdx : register(u3);
+RWStructuredBuffer<int> yVoxelTwoIdx : register(u4);
+RWStructuredBuffer<int> zVoxelOneIdx : register(u5);
+RWStructuredBuffer<int> zVoxelTwoIdx : register(u6);
 StructuredBuffer<float> weights : register(t0);
+StructuredBuffer<float> xTensionLimit : register(t1);
+StructuredBuffer<float> xCompressionLimit : register(t2);
+StructuredBuffer<float> yTensionLimit : register(t3);
+StructuredBuffer<float> yCompressionLimit : register(t4);
+StructuredBuffer<float> zTensionLimit : register(t5);
+StructuredBuffer<float> zCompressionLimit : register(t6);
 
 float3 project(float3 u, float3 v)
 {
@@ -33,16 +34,16 @@ float3 project(float3 u, float3 v)
 
 void breakConstraint(int constraintIdx) {
     if (AXIS == 0) {
-        xConstraints[constraintIdx].voxelOneIdx = -1;
-        xConstraints[constraintIdx].voxelTwoIdx = -1;
+        xVoxelOneIdx[constraintIdx] = -1;
+        xVoxelTwoIdx[constraintIdx] = -1;
     }
     else if (AXIS == 1) {
-        yConstraints[constraintIdx].voxelOneIdx = -1;
-        yConstraints[constraintIdx].voxelTwoIdx = -1;
+        yVoxelOneIdx[constraintIdx] = -1;
+        yVoxelTwoIdx[constraintIdx] = -1;
     }
     else if (AXIS == 2) {
-        zConstraints[constraintIdx].voxelOneIdx = -1;
-        zConstraints[constraintIdx].voxelTwoIdx = -1;
+        zVoxelOneIdx[constraintIdx] = -1;
+        zVoxelTwoIdx[constraintIdx] = -1;
     }
 }
 
@@ -55,20 +56,29 @@ void main(
 {
     uint constraintIdx = globalThreadId.x;
 
-    // Get the constraint data from the buffer
-    FaceConstraint constraint;
+    int voxelOneIdx;
+    int voxelTwoIdx;
+    float tensionLimit;
+    float compressionLimit;
+
 	if (AXIS == 0) {
-        constraint = xConstraints[constraintIdx];
+        voxelOneIdx = xVoxelOneIdx[constraintIdx];
+		voxelTwoIdx = xVoxelTwoIdx[constraintIdx];
+		tensionLimit = xTensionLimit[constraintIdx];
+		compressionLimit = xCompressionLimit[constraintIdx];
 	}
 	else if (AXIS == 1) {
-		constraint = yConstraints[constraintIdx];
+		voxelOneIdx = yVoxelOneIdx[constraintIdx];
+		voxelTwoIdx = yVoxelTwoIdx[constraintIdx];
+		tensionLimit = yTensionLimit[constraintIdx];
+		compressionLimit = yCompressionLimit[constraintIdx];
 	}
 	else if (AXIS == 2) {
-		constraint = zConstraints[constraintIdx];
+		voxelOneIdx = zVoxelOneIdx[constraintIdx];
+		voxelTwoIdx = zVoxelTwoIdx[constraintIdx];
+		tensionLimit = zTensionLimit[constraintIdx];
+		compressionLimit = zCompressionLimit[constraintIdx];
 	}
-    
-    int voxelOneIdx = constraint.voxelOneIdx;
-    int voxelTwoIdx = constraint.voxelTwoIdx;
 
     if (voxelOneIdx == -1 || voxelTwoIdx == -1)
     {
@@ -152,10 +162,6 @@ void main(
         float3 u = faceTwo[i] - faceOne[i];
         float L = length(u);
         float strain = (L - 2.0f * PARTICLE_RADIUS) / (2.0f * PARTICLE_RADIUS);
-
-        // Assuming tension/compression limits
-        float tensionLimit = constraint.tensionLimit;
-        float compressionLimit = constraint.compressionLimit;
 
         if (strain > tensionLimit || strain < compressionLimit)
         {
@@ -293,7 +299,6 @@ void main(
             if (V < 0.0f)
             {
                 // Break constraint due to flipping
-                // this is also broken...
                 breakConstraint(constraintIdx);
                 return;
             }
