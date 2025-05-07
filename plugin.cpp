@@ -6,6 +6,8 @@
 #include <windows.h>
 #include "voxeldragcontextcommand.h"
 #include <maya/MTimerMessage.h>
+#include <maya/MTime.h>
+#include <maya/MAnimControl.h>
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -15,6 +17,7 @@ PBD plugin::pbdSimulator{};
 std::unordered_map<std::string, MCallbackId> plugin::callbacks;
 MDagPath plugin::voxelizedMeshDagPath = MDagPath();
 VoxelRendererOverride* plugin::voxelRendererOverride = nullptr;
+bool plugin::isPlaying = false;
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -40,6 +43,39 @@ MSyntax plugin::syntax()
 	syntax.addFlag("-v", "-voxelsPerEdge", MSyntax::kLong);
 	syntax.addFlag("-n", "-gridDisplayName", MSyntax::kString);
 	return syntax;
+}
+
+// TODO: should probably track other events like when the frame rate or playback speed change, outside of when playback changes.
+// (I think the events we'd want are timeUnitChanged and playbackSpeedChanged)
+// Tangentially, we should also track the undo event and reset the simulation or play back to a cached point.
+void plugin::onPlaybackChange(bool state, void* clientData) {
+	MStatus status;
+	if (state) {
+		bool testisplaying = MAnimControl::isPlaying();
+		double timePerFrame = MTime(1.0, MTime::uiUnit()).as(MTime::kSeconds);
+		double playbackSpeed = MAnimControl::playbackSpeed();
+		if (playbackSpeed == 0.0) playbackSpeed = 1.0;
+		timePerFrame /= playbackSpeed;
+
+		// Using a timer instead of the timeChanged event, which doesn't fire during mouse interaction.
+		MCallbackId drawCallbackId = MTimerMessage::addTimerCallback(static_cast<float>(timePerFrame), plugin::simulate, NULL, &status);
+		plugin::setCallbackId("drawCallback", drawCallbackId);
+		isPlaying = true;
+	} else {
+		MTimerMessage::removeCallback(plugin::getCallbackId("drawCallback"));
+		plugin::setCallbackId("drawCallback", 0);
+		isPlaying = false;
+	}
+}
+
+void plugin::onTimeChanged(void* clientData) {
+	if (isPlaying) {
+		return;
+	}
+
+	double elapsedTime = MTime(1.0, MTime::uiUnit()).as(MTime::kSeconds);
+	// If we're just scrubbing through the timeline, call the simulation step manually.
+	plugin::simulate(static_cast<float>(elapsedTime), 0.0f, clientData);
 }
 
 // Plugin doIt function
@@ -343,8 +379,11 @@ EXPORT MStatus initializePlugin(MObject obj)
 	MString activeModelPanel = plugin::getActiveModelPanel();
 	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
 
-	MCallbackId drawCallbackId = MTimerMessage::addTimerCallback(1.0f / 60.0f, plugin::simulate, NULL, &status);
-	plugin::setCallbackId("drawCallback", drawCallbackId);
+	MCallbackId playbackChangeCallbackId = MConditionMessage::addConditionCallback("playingBack", plugin::onPlaybackChange);
+	plugin::setCallbackId("playingBack", playbackChangeCallbackId);
+
+	MCallbackId timeChangedCallbackId = MEventMessage::addEventCallback("timeChanged", plugin::onTimeChanged, NULL, &status);
+	plugin::setCallbackId("timeChanged", timeChangedCallbackId);
 
 	// Initialize DirectX
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
@@ -390,7 +429,12 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 		status.perror("deregisterContextCommand failed");
 
 	// Deregister the callbacks
-	MEventMessage::removeCallback(plugin::getCallbackId("drawCallback"));
+	MCallbackId drawCallbackId = plugin::getCallbackId("drawCallback");
+	if (drawCallbackId != 0) MEventMessage::removeCallback(drawCallbackId);
+	MCallbackId playbackChangeCallbackId = plugin::getCallbackId("playingBack");
+	MConditionMessage::removeCallback(playbackChangeCallbackId);
+	MCallbackId timeChangedCallbackId = plugin::getCallbackId("timeChanged");
+	MEventMessage::removeCallback(timeChangedCallbackId);
 
 	status = plugin.deregisterNode(VoxelSimulationNode::id);
 	if (!status) {
