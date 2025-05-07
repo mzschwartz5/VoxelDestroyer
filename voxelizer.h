@@ -76,6 +76,9 @@ public:
         MPoint gridCenter,
         const MDagPath& selectedMeshDagPath,
         MDagPath& voxelizedMeshDagPath,
+        bool voxelizeSurface,
+        bool voxelizeInterior,
+        bool doBoolean,
         MStatus& status
     );
 
@@ -126,7 +129,8 @@ private:
         float gridEdgeLength, 
         float voxelSize,       
         MPoint gridCenter,      
-        MFnMesh& originalSurface
+        MFnMesh& originalSurface,
+        bool doBoolean
     );
 
     void addVoxelToMesh(

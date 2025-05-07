@@ -14,6 +14,9 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     MPoint gridCenter,
     const MDagPath& selectedMeshPath,
     MDagPath& voxelizedMeshPath,
+    bool voxelizeSurface,
+    bool voxelizeInterior,
+    bool doBoolean,
     MStatus& status
 ) {
 
@@ -28,28 +31,33 @@ Voxels Voxelizer::voxelizeSelectedMesh(
 
     std::vector<Triangle> meshTris = getTrianglesOfMesh(selectedMesh, voxelSize, status);
 
-    getInteriorVoxels(
-        meshTris,
-        gridEdgeLength,
-        voxelSize,
-        gridCenter,
-        voxels
-    );
+    if (voxelizeInterior) {
+        getInteriorVoxels(
+            meshTris,
+            gridEdgeLength,
+            voxelSize,
+            gridCenter,
+            voxels
+        );
+    }
 
-    getSurfaceVoxels(
-        meshTris,
-        gridEdgeLength,
-        voxelSize,
-        gridCenter,
-        voxels
-    );
+    if (voxelizeSurface) {
+        getSurfaceVoxels(
+            meshTris,
+            gridEdgeLength,
+            voxelSize,
+            gridCenter,
+            voxels
+        );
+    }
 
     voxelizedMeshPath = createVoxels(
         voxels,
         gridEdgeLength,
         voxelSize,
         gridCenter,
-        selectedMesh
+        selectedMesh,
+        doBoolean
     );
 
     status = MS::kSuccess;
@@ -292,7 +300,8 @@ MDagPath Voxelizer::createVoxels(
     float gridEdgeLength, 
     float voxelSize,       
     MPoint gridCenter,      
-    MFnMesh& originalMesh
+    MFnMesh& originalMesh,
+    bool doBoolean
 ) {
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
     MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
@@ -327,10 +336,13 @@ MDagPath Voxelizer::createVoxels(
     for (int i = 0; i < overlappedVoxels.numOccupied; ++i) {
         MObject cube = overlappedVoxels.mayaObjects[i];
         meshNamesConcatenated += " " + MFnMesh(cube).name();
-
+        
+        if (!doBoolean) continue;
+        
         intersectVoxelWithOriginalMesh(overlappedVoxels, cube, originalMesh.object(), i);
     }
 
+    // TODO: if no boolean, should get rid of non-manifold geometry
     MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(combinedMeshName, meshNamesConcatenated, originalMeshName, voxelSize);
     // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh
     MGlobal::executeCommand("delete " + originalMeshName, false, true); // Delete the original mesh to clean up the scene
