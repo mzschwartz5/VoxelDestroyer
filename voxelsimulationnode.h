@@ -91,50 +91,50 @@ public:
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
 		// Tension and Compression attributes for each axis
-		xTensionAttr = nAttr.create("xTension", "xt", MFnNumericData::kFloat, 0.5, &status);
+		xTensionAttr = nAttr.create("xTension", "xt", MFnNumericData::kFloat, FLT_MAX, &status);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 		nAttr.setKeyable(true);
 		nAttr.setMin(0.0f);
-		nAttr.setMax(10000.0f);
+		nAttr.setMax(FLT_MAX);
 		status = addAttribute(xTensionAttr);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 
-		xCompressionAttr = nAttr.create("xCompression", "xc", MFnNumericData::kFloat, -0.5, &status);
+		xCompressionAttr = nAttr.create("xCompression", "xc", MFnNumericData::kFloat, -FLT_MAX, &status);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 		nAttr.setKeyable(true);
-		nAttr.setMin(-10000.0f);
+		nAttr.setMin(-FLT_MAX);
 		nAttr.setMax(0.0f);
 		status = addAttribute(xCompressionAttr);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 
-		yTensionAttr = nAttr.create("yTension", "yt", MFnNumericData::kFloat, 0.5, &status);
+		yTensionAttr = nAttr.create("yTension", "yt", MFnNumericData::kFloat, FLT_MAX, &status);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 		nAttr.setKeyable(true);
 		nAttr.setMin(0.0f);
-		nAttr.setMax(10000.0f);
+		nAttr.setMax(FLT_MAX);
 		status = addAttribute(yTensionAttr);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 
-		yCompressionAttr = nAttr.create("yCompression", "yc", MFnNumericData::kFloat, -0.5, &status);
+		yCompressionAttr = nAttr.create("yCompression", "yc", MFnNumericData::kFloat, -FLT_MAX, &status);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 		nAttr.setKeyable(true);
-		nAttr.setMin(-10000.0f);
+		nAttr.setMin(-FLT_MAX);
 		nAttr.setMax(0.0f);
 		status = addAttribute(yCompressionAttr);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 		
-        zTensionAttr = nAttr.create("zTension", "zt", MFnNumericData::kFloat, 0.5, &status);
+        zTensionAttr = nAttr.create("zTension", "zt", MFnNumericData::kFloat, FLT_MAX, &status);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 		nAttr.setKeyable(true);
 		nAttr.setMin(0.0f);
-		nAttr.setMax(10000.0f);
+		nAttr.setMax(FLT_MAX);
 		status = addAttribute(zTensionAttr);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 		
-        zCompressionAttr = nAttr.create("zCompression", "zc", MFnNumericData::kFloat, -0.5, &status);
+        zCompressionAttr = nAttr.create("zCompression", "zc", MFnNumericData::kFloat, -FLT_MAX, &status);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 		nAttr.setKeyable(true);
-		nAttr.setMin(-10000.0f);
+		nAttr.setMin(-FLT_MAX);
 		nAttr.setMax(0.0f);
 		status = addAttribute(zCompressionAttr);
 		CHECK_MSTATUS_AND_RETURN_IT(status);

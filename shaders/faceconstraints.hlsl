@@ -56,10 +56,10 @@ void main(
 {
     uint constraintIdx = globalThreadId.x;
 
-    int voxelOneIdx;
-    int voxelTwoIdx;
-    float tensionLimit;
-    float compressionLimit;
+    int voxelOneIdx = -1;
+    int voxelTwoIdx = -1;
+    float tensionLimit = 0;
+    float compressionLimit = 0;
 
 	if (AXIS == 0) {
         voxelOneIdx = xVoxelOneIdx[constraintIdx];
