@@ -80,6 +80,20 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         preVGSCompute->getOldPositionsSRV()
     );
 
+    // Hard coded for now. Later set up via UI.
+    CollisionVolume collisionVolume{
+        { -3.0f, -3.0f, -3.0f }, // gridMin
+        { 6, 6, 6 }, // gridDims
+        { 1.0f, 1.0f, 1.0f } // gridInvCellDims
+    };
+
+    buildCollisionGridCompute = std::make_unique<BuildCollisionGridCompute>(
+        collisionVolume,
+        voxelSize,
+        bindVerticesCompute->getParticlesSRV(),
+        voxels.isSurface
+    );
+
     initialized = true;
 }
 
@@ -98,7 +112,6 @@ void PBD::constructFaceToFaceConstraints(const Voxels& voxels,
         // Checks that the right voxel is in the grid and is occupied
         if (voxels.mortonCodesToSortedIdx.find(rightVoxelMortonCode) != voxels.mortonCodesToSortedIdx.end()) {
             int rightNeighborIndex = voxels.mortonCodesToSortedIdx.at(rightVoxelMortonCode);
-
             FaceConstraint newConstraint;
             newConstraint.voxelOneIdx = i;
             newConstraint.voxelTwoIdx = rightNeighborIndex;
@@ -147,6 +160,13 @@ void PBD::createParticles(const Voxels& voxels) {
 
 void PBD::simulateStep()
 {
+    // Once, at the beginning of each step, build the collision grid.
+    // (May need to do this once per substep... not sure yet.)
+    int numCollisionGridCells = 36; // hardcoded 6x6x6 for now
+    int numCollisionGridWorkgroups = (numCollisionGridCells + BUILD_COLLISION_THREADS - 1) / BUILD_COLLISION_THREADS;
+    buildCollisionGridCompute->resetCollisionBuffers();
+    buildCollisionGridCompute->dispatch(numCollisionGridWorkgroups);
+
     for (int i = 0; i < substeps; i++)
     {
         simulateSubstep();

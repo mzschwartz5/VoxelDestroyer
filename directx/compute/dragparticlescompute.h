@@ -86,6 +86,7 @@ public:
         wasDragging = isDragging;
     }
 
+    // TODO: make this a virtual method on the base compute class?
     void copyConstantBufferToGPU()
     {
         ConstantBuffer cb{
