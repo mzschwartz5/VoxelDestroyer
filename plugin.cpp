@@ -50,6 +50,12 @@ MSyntax plugin::syntax()
 	syntax.addFlag("-v", "-voxelsPerEdge", MSyntax::kLong);
 	syntax.addFlag("-n", "-gridDisplayName", MSyntax::kString);
 	syntax.addFlag("-t", "-type", MSyntax::kLong);
+	syntax.addFlag("-xit", "-xInfiniteTension", MSyntax::kLong);
+	syntax.addFlag("-xct", "-xInfiniteCompression", MSyntax::kLong);
+	syntax.addFlag("-yit", "-yInfiniteTension", MSyntax::kLong);
+	syntax.addFlag("-yct", "-yInfiniteCompression", MSyntax::kLong);
+	syntax.addFlag("-zit", "-zInfiniteTension", MSyntax::kLong);
+	syntax.addFlag("-zct", "-zInfiniteCompression", MSyntax::kLong);
 	return syntax;
 }
 
@@ -248,6 +254,72 @@ PluginArgs plugin::parsePluginArgs(const MArgList& args) {
 		status = argData.getFlagArgument("-zcompression", 0, pluginArgs.zCompression);
 		if (status != MS::kSuccess) {
 			MGlobal::displayError("Failed to get z compression: " + status.errorString());
+		}
+	}
+
+	if (argData.isFlagSet("-xInfiniteTension")) {
+		int xInfiniteTension;
+		status = argData.getFlagArgument("-xInfiniteTension", 0, xInfiniteTension);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get x infinite tension: " + status.errorString());
+		}
+		if (xInfiniteTension) {
+			pluginArgs.xTension = FLT_MAX;
+		}
+	}
+
+	if (argData.isFlagSet("-xInfiniteCompression")) {
+		int xInfiniteCompression;
+		status = argData.getFlagArgument("-xInfiniteCompression", 0, xInfiniteCompression);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get x infinite compression: " + status.errorString());
+		}
+		if (xInfiniteCompression) {
+			pluginArgs.xCompression = -FLT_MAX;
+		}
+	}
+
+	if (argData.isFlagSet("-yInfiniteTension")) {
+		int yInfiniteTension;
+		status = argData.getFlagArgument("-yInfiniteTension", 0, yInfiniteTension);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get y infinite tension: " + status.errorString());
+		}
+		if (yInfiniteTension) {
+			pluginArgs.yTension = FLT_MAX;
+		}
+	}
+
+	if (argData.isFlagSet("-yInfiniteCompression")) {
+		int yInfiniteCompression;
+		status = argData.getFlagArgument("-yInfiniteCompression", 0, yInfiniteCompression);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get y infinite compression: " + status.errorString());
+		}
+		if (yInfiniteCompression) {
+			pluginArgs.yCompression = -FLT_MAX;
+		}
+	}
+
+	if (argData.isFlagSet("-zInfiniteTension")) {
+		int zInfiniteTension;
+		status = argData.getFlagArgument("-zInfiniteTension", 0, zInfiniteTension);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get z infinite tension: " + status.errorString());
+		}
+		if (zInfiniteTension) {
+			pluginArgs.zTension = FLT_MAX;
+		}
+	}
+
+	if (argData.isFlagSet("-zInfiniteCompression")) {
+		int zInfiniteCompression;
+		status = argData.getFlagArgument("-zInfiniteCompression", 0, zInfiniteCompression);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get z infinite compression: " + status.errorString());
+		}
+		if (zInfiniteCompression) {
+			pluginArgs.zCompression = -FLT_MAX;
 		}
 	}
 

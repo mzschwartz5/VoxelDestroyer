@@ -10,7 +10,7 @@ global proc VoxelizerMenu() {
     formLayout VoxelizerMenuForm;
 
     // Instruction text
-    string $instructionText = `text -label "Use fields below to control the voxelization, or scale the box in the viewport using the manipulators"`;
+    string $instructionText = `text -label "Use fields below to control the voxelization, or scale the box in the viewport using the manipulators"`; 
 
     // Spacer for top padding
     string $spacer = `separator -style "none"`;
@@ -19,13 +19,13 @@ global proc VoxelizerMenu() {
     string $positionField = `floatFieldGrp -numberOfFields 3 -label "Position: " -value1 $bbox[0] -value2 $bbox[1] -value3 $bbox[2]
         -cc ("VoxelizerMenu_updatePosition(\"" + $voxelGridDisplayName + "\", #1, #2, #3)") 
         -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50
-        - precision 2`;
+        -precision 2`;
 
     // Scale controls
     string $scaleField = `floatFieldGrp -numberOfFields 1 -label "Scale: " -value1 $bbox[3]
         -cc ("VoxelizerMenu_updateScale(\"" + $voxelGridDisplayName + "\", #1)") 
         -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50
-        - precision 2`;
+        -precision 2`;
 
     // Subdivision controls
     string $subdivField = `intSliderGrp -label "Voxels Per Edge: " -value 1 -field true -minValue 2 -maxValue 32
@@ -33,35 +33,42 @@ global proc VoxelizerMenu() {
         -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50`;
 
     // X-axis controls
-    string $xAxisGroup = `rowLayout -numberOfColumns 2 -columnWidth2 200 200`;
-    string $xtensionField = `floatFieldGrp -numberOfFields 1 -label "X Tension: " -value1 0.5
-        -columnAlign 1 "left" -columnWidth 1 100 -columnWidth 2 80
+    string $xAxisGroup = `rowLayout -numberOfColumns 4 -columnWidth4 200 80 200 80`;
+    string $xtensionField = `floatFieldGrp -numberOfFields 1 -label "X Tension: " -value1 0.5 -precision 2
         -cc ("VoxelizerMenu_updateTension(\"" + $voxelGridDisplayName + "\", \"xtension\", #1)")`;
-    string $xcompressionField = `floatFieldGrp -numberOfFields 1 -label "X Compression: " -value1 -0.5
-        -columnAlign 1 "left" -columnWidth 1 100 -columnWidth 2 80
+    string $xInfiniteTensionCheckbox = `checkBox -label "Infinite" -value false
+        -cc ("VoxelizerMenu_updateInfiniteTension(\"" + $voxelGridDisplayName + "\", \"xtension\", #1)")`;
+    string $xcompressionField = `floatFieldGrp -numberOfFields 1 -label "X Compression: " -value1 -0.5 -precision 2
         -cc ("VoxelizerMenu_updateCompression(\"" + $voxelGridDisplayName + "\", \"xcompression\", #1)")`;
+    string $xInfiniteCompressionCheckbox = `checkBox -label "Infinite" -value false
+        -cc ("VoxelizerMenu_updateInfiniteCompression(\"" + $voxelGridDisplayName + "\", \"xcompression\", #1)")`;
     setParent ..;
 
     // Y-axis controls
-    string $yAxisGroup = `rowLayout -numberOfColumns 2 -columnWidth2 200 200`;
-    string $ytensionField = `floatFieldGrp -numberOfFields 1 -label "Y Tension: " -value1 0.5
-        -columnAlign 1 "left" -columnWidth 1 100 -columnWidth 2 80
+    string $yAxisGroup = `rowLayout -numberOfColumns 4 -columnWidth4 200 80 200 80`;
+    string $ytensionField = `floatFieldGrp -numberOfFields 1 -label "Y Tension: " -value1 0.5 -precision 2
         -cc ("VoxelizerMenu_updateTension(\"" + $voxelGridDisplayName + "\", \"ytension\", #1)")`;
-    string $ycompressionField = `floatFieldGrp -numberOfFields 1 -label "Y Compression: " -value1 -0.5
-        -columnAlign 1 "left" -columnWidth 1 100 -columnWidth 2 80
+    string $yInfiniteTensionCheckbox = `checkBox -label "Infinite" -value false
+        -cc ("VoxelizerMenu_updateInfiniteTension(\"" + $voxelGridDisplayName + "\", \"ytension\", #1)")`;
+    string $ycompressionField = `floatFieldGrp -numberOfFields 1 -label "Y Compression: " -value1 -0.5 -precision 2
         -cc ("VoxelizerMenu_updateCompression(\"" + $voxelGridDisplayName + "\", \"ycompression\", #1)")`;
+    string $yInfiniteCompressionCheckbox = `checkBox -label "Infinite" -value false
+        -cc ("VoxelizerMenu_updateInfiniteCompression(\"" + $voxelGridDisplayName + "\", \"ycompression\", #1)")`;
     setParent ..;
 
     // Z-axis controls
-    string $zAxisGroup = `rowLayout -numberOfColumns 2 -columnWidth2 200 200`;
-    string $ztensionField = `floatFieldGrp -numberOfFields 1 -label "Z Tension: " -value1 0.5
-        -columnAlign 1 "left" -columnWidth 1 100 -columnWidth 2 80
+    string $zAxisGroup = `rowLayout -numberOfColumns 4 -columnWidth4 200 80 200 80`;
+    string $ztensionField = `floatFieldGrp -numberOfFields 1 -label "Z Tension: " -value1 0.5 -precision 2
         -cc ("VoxelizerMenu_updateTension(\"" + $voxelGridDisplayName + "\", \"ztension\", #1)")`;
-    string $zcompressionField = `floatFieldGrp -numberOfFields 1 -label "Z Compression: " -value1 -0.5
-        -columnAlign 1 "left" -columnWidth 1 100 -columnWidth 2 80
+    string $zInfiniteTensionCheckbox = `checkBox -label "Infinite" -value false
+        -cc ("VoxelizerMenu_updateInfiniteTension(\"" + $voxelGridDisplayName + "\", \"ztension\", #1)")`;
+    string $zcompressionField = `floatFieldGrp -numberOfFields 1 -label "Z Compression: " -value1 -0.5 -precision 2
         -cc ("VoxelizerMenu_updateCompression(\"" + $voxelGridDisplayName + "\", \"zcompression\", #1)")`;
+    string $zInfiniteCompressionCheckbox = `checkBox -label "Infinite" -value false
+        -cc ("VoxelizerMenu_updateInfiniteCompression(\"" + $voxelGridDisplayName + "\", \"zcompression\", #1)")`;
     setParent ..;
 
+    // Surface, Solid, and Simulated checkboxes
     string $surfaceCheckbox = `checkBox -label "Surface" -value true`;
     string $solidCheckbox = `checkBox -label "Solid" -value true`;
     string $simulatedCheckbox = `checkBox -label "Simulated" -value true`;
@@ -70,7 +77,7 @@ global proc VoxelizerMenu() {
     string $cancelButton = `button -label "Cancel" -command ("VoxelizerMenu_close(\"" + $voxelGridDisplayName + "\")")`;
     string $runButton = `button -label "Voxelize" 
         -annotation "Voxelizes a mesh in preparation for VGS simulation. Uses selected mesh or, if none selected, the closest mesh to the center of the grid bounds."
-        -command ("VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", \"" + $positionField + "\", \"" + $scaleField + "\", \"" + $subdivField + "\", \"" + $surfaceCheckbox + "\", \"" + $solidCheckbox + "\", \"" + $simulatedCheckbox + "\", \"" + $xtensionField + "\", \"" + $xcompressionField + "\", \"" + $ytensionField + "\", \"" + $ycompressionField + "\", \"" + $ztensionField + "\", \"" + $zcompressionField + "\")")`;
+        -command ("VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", \"" + $positionField + "\", \"" + $scaleField + "\", \"" + $subdivField + "\", \"" + $surfaceCheckbox + "\", \"" + $solidCheckbox + "\", \"" + $simulatedCheckbox + "\", \"" + $xtensionField + "\", \"" + $xcompressionField + "\", \"" + $ytensionField + "\", \"" + $ycompressionField + "\", \"" + $ztensionField + "\", \"" + $zcompressionField + "\", \"" + $xInfiniteTensionCheckbox + "\", \"" + $xInfiniteCompressionCheckbox + "\", \"" + $yInfiniteTensionCheckbox + "\", \"" + $yInfiniteCompressionCheckbox + "\", \"" + $zInfiniteTensionCheckbox + "\", \"" + $zInfiniteCompressionCheckbox + "\")")`;
 
     // Attach elements to form layout
     formLayout -edit
@@ -100,7 +107,27 @@ global proc VoxelizerMenu() {
     scriptJob -attributeChange ($voxelGridDisplayName + ".scaleX") ("VoxelizerMenu_syncScale(\"" + $voxelGridDisplayName + "\", \"" + $scaleField + "\")");
 }
 
-global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $scaleField, string $subdivField, string $surfaceCheckbox, string $solidCheckbox, string $simulatedCheckbox, string $xtensionField, string $xcompressionField, string $ytensionField, string $ycompressionField, string $ztensionField, string $zcompressionField) {
+global proc VoxelizerMenu_run(
+    string $cubeName, 
+    string $positionField, 
+    string $scaleField, 
+    string $subdivField, 
+    string $surfaceCheckbox, 
+    string $solidCheckbox, 
+    string $simulatedCheckbox, 
+    string $xtensionField, 
+    string $xcompressionField, 
+    string $ytensionField, 
+    string $ycompressionField, 
+    string $ztensionField, 
+    string $zcompressionField,
+    string $xInfiniteTensionCheckbox,
+    string $xInfiniteCompressionCheckbox,
+    string $yInfiniteTensionCheckbox,
+    string $yInfiniteCompressionCheckbox,
+    string $zInfiniteTensionCheckbox,
+    string $zInfiniteCompressionCheckbox
+) {
     float $posX = `floatFieldGrp -query -value1 $positionField`;
     float $posY = `floatFieldGrp -query -value2 $positionField`;
     float $posZ = `floatFieldGrp -query -value3 $positionField`;
@@ -109,12 +136,43 @@ global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $s
     int $surface = `checkBox -query -value $surfaceCheckbox`;
     int $solid = `checkBox -query -value $solidCheckbox`;
     int $simulated = `checkBox -query -value $simulatedCheckbox`;
+
+    // Query tension and compression values
     float $xtension = `floatFieldGrp -query -value1 $xtensionField`;
     float $xcompression = `floatFieldGrp -query -value1 $xcompressionField`;
     float $ytension = `floatFieldGrp -query -value1 $ytensionField`;
     float $ycompression = `floatFieldGrp -query -value1 $ycompressionField`;
     float $ztension = `floatFieldGrp -query -value1 $ztensionField`;
     float $zcompression = `floatFieldGrp -query -value1 $zcompressionField`;
+
+    // Query infinite checkboxes
+    int $xInfiniteTension = `checkBox -query -value $xInfiniteTensionCheckbox`;
+    int $xInfiniteCompression = `checkBox -query -value $xInfiniteCompressionCheckbox`;
+    int $yInfiniteTension = `checkBox -query -value $yInfiniteTensionCheckbox`;
+    int $yInfiniteCompression = `checkBox -query -value $yInfiniteCompressionCheckbox`;
+    int $zInfiniteTension = `checkBox -query -value $zInfiniteTensionCheckbox`;
+    int $zInfiniteCompression = `checkBox -query -value $zInfiniteCompressionCheckbox`;
+
+    // Handle infinite values
+    float $infiniteValue = 1e30; // A very large number to represent "infinity"
+    if ($xInfiniteTension) {
+        $xtension = $infiniteValue;
+    }
+    if ($xInfiniteCompression) {
+        $xcompression = -$infiniteValue;
+    }
+    if ($yInfiniteTension) {
+        $ytension = $infiniteValue;
+    }
+    if ($yInfiniteCompression) {
+        $ycompression = -$infiniteValue;
+    }
+    if ($zInfiniteTension) {
+        $ztension = $infiniteValue;
+    }
+    if ($zInfiniteCompression) {
+        $zcompression = -$infiniteValue;
+    }
 
     // Deselect the cube if it's currently selected, so it's not a voxelization target itself
     if (`objExists $cubeName` && `objExists ($cubeName + ".visibility")`) {
@@ -141,6 +199,43 @@ global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $s
         VoxelizerMenu_close($cubeName);
     }
 }
+
+// Update infinite tension for a specific axis
+global proc VoxelizerMenu_updateInfiniteTension(string $cubeName, string $axis, int $isInfinite) {
+    if (`objExists $cubeName`) {
+        string $attribute = $cubeName + "." + $axis;
+        if (`attributeExists $axis $cubeName`) {
+            if ($isInfinite) {
+                setAttr $attribute 1e30; // Set to a very large value to represent "infinity"
+            } else {
+                setAttr $attribute 0.5; // Reset to default tension value
+            }
+        } else {
+            warning("Attribute " + $axis + " does not exist on " + $cubeName);
+        }
+    } else {
+        warning("Voxel grid display does not exist.");
+    }
+}
+
+// Update infinite compression for a specific axis
+global proc VoxelizerMenu_updateInfiniteCompression(string $cubeName, string $axis, int $isInfinite) {
+    if (`objExists $cubeName`) {
+        string $attribute = $cubeName + "." + $axis;
+        if (`attributeExists $axis $cubeName`) {
+            if ($isInfinite) {
+                setAttr $attribute -1e30; // Set to a very large negative value to represent "infinity"
+            } else {
+                setAttr $attribute -0.5; // Reset to default compression value
+            }
+        } else {
+            warning("Attribute " + $axis + " does not exist on " + $cubeName);
+        }
+    } else {
+        warning("Voxel grid display does not exist.");
+    }
+}
+
 
 // Update tension for a specific axis
 global proc VoxelizerMenu_updateTension(string $cubeName, string $axis, float $value) {
