@@ -25,8 +25,6 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 	);
 	bindVerticesCompute->dispatch(voxels.size());
 
-	MGlobal::displayInfo("Bind vertices compute shader dispatched.");
-
 	transformVerticesCompute = std::make_unique<TransformVerticesCompute>(
 		voxelMeshFn.numVertices(&status),
 		bindVerticesCompute->getParticlesSRV(), 			
@@ -36,7 +34,19 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 	);
 	transformVerticesNumWorkgroups = voxels.size();
 
-	MGlobal::displayInfo("Transform vertices compute shader initialized.");
+    // Hard coded for now. Later set up via UI.
+    CollisionVolume collisionVolume{
+        { -3.0f, -3.0f, -3.0f }, // gridMin
+        { 6, 6, 6 }, // gridDims
+        { 1.0f, 1.0f, 1.0f } // gridInvCellDims
+    };
+
+    buildCollisionGridCompute = std::make_unique<BuildCollisionGridCompute>(
+        collisionVolume,
+        voxelSize,
+        bindVerticesCompute->getParticlesSRV(),
+        voxels.isSurface
+    );
 
     //setSimValuesFromUI();
 
@@ -54,7 +64,8 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 		faceConstraints,
 		bindVerticesCompute->getParticlesUAV(),
 		vgsCompute->getWeightsSRV(),
-        vgsCompute->getVoxelSimInfoBuffer()
+        vgsCompute->getVoxelSimInfoBuffer(),
+        buildCollisionGridCompute->getIsSurfaceUAV()
 	);
 
 	simInfo = glm::vec4(GRAVITY_STRENGTH, GROUND_COLLISION_ENABLED, GROUND_COLLISION_Y, TIMESTEP);
@@ -78,20 +89,6 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
     dragParticlesCompute = std::make_unique<DragParticlesCompute>(
         bindVerticesCompute->getParticlesUAV(),
         preVGSCompute->getOldPositionsSRV()
-    );
-
-    // Hard coded for now. Later set up via UI.
-    CollisionVolume collisionVolume{
-        { -3.0f, -3.0f, -3.0f }, // gridMin
-        { 6, 6, 6 }, // gridDims
-        { 1.0f, 1.0f, 1.0f } // gridInvCellDims
-    };
-
-    buildCollisionGridCompute = std::make_unique<BuildCollisionGridCompute>(
-        collisionVolume,
-        voxelSize,
-        bindVerticesCompute->getParticlesSRV(),
-        voxels.isSurface
     );
 
     initialized = true;

@@ -23,6 +23,7 @@ RWStructuredBuffer<float4> positions : register(u0);
 RWStructuredBuffer<FaceConstraint> xConstraints : register(u1);
 RWStructuredBuffer<FaceConstraint> yConstraints : register(u2);
 RWStructuredBuffer<FaceConstraint> zConstraints : register(u3);
+RWStructuredBuffer<uint> isSurfaceVoxel : register(u4);
 StructuredBuffer<float> weights : register(t0);
 
 float3 project(float3 u, float3 v)
@@ -31,7 +32,7 @@ float3 project(float3 u, float3 v)
     return dot(v, u) / (dot(u, u) + eps) * u;
 }
 
-void breakConstraint(int constraintIdx) {
+void breakConstraint(int constraintIdx, int voxelOneIdx, int voxelTwoIdx) {
     if (AXIS == 0) {
         xConstraints[constraintIdx].voxelOneIdx = -1;
         xConstraints[constraintIdx].voxelTwoIdx = -1;
@@ -44,6 +45,9 @@ void breakConstraint(int constraintIdx) {
         zConstraints[constraintIdx].voxelOneIdx = -1;
         zConstraints[constraintIdx].voxelTwoIdx = -1;
     }
+    
+    isSurfaceVoxel[voxelOneIdx] = 1;
+    isSurfaceVoxel[voxelTwoIdx] = 1;
 }
 
 [numthreads(VGS_THREADS, 1, 1)]
@@ -159,7 +163,7 @@ void main(
 
         if (strain > tensionLimit || strain < compressionLimit)
         {
-            breakConstraint(constraintIdx);
+            breakConstraint(constraintIdx, voxelOneIdx, voxelTwoIdx);
             break;
         }
     }
@@ -218,7 +222,7 @@ void main(
         {
             // Break constraint due to volume inversion
             // THIS IS BROKEN - we should never get here
-            breakConstraint(constraintIdx);
+            breakConstraint(constraintIdx, voxelOneIdx, voxelTwoIdx);
             return;
         }
 
@@ -294,7 +298,7 @@ void main(
             {
                 // Break constraint due to flipping
                 // this is also broken...
-                breakConstraint(constraintIdx);
+                breakConstraint(constraintIdx, voxelOneIdx, voxelTwoIdx);
                 return;
             }
 

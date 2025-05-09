@@ -42,6 +42,8 @@ public:
         DirectX::getContext()->ClearUnorderedAccessViewUint(collisionVoxelIndicesUAV.Get(), clearValues);
     }
 
+    const ComPtr<ID3D11UnorderedAccessView>& getIsSurfaceUAV() const { return isSurfaceUAV; }
+
 private:
     ComPtr<ID3D11ShaderResourceView> positionsSRV;
     ComPtr<ID3D11Buffer> isSurfaceBuffer;
@@ -172,11 +174,6 @@ private:
         initData.pSysMem = &cbData;
 
         hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &constantBuffer);
-
-        if (FAILED(hr)) {
-            MGlobal::displayError("Failed to create constant buffer for collision grid.");
-            return;
-        }
     }
 
     void tearDown() override
