@@ -32,6 +32,36 @@ global proc VoxelizerMenu() {
         -cc ("VoxelizerMenu_updateSubdivisions(\"" + $voxelGridDisplayName + "\", #1)") 
         -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50`;
 
+    // X-axis controls
+    string $xAxisGroup = `rowLayout -numberOfColumns 2 -columnWidth2 200 200`;
+    string $xtensionField = `floatFieldGrp -numberOfFields 1 -label "X Tension: " -value1 0.5
+        -columnAlign 1 "left" -columnWidth 1 100 -columnWidth 2 80
+        -cc ("VoxelizerMenu_updateTension(\"" + $voxelGridDisplayName + "\", \"xtension\", #1)")`;
+    string $xcompressionField = `floatFieldGrp -numberOfFields 1 -label "X Compression: " -value1 -0.5
+        -columnAlign 1 "left" -columnWidth 1 100 -columnWidth 2 80
+        -cc ("VoxelizerMenu_updateCompression(\"" + $voxelGridDisplayName + "\", \"xcompression\", #1)")`;
+    setParent ..;
+
+    // Y-axis controls
+    string $yAxisGroup = `rowLayout -numberOfColumns 2 -columnWidth2 200 200`;
+    string $ytensionField = `floatFieldGrp -numberOfFields 1 -label "Y Tension: " -value1 0.5
+        -columnAlign 1 "left" -columnWidth 1 100 -columnWidth 2 80
+        -cc ("VoxelizerMenu_updateTension(\"" + $voxelGridDisplayName + "\", \"ytension\", #1)")`;
+    string $ycompressionField = `floatFieldGrp -numberOfFields 1 -label "Y Compression: " -value1 -0.5
+        -columnAlign 1 "left" -columnWidth 1 100 -columnWidth 2 80
+        -cc ("VoxelizerMenu_updateCompression(\"" + $voxelGridDisplayName + "\", \"ycompression\", #1)")`;
+    setParent ..;
+
+    // Z-axis controls
+    string $zAxisGroup = `rowLayout -numberOfColumns 2 -columnWidth2 200 200`;
+    string $ztensionField = `floatFieldGrp -numberOfFields 1 -label "Z Tension: " -value1 0.5
+        -columnAlign 1 "left" -columnWidth 1 100 -columnWidth 2 80
+        -cc ("VoxelizerMenu_updateTension(\"" + $voxelGridDisplayName + "\", \"ztension\", #1)")`;
+    string $zcompressionField = `floatFieldGrp -numberOfFields 1 -label "Z Compression: " -value1 -0.5
+        -columnAlign 1 "left" -columnWidth 1 100 -columnWidth 2 80
+        -cc ("VoxelizerMenu_updateCompression(\"" + $voxelGridDisplayName + "\", \"zcompression\", #1)")`;
+    setParent ..;
+
     string $surfaceCheckbox = `checkBox -label "Surface" -value true`;
     string $solidCheckbox = `checkBox -label "Solid" -value true`;
     string $simulatedCheckbox = `checkBox -label "Simulated" -value true`;
@@ -40,18 +70,21 @@ global proc VoxelizerMenu() {
     string $cancelButton = `button -label "Cancel" -command ("VoxelizerMenu_close(\"" + $voxelGridDisplayName + "\")")`;
     string $runButton = `button -label "Voxelize" 
         -annotation "Voxelizes a mesh in preparation for VGS simulation. Uses selected mesh or, if none selected, the closest mesh to the center of the grid bounds."
-        -command ("VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", \"" + $positionField + "\", \"" + $scaleField + "\", \"" + $subdivField + "\", \"" + $surfaceCheckbox + "\", \"" + $solidCheckbox + "\", \"" + $simulatedCheckbox + "\")")`;
+        -command ("VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", \"" + $positionField + "\", \"" + $scaleField + "\", \"" + $subdivField + "\", \"" + $surfaceCheckbox + "\", \"" + $solidCheckbox + "\", \"" + $simulatedCheckbox + "\", \"" + $xtensionField + "\", \"" + $xcompressionField + "\", \"" + $ytensionField + "\", \"" + $ycompressionField + "\", \"" + $ztensionField + "\", \"" + $zcompressionField + "\")")`;
 
-    // Attach elements to form layout 
+    // Attach elements to form layout
     formLayout -edit
         -attachForm $instructionText "top" 10 -attachForm $instructionText "left" 20 -attachForm $instructionText "right" 20
         -attachControl $spacer "top" 10 $instructionText
         -attachForm $positionField "left" 20 -attachControl $positionField "top" 10 $spacer -attachForm $positionField "right" 20
         -attachForm $scaleField "left" 20 -attachControl $scaleField "top" 10 $positionField -attachForm $scaleField "right" 20
         -attachForm $subdivField "left" 20 -attachControl $subdivField "top" 10 $scaleField -attachForm $subdivField "right" 20
-        -attachForm $surfaceCheckbox "left" 20 -attachControl $surfaceCheckbox "top" 10 $subdivField
-        -attachControl $solidCheckbox "left" 10 $surfaceCheckbox -attachControl $solidCheckbox "top" 10 $subdivField
-        -attachControl $simulatedCheckbox "left" 10 $solidCheckbox -attachControl $simulatedCheckbox "top" 10 $subdivField
+        -attachForm $xAxisGroup "left" 20 -attachControl $xAxisGroup "top" 10 $subdivField -attachForm $xAxisGroup "right" 20
+        -attachForm $yAxisGroup "left" 20 -attachControl $yAxisGroup "top" 10 $xAxisGroup -attachForm $yAxisGroup "right" 20
+        -attachForm $zAxisGroup "left" 20 -attachControl $zAxisGroup "top" 10 $yAxisGroup -attachForm $zAxisGroup "right" 20
+        -attachForm $surfaceCheckbox "left" 20 -attachControl $surfaceCheckbox "top" 10 $zAxisGroup
+        -attachControl $solidCheckbox "left" 10 $surfaceCheckbox -attachControl $solidCheckbox "top" 10 $zAxisGroup
+        -attachControl $simulatedCheckbox "left" 10 $solidCheckbox -attachControl $simulatedCheckbox "top" 10 $zAxisGroup
         -attachForm $runButton "left" 20 -attachControl $runButton "top" 15 $simulatedCheckbox
         -attachForm $cancelButton "left" 80 -attachControl $cancelButton "top" 15 $simulatedCheckbox
         -attachForm $runButton "bottom" 10 -attachForm $cancelButton "bottom" 10
@@ -67,7 +100,7 @@ global proc VoxelizerMenu() {
     scriptJob -attributeChange ($voxelGridDisplayName + ".scaleX") ("VoxelizerMenu_syncScale(\"" + $voxelGridDisplayName + "\", \"" + $scaleField + "\")");
 }
 
-global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $scaleField, string $subdivField, string $surfaceCheckbox, string $solidCheckbox, string $simulatedCheckbox) {
+global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $scaleField, string $subdivField, string $surfaceCheckbox, string $solidCheckbox, string $simulatedCheckbox, string $xtensionField, string $xcompressionField, string $ytensionField, string $ycompressionField, string $ztensionField, string $zcompressionField) {
     float $posX = `floatFieldGrp -query -value1 $positionField`;
     float $posY = `floatFieldGrp -query -value2 $positionField`;
     float $posZ = `floatFieldGrp -query -value3 $positionField`;
@@ -76,7 +109,13 @@ global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $s
     int $surface = `checkBox -query -value $surfaceCheckbox`;
     int $solid = `checkBox -query -value $solidCheckbox`;
     int $simulated = `checkBox -query -value $simulatedCheckbox`;
-    
+    float $xtension = `floatFieldGrp -query -value1 $xtensionField`;
+    float $xcompression = `floatFieldGrp -query -value1 $xcompressionField`;
+    float $ytension = `floatFieldGrp -query -value1 $ytensionField`;
+    float $ycompression = `floatFieldGrp -query -value1 $ycompressionField`;
+    float $ztension = `floatFieldGrp -query -value1 $ztensionField`;
+    float $zcompression = `floatFieldGrp -query -value1 $zcompressionField`;
+
     // Deselect the cube if it's currently selected, so it's not a voxelization target itself
     if (`objExists $cubeName` && `objExists ($cubeName + ".visibility")`) {
         select -deselect $cubeName;
@@ -86,13 +125,48 @@ global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $s
 
     // Construct the VoxelDestroyer command with the passed arguments
     string $command = "VoxelDestroyer -px " + $posX + " -py " + $posY + " -pz " + $posZ +
-                      " -s " + $scale + " -v " + $voxelsPerEdge + " -n \"" + $cubeName + "\"" + " -t " + $type + ";";
+                      " -s " + $scale + " -v " + $voxelsPerEdge + " -n \"" + $cubeName + "\"" + 
+                      " -t " + $type +
+                      " -xtension " + $xtension + 
+                      " -ytension " + $ytension + 
+                      " -ztension " + $ztension + 
+                      " -xcompression " + $xcompression + 
+                      " -ycompression " + $ycompression + 
+                      " -zcompression " + $zcompression + ";";
 
     // Execute the command and handle errors
     if (catch(eval($command))) {
         warning("VoxelDestroyer failed.");
     } else {
         VoxelizerMenu_close($cubeName);
+    }
+}
+
+// Update tension for a specific axis
+global proc VoxelizerMenu_updateTension(string $cubeName, string $axis, float $value) {
+    if (`objExists $cubeName`) {
+        string $attribute = $cubeName + "." + $axis;
+        if (`attributeExists $axis $cubeName`) {
+            setAttr $attribute $value;
+        } else {
+            warning("Attribute " + $axis + " does not exist on " + $cubeName);
+        }
+    } else {
+        warning("Voxel grid display does not exist.");
+    }
+}
+
+// Update compression for a specific axis
+global proc VoxelizerMenu_updateCompression(string $cubeName, string $axis, float $value) {
+    if (`objExists $cubeName`) {
+        string $attribute = $cubeName + "." + $axis;
+        if (`attributeExists $axis $cubeName`) {
+            setAttr $attribute $value;
+        } else {
+            warning("Attribute " + $axis + " does not exist on " + $cubeName);
+        }
+    } else {
+        warning("Voxel grid display does not exist.");
     }
 }
 
@@ -146,10 +220,21 @@ global proc string createVoxelGridDisplay(float $x, float $y, float $z, float $m
     connectAttr ($voxelGridDisplayName + ".scaleX") ($voxelGridDisplayName + ".scaleY");
     connectAttr ($voxelGridDisplayName + ".scaleX") ($voxelGridDisplayName + ".scaleZ");
     
-    // Lock all attributes except translation and scaling
+    // Add custom attributes for tension and compression
+    addAttr -longName "xtension" -attributeType "float" -defaultValue 0.5 -keyable true $voxelGridDisplayName;
+    addAttr -longName "xcompression" -attributeType "float" -defaultValue -0.5 -keyable true $voxelGridDisplayName;
+    addAttr -longName "ytension" -attributeType "float" -defaultValue 0.5 -keyable true $voxelGridDisplayName;
+    addAttr -longName "ycompression" -attributeType "float" -defaultValue -0.5 -keyable true $voxelGridDisplayName;
+    addAttr -longName "ztension" -attributeType "float" -defaultValue 0.5 -keyable true $voxelGridDisplayName;
+    addAttr -longName "zcompression" -attributeType "float" -defaultValue -0.5 -keyable true $voxelGridDisplayName;
+
+    // Lock all attributes except translation, scaling, and custom attributes
     string $attributes[] = `listAttr -keyable -settable $voxelGridDisplayName`;
     for ($attr in $attributes) {
-        if (!(`gmatch $attr "translate*"` || `gmatch $attr "scale*"`)) {
+        if (!(`gmatch $attr "translate*"` || `gmatch $attr "scale*"` || 
+              $attr == "xtension" || $attr == "xcompression" || 
+              $attr == "ytension" || $attr == "ycompression" || 
+              $attr == "ztension" || $attr == "zcompression")) {
             setAttr -lock true ($voxelGridDisplayName + "." + $attr);
         }
     }

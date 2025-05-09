@@ -39,6 +39,12 @@ struct PluginArgs {
 	bool voxelizeSurface{ false };
 	bool voxelizeInterior{ false };
 	bool simulate{ false };
+	double xTension{ FLT_MAX };
+	double xCompression{ -FLT_MAX };
+	double yTension{ FLT_MAX };
+	double yCompression{ -FLT_MAX };
+	double zTension{ FLT_MAX };
+	double zCompression{ -FLT_MAX };
 };
 
 // Making most functions and members static so we can bind methods to the timeChanged event

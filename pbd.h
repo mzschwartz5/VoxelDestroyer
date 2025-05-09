@@ -46,7 +46,7 @@ class PBD
 public:
     PBD() = default;
     ~PBD() = default;
-    void initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath);
+    void initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath, float xTension, float xCompression, float yTension, float yCompression, float zTension, float zCompression);
     void simulateStep();
     void updateMeshVertices();
 

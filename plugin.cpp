@@ -40,6 +40,12 @@ MSyntax plugin::syntax()
 	syntax.addFlag("-px", "-positionX", MSyntax::kDouble);
 	syntax.addFlag("-py", "-positionY", MSyntax::kDouble);
 	syntax.addFlag("-pz", "-positionZ", MSyntax::kDouble);
+	syntax.addFlag("-xt", "-xtension", MSyntax::kDouble);
+	syntax.addFlag("-xc", "-xcompression", MSyntax::kDouble);
+	syntax.addFlag("-yt", "-ytension", MSyntax::kDouble);
+	syntax.addFlag("-yc", "-ycompression", MSyntax::kDouble);
+	syntax.addFlag("-zt", "-ztension", MSyntax::kDouble);
+	syntax.addFlag("-zc", "-zcompression", MSyntax::kDouble);
 	syntax.addFlag("-s", "-scale", MSyntax::kDouble);
 	syntax.addFlag("-v", "-voxelsPerEdge", MSyntax::kLong);
 	syntax.addFlag("-n", "-gridDisplayName", MSyntax::kString);
@@ -122,7 +128,10 @@ MStatus plugin::doIt(const MArgList& argList)
 	if (!pluginArgs.simulate) return status;
 
 	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
-	plugin::pbdSimulator.initialize(voxels, voxelSize, plugin::voxelizedMeshDagPath);
+	plugin::pbdSimulator.initialize(voxels, voxelSize, plugin::voxelizedMeshDagPath, 
+		float(pluginArgs.xTension), float(pluginArgs.xCompression),
+		float(pluginArgs.yTension), float(pluginArgs.yCompression), 
+		float(pluginArgs.zTension), float(pluginArgs.zCompression));
 	MGlobal::displayInfo("PBD particles initialized.");
 
 	plugin::createVoxelSimulationNode();
@@ -197,6 +206,49 @@ PluginArgs plugin::parsePluginArgs(const MArgList& args) {
 		pluginArgs.voxelizeSurface = (type & 0x1) != 0;
 		pluginArgs.voxelizeInterior = (type & 0x2) != 0;
 		pluginArgs.simulate = (type & 0x4) != 0;
+	}
+
+	//tension and compression
+	if (argData.isFlagSet("-xtension")) {
+		status = argData.getFlagArgument("-xtension", 0, pluginArgs.xTension);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get x tension: " + status.errorString());
+		}
+	}
+
+	if (argData.isFlagSet("-xcompression")) {
+		status = argData.getFlagArgument("-xcompression", 0, pluginArgs.xCompression);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get x compression: " + status.errorString());
+		}
+	}
+
+	if (argData.isFlagSet("-ytension")) {
+		status = argData.getFlagArgument("-ytension", 0, pluginArgs.yTension);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get y tension: " + status.errorString());
+		}
+	}
+
+	if (argData.isFlagSet("-ycompression")) {
+		status = argData.getFlagArgument("-ycompression", 0, pluginArgs.yCompression);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get y compression: " + status.errorString());
+		}
+	}
+
+	if (argData.isFlagSet("-ztension")) {
+		status = argData.getFlagArgument("-ztension", 0, pluginArgs.zTension);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get z tension: " + status.errorString());
+		}
+	}
+
+	if (argData.isFlagSet("-zcompression")) {
+		status = argData.getFlagArgument("-zcompression", 0, pluginArgs.zCompression);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get z compression: " + status.errorString());
+		}
 	}
 
 	return pluginArgs;

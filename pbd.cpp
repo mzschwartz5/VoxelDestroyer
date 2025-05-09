@@ -4,10 +4,19 @@
 #include "utils.h"
 #include "constants.h"
 
-void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath) {
+void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath, float xTension, float xCompression, float yTension, float yCompression, float zTension, float zCompression) {
     this->meshDagPath = meshDagPath;
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
-    constructFaceToFaceConstraints(voxels, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX);
+
+    //log tension and compression valus
+	MGlobal::displayInfo("xTension: " + MString(std::to_string(xTension).c_str()));
+	MGlobal::displayInfo("xCompression: " + MString(std::to_string(xCompression).c_str()));
+	MGlobal::displayInfo("yTension: " + MString(std::to_string(yTension).c_str()));
+	MGlobal::displayInfo("yCompression: " + MString(std::to_string(yCompression).c_str()));
+	MGlobal::displayInfo("zTension: " + MString(std::to_string(zTension).c_str()));
+	MGlobal::displayInfo("zCompression: " + MString(std::to_string(zCompression).c_str()));
+
+    constructFaceToFaceConstraints(voxels, xTension, xCompression, yTension, yCompression, zTension, zCompression);
     createParticles(voxels);
     setRadiusAndVolumeFromLength(voxelSize);
 
