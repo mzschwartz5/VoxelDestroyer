@@ -52,14 +52,16 @@ protected:
         const std::string bindVerticesThreadStr = std::to_string(BIND_VERTICES_THREADS);
         const std::string transformVerticesThreadsStr = std::to_string(TRANSFORM_VERTICES_THREADS);
         const std::string vgsThreadsStr = std::to_string(VGS_THREADS);
-        const std::string maxVoxelsPerCellStr = std::to_string(MAX_VOXELS_PER_CELL);
         const std::string buildCollisionStr = std::to_string(BUILD_COLLISION_THREADS);
+        const std::string solveCollisionStr = std::to_string(SOLVE_COLLISION_THREADS);
+        const std::string maxVoxelsPerCellStr = std::to_string(MAX_VOXELS_PER_CELL);
         D3D_SHADER_MACRO SHADER_MACROS[] = {
             { "BIND_VERTICES_THREADS", bindVerticesThreadStr.c_str() },
             { "TRANSFORM_VERTICES_THREADS", transformVerticesThreadsStr.c_str() },
             { "VGS_THREADS", vgsThreadsStr.c_str() },
-            { "MAX_VOXELS_PER_CELL", maxVoxelsPerCellStr.c_str() },
             { "BUILD_COLLISION_THREADS", buildCollisionStr.c_str() },
+            { "SOLVE_COLLISION_THREADS", solveCollisionStr.c_str() },
+            { "MAX_VOXELS_PER_CELL", maxVoxelsPerCellStr.c_str() },
             { NULL, NULL } // Terminate the array
         };
 

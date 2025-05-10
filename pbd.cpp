@@ -36,7 +36,7 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 
     // Hard coded for now. Later set up via UI.
     CollisionVolume collisionVolume{
-        { -3.0f, -3.0f, -3.0f }, // gridMin
+        { -3.0f, 0.0f, -3.0f }, // gridMin
         { 6, 6, 6 }, // gridDims
         { 1.0f, 1.0f, 1.0f } // gridInvCellDims
     };
@@ -89,6 +89,15 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
     dragParticlesCompute = std::make_unique<DragParticlesCompute>(
         bindVerticesCompute->getParticlesUAV(),
         preVGSCompute->getOldPositionsSRV()
+    );
+
+    solveCollisionsCompute = std::make_unique<SolveCollisionsCompute>(
+        voxelSize,
+        PARTICLE_RADIUS,
+        216, // num collision grid cells (hardcoded for now)
+        bindVerticesCompute->getParticlesUAV(),
+        buildCollisionGridCompute->getCollisionVoxelCountsSRV(),
+        buildCollisionGridCompute->getCollisionVoxelIndicesSRV()
     );
 
     initialized = true;
@@ -157,13 +166,6 @@ void PBD::createParticles(const Voxels& voxels) {
 
 void PBD::simulateStep()
 {
-    // Once, at the beginning of each step, build the collision grid.
-    // (May need to do this once per substep... not sure yet.)
-    int numCollisionGridCells = 36; // hardcoded 6x6x6 for now
-    int numCollisionGridWorkgroups = (numCollisionGridCells + BUILD_COLLISION_THREADS - 1) / BUILD_COLLISION_THREADS;
-    buildCollisionGridCompute->resetCollisionBuffers();
-    buildCollisionGridCompute->dispatch(numCollisionGridWorkgroups);
-
     for (int i = 0; i < substeps; i++)
     {
         simulateSubstep();
@@ -186,6 +188,11 @@ void PBD::simulateSubstep() {
     int numPreAndPostVgsComputeWorkgroups = (particles.numParticles + VGS_THREADS + 1) / (VGS_THREADS);
     preVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);
 
+    // Way to do this once per step instead of once per substep?
+    int numCollisionGridCells = 216; // hardcoded 6x6x6 for now
+    int numCollisionGridWorkgroups = (numCollisionGridCells + BUILD_COLLISION_THREADS - 1) / BUILD_COLLISION_THREADS;
+    buildCollisionGridCompute->dispatch(numCollisionGridWorkgroups);
+
     int numVgsWorkgroups = ((particles.numParticles >> 3) + VGS_THREADS + 1) / (VGS_THREADS); 
 
     if (isDragging) {
@@ -198,6 +205,9 @@ void PBD::simulateSubstep() {
         updateAxis(i);
 		faceConstraintsCompute->dispatch(int(((faceConstraints[i].size()) + VGS_THREADS + 1) / (VGS_THREADS)));
     }
+
+    int numCollisionSolveWorkgroups = (numCollisionGridCells + SOLVE_COLLISION_THREADS - 1) / SOLVE_COLLISION_THREADS;
+    // solveCollisionsCompute->dispatch(numCollisionSolveWorkgroups);
 
     postVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);
 }

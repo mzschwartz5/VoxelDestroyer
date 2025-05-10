@@ -154,6 +154,7 @@
     <ClInclude Include="directx\compute\postvgscompute.h" />
     <ClInclude Include="directx\compute\dragparticlescompute.h" />
     <ClInclude Include="directx\compute\buildcollisiongridcompute.h" />
+    <ClInclude Include="directx\compute\solvecollisionscompute.h" />
     <ClInclude Include="voxelsimulationnode.h" />
 
   </ItemGroup>

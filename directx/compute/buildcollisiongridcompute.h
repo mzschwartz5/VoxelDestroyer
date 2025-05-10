@@ -35,14 +35,18 @@ public:
         initializeBuffers(isSurface, collisionVolume, voxelSize);
     };
 
-    void resetCollisionBuffers() {
-        // See docs: 4 values are required even though only the first will be used, in our case.
-        UINT clearValues[4] = { 0, 0, 0, 0 };
-        DirectX::getContext()->ClearUnorderedAccessViewUint(collisionVoxelCountsUAV.Get(), clearValues);
-        DirectX::getContext()->ClearUnorderedAccessViewUint(collisionVoxelIndicesUAV.Get(), clearValues);
-    }
-
     const ComPtr<ID3D11UnorderedAccessView>& getIsSurfaceUAV() const { return isSurfaceUAV; }
+
+    const ComPtr<ID3D11ShaderResourceView>& getCollisionVoxelCountsSRV() const { return collisionVoxelCountsSRV; }
+
+    const ComPtr<ID3D11ShaderResourceView>& getCollisionVoxelIndicesSRV() const { return collisionVoxelIndicesSRV; }
+
+    void dispatch(int threadGroupCount) override {
+        bind();
+        resetCollisionBuffers();
+        ComputeShader::dispatch(threadGroupCount);
+        unbind();
+    }
 
 private:
     ComPtr<ID3D11ShaderResourceView> positionsSRV;
@@ -57,7 +61,18 @@ private:
     ComPtr<ID3D11UnorderedAccessView> collisionVoxelCountsUAV;
     ComPtr<ID3D11UnorderedAccessView> collisionVoxelIndicesUAV;
 
-    void bind() override {
+    void resetCollisionBuffers() {
+        // See docs: 4 values are required even though only the first will be used, in our case.
+        UINT clearValues[4] = { 0, 0, 0, 0 };
+        DirectX::getContext()->ClearUnorderedAccessViewUint(collisionVoxelCountsUAV.Get(), clearValues);
+        
+        // API only accepts UINTs. Static cast to UINT, but interpret as int in shader to retain sign.
+        int negClearValues[4] = { -1, -1, -1, -1 };
+        UINT uintNegClearValues[4] = { static_cast<UINT>(negClearValues[0]), static_cast<UINT>(negClearValues[1]), static_cast<UINT>(negClearValues[2]), static_cast<UINT>(negClearValues[3]) };
+        DirectX::getContext()->ClearUnorderedAccessViewUint(collisionVoxelIndicesUAV.Get(), uintNegClearValues);
+    }
+
+void bind() override {
         DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
 
         ID3D11ShaderResourceView* srvs[] = { positionsSRV.Get(), isSurfaceSRV.Get() };

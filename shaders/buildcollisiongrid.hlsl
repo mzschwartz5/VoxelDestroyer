@@ -42,6 +42,10 @@ void main(uint3 gId : SV_DispatchThreadID) {
     int v0 = gId.x << 3;
     int v1 = v0 + 7;
     float3 voxelCenterPos = (particlePositions[v0].xyz + particlePositions[v1].xyz) * 0.5f;
+    if (any(voxelCenterPos < gridMin) || any(voxelCenterPos > gridMin + (gridDims / gridInvCellDims))) {
+        return; // Voxel is out of bounds.
+    }
+
     int3 cellIdx3D = voxelPosToGridCellIndex(voxelCenterPos);
 
     // Determine which octant of the grid cell the voxel center is in.

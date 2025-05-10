@@ -33,6 +33,9 @@ float3 project(float3 u, float3 v)
 }
 
 void breakConstraint(int constraintIdx, int voxelOneIdx, int voxelTwoIdx) {
+    isSurfaceVoxel[voxelOneIdx] = 1;
+    isSurfaceVoxel[voxelTwoIdx] = 1;
+
     if (AXIS == 0) {
         xConstraints[constraintIdx].voxelOneIdx = -1;
         xConstraints[constraintIdx].voxelTwoIdx = -1;
@@ -45,9 +48,6 @@ void breakConstraint(int constraintIdx, int voxelOneIdx, int voxelTwoIdx) {
         zConstraints[constraintIdx].voxelOneIdx = -1;
         zConstraints[constraintIdx].voxelTwoIdx = -1;
     }
-    
-    isSurfaceVoxel[voxelOneIdx] = 1;
-    isSurfaceVoxel[voxelTwoIdx] = 1;
 }
 
 [numthreads(VGS_THREADS, 1, 1)]
