@@ -78,17 +78,19 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         vgsCompute->getWeightsSRV(),
         bindVerticesCompute->getParticlesUAV()
     );
+    
+    dragParticlesCompute = std::make_unique<DragParticlesCompute>(
+        bindVerticesCompute->getParticlesUAV(),
+        preVGSCompute->getOldPositionsSRV(),
+        voxels.size()
+    );
 
     postVGSCompute = std::make_unique<PostVGSCompute>(
         vgsCompute->getWeightsSRV(),
         bindVerticesCompute->getParticlesSRV(),
         preVGSCompute->getOldPositionsSRV(),
-        preVGSCompute->getVelocitiesUAV()
-    );
-
-    dragParticlesCompute = std::make_unique<DragParticlesCompute>(
-        bindVerticesCompute->getParticlesUAV(),
-        preVGSCompute->getOldPositionsSRV()
+        preVGSCompute->getVelocitiesUAV(),
+        dragParticlesCompute->getIsDraggingUAV()
     );
 
     solveCollisionsCompute = std::make_unique<SolveCollisionsCompute>(
