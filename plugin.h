@@ -38,7 +38,7 @@ struct PluginArgs {
 	MString gridDisplayName{ "VoxelGridDisplay" };
 	bool voxelizeSurface{ false };
 	bool voxelizeInterior{ false };
-	bool simulate{ false };
+	bool renderAsVoxels{ false };
 };
 
 // Making most functions and members static so we can bind methods to the timeChanged event

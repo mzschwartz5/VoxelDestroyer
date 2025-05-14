@@ -148,7 +148,8 @@ private:
         Voxels& voxels,
         MObject& cube,
         MObject& originalMesh,
-        int index
+        int index,
+        bool doBoolean
     );
 
     /*

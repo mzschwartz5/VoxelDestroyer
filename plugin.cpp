@@ -113,13 +113,11 @@ MStatus plugin::doIt(const MArgList& argList)
 		plugin::voxelizedMeshDagPath,
 		pluginArgs.voxelizeSurface,
 		pluginArgs.voxelizeInterior,
-		pluginArgs.simulate,
+		!pluginArgs.renderAsVoxels,
 		status
 	);
 	
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
-
-	if (!pluginArgs.simulate) return status;
 
 	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
 	plugin::pbdSimulator.initialize(voxels, voxelSize, plugin::voxelizedMeshDagPath);
@@ -196,7 +194,7 @@ PluginArgs plugin::parsePluginArgs(const MArgList& args) {
 
 		pluginArgs.voxelizeSurface = (type & 0x1) != 0;
 		pluginArgs.voxelizeInterior = (type & 0x2) != 0;
-		pluginArgs.simulate = (type & 0x4) != 0;
+		pluginArgs.renderAsVoxels = (type & 0x4) != 0;
 	}
 
 	return pluginArgs;
