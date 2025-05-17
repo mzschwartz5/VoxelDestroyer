@@ -146,6 +146,8 @@
     <ClInclude Include="custommayaconstructs\voxeldragcontextcommand.h" />
     <ClInclude Include="custommayaconstructs\voxelrendereroverride.h" />
     <ClInclude Include="custommayaconstructs\voxelsimulationnode.h" />
+    <ClInclude Include="custommayaconstructs\voxeldeformerCPUNode.h" />
+    <ClInclude Include="custommayaconstructs\voxeldeformerGPUNode.h" />
     <ClInclude Include="constants.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\transformverticescompute.h" />

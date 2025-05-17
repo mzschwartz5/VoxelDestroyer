@@ -384,12 +384,38 @@ EXPORT MStatus initializePlugin(MObject obj)
 	if (!status)
 		status.perror("registerCommand failed");
 
+	// Register custom maya constructs (nodes, contexts, render overrides, etc.)
+	// Voxel Simulation Node
+	status = plugin.registerNode("VoxelSimulationNode", VoxelSimulationNode::id, VoxelSimulationNode::creator, VoxelSimulationNode::initialize);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelSimulationNode");
+		return status;
+	}
+
+	// Drag Context command
+	status = plugin.registerContextCommand("voxelDragContextCommand", VoxelDragContextCommand::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelDragContextCommand");
+		return status;
+	}
+
+	// Renderer Override
 	plugin::voxelRendererOverride = new VoxelRendererOverride("VoxelRendererOverride");
 	status = MRenderer::theRenderer()->registerOverride(plugin::voxelRendererOverride);
 	if (!status) {
 		MGlobal::displayError("Failed to register VoxelRendererOverride: " + status.errorString());
 		return status;
 	}
+
+	// CPU Deformer Node
+	status = plugin.registerNode("VoxelDeformerCPUNode", VoxelDeformerCPUNode::id, VoxelDeformerCPUNode::creator, VoxelDeformerCPUNode::initialize, MPxNode::kDeformerNode);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelDeformerCPUNode");
+		return status;
+	}
+
+	// GPU Deformer override
+	MGPUDeformerRegistry::registerGPUDeformerCreator("VoxelDeformerCPUNode", "VoxelDestroyer", VoxelDeformerGPUNode::getGPUDeformerInfo());
 
 	// TODO: potentially make this more robust / only allow in perspective panel?
 	MString activeModelPanel = plugin::getActiveModelPanel();
@@ -410,19 +436,6 @@ EXPORT MStatus initializePlugin(MObject obj)
 
 	MGlobal::executeCommand("VoxelizerMenu_addToShelf");
 
-	// Register the VoxelSimulationNode
-	status = plugin.registerNode("VoxelSimulationNode", VoxelSimulationNode::id, VoxelSimulationNode::creator, VoxelSimulationNode::initialize);
-	if (!status) {
-		MGlobal::displayError("Failed to register VoxelSimulationNode");
-		return status;
-	}
-
-	status = plugin.registerContextCommand("voxelDragContextCommand", VoxelDragContextCommand::creator);
-	if (!status) {
-		MGlobal::displayError("Failed to register VoxelDragContextCommand");
-		return status;
-	}
-
 	return status;
 }
 
@@ -430,19 +443,36 @@ EXPORT MStatus initializePlugin(MObject obj)
 EXPORT MStatus uninitializePlugin(MObject obj)
 {
 	MGlobal::executeCommand("VoxelizerMenu_removeFromShelf");
-	MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);
-	delete plugin::voxelRendererOverride;
-	plugin::voxelRendererOverride = nullptr;
 
 	MStatus status;
 	MFnPlugin plugin(obj);
 	status = plugin.deregisterCommand("VoxelDestroyer");
 	if (!status)
-		status.perror("deregisterCommand failed");
+		status.perror("deregisterCommand failed on VoxelDestroyer");
 
+	// Deregister the custom maya constructs (nodes, contexts, render overrides, etc.)
+	// Voxel Drag Context command
 	status = plugin.deregisterContextCommand("voxelDragContextCommand");
 	if (!status)
-		status.perror("deregisterContextCommand failed");
+		status.perror("deregisterContextCommand failed on VoxelDragContextCommand");
+
+	// Voxel Simulation Node
+	status = plugin.deregisterNode(VoxelSimulationNode::id);
+	if (!status)
+		status.perror("deregisterNode failed on VoxelSimulationNode");
+
+	// Voxel Renderer Override
+	MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);
+	delete plugin::voxelRendererOverride;
+	plugin::voxelRendererOverride = nullptr;
+
+	// Voxel Deformer CPU Node
+	status = plugin.deregisterNode(VoxelDeformerCPUNode::id);
+	if (!status)
+		status.perror("deregisterNode failed on VoxelDeformerCPUNode");
+
+	// Voxel Deformer GPU override
+	status = MGPUDeformerRegistry::deregisterGPUDeformerCreator("VoxelDeformerCPUNode", "VoxelDestroyer");
 
 	// Deregister the callbacks
 	MCallbackId drawCallbackId = plugin::getCallbackId("drawCallback");
@@ -451,11 +481,6 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	MConditionMessage::removeCallback(playbackChangeCallbackId);
 	MCallbackId timeChangedCallbackId = plugin::getCallbackId("timeChanged");
 	MEventMessage::removeCallback(timeChangedCallbackId);
-
-	status = plugin.deregisterNode(VoxelSimulationNode::id);
-	if (!status) {
-		MGlobal::displayError("Failed to deregister VoxelSimulationNode");
-	}
 
 	return status;
 }
