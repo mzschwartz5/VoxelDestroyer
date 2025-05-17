@@ -1,10 +1,10 @@
 #include "plugin.h"
 #include "glm/glm.hpp"
 #include <maya/MCommandResult.h>
-#include "voxelsimulationnode.h"
+#include "custommayaconstructs/voxelsimulationnode.h"
 #include <maya/MFnMessageAttribute.h>
 #include <windows.h>
-#include "voxeldragcontextcommand.h"
+#include "custommayaconstructs/voxeldragcontextcommand.h"
 #include <maya/MTimerMessage.h>
 #include <maya/MTime.h>
 #include <maya/MAnimControl.h>

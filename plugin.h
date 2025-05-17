@@ -26,7 +26,7 @@
 #include <maya/MConditionMessage.h>
 #include <unordered_map>
 #include <string>
-#include "voxelrendereroverride.h"
+#include "custommayaconstructs/voxelrendereroverride.h"
 #include <maya/MViewport2Renderer.h>
 using namespace MHWRender;
 

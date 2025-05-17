@@ -142,9 +142,10 @@
     <ClInclude Include="directx\directx.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="voxelizer.h" />
-    <ClInclude Include="voxeldragcontext.h" />
-    <ClInclude Include="voxeldragcontextcommand.h" />
-    <ClInclude Include="voxelrendereroverride.h" />
+    <ClInclude Include="custommayaconstructs\voxeldragcontext.h" />
+    <ClInclude Include="custommayaconstructs\voxeldragcontextcommand.h" />
+    <ClInclude Include="custommayaconstructs\voxelrendereroverride.h" />
+    <ClInclude Include="custommayaconstructs\voxelsimulationnode.h" />
     <ClInclude Include="constants.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\transformverticescompute.h" />
@@ -155,7 +156,6 @@
     <ClInclude Include="directx\compute\dragparticlescompute.h" />
     <ClInclude Include="directx\compute\buildcollisiongridcompute.h" />
     <ClInclude Include="directx\compute\solvecollisionscompute.h" />
-    <ClInclude Include="voxelsimulationnode.h" />
 
   </ItemGroup>
   <ItemGroup>
@@ -168,9 +168,8 @@
     <ResourceCompile Include="resources.rc" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="AEVoxelSimulationNodeTemplate.mel" />
-    <None Include="AEVoxelSimulationNodeTemplate.py" />
-    <None Include="VoxelizerMenu.mel" />
+    <None Include="mel\AEVoxelSimulationNodeTemplate.mel" />
+    <None Include="mel\VoxelizerMenu.mel" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
