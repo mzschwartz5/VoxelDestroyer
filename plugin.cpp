@@ -20,9 +20,6 @@ VoxelRendererOverride* plugin::voxelRendererOverride = nullptr;
 bool plugin::isPlaying = false;
 MString plugin::mouseInteractionCommandName = "voxelDragContextCommand1";
 
-// This is Maya's internal classification for the mesh shape node
-const MString MeshShapeDrawClassification = "drawdb/geometry/mesh";
-
 // Maya Plugin creator function
 void* plugin::creator()
 {
@@ -410,13 +407,6 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
-	// Geometry Override
-    status = MDrawRegistry::registerGeometryOverrideCreator(MeshShapeDrawClassification, "VoxelDestroyer", VoxelGeometryOverride::creator);
-	if (!status) {
-		MGlobal::displayError("Failed to register VoxelGeometryOverride: " + status.errorString());
-		return status;
-	}
-		
 	// TODO: potentially make this more robust / only allow in perspective panel?
 	MString activeModelPanel = plugin::getActiveModelPanel();
 	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
@@ -465,11 +455,6 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);
 	delete plugin::voxelRendererOverride;
 	plugin::voxelRendererOverride = nullptr;
-
-	// Voxel Geometry Override
-	status = MDrawRegistry::deregisterGeometryOverrideCreator(MeshShapeDrawClassification, "VoxelDestroyer");
-	if (!status)
-		status.perror("deregisterGeometryOverride failed on VoxelGeometryOverride");
 
 	// Deregister the callbacks
 	MCallbackId drawCallbackId = plugin::getCallbackId("drawCallback");
