@@ -407,6 +407,16 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	// CPU Deformer Node
+	status = plugin.registerNode("VoxelDeformerCPUNode", VoxelDeformerCPUNode::id, VoxelDeformerCPUNode::creator, VoxelDeformerCPUNode::initialize, MPxNode::kDeformerNode);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelDeformerCPUNode");
+		return status;
+	}
+
+	// GPU Deformer override
+	MGPUDeformerRegistry::registerGPUDeformerCreator("VoxelDeformerCPUNode", "VoxelDestroyer", VoxelDeformerGPUNode::getGPUDeformerInfo());
+
 	// TODO: potentially make this more robust / only allow in perspective panel?
 	MString activeModelPanel = plugin::getActiveModelPanel();
 	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
@@ -455,6 +465,14 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);
 	delete plugin::voxelRendererOverride;
 	plugin::voxelRendererOverride = nullptr;
+
+	// Voxel Deformer CPU Node
+	status = plugin.deregisterNode(VoxelDeformerCPUNode::id);
+	if (!status)
+		status.perror("deregisterNode failed on VoxelDeformerCPUNode");
+
+	// Voxel Deformer GPU override
+	status = MGPUDeformerRegistry::deregisterGPUDeformerCreator("VoxelDeformerCPUNode", "VoxelDestroyer");
 
 	// Deregister the callbacks
 	MCallbackId drawCallbackId = plugin::getCallbackId("drawCallback");
