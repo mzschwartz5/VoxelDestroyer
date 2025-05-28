@@ -1,6 +1,7 @@
 #pragma once
 #include "computeshader.h"
 #include "../glm/glm.hpp"
+#include "../../custommayaconstructs/voxeldeformerGPUNode.h" // there's probably a better place to do this...
 
 class BindVerticesCompute : public ComputeShader
 {
@@ -121,7 +122,7 @@ private:
         DirectX::getDevice()->CreateShaderResourceView(verticesBuffer.Get(), &srvDesc, &verticesSRV);
 
         // Initialize vertStartIdxBuffer and its SRV
-        bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+        bufferDesc.Usage = D3D11_USAGE_DEFAULT; // While this is technically an immutable buffer, default is needed for interop with OpenCL
         bufferDesc.ByteWidth = sizeof(uint) * static_cast<UINT>(vertStartIds.size());
         bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
         bufferDesc.CPUAccessFlags = 0; // No CPU access needed
@@ -138,7 +139,7 @@ private:
         DirectX::getDevice()->CreateShaderResourceView(vertStartIdxBuffer.Get(), &srvDesc, &vertStartIdxSRV);
 
         // Initialize numVerticesBuffer and its SRV
-        bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+        bufferDesc.Usage = D3D11_USAGE_DEFAULT; // While this is technically an immutable buffer, default is needed for interop with OpenCL
         bufferDesc.ByteWidth = sizeof(uint) * static_cast<UINT>(numVertices.size());
         bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
         bufferDesc.CPUAccessFlags = 0; // No CPU access needed
@@ -177,6 +178,15 @@ private:
         srvDesc.Buffer.NumElements = numVerts;
 
         DirectX::getDevice()->CreateShaderResourceView(localRestPositionsBuffer.Get(), &srvDesc, &localRestPositionsSRV);
+
+        // Now pass the buffers to the GPU deformer (part of rendering)
+        VoxelDeformerGPUNode::initializeExternalKernelArgs(
+            static_cast<int>(particles.size() / 8),
+            particlesBuffer.Get(),
+            vertStartIdxBuffer.Get(),
+            numVerticesBuffer.Get(),
+            localRestPositionsBuffer.Get()
+        );
     }
 
     void tearDown() override

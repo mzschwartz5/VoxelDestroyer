@@ -30,6 +30,7 @@
 #include "custommayaconstructs/voxeldeformerCPUNode.h"
 #include "custommayaconstructs/voxeldeformerGPUNode.h"
 #include <maya/MViewport2Renderer.h>
+#include <thread>
 using namespace MHWRender;
 
 

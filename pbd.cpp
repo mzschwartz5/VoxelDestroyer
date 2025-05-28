@@ -25,15 +25,6 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 	);
 	bindVerticesCompute->dispatch(voxels.size());
 
-	transformVerticesCompute = std::make_unique<TransformVerticesCompute>(
-		voxelMeshFn.numVertices(&status),
-		bindVerticesCompute->getParticlesSRV(), 			
-		bindVerticesCompute->getVertStartIdxSRV(), 
-		bindVerticesCompute->getNumVerticesSRV(), 
-		bindVerticesCompute->getLocalRestPositionsSRV()
-	);
-	transformVerticesNumWorkgroups = voxels.size();
-
     // Hard coded for now. Later set up via UI.
     CollisionVolume collisionVolume{
         { -3.0f, 0.0f, -3.0f }, // gridMin
@@ -47,8 +38,6 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         bindVerticesCompute->getParticlesSRV(),
         voxels.isSurface
     );
-
-    //setSimValuesFromUI();
 
     vgsInfo[0] = glm::vec4(RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME);
     vgsInfo[1] = glm::vec4(3.0, 0, FTF_RELAXATION, FTF_BETA); //iter count, axis, padding, padding
@@ -172,18 +161,6 @@ void PBD::simulateStep()
     {
         simulateSubstep();
     }
-}
-
-void PBD::updateMeshVertices() {
-	MFnMesh meshFn(meshDagPath);
-	MFloatPointArray vertexArray;
-
-	// For rendering, we need to update each voxel with its new basis, which we'll use to transform all vertices owned by that voxel
-	transformVerticesCompute->dispatch(transformVerticesNumWorkgroups);
-	transformVerticesCompute->copyTransformedVertsToCPU(vertexArray, meshFn.numVertices());
-
-	meshFn.setPoints(vertexArray, MSpace::kWorld);
-	meshFn.updateSurface();
 }
 
 void PBD::simulateSubstep() {
