@@ -16,6 +16,8 @@
 #include "directx/compute/postvgscompute.h"
 #include "directx/compute/faceconstraintscompute.h"
 #include "directx/compute/dragparticlescompute.h"
+#include "directx/compute/buildcollisiongridcompute.h"
+#include "directx/compute/solvecollisionscompute.h"
 
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
@@ -85,8 +87,8 @@ public:
         dragParticlesCompute->updateDepthBuffer(depthResourceHandle);
     }
 
-    void updateCameraMatrices(MMatrix viewProjMatrix, MMatrix invViewProjMatrix, int viewportWidth, int viewportHeight) {
-        dragParticlesCompute->updateCameraMatrices({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), mayaMatrixToGlm(viewProjMatrix), mayaMatrixToGlm(invViewProjMatrix)});
+    void updateCameraMatrices(MMatrix viewMatrix, MMatrix projMatrix, MMatrix invViewProjMatrix, int viewportWidth, int viewportHeight) {
+        dragParticlesCompute->updateCameraMatrices({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), mayaMatrixToGlm(viewMatrix), mayaMatrixToGlm(projMatrix), mayaMatrixToGlm(invViewProjMatrix)});
     }
     
 private:
@@ -111,6 +113,8 @@ private:
     std::unique_ptr<PreVGSCompute> preVGSCompute;
     std::unique_ptr<PostVGSCompute> postVGSCompute;
     std::unique_ptr<DragParticlesCompute> dragParticlesCompute;
+    std::unique_ptr<BuildCollisionGridCompute> buildCollisionGridCompute;
+    std::unique_ptr<SolveCollisionsCompute> solveCollisionsCompute;
     
     void simulateSubstep();
 

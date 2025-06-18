@@ -33,14 +33,15 @@ public:
             return MStatus::kFailure;
         }
 
-        MMatrix viewProjMatrix = mFrameContext->getMatrix(MFrameContext::kViewProjMtx);
+        MMatrix viewMatrix = mFrameContext->getMatrix(MFrameContext::kViewMtx);
+        MMatrix projMatrix = mFrameContext->getMatrix(MFrameContext::kProjectionMtx);
         MMatrix invViewProjMatrix = mFrameContext->getMatrix(MFrameContext::kViewProjInverseMtx);
 
         int viewPortWidth, viewPortHeight, viewPortOriginX, viewPortOriginY;
         mFrameContext->getViewportDimensions(viewPortOriginX, viewPortOriginY, viewPortWidth, viewPortHeight);
 
         if (pbdSimulator) {
-            pbdSimulator->updateCameraMatrices(viewProjMatrix, invViewProjMatrix, viewPortWidth, viewPortHeight);
+            pbdSimulator->updateCameraMatrices(viewMatrix, projMatrix, invViewProjMatrix, viewPortWidth, viewPortHeight);
             pbdSimulator->updateDepthResourceHandle(depthTarget->resourceHandle());
         } 
         

@@ -21,7 +21,8 @@ struct CameraMatrices
 {
     float viewportWidth{ 0.0f };
     float viewportHeight{ 0.0f };
-    glm::mat4 viewProjMatrix;
+    glm::mat4 viewMatrix;
+    glm::mat4 projMatrix;
     glm::mat4 invViewProjMatrix;
 };
 
@@ -35,10 +36,11 @@ class DragParticlesCompute : public ComputeShader
 public:
     DragParticlesCompute(
         const ComPtr<ID3D11UnorderedAccessView>& particlesUAV,
-        const ComPtr<ID3D11ShaderResourceView>& oldParticlesSRV
+        const ComPtr<ID3D11ShaderResourceView>& oldParticlesSRV,
+        int numVoxels
     ) : ComputeShader(IDR_SHADER7), particlesUAV(particlesUAV), oldParticlesSRV(oldParticlesSRV)
     {
-        initializeBuffers();
+        initializeBuffers(numVoxels);
     };
 
     void updateDepthBuffer(void* depthResourceHandle)
@@ -86,6 +88,7 @@ public:
         wasDragging = isDragging;
     }
 
+    // TODO: make this a virtual method on the base compute class?
     void copyConstantBufferToGPU()
     {
         ConstantBuffer cb{
@@ -109,6 +112,11 @@ public:
     void updateCameraMatrices(const CameraMatrices& cameraMatrices)
     {
         this->cameraMatrices = cameraMatrices;
+    }
+
+    const ComPtr<ID3D11UnorderedAccessView>& getIsDraggingUAV() const
+    {
+        return isDraggingUAV;
     }
 
     void dispatch(int threadGroupCount) override
@@ -135,7 +143,9 @@ private:
     ComPtr<ID3D11UnorderedAccessView> particlesUAV;
     ComPtr<ID3D11ShaderResourceView> oldParticlesSRV;
     ComPtr<ID3D11ShaderResourceView> depthSRV;
+    ComPtr<ID3D11UnorderedAccessView> isDraggingUAV;
     ComPtr<ID3D11Buffer> constantBuffer;
+    ComPtr<ID3D11Buffer> isDraggingBuffer;
     ID3D11DepthStencilView* depthStencilView;
     CameraMatrices cameraMatrices;
     DragValues dragValues;
@@ -145,7 +155,7 @@ private:
     {
         DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
 
-        ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get() };
+        ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get(), isDraggingUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
         ID3D11ShaderResourceView* srvs[] = { oldParticlesSRV.Get(), depthSRV.Get() };
@@ -157,7 +167,7 @@ private:
 
     void unbind() override
     {
-        ID3D11UnorderedAccessView* uavs[] = { nullptr };
+        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr); 
 
         ID3D11ShaderResourceView* srvs[] = { nullptr, nullptr };
@@ -168,24 +178,38 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
-    void initializeBuffers()
+    void initializeBuffers(int numVoxels)
     {
-        // Create CBV for the drag values (mouse position, drag distance, grab radius)
         D3D11_BUFFER_DESC bufferDesc = {};
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+
+        // Create CBV for the drag values (mouse position, drag distance, grab radius)
         bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
         bufferDesc.ByteWidth = sizeof(ConstantBuffer);
         bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
         bufferDesc.MiscFlags = 0;
     
-        HRESULT hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &constantBuffer);
+        DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &constantBuffer);
 
-        if (FAILED(hr))
-        {
-            MGlobal::displayError("Failed to create drag values buffer.");
-            return;
-        }
+        // Create isDragging buffer and its SRV/UAV
+        bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        bufferDesc.ByteWidth = sizeof(UINT) * numVoxels;
+        bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
+        bufferDesc.CPUAccessFlags = 0;
+        bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+        bufferDesc.StructureByteStride = sizeof(UINT);
 
+        DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &isDraggingBuffer);
+
+        // Create the UAV for the isDragging buffer
+        uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+        uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+        uavDesc.Buffer.FirstElement = 0;
+        uavDesc.Buffer.NumElements = numVoxels;
+
+        DirectX::getDevice()->CreateUnorderedAccessView(isDraggingBuffer.Get(), &uavDesc, &isDraggingUAV);
     };
 
     void tearDown() override
@@ -197,6 +221,9 @@ private:
         }
 
         constantBuffer.Reset();
+
+        isDraggingBuffer.Reset();
+        isDraggingUAV.Reset();
     };
     
 };

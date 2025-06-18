@@ -17,8 +17,9 @@ public:
         const std::array<std::vector<FaceConstraint>, 3>& constraints,
         const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
 		const ComPtr<ID3D11ShaderResourceView>& weightsSRV,
-        const ComPtr<ID3D11Buffer>& voxelSimInfoBuffer
-    ) : ComputeShader(IDR_SHADER4), positionsUAV(positionsUAV), weightsSRV(weightsSRV), voxelSimInfoBuffer(voxelSimInfoBuffer)
+        const ComPtr<ID3D11Buffer>& voxelSimInfoBuffer,
+		const ComPtr<ID3D11UnorderedAccessView>& isSurfaceUAV
+    ) : ComputeShader(IDR_SHADER4), positionsUAV(positionsUAV), weightsSRV(weightsSRV), voxelSimInfoBuffer(voxelSimInfoBuffer), isSurfaceUAV(isSurfaceUAV)
     {
         initializeBuffers(constraints);
     };
@@ -47,6 +48,8 @@ private:
 
     ComPtr<ID3D11Buffer> voxelSimInfoBuffer;
 
+	ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV;
+
     void bind() override
     {
         DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
@@ -54,7 +57,7 @@ private:
         ID3D11ShaderResourceView* srvs[] = { weightsSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
-        ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), xConstraintsUAV.Get(), yConstraintsUAV.Get(), zConstraintsUAV.Get() };
+        ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), xConstraintsUAV.Get(), yConstraintsUAV.Get(), zConstraintsUAV.Get(), isSurfaceUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
         ID3D11Buffer* cbvs[] = { voxelSimInfoBuffer.Get() };
@@ -68,7 +71,7 @@ private:
         ID3D11ShaderResourceView* srvs[] = { nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
-        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr, nullptr };
+        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr, nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
         ID3D11Buffer* cbvs[] = { nullptr };

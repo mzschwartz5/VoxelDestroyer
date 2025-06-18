@@ -37,14 +37,14 @@ struct VoxelPositions {
 };
 
 struct Voxels {
-    std::vector<bool> occupied; // contains some part (surface or interior) of the underlying mesh
-    std::vector<bool> isSurface;
-    std::vector<MObject> mayaObjects;   // the actual cube meshes
+    std::vector<bool> occupied;           // contains some part (surface or interior) of the underlying mesh
+    std::vector<uint> isSurface;          // Use uints instead of bools because vector<bool> packs bools into bits, which will not work for GPU access.
+    std::vector<MObject> mayaObjects;     // the actual cube meshes
     std::vector<VoxelPositions> corners;  // ordered according to the VGS expectations
 
-    std::vector<uint> vertStartIdx;     // Each voxel owns a number of vertices contained within (including the corners)
+    std::vector<uint> vertStartIdx;       // Each voxel owns a number of vertices contained within (including the corners)
     std::vector<uint> numVerts;
-    int totalVerts = 0; // total number of vertices in the voxelized mesh
+    int totalVerts = 0;                   // total number of vertices in the voxelized mesh
 
     std::vector<uint32_t> mortonCodes;
     // Answers the question: for a given voxel morton code, what is the index of the corresponding voxel in the sorted array of voxels?
@@ -148,7 +148,8 @@ private:
         Voxels& voxels,
         MObject& cube,
         MObject& originalMesh,
-        int index
+        int index,
+        bool doBoolean
     );
 
     /*

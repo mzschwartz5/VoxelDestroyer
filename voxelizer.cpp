@@ -337,9 +337,7 @@ MDagPath Voxelizer::createVoxels(
         MObject cube = overlappedVoxels.mayaObjects[i];
         meshNamesConcatenated += " " + MFnMesh(cube).name();
         
-        if (!doBoolean) continue;
-        
-        intersectVoxelWithOriginalMesh(overlappedVoxels, cube, originalMesh.object(), i);
+        intersectVoxelWithOriginalMesh(overlappedVoxels, cube, originalMesh.object(), i, doBoolean);
     }
 
     // TODO: if no boolean, should get rid of non-manifold geometry
@@ -544,7 +542,8 @@ void Voxelizer::intersectVoxelWithOriginalMesh(
     Voxels& voxels,
     MObject& cube,
     MObject& originalMesh,
-    int index
+    int index,
+    bool doBoolean
 ) {
     voxels.vertStartIdx[index] = voxels.totalVerts;
 
@@ -556,10 +555,12 @@ void Voxelizer::intersectVoxelWithOriginalMesh(
 
     MFnMesh cubeMeshFn(cube);
 
-    MObjectArray objsToIntersect;
-    objsToIntersect.append(cube);
-    objsToIntersect.append(originalMesh);
-    cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect);
+    if (doBoolean) {
+        MObjectArray objsToIntersect;
+        objsToIntersect.append(cube);
+        objsToIntersect.append(originalMesh);
+        cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect);
+    }
 
     voxels.numVerts[index] = cubeMeshFn.numVertices();
     voxels.totalVerts += cubeMeshFn.numVertices();

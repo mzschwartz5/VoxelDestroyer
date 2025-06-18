@@ -1,24 +1,23 @@
 #include "plugin.h"
 #include "glm/glm.hpp"
 #include <maya/MCommandResult.h>
-#include "voxelsimulationnode.h"
+#include "custommayaconstructs/voxelsimulationnode.h"
 #include <maya/MFnMessageAttribute.h>
 #include <windows.h>
-#include "voxeldragcontextcommand.h"
+#include "custommayaconstructs/voxeldragcontextcommand.h"
 #include <maya/MTimerMessage.h>
 #include <maya/MTime.h>
 #include <maya/MAnimControl.h>
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
+extern std::thread::id g_mainThreadId = std::this_thread::get_id();
 
 Voxelizer plugin::voxelizer = Voxelizer();
 PBD plugin::pbdSimulator{};
 std::unordered_map<std::string, MCallbackId> plugin::callbacks;
 MDagPath plugin::voxelizedMeshDagPath = MDagPath();
 VoxelRendererOverride* plugin::voxelRendererOverride = nullptr;
-bool plugin::isPlaying = false;
-MString plugin::mouseInteractionCommandName = "voxelDragContextCommand1";
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -26,11 +25,10 @@ void* plugin::creator()
 	return new plugin;
 }
 
-void plugin::simulate(float elapsedTime, float lastTime, void* clientData) {
+void plugin::simulate(void* clientData) {
 	if (!plugin::pbdSimulator.isInitialized()) return;
 
 	plugin::pbdSimulator.simulateStep();
-	plugin::pbdSimulator.updateMeshVertices();
 	MGlobal::executeCommand("refresh");
 }
 
@@ -45,41 +43,6 @@ MSyntax plugin::syntax()
 	syntax.addFlag("-n", "-gridDisplayName", MSyntax::kString);
 	syntax.addFlag("-t", "-type", MSyntax::kLong);
 	return syntax;
-}
-
-// TODO: should probably track other events like when the frame rate or playback speed change, outside of when playback changes.
-// (I think the events we'd want are timeUnitChanged and playbackSpeedChanged)
-// Tangentially, we should also track the undo event and reset the simulation or play back to a cached point.
-void plugin::onPlaybackChange(bool state, void* clientData) {
-	MStatus status;
-	if (state) {
-		bool testisplaying = MAnimControl::isPlaying();
-		double timePerFrame = MTime(1.0, MTime::uiUnit()).as(MTime::kSeconds);
-		double playbackSpeed = MAnimControl::playbackSpeed();
-		if (playbackSpeed == 0.0) playbackSpeed = 1.0;
-		timePerFrame /= playbackSpeed;
-
-		// Using a timer instead of the timeChanged event, which doesn't fire during mouse interaction.
-		MCallbackId drawCallbackId = MTimerMessage::addTimerCallback(static_cast<float>(timePerFrame), plugin::simulate, NULL, &status);
-		plugin::setCallbackId("drawCallback", drawCallbackId);
-		isPlaying = true;
-		MGlobal::executeCommand("setToolTo " + plugin::mouseInteractionCommandName);
-	} else {
-		MTimerMessage::removeCallback(plugin::getCallbackId("drawCallback"));
-		plugin::setCallbackId("drawCallback", 0);
-		isPlaying = false;
-		MGlobal::executeCommand("setToolTo selectSuperContext");
-	}
-}
-
-void plugin::onTimeChanged(void* clientData) {
-	if (isPlaying) {
-		return;
-	}
-
-	double elapsedTime = MTime(1.0, MTime::uiUnit()).as(MTime::kSeconds);
-	// If we're just scrubbing through the timeline, call the simulation step manually.
-	plugin::simulate(static_cast<float>(elapsedTime), 0.0f, clientData);
 }
 
 // Plugin doIt function
@@ -113,13 +76,11 @@ MStatus plugin::doIt(const MArgList& argList)
 		plugin::voxelizedMeshDagPath,
 		pluginArgs.voxelizeSurface,
 		pluginArgs.voxelizeInterior,
-		pluginArgs.simulate,
+		!pluginArgs.renderAsVoxels,
 		status
 	);
 	
 	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
-
-	if (!pluginArgs.simulate) return status;
 
 	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
 	plugin::pbdSimulator.initialize(voxels, voxelSize, plugin::voxelizedMeshDagPath);
@@ -129,8 +90,8 @@ MStatus plugin::doIt(const MArgList& argList)
 		
 	VoxelDragContextCommand::setPBD(&plugin::pbdSimulator);
 	VoxelRendererOverride::setPBD(&plugin::pbdSimulator);
+	VoxelDeformerCPUNode::instantiateAndAttachToMesh(plugin::voxelizedMeshDagPath);
 
-	MGlobal::executeCommand("voxelDragContextCommand", plugin::mouseInteractionCommandName);
 	return status;
 }
 
@@ -196,7 +157,7 @@ PluginArgs plugin::parsePluginArgs(const MArgList& args) {
 
 		pluginArgs.voxelizeSurface = (type & 0x1) != 0;
 		pluginArgs.voxelizeInterior = (type & 0x2) != 0;
-		pluginArgs.simulate = (type & 0x4) != 0;
+		pluginArgs.renderAsVoxels = (type & 0x4) != 0;
 	}
 
 	return pluginArgs;
@@ -290,6 +251,7 @@ bool plugin::isBoundingBoxOverlappingVoxelGrid(const MBoundingBox& objectBoundin
 	);
 }
 
+// TODO: this will need work to support multiple meshes. Perhaps move to the VoxelSimulationNode class.
 void plugin::createVoxelSimulationNode() {
     MStatus status;
 
@@ -300,7 +262,6 @@ void plugin::createVoxelSimulationNode() {
         MGlobal::displayError("Failed to create VoxelSimulationNode: " + status.errorString());
         return;
     }
-
 
     // Add a message attribute to the voxelized mesh's transform node
     MFnDagNode dagNode(plugin::voxelizedMeshDagPath.transform(&status));
@@ -380,12 +341,34 @@ MString plugin::getActiveModelPanel() {
 // Initialize Maya Plugin upon loading
 EXPORT MStatus initializePlugin(MObject obj)
 {
+	g_mainThreadId = std::this_thread::get_id();
+
+	// Initialize DirectX
+	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
+	DirectX::initialize(MhInstPlugin);
+
 	MStatus status;
 	MFnPlugin plugin(obj, "VoxelDestroyer", "1.0", "Any");
 	status = plugin.registerCommand("VoxelDestroyer", plugin::creator);
 	if (!status)
 		status.perror("registerCommand failed");
 
+	// Register custom maya constructs (nodes, contexts, render overrides, etc.)
+	// Voxel Simulation Node
+	status = plugin.registerNode("VoxelSimulationNode", VoxelSimulationNode::id, VoxelSimulationNode::creator, VoxelSimulationNode::initialize);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelSimulationNode");
+		return status;
+	}
+
+	// Drag Context command
+	status = plugin.registerContextCommand("voxelDragContextCommand", VoxelDragContextCommand::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelDragContextCommand");
+		return status;
+	}
+
+	// Renderer Override
 	plugin::voxelRendererOverride = new VoxelRendererOverride("VoxelRendererOverride");
 	status = MRenderer::theRenderer()->registerOverride(plugin::voxelRendererOverride);
 	if (!status) {
@@ -393,37 +376,32 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	// CPU Deformer Node
+	status = plugin.registerNode(VoxelDeformerCPUNode::typeName(), VoxelDeformerCPUNode::id, VoxelDeformerCPUNode::creator, VoxelDeformerCPUNode::initialize, MPxNode::kDeformerNode);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelDeformerCPUNode");
+		return status;
+	}
+
+	// GPU Deformer override
+	status = MGPUDeformerRegistry::registerGPUDeformerCreator(VoxelDeformerCPUNode::typeName(), "VoxelDestroyer", VoxelDeformerGPUNode::getGPUDeformerInfo());
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelDeformerGPUNode: " + status.errorString());
+		return status;
+	}
+	VoxelDeformerGPUNode::compileKernel();
+
 	// TODO: potentially make this more robust / only allow in perspective panel?
 	MString activeModelPanel = plugin::getActiveModelPanel();
 	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
 
-	MCallbackId playbackChangeCallbackId = MConditionMessage::addConditionCallback("playingBack", plugin::onPlaybackChange);
-	plugin::setCallbackId("playingBack", playbackChangeCallbackId);
-
-	MCallbackId timeChangedCallbackId = MEventMessage::addEventCallback("timeChanged", plugin::onTimeChanged, NULL, &status);
+	MCallbackId timeChangedCallbackId = MEventMessage::addEventCallback("timeChanged", plugin::simulate, NULL, &status);
 	plugin::setCallbackId("timeChanged", timeChangedCallbackId);
-
-	// Initialize DirectX
-	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
-	DirectX::initialize(MhInstPlugin);
 
 	plugin::loadVoxelSimulationNodeEditorTemplate();
 	plugin::loadVoxelizerMenu();
 
 	MGlobal::executeCommand("VoxelizerMenu_addToShelf");
-
-	// Register the VoxelSimulationNode
-	status = plugin.registerNode("VoxelSimulationNode", VoxelSimulationNode::id, VoxelSimulationNode::creator, VoxelSimulationNode::initialize);
-	if (!status) {
-		MGlobal::displayError("Failed to register VoxelSimulationNode");
-		return status;
-	}
-
-	status = plugin.registerContextCommand("voxelDragContextCommand", VoxelDragContextCommand::creator);
-	if (!status) {
-		MGlobal::displayError("Failed to register VoxelDragContextCommand");
-		return status;
-	}
 
 	return status;
 }
@@ -432,32 +410,43 @@ EXPORT MStatus initializePlugin(MObject obj)
 EXPORT MStatus uninitializePlugin(MObject obj)
 {
 	MGlobal::executeCommand("VoxelizerMenu_removeFromShelf");
-	MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);
-	delete plugin::voxelRendererOverride;
-	plugin::voxelRendererOverride = nullptr;
-
-	MStatus status;
-	MFnPlugin plugin(obj);
-	status = plugin.deregisterCommand("VoxelDestroyer");
-	if (!status)
-		status.perror("deregisterCommand failed");
-
-	status = plugin.deregisterContextCommand("voxelDragContextCommand");
-	if (!status)
-		status.perror("deregisterContextCommand failed");
 
 	// Deregister the callbacks
-	MCallbackId drawCallbackId = plugin::getCallbackId("drawCallback");
-	if (drawCallbackId != 0) MEventMessage::removeCallback(drawCallbackId);
-	MCallbackId playbackChangeCallbackId = plugin::getCallbackId("playingBack");
-	MConditionMessage::removeCallback(playbackChangeCallbackId);
 	MCallbackId timeChangedCallbackId = plugin::getCallbackId("timeChanged");
 	MEventMessage::removeCallback(timeChangedCallbackId);
 
-	status = plugin.deregisterNode(VoxelSimulationNode::id);
-	if (!status) {
-		MGlobal::displayError("Failed to deregister VoxelSimulationNode");
-	}
+    MStatus status;
+    MFnPlugin plugin(obj);
+    status = plugin.deregisterCommand("VoxelDestroyer");
+    if (!status)
+        MGlobal::displayError("deregisterCommand failed on VoxelDestroyer: " + status.errorString());
+
+    // Deregister the custom maya constructs (nodes, contexts, render overrides, etc.)
+    // Voxel Drag Context command
+    status = plugin.deregisterContextCommand("voxelDragContextCommand");
+    if (!status)
+        MGlobal::displayError("deregisterContextCommand failed on VoxelDragContextCommand: " + status.errorString());
+
+    // Voxel Simulation Node
+    status = plugin.deregisterNode(VoxelSimulationNode::id);
+    if (!status)
+        MGlobal::displayError("deregisterNode failed on VoxelSimulationNode: " + status.errorString());
+
+    // Voxel Renderer Override
+    MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);
+    delete plugin::voxelRendererOverride;
+    plugin::voxelRendererOverride = nullptr;
+	
+    // Voxel Deformer GPU override
+	VoxelDeformerGPUNode::tearDown();
+    status = MGPUDeformerRegistry::deregisterGPUDeformerCreator(VoxelDeformerCPUNode::typeName(), "VoxelDestroyer");
+    if (!status)
+		MGlobal::displayError("deregisterGPUDeformerCreator failed on VoxelDeformerCPUNode: " + status.errorString());
+
+	// Voxel Deformer CPU Node
+    status = plugin.deregisterNode(VoxelDeformerCPUNode::id);
+    if (!status)
+        MGlobal::displayError("deregisterNode failed on VoxelDeformerCPUNode: " + status.errorString());
 
 	return status;
 }

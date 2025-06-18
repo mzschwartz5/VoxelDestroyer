@@ -1,6 +1,7 @@
 #pragma once
 #include "computeshader.h"
 #include "../glm/glm.hpp"
+#include "../../custommayaconstructs/voxeldeformerGPUNode.h" // there's probably a better place to do this...
 
 class BindVerticesCompute : public ComputeShader
 {
@@ -23,6 +24,16 @@ public:
         DirectX::getContext()->Dispatch(numWorkgroups, 1, 1);
         unbind();
 
+        // Now pass the buffers to the GPU deformer (part of rendering)
+        // TODO: eventually we shouldn't even have a bind compute pass; the GPU deformer has access to the original geometry.
+        VoxelDeformerGPUNode::initializeExternalKernelArgs(
+            numWorkgroups,
+            particlesBuffer.Get(),
+            vertStartIdxBuffer.Get(),
+            numVerticesBuffer.Get(),
+            localRestPositionsBuffer.Get()
+        );
+
         // Can actually release the verticesBuffer and SRV now: used only for binding, which occurs just once.
         verticesBuffer.Reset();
         verticesSRV.Reset();
@@ -35,6 +46,7 @@ public:
     const ComPtr<ID3D11UnorderedAccessView>& getParticlesUAV() const { return particlesUAV; };
 
 private:
+    int numParticles;
     ComPtr<ID3D11Buffer> particlesBuffer; 
     ComPtr<ID3D11Buffer> verticesBuffer;
     ComPtr<ID3D11Buffer> vertStartIdxBuffer;       // for each voxel (workgroup), the start index of the vertices in the vertex buffer
@@ -121,7 +133,7 @@ private:
         DirectX::getDevice()->CreateShaderResourceView(verticesBuffer.Get(), &srvDesc, &verticesSRV);
 
         // Initialize vertStartIdxBuffer and its SRV
-        bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+        bufferDesc.Usage = D3D11_USAGE_DEFAULT; // While this is technically an immutable buffer, default is needed for interop with OpenCL
         bufferDesc.ByteWidth = sizeof(uint) * static_cast<UINT>(vertStartIds.size());
         bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
         bufferDesc.CPUAccessFlags = 0; // No CPU access needed
@@ -138,7 +150,7 @@ private:
         DirectX::getDevice()->CreateShaderResourceView(vertStartIdxBuffer.Get(), &srvDesc, &vertStartIdxSRV);
 
         // Initialize numVerticesBuffer and its SRV
-        bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+        bufferDesc.Usage = D3D11_USAGE_DEFAULT; // While this is technically an immutable buffer, default is needed for interop with OpenCL
         bufferDesc.ByteWidth = sizeof(uint) * static_cast<UINT>(numVertices.size());
         bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
         bufferDesc.CPUAccessFlags = 0; // No CPU access needed

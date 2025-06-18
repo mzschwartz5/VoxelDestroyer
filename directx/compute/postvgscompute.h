@@ -9,8 +9,9 @@ public:
         const ComPtr<ID3D11ShaderResourceView>& weightsSRV,
         const ComPtr<ID3D11ShaderResourceView>& positionsSRV,
         const ComPtr<ID3D11ShaderResourceView>& oldPositionsSRV,
-        const ComPtr<ID3D11UnorderedAccessView>& velocitiesUAV
-	) : ComputeShader(IDR_SHADER6), weightsSRV(weightsSRV), positionsSRV(positionsSRV), oldPositionsSRV(oldPositionsSRV), velocitiesUAV(velocitiesUAV)
+        const ComPtr<ID3D11UnorderedAccessView>& velocitiesUAV,
+        const ComPtr<ID3D11UnorderedAccessView>& isDraggingUAV
+	) : ComputeShader(IDR_SHADER6), weightsSRV(weightsSRV), positionsSRV(positionsSRV), oldPositionsSRV(oldPositionsSRV), velocitiesUAV(velocitiesUAV), isDraggingUAV(isDraggingUAV)
     {};
 
 private:
@@ -19,6 +20,7 @@ private:
     ComPtr<ID3D11ShaderResourceView> positionsSRV;
     ComPtr<ID3D11ShaderResourceView> oldPositionsSRV;
     ComPtr<ID3D11UnorderedAccessView> velocitiesUAV;
+    ComPtr<ID3D11UnorderedAccessView> isDraggingUAV;
 
     void bind() override
     {
@@ -27,7 +29,7 @@ private:
         ID3D11ShaderResourceView* srvs[] = { weightsSRV.Get(), positionsSRV.Get(), oldPositionsSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
-        ID3D11UnorderedAccessView* uavs[] = { velocitiesUAV.Get() };
+        ID3D11UnorderedAccessView* uavs[] = { velocitiesUAV.Get(), isDraggingUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
     };
 
@@ -38,7 +40,7 @@ private:
         ID3D11ShaderResourceView* srvs[] = { nullptr, nullptr, nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
-        ID3D11UnorderedAccessView* uavs[] = { nullptr };
+        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
     };
 

@@ -100,7 +100,7 @@
       <SubSystem>Windows</SubSystem>
       <OutputFile>$(OutDir)$(ProjectName).mll</OutputFile>
       <AdditionalLibraryDirectories>C:\Program Files\Autodesk\Maya2025\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Foundation.lib;OpenMaya.lib;OpenMayaUI.lib;OpenMayaAnim.lib;OpenMayaFX.lib;OpenMayaRender.lib;Image.lib;opengl32.lib;D3DCompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Foundation.lib;OpenMaya.lib;OpenMayaUI.lib;OpenMayaAnim.lib;OpenMayaFX.lib;OpenMayaRender.lib;Image.lib;opengl32.lib;D3DCompiler.lib;clew.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -131,7 +131,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <OutputFile>$(OutDir)$(ProjectName).mll</OutputFile>
       <AdditionalLibraryDirectories>C:\Program Files\Autodesk\Maya2025\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Foundation.lib;OpenMaya.lib;OpenMayaUI.lib;OpenMayaAnim.lib;OpenMayaFX.lib;OpenMayaRender.lib;Image.lib;opengl32.lib;D3DCompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Foundation.lib;OpenMaya.lib;OpenMayaUI.lib;OpenMayaAnim.lib;OpenMayaFX.lib;OpenMayaRender.lib;Image.lib;opengl32.lib;D3DCompiler.lib;clew.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -142,9 +142,12 @@
     <ClInclude Include="directx\directx.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="voxelizer.h" />
-    <ClInclude Include="voxeldragcontext.h" />
-    <ClInclude Include="voxeldragcontextcommand.h" />
-    <ClInclude Include="voxelrendereroverride.h" />
+    <ClInclude Include="custommayaconstructs\voxeldragcontext.h" />
+    <ClInclude Include="custommayaconstructs\voxeldragcontextcommand.h" />
+    <ClInclude Include="custommayaconstructs\voxelrendereroverride.h" />
+    <ClInclude Include="custommayaconstructs\voxelsimulationnode.h" />
+    <ClInclude Include="custommayaconstructs\voxeldeformerCPUNode.h" />
+    <ClInclude Include="custommayaconstructs\voxeldeformerGPUNode.h" />
     <ClInclude Include="constants.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\transformverticescompute.h" />
@@ -152,8 +155,10 @@
     <ClInclude Include="directx\compute\vgscompute.h" />
     <ClInclude Include="directx\compute\prevgscompute.h" />
     <ClInclude Include="directx\compute\postvgscompute.h" />
-    <ClInclude Include="voxelsimulationnode.h" />
     <ClInclude Include="directx\compute\dragparticlescompute.h" />
+    <ClInclude Include="directx\compute\buildcollisiongridcompute.h" />
+    <ClInclude Include="directx\compute\solvecollisionscompute.h" />
+
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="plugin.cpp" />
@@ -165,9 +170,8 @@
     <ResourceCompile Include="resources.rc" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="AEVoxelSimulationNodeTemplate.mel" />
-    <None Include="AEVoxelSimulationNodeTemplate.py" />
-    <None Include="VoxelizerMenu.mel" />
+    <None Include="mel\AEVoxelSimulationNodeTemplate.mel" />
+    <None Include="mel\VoxelizerMenu.mel" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
