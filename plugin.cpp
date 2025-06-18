@@ -18,8 +18,6 @@ PBD plugin::pbdSimulator{};
 std::unordered_map<std::string, MCallbackId> plugin::callbacks;
 MDagPath plugin::voxelizedMeshDagPath = MDagPath();
 VoxelRendererOverride* plugin::voxelRendererOverride = nullptr;
-bool plugin::isPlaying = false;
-MString plugin::mouseInteractionCommandName = "voxelDragContextCommand1";
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -27,7 +25,7 @@ void* plugin::creator()
 	return new plugin;
 }
 
-void plugin::simulate(float elapsedTime, float lastTime, void* clientData) {
+void plugin::simulate(void* clientData) {
 	if (!plugin::pbdSimulator.isInitialized()) return;
 
 	plugin::pbdSimulator.simulateStep();
@@ -45,41 +43,6 @@ MSyntax plugin::syntax()
 	syntax.addFlag("-n", "-gridDisplayName", MSyntax::kString);
 	syntax.addFlag("-t", "-type", MSyntax::kLong);
 	return syntax;
-}
-
-// TODO: should probably track other events like when the frame rate or playback speed change, outside of when playback changes.
-// (I think the events we'd want are timeUnitChanged and playbackSpeedChanged)
-// Tangentially, we should also track the undo event and reset the simulation or play back to a cached point.
-void plugin::onPlaybackChange(bool state, void* clientData) {
-	MStatus status;
-	if (state) {
-		bool testisplaying = MAnimControl::isPlaying();
-		double timePerFrame = MTime(1.0, MTime::uiUnit()).as(MTime::kSeconds);
-		double playbackSpeed = MAnimControl::playbackSpeed();
-		if (playbackSpeed == 0.0) playbackSpeed = 1.0;
-		timePerFrame /= playbackSpeed;
-
-		// Using a timer instead of the timeChanged event, which doesn't fire during mouse interaction.
-		MCallbackId drawCallbackId = MTimerMessage::addTimerCallback(static_cast<float>(timePerFrame), plugin::simulate, NULL, &status);
-		plugin::setCallbackId("drawCallback", drawCallbackId);
-		isPlaying = true;
-		MGlobal::executeCommand("setToolTo " + plugin::mouseInteractionCommandName);
-	} else {
-		MTimerMessage::removeCallback(plugin::getCallbackId("drawCallback"));
-		plugin::setCallbackId("drawCallback", 0);
-		isPlaying = false;
-		MGlobal::executeCommand("setToolTo selectSuperContext");
-	}
-}
-
-void plugin::onTimeChanged(void* clientData) {
-	if (isPlaying) {
-		return;
-	}
-
-	double elapsedTime = MTime(1.0, MTime::uiUnit()).as(MTime::kSeconds);
-	// If we're just scrubbing through the timeline, call the simulation step manually.
-	plugin::simulate(static_cast<float>(elapsedTime), 0.0f, clientData);
 }
 
 // Plugin doIt function
@@ -127,8 +90,8 @@ MStatus plugin::doIt(const MArgList& argList)
 		
 	VoxelDragContextCommand::setPBD(&plugin::pbdSimulator);
 	VoxelRendererOverride::setPBD(&plugin::pbdSimulator);
+	VoxelDeformerCPUNode::instantiateAndAttachToMesh(plugin::voxelizedMeshDagPath);
 
-	MGlobal::executeCommand("voxelDragContextCommand", plugin::mouseInteractionCommandName);
 	return status;
 }
 
@@ -414,14 +377,14 @@ EXPORT MStatus initializePlugin(MObject obj)
 	}
 
 	// CPU Deformer Node
-	status = plugin.registerNode("VoxelDeformerCPUNode", VoxelDeformerCPUNode::id, VoxelDeformerCPUNode::creator, VoxelDeformerCPUNode::initialize, MPxNode::kDeformerNode);
+	status = plugin.registerNode(VoxelDeformerCPUNode::typeName(), VoxelDeformerCPUNode::id, VoxelDeformerCPUNode::creator, VoxelDeformerCPUNode::initialize, MPxNode::kDeformerNode);
 	if (!status) {
 		MGlobal::displayError("Failed to register VoxelDeformerCPUNode");
 		return status;
 	}
 
 	// GPU Deformer override
-	status = MGPUDeformerRegistry::registerGPUDeformerCreator("VoxelDeformerCPUNode", "VoxelDestroyer", VoxelDeformerGPUNode::getGPUDeformerInfo());
+	status = MGPUDeformerRegistry::registerGPUDeformerCreator(VoxelDeformerCPUNode::typeName(), "VoxelDestroyer", VoxelDeformerGPUNode::getGPUDeformerInfo());
 	if (!status) {
 		MGlobal::displayError("Failed to register VoxelDeformerGPUNode: " + status.errorString());
 		return status;
@@ -432,10 +395,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 	MString activeModelPanel = plugin::getActiveModelPanel();
 	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
 
-	MCallbackId playbackChangeCallbackId = MConditionMessage::addConditionCallback("playingBack", plugin::onPlaybackChange);
-	plugin::setCallbackId("playingBack", playbackChangeCallbackId);
-
-	MCallbackId timeChangedCallbackId = MEventMessage::addEventCallback("timeChanged", plugin::onTimeChanged, NULL, &status);
+	MCallbackId timeChangedCallbackId = MEventMessage::addEventCallback("timeChanged", plugin::simulate, NULL, &status);
 	plugin::setCallbackId("timeChanged", timeChangedCallbackId);
 
 	plugin::loadVoxelSimulationNodeEditorTemplate();
@@ -450,6 +410,10 @@ EXPORT MStatus initializePlugin(MObject obj)
 EXPORT MStatus uninitializePlugin(MObject obj)
 {
 	MGlobal::executeCommand("VoxelizerMenu_removeFromShelf");
+
+	// Deregister the callbacks
+	MCallbackId timeChangedCallbackId = plugin::getCallbackId("timeChanged");
+	MEventMessage::removeCallback(timeChangedCallbackId);
 
     MStatus status;
     MFnPlugin plugin(obj);
@@ -474,22 +438,15 @@ EXPORT MStatus uninitializePlugin(MObject obj)
     plugin::voxelRendererOverride = nullptr;
 	
     // Voxel Deformer GPU override
-    status = MGPUDeformerRegistry::deregisterGPUDeformerCreator("VoxelDeformerCPUNode", "VoxelDestroyer");
+	VoxelDeformerGPUNode::tearDown();
+    status = MGPUDeformerRegistry::deregisterGPUDeformerCreator(VoxelDeformerCPUNode::typeName(), "VoxelDestroyer");
     if (!status)
-	MGlobal::displayError("deregisterGPUDeformerCreator failed on VoxelDeformerCPUNode: " + status.errorString());
+		MGlobal::displayError("deregisterGPUDeformerCreator failed on VoxelDeformerCPUNode: " + status.errorString());
 
 	// Voxel Deformer CPU Node
     status = plugin.deregisterNode(VoxelDeformerCPUNode::id);
     if (!status)
         MGlobal::displayError("deregisterNode failed on VoxelDeformerCPUNode: " + status.errorString());
-	
-	// Deregister the callbacks
-	MCallbackId drawCallbackId = plugin::getCallbackId("drawCallback");
-	if (drawCallbackId != 0) MEventMessage::removeCallback(drawCallbackId);
-	MCallbackId playbackChangeCallbackId = plugin::getCallbackId("playingBack");
-	MConditionMessage::removeCallback(playbackChangeCallbackId);
-	MCallbackId timeChangedCallbackId = plugin::getCallbackId("timeChanged");
-	MEventMessage::removeCallback(timeChangedCallbackId);
 
 	return status;
 }

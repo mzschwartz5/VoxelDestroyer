@@ -58,13 +58,8 @@ public:
 	static MSyntax syntax();
 	
 	// Callbacks
-	// Called on a timer callback (or when stepping through the animation timeline)
-	// Note that we do not call this on the animation timeChanged event, because that event pauses during mouse interaction.
-	static void simulate(float elapsedTime, float lastTime, void* clientData);
-	// Called when the playback state changes (play, stop)
-	static void onPlaybackChange(bool state, void* clientData);
-	// A callback bound to the timeChanged event (e.g. moving the animation slider)
-	static void onTimeChanged(void* clientData);
+	// Called when the animation time changes (i.e. via playback or scrubbing)
+	static void simulate(void* clientData);
 	
 	// Compare the center of an object's bounding box to the center of the voxel grid
 	// to determine the closest object to the voxel grid (used as a fallback if nothing selected)
@@ -94,6 +89,5 @@ private:
 	static Voxelizer voxelizer;
 	static MDagPath voxelizedMeshDagPath;
 	static std::unordered_map<std::string, MCallbackId> callbacks;
-	static bool isPlaying;
 	static MString mouseInteractionCommandName;
 };

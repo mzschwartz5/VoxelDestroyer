@@ -30,16 +30,15 @@ public:
         const MGPUDeformerData& inputData,
         MGPUDeformerData& outputData
     ) override {
-
         // According to the docs, D3D/OpenCL interop must be executed from the main thread to 
-        // provide access to the D3D11 device and context.
-        if (std::this_thread::get_id() != g_mainThreadId) {
-            return MPxGPUDeformer::kDeformerRetryMainThread;
-        }
+        // provide safe access to the D3D11 / OpenCL device and context.
+        if (std::this_thread::get_id() != g_mainThreadId) return MPxGPUDeformer::kDeformerRetryMainThread;
 
-        // Only support a single input plug
-        if (inputPlugs.length() != 1)
+        // Only support a single input geometry
+        if (inputPlugs.length() != 1) {
+            MGlobal::displayError("VoxelDeformerGPUNode only supports a single input geometry.");
             return MPxGPUDeformer::kDeformerFailure;
+        }
 
         const MPlug& inputPlug = inputPlugs[0];
         const MGPUDeformerBuffer inputPositions = inputData.getBuffer(MPxGPUDeformer::sPositionsName(), inputPlug);
@@ -47,21 +46,15 @@ public:
 
         if (!inputPositions.isValid() || !outputPositions.isValid()) return MPxGPUDeformer::kDeformerFailure;
 
-        // Acquire D3D11 interop input buffers
+        // Acquire D3D11 interop buffers
+        cl_int err = CL_SUCCESS;
         MAutoCLEvent acquireEvent;
         cl_mem buffers[] = { m_particlePositionsBuffer.get(), m_vertStartIdsBuffer.get(), m_numVerticesBuffer.get(), m_localRestPositionsBuffer.get() };
-
-        // Check if the buffers are valid
-        if (m_particlePositionsBuffer.isNull() || m_vertStartIdsBuffer.isNull() || m_numVerticesBuffer.isNull() || m_localRestPositionsBuffer.isNull()) {
-            MGlobal::displayError("One or more D3D11 interop buffers are not initialized.");
-            return MPxGPUDeformer::kDeformerFailure;
-        }
-
-        clEnqueueAcquireD3D11Objects(MOpenCLInfo::getMayaDefaultOpenCLCommandQueue(), ARRAYSIZE(buffers), buffers, 0, NULL, acquireEvent.getReferenceForAssignment());
+        err = clEnqueueAcquireD3D11Objects(MOpenCLInfo::getMayaDefaultOpenCLCommandQueue(), ARRAYSIZE(buffers), buffers, 0, NULL, acquireEvent.getReferenceForAssignment());
+        MOpenCLInfo::checkCLErrorStatus(err);
 
         // Set kernel parameters
         unsigned int parameterId = 0;
-        cl_int err = CL_SUCCESS;
         err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_mem), (void*)m_particlePositionsBuffer.getReadOnlyRef());
         MOpenCLInfo::checkCLErrorStatus(err);
         err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_mem), (void*)m_vertStartIdsBuffer.getReadOnlyRef());
@@ -77,23 +70,26 @@ public:
         MAutoCLEvent kernelFinishedEvent;
         cl_event acquireEventHandle = acquireEvent.get();
         err = clEnqueueNDRangeKernel(MOpenCLInfo::getMayaDefaultOpenCLCommandQueue(), mKernel.get(), 1, NULL, &m_globalWorkSize, &m_localWorkSize, 1, &acquireEventHandle, kernelFinishedEvent.getReferenceForAssignment());
-        MGlobal::displayInfo("OpenCL kernel launched successfully.");
+        MOpenCLInfo::checkCLErrorStatus(err);
+
+        if ( err != CL_SUCCESS ) {
+            MGlobal::displayError(MString("Failed to run OpenCL kernel: ") + MString(clewErrorString(err)));
+            return MPxGPUDeformer::kDeformerFailure;
+        }
 
         // Release D3D11 interop input buffers
         cl_event kernelFinishedEventHandle = kernelFinishedEvent.get();
-        clEnqueueReleaseD3D11Objects(MOpenCLInfo::getMayaDefaultOpenCLCommandQueue(), ARRAYSIZE(buffers), buffers, 1, &kernelFinishedEventHandle, NULL);
+        err = clEnqueueReleaseD3D11Objects(MOpenCLInfo::getMayaDefaultOpenCLCommandQueue(), ARRAYSIZE(buffers), buffers, 1, &kernelFinishedEventHandle, NULL);
+        MOpenCLInfo::checkCLErrorStatus(err);
 
         outputPositions.setBufferReadyEvent(kernelFinishedEvent);
-        MOpenCLInfo::checkCLErrorStatus(err);
-        if ( err != CL_SUCCESS ) return MPxGPUDeformer::kDeformerFailure;
 
         outputData.setBuffer(outputPositions);
         return MPxGPUDeformer::kDeformerSuccess;
     }
 
     void terminate() override {
-        MOpenCLInfo::releaseOpenCLKernel(mKernel);
-        mKernel.reset();
+
     }
 
     // We need to the OpenCL context to be valid, so this cannot be done in the constructor.
@@ -118,7 +114,7 @@ public:
     }
 
     // TODO: for now, this is static. When we handle multiple objects, each with their own deformer node,
-    // this will need to be an instance method.
+    // this will need to be an instance method. MAutoCLMem will then take care of releasing the buffers when the node is deleted.
     static void initializeExternalKernelArgs(
         const int numVoxels,
         ID3D11Buffer* particlePositions,
@@ -126,13 +122,14 @@ public:
         ID3D11Buffer* numVerts,
         ID3D11Buffer* localRestPositionsBuffer
     ) {
-        m_globalWorkSize = numVoxels;
+        numberVoxels = numVoxels;
+        m_globalWorkSize = numberVoxels * m_localWorkSize;
         MAutoCLMem::NoRef dummy;
         cl_int err = CL_SUCCESS;
 
         cl_mem particlePositionsMem = clCreateFromD3D11Buffer(
             MOpenCLInfo::getOpenCLContext(),
-            CL_MEM_READ_WRITE,
+            CL_MEM_READ_ONLY,
             particlePositions,
             &err
         );
@@ -183,8 +180,14 @@ public:
         m_localRestPositionsBuffer = MAutoCLMem(localRestPositionsMem, dummy);
     }
 
+    static void tearDown() {
+        MOpenCLInfo::releaseOpenCLKernel(mKernel);
+        mKernel.reset();
+    }
+
 private:
     inline static MAutoCLKernel mKernel;
+    inline static unsigned int numberVoxels = 0;
     inline static MAutoCLMem m_particlePositionsBuffer;
     inline static MAutoCLMem m_vertStartIdsBuffer;
     inline static MAutoCLMem m_numVerticesBuffer;

@@ -24,6 +24,16 @@ public:
         DirectX::getContext()->Dispatch(numWorkgroups, 1, 1);
         unbind();
 
+        // Now pass the buffers to the GPU deformer (part of rendering)
+        // TODO: eventually we shouldn't even have a bind compute pass; the GPU deformer has access to the original geometry.
+        VoxelDeformerGPUNode::initializeExternalKernelArgs(
+            numWorkgroups,
+            particlesBuffer.Get(),
+            vertStartIdxBuffer.Get(),
+            numVerticesBuffer.Get(),
+            localRestPositionsBuffer.Get()
+        );
+
         // Can actually release the verticesBuffer and SRV now: used only for binding, which occurs just once.
         verticesBuffer.Reset();
         verticesSRV.Reset();
@@ -36,6 +46,7 @@ public:
     const ComPtr<ID3D11UnorderedAccessView>& getParticlesUAV() const { return particlesUAV; };
 
 private:
+    int numParticles;
     ComPtr<ID3D11Buffer> particlesBuffer; 
     ComPtr<ID3D11Buffer> verticesBuffer;
     ComPtr<ID3D11Buffer> vertStartIdxBuffer;       // for each voxel (workgroup), the start index of the vertices in the vertex buffer
@@ -178,15 +189,6 @@ private:
         srvDesc.Buffer.NumElements = numVerts;
 
         DirectX::getDevice()->CreateShaderResourceView(localRestPositionsBuffer.Get(), &srvDesc, &localRestPositionsSRV);
-
-        // Now pass the buffers to the GPU deformer (part of rendering)
-        VoxelDeformerGPUNode::initializeExternalKernelArgs(
-            static_cast<int>(particles.size() / 8),
-            particlesBuffer.Get(),
-            vertStartIdxBuffer.Get(),
-            numVerticesBuffer.Get(),
-            localRestPositionsBuffer.Get()
-        );
     }
 
     void tearDown() override

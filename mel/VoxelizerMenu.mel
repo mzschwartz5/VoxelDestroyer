@@ -257,6 +257,13 @@ global proc VoxelizerMenu_addToShelf() {
             -annotation "Run VoxelDestroyer Plugin"
             -image1 "TypeSeparateMaterials_200.png"
             -command "VoxelizerMenu();";
+        
+        // Also add a button for the live-interaction tool
+        shelfButton -parent "Custom"
+            -label "VoxelDragTool"
+            -annotation "Interactively drag voxels in the viewport while previewing an animation"
+            -image1 "out_colorComposite_200.png"
+            -command "string $ctx = `voxelDragContextCommand`; setToolTo $ctx;";
     }
 }
 
@@ -268,7 +275,8 @@ global proc VoxelizerMenu_removeFromShelf() {
 
         // Iterate through the buttons and remove the "VoxelDestroyer" button if it exists
         for ($button in $buttons) {
-            if (`shelfButton -query -label $button` == "VoxelDestroyer") {
+            string $label = `shelfButton -query -label $button`;
+            if ($label == "VoxelDestroyer" || $label == "VoxelDragTool") {
                 deleteUI -control $button;
             }
         }

@@ -1,9 +1,17 @@
+// TODO: particles should be in local space. Only reason this works is because object origin is currently world origin.
+// TODO: not necessary to have numVerts buffer, can just use vertStartIds of next voxel to determin num verts.
+// TDOO: instead of a bind step, just keep a buffer of the original particle positions.
+
+/*
+* Each workgroup represents a voxel. Each thread in the workgroup handles 
+* (numVerts / TRANFORM_VERTICES_THREADS) vertices from the voxel and transforms them based on the deformed voxel's basis.
+*/
 __kernel void transformVertices(
     __global const float4* particles,
     __global const uint* vertStartIds,
     __global const uint* numVerts,
     __global const float4* localRestPositions,
-    __global float4* transformedPositions
+    __global float* transformedPositions
 ) {
     uint globalThreadId = get_global_id(0);
     uint groupId = get_group_id(0);
@@ -32,6 +40,10 @@ __kernel void transformVertices(
 
         float4 localRestPosition = localRestPositions[vertexIdx];
         float4 transformedPos = v0 + (localRestPosition.x * e0) + (localRestPosition.y * e1) + (localRestPosition.z * e2);
-        transformedPositions[vertexIdx] = (float4)(transformedPos.x, transformedPos.y, transformedPos.z, 1.0f);
+
+        uint outIdx = vertexIdx * 3;
+        transformedPositions[outIdx] = transformedPos.x;
+        transformedPositions[outIdx + 1] = transformedPos.y;
+        transformedPositions[outIdx + 2] = transformedPos.z;
     }
 }

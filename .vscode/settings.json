@@ -68,5 +68,6 @@
         "ratio": "cpp",
         "stop_token": "cpp",
         "thread": "cpp"
-    }
+    },
+    "cmake.ignoreCMakeListsMissing": true
 }
