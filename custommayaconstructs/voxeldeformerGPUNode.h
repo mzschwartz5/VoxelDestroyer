@@ -145,14 +145,18 @@ public:
         }
         m_particlePositionsBuffer.attach(particlePositionsMem);
 
-        // Store a copy of the original particle positions for the kernel to use
-        // TODO: we technically only need the original positions of one particle per voxel. Stride by 8?
-        m_originalParticlePositionsBufferSize = sizeof(glm::vec4) * particlePositionsCPU.size();
+        // Store a copy of the original position of a reference particle (lower left corner of each voxel) for the kernel to use
+        std::vector<glm::vec4> referenceParticlePositions(numVoxels);
+        for (int i = 0; i < particlePositionsCPU.size(); i += 8) {
+            referenceParticlePositions[i / 8] = particlePositionsCPU[i];
+        }
+
+        m_originalParticlePositionsBufferSize = sizeof(glm::vec4) * numVoxels;
         cl_mem originalParticlePositionsMem = clCreateBuffer(
             MOpenCLInfo::getOpenCLContext(),
             CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
             m_originalParticlePositionsBufferSize,
-            (void*)particlePositionsCPU.data(),
+            (void*)referenceParticlePositions.data(),
             &err
         );
 

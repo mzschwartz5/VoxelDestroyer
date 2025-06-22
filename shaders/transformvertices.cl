@@ -1,5 +1,3 @@
-// TODO: particles should be in local space. Only reason this works is because object origin is currently world origin.
-
 /*
 * Each workgroup represents a voxel. Each thread in the workgroup handles 
 * (numVerts / TRANFORM_VERTICES_THREADS) vertices from the voxel and transforms them based on the deformed voxel's basis.
@@ -19,11 +17,14 @@ __kernel void transformVertices(
     uint localSize = get_local_size(0);
 
     uint v0_idx = groupId << 3;
-    float4 v0_orig = originalParticles[v0_idx];
     float4 v0 = particles[v0_idx];
     float4 v1 = particles[v0_idx + 1];
     float4 v2 = particles[v0_idx + 2];
     float4 v4 = particles[v0_idx + 4];
+
+    // Note: originalParticles contains only one reference particle per voxel, thus the index into it
+    // does not need to be multiplied by 8 to account for the 8 particles per voxel.
+    float4 v0_orig = originalParticles[groupId]; 
 
     float3 e0 = normalize(v1 - v0).xyz;
     float3 e1 = normalize(v2 - v0).xyz;
