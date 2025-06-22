@@ -1,6 +1,5 @@
 // TODO: particles should be in local space. Only reason this works is because object origin is currently world origin.
 // TODO: not necessary to have numVerts buffer, can just use vertStartIds of next voxel to determin num verts.
-// TDOO: instead of a bind step, just keep a buffer of the original particle positions.
 
 /*
 * Each workgroup represents a voxel. Each thread in the workgroup handles 
@@ -10,8 +9,9 @@ __kernel void transformVertices(
     __global const float4* particles,
     __global const uint* vertStartIds,
     __global const uint* numVerts,
-    __global const float4* localRestPositions,
-    __global float* transformedPositions
+    __global const float4* originalParticles,
+    __global const float* originalVertPositions, // inputPositions from deformer input
+    __global float* transformedPositions         // outputPositions from deformer output
 ) {
     uint globalThreadId = get_global_id(0);
     uint groupId = get_group_id(0);
@@ -19,14 +19,15 @@ __kernel void transformVertices(
     uint localSize = get_local_size(0);
 
     uint v0_idx = groupId << 3;
+    float4 v0_orig = originalParticles[v0_idx];
     float4 v0 = particles[v0_idx];
     float4 v1 = particles[v0_idx + 1];
     float4 v2 = particles[v0_idx + 2];
     float4 v4 = particles[v0_idx + 4];
 
-    float4 e0 = normalize(v1 - v0);
-    float4 e1 = normalize(v2 - v0);
-    float4 e2 = normalize(v4 - v0);
+    float3 e0 = normalize(v1 - v0).xyz;
+    float3 e1 = normalize(v2 - v0).xyz;
+    float3 e2 = normalize(v4 - v0).xyz;
 
     uint vertexStartIdx = vertStartIds[groupId];
     uint numVertsInVoxel = numVerts[groupId];
@@ -38,12 +39,13 @@ __kernel void transformVertices(
             continue;
         }
 
-        float4 localRestPosition = localRestPositions[vertexIdx];
-        float4 transformedPos = v0 + (localRestPosition.x * e0) + (localRestPosition.y * e1) + (localRestPosition.z * e2);
+        vertexIdx *= 3; // Vertex positions are stored as flat arrays of floats, 3 floats per vertex.
+        float3 restPosition = (float3)(originalVertPositions[vertexIdx + 0], originalVertPositions[vertexIdx + 1], originalVertPositions[vertexIdx + 2]) 
+                            - v0_orig.xyz;
+        float3 transformedPos = v0.xyz + (restPosition.x * e0) + (restPosition.y * e1) + (restPosition.z * e2);
 
-        uint outIdx = vertexIdx * 3;
-        transformedPositions[outIdx] = transformedPos.x;
-        transformedPositions[outIdx + 1] = transformedPos.y;
-        transformedPositions[outIdx + 2] = transformedPos.z;
+        transformedPositions[vertexIdx + 0] = transformedPos.x;
+        transformedPositions[vertexIdx + 1] = transformedPos.y;
+        transformedPositions[vertexIdx + 2] = transformedPos.z;
     }
 }

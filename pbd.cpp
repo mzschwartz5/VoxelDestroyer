@@ -3,6 +3,7 @@
 #include <float.h>
 #include "utils.h"
 #include "constants.h"
+#include "custommayaconstructs/voxeldeformerGPUNode.h"
 
 void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath) {
     this->meshDagPath = meshDagPath;
@@ -14,16 +15,23 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
     MStatus status;
 	MFnMesh voxelMeshFn(meshDagPath);
 
-	// Calculate a local rest position for each vertex in every voxel.
-	bindVerticesCompute = std::make_unique<BindVerticesCompute>(
-		static_cast<int>(voxels.size()) * 8, // 8 particles per voxel
-		voxelMeshFn.getRawPoints(&status),
-		voxelMeshFn.numVertices(&status),
+    vgsInfo[0] = glm::vec4(RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME);
+    vgsInfo[1] = glm::vec4(3.0, 0, FTF_RELAXATION, FTF_BETA); //iter count, axis, padding, padding
+    
+    vgsCompute = std::make_unique<VGSCompute>(
+        particles.numParticles,
+        particles.w.data(),
         particles.positions,
-		voxels.vertStartIdx, 
+        vgsInfo
+    );
+
+    VoxelDeformerGPUNode::initializeExternalKernelArgs(
+        voxels.size(),
+        vgsCompute->getParticlesBuffer().Get(),
+        particles.positions,
+        voxels.vertStartIdx, 
 		voxels.numVerts
-	);
-	bindVerticesCompute->dispatch(voxels.size());
+    );
 
     // Hard coded for now. Later set up via UI.
     CollisionVolume collisionVolume{
@@ -35,23 +43,13 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
     buildCollisionGridCompute = std::make_unique<BuildCollisionGridCompute>(
         collisionVolume,
         voxelSize,
-        bindVerticesCompute->getParticlesSRV(),
+        vgsCompute->getParticlesSRV(),
         voxels.isSurface
-    );
-
-    vgsInfo[0] = glm::vec4(RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME);
-    vgsInfo[1] = glm::vec4(3.0, 0, FTF_RELAXATION, FTF_BETA); //iter count, axis, padding, padding
-
-    vgsCompute = std::make_unique<VGSCompute>(
-        particles.numParticles,
-        particles.w.data(),
-        vgsInfo,
-        bindVerticesCompute->getParticlesUAV()
     );
 
 	faceConstraintsCompute = std::make_unique<FaceConstraintsCompute>(
 		faceConstraints,
-		bindVerticesCompute->getParticlesUAV(),
+		vgsCompute->getParticlesUAV(),
 		vgsCompute->getWeightsSRV(),
         vgsCompute->getVoxelSimInfoBuffer(),
         buildCollisionGridCompute->getIsSurfaceUAV()
@@ -65,18 +63,18 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         particles.velocities.data(),
 		&simInfo,
         vgsCompute->getWeightsSRV(),
-        bindVerticesCompute->getParticlesUAV()
+        vgsCompute->getParticlesUAV()
     );
     
     dragParticlesCompute = std::make_unique<DragParticlesCompute>(
-        bindVerticesCompute->getParticlesUAV(),
+        vgsCompute->getParticlesUAV(),
         preVGSCompute->getOldPositionsSRV(),
         voxels.size()
     );
 
     postVGSCompute = std::make_unique<PostVGSCompute>(
         vgsCompute->getWeightsSRV(),
-        bindVerticesCompute->getParticlesSRV(),
+        vgsCompute->getParticlesSRV(),
         preVGSCompute->getOldPositionsSRV(),
         preVGSCompute->getVelocitiesUAV(),
         dragParticlesCompute->getIsDraggingUAV()
@@ -86,7 +84,7 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         voxelSize,
         PARTICLE_RADIUS,
         216, // num collision grid cells (hardcoded for now)
-        bindVerticesCompute->getParticlesUAV(),
+        vgsCompute->getParticlesUAV(),
         buildCollisionGridCompute->getCollisionVoxelCountsSRV(),
         buildCollisionGridCompute->getCollisionVoxelIndicesSRV()
     );
