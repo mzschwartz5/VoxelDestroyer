@@ -158,6 +158,7 @@ private:
         const MString& combinedMeshName,
         const MString& meshNamesConcatenated,
         const MString& originalMesh,
+        const MPoint& originalPivot,
         float voxelSize
     );
 

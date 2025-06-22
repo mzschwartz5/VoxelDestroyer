@@ -330,6 +330,8 @@ MDagPath Voxelizer::createVoxels(
 
     MDagPath transformPath = originalMesh.dagPath();
     transformPath.pop(); // Move up to the transform node
+    MFnTransform transform(transformPath);
+    MPoint originalPivot = transform.rotatePivot(MSpace::kWorld);
     MString originalMeshName = transformPath.partialPathName();
     MString combinedMeshName = originalMeshName + "_voxelized";
     MString meshNamesConcatenated;
@@ -341,7 +343,7 @@ MDagPath Voxelizer::createVoxels(
     }
 
     // TODO: if no boolean, should get rid of non-manifold geometry
-    MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(combinedMeshName, meshNamesConcatenated, originalMeshName, voxelSize);
+    MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(combinedMeshName, meshNamesConcatenated, originalMeshName, originalPivot, voxelSize);
     // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh
     MGlobal::executeCommand("delete " + originalMeshName, false, true); // Delete the original mesh to clean up the scene
 
@@ -352,6 +354,7 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     const MString& combinedMeshName,
     const MString& meshNamesConcatenated,
     const MString& originalMeshName,
+    const MPoint& originalPivot,
     float voxelSize
 ) {
     MStatus status;
@@ -368,6 +371,8 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MDagPath resultMeshDagPath;
     MDagPath::getAPathTo(resultMeshObject, resultMeshDagPath);
     MFnMesh resultMeshFn(resultMeshDagPath, &status);
+    MFnTransform resultTransformFn(resultMeshDagPath, &status);
+    resultTransformFn.setRotatePivot(originalPivot, MSpace::kTransform, false); // Set the pivot to the original mesh's pivot
 
     // Use MEL to transferAttributes the normals from the original mesh to the new voxelized/combined one
     MString interiorFaces;
@@ -400,12 +405,17 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     // MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + interiorFaces, false, true); // Add the non-surface faces to the initial shading group
 
     MGlobal::executeCommand("delete -ch " + combinedMeshName + ";"); // Delete the history of the combined mesh to decouple it from the original mesh
-    MGlobal::executeCommand("select -cl;", false, true);
+    MGlobal::executeCommand("select -cl;", false, true); // Clear selection
 
     return resultMeshDagPath;
 }
 
+/**
+ * Use raycasting to find and select the surface faces of the voxelized mesh (after combining all voxels).
+ * Only surface faces will not have any intersections with the mesh along their normal direction.
+ */
 MString Voxelizer::selectSurfaceFaces(MFnMesh& meshFn, const MString& meshName, float voxelSize, MString& interiorFaces) {
+    // Can short circuit raycasting by bounding the ray length to the diagonal of a voxel. If no intersection is found by then, it must be a surface face.
     float maxDistance = 1.73f * 1.1f * voxelSize; // 1.73 is the diagonal of a cube with edge length 1.0
     MMeshIsectAccelParams accelParams = MFnMesh::autoUniformGridParams();
     MItMeshPolygon faceIter(meshFn.object());
@@ -424,6 +434,8 @@ MString Voxelizer::selectSurfaceFaces(MFnMesh& meshFn, const MString& meshName, 
 
         if (!hit) {
             surfaceFaces += meshName + ".f[" + faceIter.index() + "] ";
+            faceIter.next();
+            continue;
         }
         
         interiorFaces += meshName + ".f[" + faceIter.index() + "] ";
@@ -496,7 +508,7 @@ void Voxelizer::addVoxelToMesh(
 
     MFnTransform cubeTransformFn;
     MObject cubeTransform = cubeTransformFn.create();
-    cubeTransformFn.setRotatePivot(voxelCenter, MSpace::kTransform, true);
+    cubeTransformFn.setRotatePivot(voxelCenter, MSpace::kTransform, false);
 
     // Create the cube mesh under the transform
     MFnMesh cubeMeshFn;
