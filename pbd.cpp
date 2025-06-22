@@ -29,8 +29,7 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         voxels.size(),
         vgsCompute->getParticlesBuffer().Get(),
         particles.positions,
-        voxels.vertStartIdx, 
-		voxels.numVerts
+        voxels.vertStartIdx
     );
 
     // Hard coded for now. Later set up via UI.

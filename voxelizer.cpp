@@ -548,7 +548,6 @@ void Voxelizer::intersectVoxelWithOriginalMesh(
     voxels.vertStartIdx[index] = voxels.totalVerts;
 
     if (!voxels.isSurface[index]) {
-        voxels.numVerts[index] = 8;
         voxels.totalVerts += 8;
         return;
     }
@@ -562,6 +561,5 @@ void Voxelizer::intersectVoxelWithOriginalMesh(
         cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect);
     }
 
-    voxels.numVerts[index] = cubeMeshFn.numVertices();
     voxels.totalVerts += cubeMeshFn.numVertices();
 }

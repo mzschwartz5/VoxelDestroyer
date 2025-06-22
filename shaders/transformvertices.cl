@@ -1,14 +1,14 @@
 // TODO: particles should be in local space. Only reason this works is because object origin is currently world origin.
-// TODO: not necessary to have numVerts buffer, can just use vertStartIds of next voxel to determin num verts.
 
 /*
 * Each workgroup represents a voxel. Each thread in the workgroup handles 
 * (numVerts / TRANFORM_VERTICES_THREADS) vertices from the voxel and transforms them based on the deformed voxel's basis.
 */
 __kernel void transformVertices(
+    const uint numVoxels,
+    const uint totalVerts,
     __global const float4* particles,
     __global const uint* vertStartIds,
-    __global const uint* numVerts,
     __global const float4* originalParticles,
     __global const float* originalVertPositions, // inputPositions from deformer input
     __global float* transformedPositions         // outputPositions from deformer output
@@ -30,12 +30,12 @@ __kernel void transformVertices(
     float3 e2 = normalize(v4 - v0).xyz;
 
     uint vertexStartIdx = vertStartIds[groupId];
-    uint numVertsInVoxel = numVerts[groupId];
-    uint numVertsPerThread = (numVertsInVoxel + localSize - 1) / localSize;
+    uint vertexEndIdx = (groupId + 1 < numVoxels) ? vertStartIds[groupId + 1] : totalVerts;
+    uint numVertsPerThread = (vertexEndIdx - vertexStartIdx + localSize - 1) / localSize;
 
     for (uint i = 0; i < numVertsPerThread; i++) {
         uint vertexIdx = vertexStartIdx + localThreadId + (i * localSize);
-        if (vertexIdx >= vertexStartIdx + numVertsInVoxel) {
+        if (vertexIdx >= vertexEndIdx) {
             continue;
         }
 
