@@ -9,8 +9,6 @@
 #include <numeric>
 #include <memory>
 #include "directx/compute/computeshader.h"
-#include "directx/compute/transformverticescompute.h"
-#include "directx/compute/bindverticescompute.h"
 #include "directx/compute/vgscompute.h"
 #include "directx/compute/prevgscompute.h"
 #include "directx/compute/postvgscompute.h"
@@ -105,9 +103,6 @@ private:
 
     // Shaders
 	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
-	int transformVerticesNumWorkgroups;
-	std::unique_ptr<TransformVerticesCompute> transformVerticesCompute;
-	std::unique_ptr<BindVerticesCompute> bindVerticesCompute;
     std::unique_ptr<VGSCompute> vgsCompute;
 	std::unique_ptr<FaceConstraintsCompute> faceConstraintsCompute;
     std::unique_ptr<PreVGSCompute> preVGSCompute;

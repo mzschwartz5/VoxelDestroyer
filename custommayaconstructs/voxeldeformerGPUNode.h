@@ -40,36 +40,43 @@ public:
             return MPxGPUDeformer::kDeformerFailure;
         }
 
+        MAutoCLEventList kernelWaitOnEvents;
         const MPlug& inputPlug = inputPlugs[0];
         const MGPUDeformerBuffer inputPositions = inputData.getBuffer(MPxGPUDeformer::sPositionsName(), inputPlug);
+        cl_uint inputElementCount = inputPositions.elementCount();
         MGPUDeformerBuffer outputPositions = createOutputBuffer(inputPositions);
+        kernelWaitOnEvents.add(inputPositions.bufferReadyEvent());
 
         if (!inputPositions.isValid() || !outputPositions.isValid()) return MPxGPUDeformer::kDeformerFailure;
 
         // Acquire D3D11 interop buffers
         cl_int err = CL_SUCCESS;
         MAutoCLEvent acquireEvent;
-        cl_mem buffers[] = { m_particlePositionsBuffer.get(), m_vertStartIdsBuffer.get(), m_numVerticesBuffer.get(), m_localRestPositionsBuffer.get() };
+        cl_mem buffers[] = { m_particlePositionsBuffer.get() };
         err = clEnqueueAcquireD3D11Objects(MOpenCLInfo::getMayaDefaultOpenCLCommandQueue(), ARRAYSIZE(buffers), buffers, 0, NULL, acquireEvent.getReferenceForAssignment());
+        kernelWaitOnEvents.add(acquireEvent);
         MOpenCLInfo::checkCLErrorStatus(err);
 
         // Set kernel parameters
         unsigned int parameterId = 0;
+        err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_uint), (void*)&numberVoxels);
+        MOpenCLInfo::checkCLErrorStatus(err);
+        err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_uint), (void*)&inputElementCount);
+        MOpenCLInfo::checkCLErrorStatus(err);
         err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_mem), (void*)m_particlePositionsBuffer.getReadOnlyRef());
         MOpenCLInfo::checkCLErrorStatus(err);
         err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_mem), (void*)m_vertStartIdsBuffer.getReadOnlyRef());
         MOpenCLInfo::checkCLErrorStatus(err);
-        err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_mem), (void*)m_numVerticesBuffer.getReadOnlyRef());
+        err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_mem), (void*)m_originalParticlePositionsBuffer.getReadOnlyRef());
         MOpenCLInfo::checkCLErrorStatus(err);
-        err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_mem), (void*)m_localRestPositionsBuffer.getReadOnlyRef());
+        err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_mem), (void*)inputPositions.buffer().getReadOnlyRef());
         MOpenCLInfo::checkCLErrorStatus(err);
         err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_mem), (void*)outputPositions.buffer().getReadOnlyRef());
         MOpenCLInfo::checkCLErrorStatus(err);
 
         // Run the kernel
         MAutoCLEvent kernelFinishedEvent;
-        cl_event acquireEventHandle = acquireEvent.get();
-        err = clEnqueueNDRangeKernel(MOpenCLInfo::getMayaDefaultOpenCLCommandQueue(), mKernel.get(), 1, NULL, &m_globalWorkSize, &m_localWorkSize, 1, &acquireEventHandle, kernelFinishedEvent.getReferenceForAssignment());
+        err = clEnqueueNDRangeKernel(MOpenCLInfo::getMayaDefaultOpenCLCommandQueue(), mKernel.get(), 1, NULL, &m_globalWorkSize, &m_localWorkSize, kernelWaitOnEvents.size(), kernelWaitOnEvents.array(), kernelFinishedEvent.getReferenceForAssignment());
         MOpenCLInfo::checkCLErrorStatus(err);
 
         if ( err != CL_SUCCESS ) {
@@ -92,7 +99,7 @@ public:
 
     }
 
-    // We need to the OpenCL context to be valid, so this cannot be done in the constructor.
+    // We need the OpenCL context to be valid, so this cannot be done in the constructor.
     // Instead, call this after registering the node.
     static bool compileKernel() {
         // Use utils loadResourceFile to get kernel as string
@@ -118,13 +125,11 @@ public:
     static void initializeExternalKernelArgs(
         const int numVoxels,
         ID3D11Buffer* particlePositions,
-        ID3D11Buffer* vertStartIds,
-        ID3D11Buffer* numVerts,
-        ID3D11Buffer* localRestPositionsBuffer
+        const std::vector<glm::vec4>& particlePositionsCPU, // to store the original particle positions, as an OpenCL-only buffer
+        const std::vector<uint>& vertStartIds
     ) {
         numberVoxels = numVoxels;
         m_globalWorkSize = numberVoxels * m_localWorkSize;
-        MAutoCLMem::NoRef dummy;
         cl_int err = CL_SUCCESS;
 
         cl_mem particlePositionsMem = clCreateFromD3D11Buffer(
@@ -138,51 +143,59 @@ public:
             MGlobal::displayError(MString("Failed to create particlePositionsBuffer from D3D11 buffer: ") + MString(clewErrorString(err)));
             return;
         }
-        m_particlePositionsBuffer = MAutoCLMem(particlePositionsMem, dummy);
+        m_particlePositionsBuffer.attach(particlePositionsMem);
 
-        cl_mem vertStartIdsMem = clCreateFromD3D11Buffer(
+        // Store a copy of the original position of a reference particle (lower left corner of each voxel) for the kernel to use
+        std::vector<glm::vec4> referenceParticlePositions(numVoxels);
+        for (int i = 0; i < particlePositionsCPU.size(); i += 8) {
+            referenceParticlePositions[i / 8] = particlePositionsCPU[i];
+        }
+
+        m_originalParticlePositionsBufferSize = sizeof(glm::vec4) * numVoxels;
+        cl_mem originalParticlePositionsMem = clCreateBuffer(
             MOpenCLInfo::getOpenCLContext(),
-            CL_MEM_READ_ONLY,
-            vertStartIds,
+            CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+            m_originalParticlePositionsBufferSize,
+            (void*)referenceParticlePositions.data(),
             &err
         );
-        
+
         if (err != CL_SUCCESS) {
-            MGlobal::displayError(MString("Failed to create vertStartIdsBuffer from D3D11 buffer: ") + MString(clewErrorString(err)));
+            MGlobal::displayError(MString("Failed to create originalParticlePositionsBuffer: ") + MString(clewErrorString(err)));
             return;
         }
-        m_vertStartIdsBuffer = MAutoCLMem(vertStartIdsMem, dummy);
+        MHWRender::MRenderer::theRenderer()->holdGPUMemory(m_originalParticlePositionsBufferSize); // Helps Maya track and manage GPU memory usage
+        m_originalParticlePositionsBuffer.attach(originalParticlePositionsMem);
 
-        cl_mem numVerticesMem = clCreateFromD3D11Buffer(
+        m_vertStartIdsBufferSize = sizeof(uint) * vertStartIds.size();
+        cl_mem vertStartIdsMem = clCreateBuffer(
             MOpenCLInfo::getOpenCLContext(),
-            CL_MEM_READ_ONLY,
-            numVerts,
+            CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+            m_vertStartIdsBufferSize,
+            (void*)vertStartIds.data(),
             &err
         );
-        
-        if (err != CL_SUCCESS) {
-            MGlobal::displayError(MString("Failed to create numVertsBuffer from D3D11 buffer: ") + MString(clewErrorString(err)));
-            return;
-        }
-        m_numVerticesBuffer = MAutoCLMem(numVerticesMem, dummy);
 
-        cl_mem localRestPositionsMem = clCreateFromD3D11Buffer(
-            MOpenCLInfo::getOpenCLContext(),
-            CL_MEM_READ_ONLY,
-            localRestPositionsBuffer,
-            &err
-        );
-        
         if (err != CL_SUCCESS) {
-            MGlobal::displayError(MString("Failed to create localRestPositionsBuffer from D3D11 buffer: ") + MString(clewErrorString(err)));
+            MGlobal::displayError(MString("Failed to create vertStartIdsBuffer: ") + MString(clewErrorString(err)));
             return;
         }
-        m_localRestPositionsBuffer = MAutoCLMem(localRestPositionsMem, dummy);
+        MHWRender::MRenderer::theRenderer()->holdGPUMemory(m_vertStartIdsBufferSize); // Helps Maya track and manage GPU memory usage
+        m_vertStartIdsBuffer.attach(vertStartIdsMem);
     }
 
     static void tearDown() {
         MOpenCLInfo::releaseOpenCLKernel(mKernel);
         mKernel.reset();
+
+        // These only need to be reset because they're static. Once we have support for multiple meshes+deformers, 
+        // we'll use terminate() instead, and MAutoCLMem will automatically release buffers.
+        m_particlePositionsBuffer.reset();
+        m_vertStartIdsBuffer.reset();
+        m_originalParticlePositionsBuffer.reset();
+        // Still need to do this part though, in terminate():
+        MHWRender::MRenderer::theRenderer()->releaseGPUMemory(m_originalParticlePositionsBufferSize);
+        MHWRender::MRenderer::theRenderer()->releaseGPUMemory(m_vertStartIdsBufferSize);
     }
 
 private:
@@ -190,8 +203,9 @@ private:
     inline static unsigned int numberVoxels = 0;
     inline static MAutoCLMem m_particlePositionsBuffer;
     inline static MAutoCLMem m_vertStartIdsBuffer;
-    inline static MAutoCLMem m_numVerticesBuffer;
-    inline static MAutoCLMem m_localRestPositionsBuffer;
+    inline static MAutoCLMem m_originalParticlePositionsBuffer;
+    inline static size_t m_vertStartIdsBufferSize = 0;
+    inline static size_t m_originalParticlePositionsBufferSize = 0;
     inline static size_t m_globalWorkSize;
     inline static size_t m_localWorkSize = TRANSFORM_VERTICES_THREADS;
 };

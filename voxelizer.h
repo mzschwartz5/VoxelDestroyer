@@ -43,7 +43,6 @@ struct Voxels {
     std::vector<VoxelPositions> corners;  // ordered according to the VGS expectations
 
     std::vector<uint> vertStartIdx;       // Each voxel owns a number of vertices contained within (including the corners)
-    std::vector<uint> numVerts;
     int totalVerts = 0;                   // total number of vertices in the voxelized mesh
 
     std::vector<uint32_t> mortonCodes;
@@ -58,7 +57,6 @@ struct Voxels {
         isSurface.resize(size, false);
         mayaObjects.resize(size, MObject::kNullObj);
         corners.resize(size, VoxelPositions());
-		numVerts.resize(size, 0);
 		vertStartIdx.resize(size, -1);
         mortonCodes.resize(size, UINT_MAX);                 
     }
@@ -160,6 +158,7 @@ private:
         const MString& combinedMeshName,
         const MString& meshNamesConcatenated,
         const MString& originalMesh,
+        const MPoint& originalPivot,
         float voxelSize
     );
 

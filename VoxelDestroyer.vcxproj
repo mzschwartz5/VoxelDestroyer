@@ -150,8 +150,6 @@
     <ClInclude Include="custommayaconstructs\voxeldeformerGPUNode.h" />
     <ClInclude Include="constants.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
-    <ClInclude Include="directx\compute\transformverticescompute.h" />
-    <ClInclude Include="directx\compute\bindverticescompute.h" />
     <ClInclude Include="directx\compute\vgscompute.h" />
     <ClInclude Include="directx\compute\prevgscompute.h" />
     <ClInclude Include="directx\compute\postvgscompute.h" />

@@ -47,16 +47,10 @@
     <ClInclude Include="directx\compute\computeshader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="directx\compute\transformVerticesCompute.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="constants.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="utils.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="directx\compute\bindverticescompute.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="directx\compute\vgscompute.h">
