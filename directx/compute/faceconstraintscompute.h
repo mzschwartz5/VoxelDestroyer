@@ -90,10 +90,7 @@ private:
 		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[0].data();
-		HRESULT hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &xConstraintsBuffer);
-		if (FAILED(hr)) {
-			MGlobal::displayError("Failed to create constraints buffer.");
-		}
+		CreateBuffer(&bufferDesc, &initData, &xConstraintsBuffer);
 
 		// Create the UAV for the X constraints buffer
 		D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -101,10 +98,7 @@ private:
         uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
         uavDesc.Buffer.FirstElement = 0;
         uavDesc.Buffer.NumElements = UINT(constraints[0].size());
-		hr = DirectX::getDevice()->CreateUnorderedAccessView(xConstraintsBuffer.Get(), &uavDesc, &xConstraintsUAV);
-		if (FAILED(hr)) {
-			MGlobal::displayError("Failed to create X constraints UAV.");
-		}
+		DirectX::getDevice()->CreateUnorderedAccessView(xConstraintsBuffer.Get(), &uavDesc, &xConstraintsUAV);
 
 		// Initialize Y constraints buffer and its UAV
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -114,20 +108,14 @@ private:
 		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[1].data();
-		hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &yConstraintsBuffer);
-        if (FAILED(hr)) {
-            MGlobal::displayError("Failed to create constraints buffer.");
-        }
+		CreateBuffer(&bufferDesc, &initData, &yConstraintsBuffer);
 
 		// Create the UAV for the Y constraints buffer
 		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
 		uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
 		uavDesc.Buffer.FirstElement = 0;
 		uavDesc.Buffer.NumElements = UINT(constraints[1].size());
-		hr = DirectX::getDevice()->CreateUnorderedAccessView(yConstraintsBuffer.Get(), &uavDesc, &yConstraintsUAV);
-		if (FAILED(hr)) {
-			MGlobal::displayError("Failed to create Y constraints UAV.");
-		}
+		DirectX::getDevice()->CreateUnorderedAccessView(yConstraintsBuffer.Get(), &uavDesc, &yConstraintsUAV);
 
 		// Initialize Z constraints buffer and its UAV
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -137,20 +125,14 @@ private:
 		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[2].data();
-		hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &zConstraintsBuffer);
-		if (FAILED(hr)) {
-			MGlobal::displayError("Failed to create constraints buffer.");
-		}
+		CreateBuffer(&bufferDesc, &initData, &zConstraintsBuffer);
 
 		// Create the UAV for the Z constraints buffer
 		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
 		uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
 		uavDesc.Buffer.FirstElement = 0;
 		uavDesc.Buffer.NumElements = UINT(constraints[2].size());
-		hr = DirectX::getDevice()->CreateUnorderedAccessView(zConstraintsBuffer.Get(), &uavDesc, &zConstraintsUAV);
-        if (FAILED(hr)) {
-            MGlobal::displayError("Failed to create Z constraints UAV.");
-        }
+		DirectX::getDevice()->CreateUnorderedAccessView(zConstraintsBuffer.Get(), &uavDesc, &zConstraintsUAV);
 
     }
 

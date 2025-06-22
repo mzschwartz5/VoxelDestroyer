@@ -114,7 +114,7 @@ void bind() override {
 
         initData.pSysMem = isSurface.data();
 
-        HRESULT hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &isSurfaceBuffer);
+        CreateBuffer(&bufferDesc, &initData, &isSurfaceBuffer);
         
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
@@ -136,7 +136,7 @@ void bind() override {
         bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
         bufferDesc.StructureByteStride = sizeof(int);
 
-        hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &collisionVoxelCountsBuffer);
+        CreateBuffer(&bufferDesc, nullptr, &collisionVoxelCountsBuffer);
 
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
@@ -158,7 +158,7 @@ void bind() override {
         bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
         bufferDesc.StructureByteStride = sizeof(int);
 
-        hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &collisionVoxelIndicesBuffer);
+        CreateBuffer(&bufferDesc, nullptr, &collisionVoxelIndicesBuffer);
 
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
@@ -188,7 +188,7 @@ void bind() override {
 
         initData.pSysMem = &cbData;
 
-        hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &constantBuffer);
+        CreateBuffer(&bufferDesc, &initData, &constantBuffer);
     }
 
     void tearDown() override

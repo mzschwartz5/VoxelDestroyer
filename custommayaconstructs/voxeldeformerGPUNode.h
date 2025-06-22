@@ -164,7 +164,7 @@ public:
             MGlobal::displayError(MString("Failed to create originalParticlePositionsBuffer: ") + MString(clewErrorString(err)));
             return;
         }
-        MHWRender::MRenderer::theRenderer()->holdGPUMemory(m_originalParticlePositionsBufferSize); // Helps Maya track and manage GPU memory usage
+        MRenderer::theRenderer()->holdGPUMemory(m_originalParticlePositionsBufferSize); // Helps Maya track and manage GPU memory usage
         m_originalParticlePositionsBuffer.attach(originalParticlePositionsMem);
 
         m_vertStartIdsBufferSize = sizeof(uint) * vertStartIds.size();
@@ -180,7 +180,7 @@ public:
             MGlobal::displayError(MString("Failed to create vertStartIdsBuffer: ") + MString(clewErrorString(err)));
             return;
         }
-        MHWRender::MRenderer::theRenderer()->holdGPUMemory(m_vertStartIdsBufferSize); // Helps Maya track and manage GPU memory usage
+        MRenderer::theRenderer()->holdGPUMemory(m_vertStartIdsBufferSize); // Helps Maya track and manage GPU memory usage
         m_vertStartIdsBuffer.attach(vertStartIdsMem);
     }
 
@@ -194,8 +194,8 @@ public:
         m_vertStartIdsBuffer.reset();
         m_originalParticlePositionsBuffer.reset();
         // Still need to do this part though, in terminate():
-        MHWRender::MRenderer::theRenderer()->releaseGPUMemory(m_originalParticlePositionsBufferSize);
-        MHWRender::MRenderer::theRenderer()->releaseGPUMemory(m_vertStartIdsBufferSize);
+        MRenderer::theRenderer()->releaseGPUMemory(m_originalParticlePositionsBufferSize);
+        MRenderer::theRenderer()->releaseGPUMemory(m_vertStartIdsBufferSize);
     }
 
 private:

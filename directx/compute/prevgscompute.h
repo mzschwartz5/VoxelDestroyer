@@ -88,7 +88,7 @@ private:
         bufferDesc.StructureByteStride = sizeof(glm::vec4); // Size of each element in the buffer
 
         initData.pSysMem = initialOldPositions; 
-        DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &oldPositionsBuffer);
+        CreateBuffer(&bufferDesc, &initData, &oldPositionsBuffer);
 
         srvDesc.Format = DXGI_FORMAT_UNKNOWN; // Structured buffer, no format
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
@@ -112,7 +112,7 @@ private:
         bufferDesc.StructureByteStride = sizeof(glm::vec4); // Size of each element in the buffer
 
         initData.pSysMem = initialVelocities;
-        DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &velocitiesBuffer);
+        CreateBuffer(&bufferDesc, &initData, &velocitiesBuffer);
 
         uavDesc.Format = DXGI_FORMAT_UNKNOWN; // Structured buffer, no format
         uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
@@ -127,7 +127,7 @@ private:
 		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
         bufferDesc.MiscFlags = 0;
 		initData.pSysMem = simConstants;
-		DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &simConstantsBuffer);
+		CreateBuffer(&bufferDesc, &initData, &simConstantsBuffer);
 
     }
 
