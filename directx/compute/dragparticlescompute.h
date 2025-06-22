@@ -191,7 +191,7 @@ private:
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
         bufferDesc.MiscFlags = 0;
     
-        DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &constantBuffer);
+        CreateBuffer(&bufferDesc, nullptr, &constantBuffer);
 
         // Create isDragging buffer and its SRV/UAV
         bufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -201,7 +201,7 @@ private:
         bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
         bufferDesc.StructureByteStride = sizeof(UINT);
 
-        DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &isDraggingBuffer);
+        CreateBuffer(&bufferDesc, nullptr, &isDraggingBuffer);
 
         // Create the UAV for the isDragging buffer
         uavDesc.Format = DXGI_FORMAT_UNKNOWN;

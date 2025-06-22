@@ -96,7 +96,7 @@ private:
         bufferDesc.StructureByteStride = sizeof(float);
 
         initData.pSysMem = weights;
-        DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &weightsBuffer);
+        CreateBuffer(&bufferDesc, &initData, &weightsBuffer);
 
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
@@ -114,7 +114,7 @@ private:
         bufferDesc.StructureByteStride = sizeof(glm::vec4); // Size of each element in the buffer
     
         initData.pSysMem = particlePositions.data();
-        DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &particlesBuffer);
+        CreateBuffer(&bufferDesc, &initData, &particlesBuffer);
     
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
@@ -137,10 +137,7 @@ private:
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // Allow CPU writes
         bufferDesc.MiscFlags = 0;
         initData.pSysMem = voxelSimInfo.data();
-        HRESULT hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &voxelSimInfoBuffer);
-        if (FAILED(hr)) {
-            MGlobal::displayError("Failed to create constant buffer.");
-        }
+        CreateBuffer(&bufferDesc, &initData, &voxelSimInfoBuffer);
     }
 
     void tearDown() override

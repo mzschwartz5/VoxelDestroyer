@@ -73,7 +73,7 @@ private:
 
         initData.pSysMem = &cbData;
 
-        HRESULT hr = DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, &constantBuffer);
+        CreateBuffer(&bufferDesc, &initData, &constantBuffer);
     }
 
 };

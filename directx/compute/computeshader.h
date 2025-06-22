@@ -15,29 +15,46 @@ public:
         load();
     }
     ~ComputeShader() { tearDown(); };
-
-    virtual void tearDown() {
-        if (shaderPtr) {
-            shaderPtr->Release();
-            shaderPtr = NULL;
-        }
-    };
-
+    
     int getId() const { return id; };
-
+    
     ID3D11ComputeShader*& getShaderPtr()  { return shaderPtr; };
-
+    
     virtual void dispatch(int threadGroupCount) {
         bind();
         DirectX::getContext()->Dispatch(threadGroupCount, 1, 1); 
         unbind();
     };
     
-protected:
-    virtual void bind() {};
-    virtual void unbind() {};
+protected:    
+    MInt64 heldMemory = 0; // Memory held by this shader, used for Maya's GPU memory tracking
     int id;
     ID3D11ComputeShader* shaderPtr = NULL;
+
+    virtual void tearDown() {
+        if (shaderPtr) {
+            shaderPtr->Release();
+            shaderPtr = NULL;
+        }
+        MRenderer::theRenderer()->releaseGPUMemory(heldMemory);
+        heldMemory = 0;
+    };
+    virtual void bind() = 0;
+    virtual void unbind() = 0;
+
+    /**
+     * Wrapper around D3D11 CreateBuffer which uses Maya's hardware renderer to log GPU memory usage.
+     */
+    HRESULT CreateBuffer(
+        const D3D11_BUFFER_DESC* pDesc,
+        const D3D11_SUBRESOURCE_DATA* pInitialData,
+        ID3D11Buffer** ppBuffer
+    ) {
+        HRESULT hr = DirectX::getDevice()->CreateBuffer(pDesc, pInitialData, ppBuffer);
+        MRenderer::theRenderer()->holdGPUMemory(pDesc->ByteWidth);
+        heldMemory += pDesc->ByteWidth;
+        return hr;
+    }
 
     void load() {
         void* data = nullptr;
