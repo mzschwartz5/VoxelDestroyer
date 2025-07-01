@@ -66,8 +66,8 @@ Voxels Voxelizer::voxelizeSelectedMesh(
 
 std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxelSize, MStatus& status) {
     MIntArray triangleCounts;
-    MIntArray triangleVertices;
-    status = meshFn.getTriangles(triangleCounts, triangleVertices);
+    MIntArray triangleIndices;
+    status = meshFn.getTriangles(triangleCounts, triangleIndices);
     if (status != MS::kSuccess) {
         MGlobal::displayError("Failed to retrieve triangles.");
         return {};
@@ -75,20 +75,20 @@ std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxel
 
     // This will later be done on the gpu, one thread per triangle
     std::vector<Triangle> triangles;
-    for (unsigned int i = 0; i < triangleVertices.length() / 3; ++i) {
+    for (unsigned int i = 0; i < triangleIndices.length() / 3; ++i) {
         MPointArray vertices;
 
         MPoint point;
-        meshFn.getPoint(triangleVertices[3 * i], point, MSpace::kWorld);
+        meshFn.getPoint(triangleIndices[3 * i], point, MSpace::kWorld);
         vertices.append(point);
 
-        meshFn.getPoint(triangleVertices[3 * i + 1], point, MSpace::kWorld);
+        meshFn.getPoint(triangleIndices[3 * i + 1], point, MSpace::kWorld);
         vertices.append(point);
 
-        meshFn.getPoint(triangleVertices[3 * i + 2], point, MSpace::kWorld);
+        meshFn.getPoint(triangleIndices[3 * i + 2], point, MSpace::kWorld);
         vertices.append(point);
 
-        Triangle triangle = processMayaTriangle(vertices, voxelSize);
+        Triangle triangle = processMayaTriangle(vertices, triangleIndices, voxelSize);
         triangles.push_back(triangle);
     }
 
@@ -96,9 +96,10 @@ std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxel
     return triangles;
 }
 
-Triangle Voxelizer::processMayaTriangle(const MPointArray& vertices, float voxelSize) {
+Triangle Voxelizer::processMayaTriangle(const MPointArray& vertices, const MIntArray& triangleIndices, float voxelSize) {
     Triangle triangle;
     triangle.vertices = vertices;
+    triangle.indices = triangleIndices;
     triangle.normal = ((vertices[1] - vertices[0]) ^ (vertices[2] - vertices[0])).normal();
 
     triangle.boundingBox.expand(vertices[0]);

@@ -17,6 +17,7 @@
 // This isn't a triangle, per se, as much as it is the required values precomputed for later use in triangle/voxel intersection
 struct Triangle {
     MPointArray vertices;
+    MIntArray indices;
     MBoundingBox boundingBox; 
     MVector normal;
     // Derived values used in determining triangle plane / voxel overlap
@@ -37,18 +38,17 @@ struct VoxelPositions {
 };
 
 struct Voxels {
-    std::vector<bool> occupied;           // contains some part (surface or interior) of the underlying mesh
-    std::vector<uint> isSurface;          // Use uints instead of bools because vector<bool> packs bools into bits, which will not work for GPU access.
-    std::vector<MObject> mayaObjects;     // the actual cube meshes
-    std::vector<VoxelPositions> corners;  // ordered according to the VGS expectations
-
-    std::vector<uint> vertStartIdx;       // Each voxel owns a number of vertices contained within (including the corners)
-    int totalVerts = 0;                   // total number of vertices in the voxelized mesh
-
+    std::vector<bool> occupied;                   // Contains some part (surface or interior) of the underlying mesh
+    std::vector<uint> isSurface;                  // Use uints instead of bools because vector<bool> packs bools into bits, which will not work for GPU access.
+    std::vector<MObject> mayaObjects;             // The actual cube meshes
+    std::vector<VoxelPositions> corners;          // Ordered according to the VGS expectations
+    std::vector<uint> vertStartIdx;               // Each voxel owns a number of vertices contained within (including the corners)
     std::vector<uint32_t> mortonCodes;
     // Answers the question: for a given voxel morton code, what is the index of the corresponding voxel in the sorted array of voxels?
     std::unordered_map<uint32_t, uint32_t> mortonCodesToSortedIdx;
-
+    std::vector<std::vector<int>> triangleIndices; // Indices of triangles that overlap with the voxel
+    
+    int totalVerts = 0;                   // total number of vertices in the voxelized mesh
     int numOccupied = 0;
     
     int size() const { return static_cast<int>(occupied.size()); }
@@ -58,7 +58,8 @@ struct Voxels {
         mayaObjects.resize(size, MObject::kNullObj);
         corners.resize(size, VoxelPositions());
 		vertStartIdx.resize(size, -1);
-        mortonCodes.resize(size, UINT_MAX);                 
+        mortonCodes.resize(size, UINT_MAX);
+        triangleIndices.resize(size);
     }
 };
 
@@ -85,8 +86,9 @@ private:
     std::vector<Triangle> getTrianglesOfMesh(MFnMesh& mesh, float voxelSize, MStatus& status);
 
     Triangle processMayaTriangle(
-        const MPointArray& vertices, // vertex positions of the triangle
-        float voxelSize              // edge length of a single voxel
+        const MPointArray& vertices,      // vertex positions of the triangle
+        const MIntArray& triangleIndices, // indices of the triangle vertices
+        float voxelSize                   // edge length of a single voxel
     );
     
     // Does a conservative surface voxelization
