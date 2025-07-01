@@ -206,6 +206,7 @@
   <ItemGroup>
     <ClCompile Include="plugin.cpp" />
     <ClCompile Include="pbd.cpp" />
+    <ClCompile Include="utils.cpp" />
     <ClCompile Include="directx\directx.cpp" />
     <ClCompile Include="voxelizer.cpp" />
   </ItemGroup>
