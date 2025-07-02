@@ -1,5 +1,6 @@
 #pragma once
 #include <maya/MObject.h>
+#include <maya/MPoint.h>
 
 #include <CGAL/Polygon_mesh_processing/clip.h>
 #include <CGAL/Polygon_mesh_processing/repair.h>
@@ -14,27 +15,39 @@
 struct Triangle;
 
 namespace CGALHelper {
-    using Kernel = CGAL::Simple_cartesian<double>;
-    using Point_3 = Kernel::Point_3;
-    using SurfaceMesh = CGAL::Surface_mesh<Point_3>;
+    using Kernel       = CGAL::Simple_cartesian<double>;
+    using Point_3      = Kernel::Point_3;
+    using SurfaceMesh  = CGAL::Surface_mesh<Point_3>;
     using Primitive    = CGAL::AABB_face_graph_triangle_primitive<SurfaceMesh>;
     using AABB_traits  = CGAL::AABB_traits_3<Kernel, Primitive>;
     using Tree         = CGAL::AABB_tree<AABB_traits>;
-    using Point_inside = CGAL::Side_of_triangle_mesh<SurfaceMesh, Kernel>;
+    using SideTester   = CGAL::Side_of_triangle_mesh<SurfaceMesh, Kernel>;
+
+    /**
+     * Creates a cube mesh centered at the given point with the specified edge length.
+     */
+    SurfaceMesh cube(
+        const MPoint& minCorner,
+        float edgeLength
+    );
 
     /**
      * Converts a Maya mesh (or subset of it) to a CGAL SurfaceMesh.
+     * 
+     * triangleIndices index into the triangles vector. The latter should be all triangles of the mesh,
+     * and the former can be a subset of those triangles.
      */
     SurfaceMesh toSurfaceMesh(
         const MObject& mayaMesh,
+        const MIntArray triangleIndices,
         const std::vector<Triangle>& triangles
     );
 
     /**
      * Converts a CGAL SurfaceMesh back to a Maya mesh.
+     * Returns a transform node-type MObject (with the mesh shape node as a child).
      */
     MObject toMayaMesh(const SurfaceMesh& cgalMesh);
-
 
     /**
      * Performs a boolean intersection between two meshes where the first mesh
@@ -42,8 +55,8 @@ namespace CGALHelper {
      * is undefined for an open mesh - there is no concept of "inside" or "outside".
      * 
      * Instead, here, we use a reference mesh (which *is* closed) to determine "inside" and "outside".
-     * We start by splitting the closedMesh by the openMesh, and then we use the insideOutsideReference
-     * to discard triangles that are not inside the closedMesh. Note: insideOutsideReference is an acceleration tree on the reference mesh.
+     * We start by splitting the closedMesh by the openMesh, and then we use the sideTester based on the reference mesh
+     * to discard triangles that are not inside the closedMesh.
      * 
      * This is useful for voxelization, where each voxel is small compared to the overall mesh, and
      * each voxel is independent of each other. This way, each voxel can calculate a boolean with just a piece of
@@ -54,7 +67,7 @@ namespace CGALHelper {
     void openMeshBooleanIntersection(
         SurfaceMesh& openMesh,
         SurfaceMesh& closedMesh,
-        const Point_inside& insideOutsideReference
+        const SideTester& sideTester
     );
 
 } // namespace CGALHelper

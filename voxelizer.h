@@ -12,6 +12,20 @@
 #include "utils.h"
 #include "glm/glm.hpp"
 
+#include <CGAL/Simple_cartesian.h>
+#include <CGAL/Surface_mesh.h>
+#include <CGAL/AABB_face_graph_triangle_primitive.h>
+#include <CGAL/AABB_traits_3.h>
+#include <CGAL/AABB_tree.h>
+#include <CGAL/Side_of_triangle_mesh.h>
+using Kernel       = CGAL::Simple_cartesian<double>;
+using Point_3      = Kernel::Point_3;
+using SurfaceMesh  = CGAL::Surface_mesh<Point_3>;
+using Primitive    = CGAL::AABB_face_graph_triangle_primitive<SurfaceMesh>;
+using AABB_traits  = CGAL::AABB_traits_3<Kernel, Primitive>;
+using Tree = CGAL::AABB_tree<AABB_traits>;
+using SideTester   = CGAL::Side_of_triangle_mesh<SurfaceMesh, Kernel>;
+
 // See https://michael-schwarz.com/research/publ/files/vox-siga10.pdf
 // "Surface voxelization" for a mathematical explanation of the below fields / how they're used.
 // This struct is more than just the geometry - it's precomputed values for later use in triangle/voxel intersection
@@ -37,15 +51,15 @@ struct VoxelPositions {
 };
 
 struct Voxels {
-    std::vector<bool> occupied;                   // Contains some part (surface or interior) of the underlying mesh
-    std::vector<uint> isSurface;                  // Use uints instead of bools because vector<bool> packs bools into bits, which will not work for GPU access.
-    std::vector<MObject> mayaObjects;             // The actual cube meshes
-    std::vector<VoxelPositions> corners;          // Ordered according to the VGS expectations
-    std::vector<uint> vertStartIdx;               // Each voxel owns a number of vertices contained within (including the corners)
+    std::vector<bool> occupied;             // Contains some part (surface or interior) of the underlying mesh
+    std::vector<uint> isSurface;            // Use uints instead of bools because vector<bool> packs bools into bits, which will not work for GPU access.
+    std::vector<SurfaceMesh> cgalMeshes;    // The actual cube meshes
+    std::vector<VoxelPositions> corners;    // Ordered according to the VGS expectations
+    std::vector<uint> vertStartIdx;         // Each voxel owns a number of vertices contained within (including the corners)
     std::vector<uint32_t> mortonCodes;
     // Answers the question: for a given voxel morton code, what is the index of the corresponding voxel in the sorted array of voxels?
     std::unordered_map<uint32_t, uint32_t> mortonCodesToSortedIdx;
-    std::vector<std::vector<int>> triangleIndices; // Indices of triangles that overlap with the voxel
+    std::vector<MIntArray> triangleIndices; // Indices of triangles that overlap with the voxel
     
     int totalVerts = 0;                   // total number of vertices in the voxelized mesh
     int numOccupied = 0;
@@ -54,7 +68,7 @@ struct Voxels {
     void resize(int size) {
         occupied.resize(size, false);
         isSurface.resize(size, false);
-        mayaObjects.resize(size, MObject::kNullObj);
+        cgalMeshes.resize(size);
         corners.resize(size, VoxelPositions());
 		vertStartIdx.resize(size, -1);
         mortonCodes.resize(size, UINT_MAX);
@@ -131,6 +145,7 @@ private:
         float voxelSize,       
         MPoint gridCenter,      
         MFnMesh& originalSurface,
+        const std::vector<Triangle>& triangles,
         bool doBoolean
     );
 
@@ -145,10 +160,12 @@ private:
         const Voxels& voxels
     );
 
-    void intersectVoxelWithOriginalMesh(
+    MObject intersectVoxelWithOriginalMesh(
         Voxels& voxels,
-        MObject& cube,
-        MObject& originalMesh,
+        const MObject& originalMesh,
+        SurfaceMesh& cube,
+        const std::vector<Triangle>& triangles,
+        const SideTester& sideTester,
         int index,
         bool doBoolean
     );
