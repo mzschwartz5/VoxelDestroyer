@@ -187,6 +187,7 @@
     <ClInclude Include="directx\directx.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="voxelizer.h" />
+    <ClInclude Include="cgalhelper.h" />
     <ClInclude Include="custommayaconstructs\voxeldragcontext.h" />
     <ClInclude Include="custommayaconstructs\voxeldragcontextcommand.h" />
     <ClInclude Include="custommayaconstructs\voxelrendereroverride.h" />
@@ -209,6 +210,7 @@
     <ClCompile Include="utils.cpp" />
     <ClCompile Include="directx\directx.cpp" />
     <ClCompile Include="voxelizer.cpp" />
+    <ClCompile Include="cgalhelper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resources.rc" />

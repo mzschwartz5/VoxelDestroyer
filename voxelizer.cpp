@@ -37,7 +37,8 @@ Voxels Voxelizer::voxelizeSelectedMesh(
             gridEdgeLength,
             voxelSize,
             gridCenter,
-            voxels
+            voxels,
+            selectedMesh
         );
     }
 
@@ -68,27 +69,17 @@ std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxel
     MIntArray triangleCounts;
     MIntArray triangleIndices;
     status = meshFn.getTriangles(triangleCounts, triangleIndices);
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("Failed to retrieve triangles.");
-        return {};
-    }
 
     // This will later be done on the gpu, one thread per triangle
     std::vector<Triangle> triangles;
+    std::array<int, 3> triIndices;
     for (unsigned int i = 0; i < triangleIndices.length() / 3; ++i) {
-        MPointArray vertices;
 
-        MPoint point;
-        meshFn.getPoint(triangleIndices[3 * i], point, MSpace::kWorld);
-        vertices.append(point);
+        triIndices[0] = triangleIndices[3 * i];
+        triIndices[1] = triangleIndices[3 * i + 1];
+        triIndices[2] = triangleIndices[3 * i + 2];
 
-        meshFn.getPoint(triangleIndices[3 * i + 1], point, MSpace::kWorld);
-        vertices.append(point);
-
-        meshFn.getPoint(triangleIndices[3 * i + 2], point, MSpace::kWorld);
-        vertices.append(point);
-
-        Triangle triangle = processMayaTriangle(vertices, triangleIndices, voxelSize);
+        Triangle triangle = processMayaTriangle(meshFn, triIndices, voxelSize);
         triangles.push_back(triangle);
     }
 
@@ -96,10 +87,14 @@ std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxel
     return triangles;
 }
 
-Triangle Voxelizer::processMayaTriangle(const MPointArray& vertices, const MIntArray& triangleIndices, float voxelSize) {
+Triangle Voxelizer::processMayaTriangle(const MFnMesh& meshFn, const std::array<int, 3>& triIndices, float voxelSize) {
+    std::array<MPoint, 3> vertices;
+    meshFn.getPoint(triIndices[0], vertices[0], MSpace::kWorld);
+    meshFn.getPoint(triIndices[1], vertices[1], MSpace::kWorld);
+    meshFn.getPoint(triIndices[2], vertices[2], MSpace::kWorld);
+
     Triangle triangle;
-    triangle.vertices = vertices;
-    triangle.indices = triangleIndices;
+    triangle.indices = triIndices;
     triangle.normal = ((vertices[1] - vertices[0]) ^ (vertices[2] - vertices[0])).normal();
 
     triangle.boundingBox.expand(vertices[0]);
@@ -184,6 +179,9 @@ void Voxelizer::getSurfaceVoxels(
                     
                     voxels.occupied[index] = true;
                     voxels.isSurface[index] = true;
+                    voxels.triangleIndices[index].push_back(tri.indices[0]);
+                    voxels.triangleIndices[index].push_back(tri.indices[1]);
+                    voxels.triangleIndices[index].push_back(tri.indices[2]);
                 }
             }
         }
@@ -213,7 +211,8 @@ void Voxelizer::getInteriorVoxels(
     float gridEdgeLength,
     float voxelSize,
     MPoint gridCenter,
-    Voxels& voxels
+    Voxels& voxels,
+    const MFnMesh& selectedMesh
 ) {
     
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
@@ -243,7 +242,7 @@ void Voxelizer::getInteriorVoxels(
                 );
                 
                 if (!doesTriangleOverlapVoxelCenter(tri, voxelCenter)) continue;
-                double xIntercept = getTriangleVoxelCenterIntercept(tri, voxelCenter);
+                double xIntercept = getTriangleVoxelCenterIntercept(tri, voxelCenter, selectedMesh);
                 int xVoxelMin = std::max(0, static_cast<int>(std::ceil((xIntercept - (voxelSize / 2.0) - gridMin.x) / voxelSize)));
 
                 // Now iterate over all voxels in the column (in +x) and flip their occupancy state
@@ -280,10 +279,12 @@ bool Voxelizer::doesTriangleOverlapVoxelCenter(
 // (Can alternatively think of this as a projection)
 double Voxelizer::getTriangleVoxelCenterIntercept(
     const Triangle& triangle,
-    const MVector& voxelCenterYZ // YZ coords of the voxel column center
+    const MVector& voxelCenterYZ, // YZ coords of the voxel column center
+    const MFnMesh& selectedMesh
 ) {
     // Calculate D using one of the triangle's vertices
-    const MPoint& vertex = triangle.vertices[0];
+    MPoint vertex; 
+    selectedMesh.getPoint(triangle.indices[0], vertex, MSpace::kWorld);
     double D = -(triangle.normal.x * vertex.x + triangle.normal.y * vertex.y + triangle.normal.z * vertex.z);
 
     // Check for vertical plane (Nx == 0)

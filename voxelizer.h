@@ -14,10 +14,9 @@
 
 // See https://michael-schwarz.com/research/publ/files/vox-siga10.pdf
 // "Surface voxelization" for a mathematical explanation of the below fields / how they're used.
-// This isn't a triangle, per se, as much as it is the required values precomputed for later use in triangle/voxel intersection
+// This struct is more than just the geometry - it's precomputed values for later use in triangle/voxel intersection
 struct Triangle {
-    MPointArray vertices;
-    MIntArray indices;
+    std::array<int, 3> indices;
     MBoundingBox boundingBox; 
     MVector normal;
     // Derived values used in determining triangle plane / voxel overlap
@@ -86,9 +85,9 @@ private:
     std::vector<Triangle> getTrianglesOfMesh(MFnMesh& mesh, float voxelSize, MStatus& status);
 
     Triangle processMayaTriangle(
-        const MPointArray& vertices,      // vertex positions of the triangle
-        const MIntArray& triangleIndices, // indices of the triangle vertices
-        float voxelSize                   // edge length of a single voxel
+        const MFnMesh& meshFn,                   // the overall mesh
+        const std::array<int, 3>& triIndices,    // indices of the triangle vertices in the mesh
+        float voxelSize                          // edge length of a single voxel
     );
     
     // Does a conservative surface voxelization
@@ -105,7 +104,8 @@ private:
         float gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
         float voxelSize,                        // edge length of a single voxel
         MPoint gridCenter,                      // center of the grid in world space
-        Voxels& voxels               // output array of voxels (true = occupied, false = empty)
+        Voxels& voxels,                         // output array of voxels (true = occupied, false = empty)
+        const MFnMesh& selectedMesh             // the original mesh to use for boolean operations
     );
 
     bool doesTriangleOverlapVoxel(
@@ -114,14 +114,15 @@ private:
     );
 
     bool doesTriangleOverlapVoxelCenter(
-        const Triangle& triangle,    // triangle to check against
-        const MVector& voxelCenterYZ // YZ coords of the voxel column center
+        const Triangle& triangle,     // triangle to check against
+        const MVector& voxelCenterYZ  // YZ coords of the voxel column center
     );
 
     // Returns the X coordinate where the voxel column center intersects the triangle plane
     double getTriangleVoxelCenterIntercept(
-        const Triangle& triangle,    // triangle to check against
-        const MVector& voxelCenterYZ // YZ coords of the voxel column center
+        const Triangle& triangle,     // triangle to check against
+        const MVector& voxelCenterYZ, // YZ coords of the voxel column center
+        const MFnMesh& selectedMesh   // the original mesh to use for boolean operations
     );
 
     MDagPath createVoxels(
