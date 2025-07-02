@@ -7,6 +7,7 @@
 #include <maya/MItMeshPolygon.h>
 #include <maya/MFloatPointArray.h>
 #include <numeric>
+#include "cgalhelper.h"
 
 Voxels Voxelizer::voxelizeSelectedMesh(
     float gridEdgeLength,
@@ -58,6 +59,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
         voxelSize,
         gridCenter,
         selectedMesh,
+        meshTris,
         doBoolean
     );
 
@@ -179,9 +181,9 @@ void Voxelizer::getSurfaceVoxels(
                     
                     voxels.occupied[index] = true;
                     voxels.isSurface[index] = true;
-                    voxels.triangleIndices[index].push_back(tri.indices[0]);
-                    voxels.triangleIndices[index].push_back(tri.indices[1]);
-                    voxels.triangleIndices[index].push_back(tri.indices[2]);
+                    voxels.triangleIndices[index].append(tri.indices[0]);
+                    voxels.triangleIndices[index].append(tri.indices[1]);
+                    voxels.triangleIndices[index].append(tri.indices[2]);
                 }
             }
         }
@@ -303,6 +305,7 @@ MDagPath Voxelizer::createVoxels(
     float voxelSize,       
     MPoint gridCenter,      
     MFnMesh& originalMesh,
+    const std::vector<Triangle>& meshTris,
     bool doBoolean
 ) {
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
@@ -330,6 +333,14 @@ MDagPath Voxelizer::createVoxels(
 
     overlappedVoxels = sortVoxelsByMortonCode(overlappedVoxels);
 
+    // Prepare for boolean operations
+    // We only want to create the acceleration structure once (which is why we do it here, before all the boolean ops begin)
+    MIntArray triangleCounts, triangleIndices;
+    originalMesh.getTriangles(triangleCounts, triangleIndices);
+    SurfaceMesh originalMeshCGAL = CGALHelper::toSurfaceMesh(originalMesh.object(), triangleIndices, meshTris);
+    Tree aabbTree(originalMeshCGAL.faces().first, originalMeshCGAL.faces().second, originalMeshCGAL);
+    SideTester sideTester(aabbTree);
+
     MDagPath transformPath = originalMesh.dagPath();
     transformPath.pop(); // Move up to the transform node
     MFnTransform transform(transformPath);
@@ -338,10 +349,9 @@ MDagPath Voxelizer::createVoxels(
     MString combinedMeshName = originalMeshName + "_voxelized";
     MString meshNamesConcatenated;
     for (int i = 0; i < overlappedVoxels.numOccupied; ++i) {
-        MObject cube = overlappedVoxels.mayaObjects[i];
-        meshNamesConcatenated += " " + MFnMesh(cube).name();
-        
-        intersectVoxelWithOriginalMesh(overlappedVoxels, cube, originalMesh.object(), i, doBoolean);
+        SurfaceMesh cube = overlappedVoxels.cgalMeshes[i];
+        MObject voxelIntersection = intersectVoxelWithOriginalMesh(overlappedVoxels, originalMesh.object(), cube, meshTris, sideTester, i, doBoolean);
+        meshNamesConcatenated += " " + MFnDependencyNode(voxelIntersection).name();
     }
 
     // TODO: if no boolean, should get rid of non-manifold geometry
@@ -463,67 +473,25 @@ void Voxelizer::addVoxelToMesh(
     Voxels& voxels,
     int index
 ) {
-    MPointArray cubeVertices;
-    MPoint voxelMax = MPoint(
-        voxelMin.x + voxelSize,
-        voxelMin.y + voxelSize,
-        voxelMin.z + voxelSize
+    CGALHelper::SurfaceMesh cubeMesh = CGALHelper::cube(
+        voxelMin,
+        voxelSize
     );
 
-    MPoint voxelCenter = MPoint(
-        voxelMin.x + 0.5 * voxelSize,
-        voxelMin.y + 0.5 * voxelSize,
-        voxelMin.z + 0.5 * voxelSize
-    );
-    
-    float halfVoxelSize = voxelSize * 0.5f;
-
-    cubeVertices.append(voxelMin);
-    cubeVertices.append(MPoint(voxelMax.x, voxelMin.y, voxelMin.z));
-    cubeVertices.append(MPoint(voxelMin.x, voxelMax.y, voxelMin.z));
-    cubeVertices.append(MPoint(voxelMax.x, voxelMax.y, voxelMin.z));
-    cubeVertices.append(MPoint(voxelMin.x, voxelMin.y, voxelMax.z));
-    cubeVertices.append(MPoint(voxelMax.x, voxelMin.y, voxelMax.z));
-    cubeVertices.append(MPoint(voxelMin.x, voxelMax.y, voxelMax.z));
-    cubeVertices.append(voxelMax);
-
-    VoxelPositions newPositions;
-    newPositions.corners = std::array<glm::vec3, 8>();
-    for (int i = 0; i < 8; ++i) {
-		newPositions.corners[i] = glm::vec3(
-			cubeVertices[i].x,
-			cubeVertices[i].y,
-			cubeVertices[i].z
-		);
+    VoxelPositions positions;
+    positions.corners = std::array<glm::vec3, 8>();
+    int i = 0;
+    for (const auto& vertex : cubeMesh.vertices()) {
+        const auto& point = cubeMesh.point(vertex);
+        positions.corners[i++] = glm::vec3(
+            static_cast<float>(point.x()),
+            static_cast<float>(point.y()),
+            static_cast<float>(point.z())
+        );
     }
 
-    voxels.corners[index] = newPositions;
-
-    MIntArray faceCounts;
-    MIntArray faceConnects;
-    for (int i = 0; i < 6; ++i) {
-        faceCounts.append(4);
-        for (int j = 0; j < 4; ++j) {
-            faceConnects.append(faceIndices[i][j]);
-        }
-    }
-
-    MFnTransform cubeTransformFn;
-    MObject cubeTransform = cubeTransformFn.create();
-    cubeTransformFn.setRotatePivot(voxelCenter, MSpace::kTransform, false);
-
-    // Create the cube mesh under the transform
-    MFnMesh cubeMeshFn;
-    MObject cube = cubeMeshFn.create(
-        cubeVertices.length(),
-        faceCounts.length(),
-        cubeVertices,
-        faceCounts,
-        faceConnects,
-        cubeTransform
-    );
-
-    voxels.mayaObjects[index] = cube;
+    voxels.corners[index] = positions;
+    voxels.cgalMeshes[index] = cubeMesh;
 }
 
 Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
@@ -541,7 +509,7 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
 
     for (size_t i = 0; i < voxels.numOccupied; ++i) {
         sortedVoxels.isSurface[i] = voxels.isSurface[voxelIndices[i]];
-        sortedVoxels.mayaObjects[i] = voxels.mayaObjects[voxelIndices[i]];
+        sortedVoxels.cgalMeshes[i] = voxels.cgalMeshes[voxelIndices[i]];
         sortedVoxels.corners[i] = voxels.corners[voxelIndices[i]];
         sortedVoxels.mortonCodes[i] = voxels.mortonCodes[voxelIndices[i]];
         sortedVoxels.mortonCodesToSortedIdx[voxels.mortonCodes[voxelIndices[i]]] = static_cast<uint32_t>(i);
@@ -552,28 +520,42 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
     return sortedVoxels;
 }
 
-void Voxelizer::intersectVoxelWithOriginalMesh(
+MObject Voxelizer::intersectVoxelWithOriginalMesh(
     Voxels& voxels,
-    MObject& cube,
-    MObject& originalMesh,
+    const MObject& originalMesh,
+    SurfaceMesh& cube,
+    const std::vector<Triangle>& meshTris,
+    const SideTester& sideTester,
     int index,
     bool doBoolean
 ) {
     voxels.vertStartIdx[index] = voxels.totalVerts;
 
-    if (!voxels.isSurface[index]) {
+    if (!voxels.isSurface[index] || !doBoolean) {
         voxels.totalVerts += 8;
-        return;
+        return CGALHelper::toMayaMesh(cube);
     }
 
-    MFnMesh cubeMeshFn(cube);
+    // Each voxel contains the triangles of the original mesh that overlap it
+    // This is what we want to use for the boolean intersection. Convert this subset of the original mesh to a CGAL SurfaceMesh.
+    SurfaceMesh originalMeshPiece = CGALHelper::toSurfaceMesh(originalMesh, voxels.triangleIndices[index], meshTris);
+    CGALHelper::openMeshBooleanIntersection(originalMeshPiece, cube, sideTester);  // modifies cube in place
 
-    if (doBoolean) {
-        MObjectArray objsToIntersect;
-        objsToIntersect.append(cube);
-        objsToIntersect.append(originalMesh);
-        cubeMeshFn.booleanOps(MFnMesh::kIntersection, objsToIntersect);
-    }
+    MObject intersectedCube = CGALHelper::toMayaMesh(cube);
+    MObject originalMeshPieceObj = CGALHelper::toMayaMesh(originalMeshPiece);
 
-    voxels.totalVerts += cubeMeshFn.numVertices();
+    // Combine the two (now booleaned) meshes into one, watertight result.
+    MString meshesToUnite = MFnDependencyNode(intersectedCube).name() + " " + MFnDependencyNode(originalMeshPieceObj).name();
+    MString uniteCommandResult;
+    MGlobal::executeCommand(MString("polyUnite -ch 0 -mergeUVSets 1 ") + meshesToUnite, uniteCommandResult, false, false);
+    
+    MSelectionList selectionList;
+    selectionList.add(uniteCommandResult);
+    MObject combinedMesh;
+    selectionList.getDependNode(0, combinedMesh);
+
+    MFnMesh combinedMeshFn(combinedMesh);
+    voxels.totalVerts += combinedMeshFn.numVertices();
+
+    return combinedMesh;
 }
