@@ -56,8 +56,8 @@ SurfaceMesh cube(
 }
 
 SurfaceMesh toSurfaceMesh(
-    const MObject& mayaMesh,
-    const MIntArray triangleIndices,
+    const MFnMesh& meshFn,
+    const std::vector<int> triangleIndices,
     const std::vector<Triangle>& triangles
 ){
     SurfaceMesh cgalMesh;
@@ -65,7 +65,6 @@ SurfaceMesh toSurfaceMesh(
     std::array<SurfaceMesh::Vertex_index, 3> cgalTriIndices;
     
     MStatus status;
-    MFnMesh meshFn(mayaMesh, &status);
     MPointArray vertices;
     status = meshFn.getPoints(vertices, MSpace::kWorld);
 
@@ -98,7 +97,7 @@ SurfaceMesh toSurfaceMesh(
 
 MObject toMayaMesh(const SurfaceMesh& cgalMesh) {
     MStatus status;
-
+    // TODO: similar tactic as in toSurfaceMesh(): iterate just once over faces. 
     // 1. Extract vertices from CGAL mesh
     MPointArray mayaPoints;
     for (auto v : cgalMesh.vertices()) {

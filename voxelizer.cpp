@@ -182,7 +182,7 @@ void Voxelizer::getSurfaceVoxels(
                     
                     voxels.occupied[index] = true;
                     voxels.isSurface[index] = true;
-                    voxels.triangleIndices[index].append(triIdx);
+                    voxels.triangleIndices[index].push_back(triIdx);
                 }
             }
         }
@@ -336,9 +336,9 @@ MDagPath Voxelizer::createVoxels(
 
     // Prepare for boolean operations
     // We only want to create the acceleration structure once (which is why we do it here, before all the boolean ops begin)
-    MIntArray triangleCounts, triangleIndices;
-    originalMesh.getTriangles(triangleCounts, triangleIndices);
-    SurfaceMesh originalMeshCGAL = CGALHelper::toSurfaceMesh(originalMesh.object(), triangleIndices, meshTris);
+    std::vector<int> allTriangleIndices(meshTris.size());
+    std::iota(allTriangleIndices.begin(), allTriangleIndices.end(), 0); // Fill with indices from 0 to size-1
+    SurfaceMesh originalMeshCGAL = CGALHelper::toSurfaceMesh(originalMesh, allTriangleIndices, meshTris);
     Tree aabbTree(originalMeshCGAL.faces().first, originalMeshCGAL.faces().second, originalMeshCGAL);
     SideTester sideTester(aabbTree);
 
@@ -351,8 +351,7 @@ MDagPath Voxelizer::createVoxels(
     MString meshNamesConcatenated;
     for (int i = 0; i < overlappedVoxels.numOccupied; ++i) {
         SurfaceMesh cube = overlappedVoxels.cgalMeshes[i];
-        MObject voxelIntersection = intersectVoxelWithOriginalMesh(overlappedVoxels, originalMesh.object(), cube, meshTris, sideTester, i, doBoolean);
-        meshNamesConcatenated += " " + MFnDependencyNode(voxelIntersection).name();
+        meshNamesConcatenated += " " + intersectVoxelWithOriginalMesh(overlappedVoxels, originalMesh, cube, meshTris, sideTester, i, doBoolean);
     }
 
     // TODO: if no boolean, should get rid of non-manifold geometry
@@ -513,9 +512,9 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
     return sortedVoxels;
 }
 
-MObject Voxelizer::intersectVoxelWithOriginalMesh(
+MString Voxelizer::intersectVoxelWithOriginalMesh(
     Voxels& voxels,
-    const MObject& originalMesh,
+    const MFnMesh& originalMesh,
     SurfaceMesh& cube,
     const std::vector<Triangle>& meshTris,
     const SideTester& sideTester,
@@ -526,7 +525,8 @@ MObject Voxelizer::intersectVoxelWithOriginalMesh(
 
     if (!voxels.isSurface[index] || !doBoolean) {
         voxels.totalVerts += 8;
-        return CGALHelper::toMayaMesh(cube);
+        MObject mayaCube = CGALHelper::toMayaMesh(cube);
+        return MFnDependencyNode(mayaCube).name();
     }
 
     // Each voxel contains the triangles of the original mesh that overlap it
@@ -542,13 +542,16 @@ MObject Voxelizer::intersectVoxelWithOriginalMesh(
     MStringArray uniteCommandResult;
     MGlobal::executeCommand(MString("polyUnite -ch 0 -mergeUVSets 1 ") + meshesToUnite, uniteCommandResult, false, false);
     
+    // TODO: polyMergeVertex? Maybe only if polygon clipping is on.
+
     MSelectionList selectionList;
     selectionList.add(uniteCommandResult[0]);
-    MObject combinedMesh;
-    selectionList.getDependNode(0, combinedMesh);
+    MDagPath combinedMeshPath;
+    selectionList.getDagPath(0, combinedMeshPath);
+    combinedMeshPath.extendToShape();
 
-    MFnMesh combinedMeshFn(combinedMesh);
+    MFnMesh combinedMeshFn(combinedMeshPath);
     voxels.totalVerts += combinedMeshFn.numVertices();
 
-    return combinedMesh;
+    return uniteCommandResult[0];
 }
