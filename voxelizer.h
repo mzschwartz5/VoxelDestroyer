@@ -59,7 +59,7 @@ struct Voxels {
     std::vector<uint32_t> mortonCodes;
     // Answers the question: for a given voxel morton code, what is the index of the corresponding voxel in the sorted array of voxels?
     std::unordered_map<uint32_t, uint32_t> mortonCodesToSortedIdx;
-    std::vector<MIntArray> triangleIndices; // Indices of triangles that overlap with the voxel
+    std::vector<std::vector<int>> triangleIndices; // Indices of triangles that overlap with the voxel
     
     int totalVerts = 0;                   // total number of vertices in the voxelized mesh
     int numOccupied = 0;
@@ -160,9 +160,9 @@ private:
         const Voxels& voxels
     );
 
-    MObject intersectVoxelWithOriginalMesh(
+    MString intersectVoxelWithOriginalMesh(
         Voxels& voxels,
-        const MObject& originalMesh,
+        const MFnMesh& originalMesh,
         SurfaceMesh& cube,
         const std::vector<Triangle>& triangles,
         const SideTester& sideTester,

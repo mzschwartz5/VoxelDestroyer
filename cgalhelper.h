@@ -1,5 +1,6 @@
 #pragma once
 #include <maya/MObject.h>
+#include <maya/MFnMesh.h>
 #include <maya/MPoint.h>
 
 #include <CGAL/Polygon_mesh_processing/clip.h>
@@ -38,8 +39,8 @@ namespace CGALHelper {
      * and the former can be a subset of those triangles.
      */
     SurfaceMesh toSurfaceMesh(
-        const MObject& mayaMesh,
-        const MIntArray triangleIndices,
+        const MFnMesh& meshFn,
+        const std::vector<int> triangleIndices,
         const std::vector<Triangle>& triangles
     );
 
