@@ -39,12 +39,12 @@ SurfaceMesh cube(
     }
 
     std::array<std::array<int, 3>, 12> faces = {
-        std::array<int, 3>{0, 1, 2}, std::array<int, 3>{0, 2, 3}, // Bottom face
-        std::array<int, 3>{4, 5, 6}, std::array<int, 3>{4, 6, 7}, // Top face
-        std::array<int, 3>{0, 1, 5}, std::array<int, 3>{0, 5, 4}, // Front face
-        std::array<int, 3>{1, 2, 6}, std::array<int, 3>{1, 6, 5}, // Right face
-        std::array<int, 3>{2, 3, 7}, std::array<int, 3>{2, 7, 6}, // Back face
-        std::array<int, 3>{3, 0, 4}, std::array<int, 3>{3, 4, 7}  // Left face
+        std::array<int, 3>{0, 4, 6}, std::array<int, 3>{0, 6, 2}, // Bottom
+        std::array<int, 3>{1, 3, 7}, std::array<int, 3>{1, 7, 5}, // Top
+        std::array<int, 3>{0, 1, 5}, std::array<int, 3>{0, 5, 4}, // Front
+        std::array<int, 3>{4, 5, 7}, std::array<int, 3>{4, 7, 6}, // Right
+        std::array<int, 3>{6, 7, 3}, std::array<int, 3>{6, 3, 2}, // Back
+        std::array<int, 3>{2, 3, 1}, std::array<int, 3>{2, 1, 0}  // Left
     };
 
     // Add faces
@@ -61,16 +61,19 @@ SurfaceMesh toSurfaceMesh(
     const std::vector<Triangle>& triangles
 ){
     SurfaceMesh cgalMesh;
-    MStatus status;
-    MFnMesh meshFn(mayaMesh, &status);
-    MPoint vertex;
     std::unordered_map<int, SurfaceMesh::Vertex_index> mayaVertIdxToCgalIdx;
     std::array<SurfaceMesh::Vertex_index, 3> cgalTriIndices;
+    
+    MStatus status;
+    MFnMesh meshFn(mayaMesh, &status);
+    MPointArray vertices;
+    status = meshFn.getPoints(vertices, MSpace::kWorld);
 
     // Iterate over all triangles and add them to the CGAL mesh
     for (const auto& triangleIdx : triangleIndices) {
+        Triangle triangle = triangles[triangleIdx];
+
         for (int i = 0; i < 3; ++i) {
-            Triangle triangle = triangles[triangleIdx];
             int vertIdx = triangle.indices[i];
 
             // If we've seen this vertex before, use the existing index
@@ -81,7 +84,7 @@ SurfaceMesh toSurfaceMesh(
 
             // Otherwise, we need to add the vertex to the CGAL mesh
             // And record the index it returns
-            meshFn.getPoint(vertIdx, vertex, MSpace::kWorld);
+            const MPoint& vertex = vertices[vertIdx];
             SurfaceMesh::Vertex_index cgalIdx = cgalMesh.add_vertex(Point_3(vertex.x, vertex.y, vertex.z));
             cgalTriIndices[i] = cgalIdx;
             mayaVertIdxToCgalIdx[vertIdx] = cgalIdx;
@@ -100,7 +103,11 @@ MObject toMayaMesh(const SurfaceMesh& cgalMesh) {
     MPointArray mayaPoints;
     for (auto v : cgalMesh.vertices()) {
         const Point_3& p = cgalMesh.point(v);
-        mayaPoints.append(MPoint(p.x(), p.y(), p.z()));
+        mayaPoints.append(
+            CGAL::to_double(p.x()),
+            CGAL::to_double(p.y()),
+            CGAL::to_double(p.z())
+        );
     }
 
     // 2. Extract polygon counts and vertex indices
@@ -129,12 +136,7 @@ MObject toMayaMesh(const SurfaceMesh& cgalMesh) {
         &status
     );
 
-    // Get and return the transform object
-    MFnDagNode fnDagShape(newMesh);
-    MDagPath shapePath;
-    fnDagShape.getPath(shapePath);
-    shapePath.pop(); // shape -> transform
-    return shapePath.node();
+    return newMesh;
 }
 
 void openMeshBooleanIntersection(
@@ -143,6 +145,7 @@ void openMeshBooleanIntersection(
     const SideTester& sideTester
 ) {
     // TODO: add a "clip" flag to allow first clipping the open mesh's triangles to the closed mesh.
+    // Rather than using PMP::clip(), might be able to just not set do_not_modify on split(). I think it may clip the splitter if so.
 
     // Add edges to the closed mesh where it intersects with the open mesh
     CGAL::Polygon_mesh_processing::split(

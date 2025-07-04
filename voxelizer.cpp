@@ -69,19 +69,19 @@ Voxels Voxelizer::voxelizeSelectedMesh(
 
 std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxelSize, MStatus& status) {
     MIntArray triangleCounts;
-    MIntArray triangleIndices;
-    status = meshFn.getTriangles(triangleCounts, triangleIndices);
+    MIntArray vertexIndices;
+    status = meshFn.getTriangles(triangleCounts, vertexIndices);
 
     // This will later be done on the gpu, one thread per triangle
     std::vector<Triangle> triangles;
-    std::array<int, 3> triIndices;
-    for (unsigned int i = 0; i < triangleIndices.length() / 3; ++i) {
+    std::array<int, 3> vertIndices;
+    for (unsigned int i = 0; i < vertexIndices.length() / 3; ++i) {
 
-        triIndices[0] = triangleIndices[3 * i];
-        triIndices[1] = triangleIndices[3 * i + 1];
-        triIndices[2] = triangleIndices[3 * i + 2];
+        vertIndices[0] = vertexIndices[3 * i];
+        vertIndices[1] = vertexIndices[3 * i + 1];
+        vertIndices[2] = vertexIndices[3 * i + 2];
 
-        Triangle triangle = processMayaTriangle(meshFn, triIndices, voxelSize);
+        Triangle triangle = processMayaTriangle(meshFn, vertIndices, voxelSize);
         triangles.push_back(triangle);
     }
 
@@ -89,14 +89,14 @@ std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxel
     return triangles;
 }
 
-Triangle Voxelizer::processMayaTriangle(const MFnMesh& meshFn, const std::array<int, 3>& triIndices, float voxelSize) {
+Triangle Voxelizer::processMayaTriangle(const MFnMesh& meshFn, const std::array<int, 3>& vertIndices, float voxelSize) {
     std::array<MPoint, 3> vertices;
-    meshFn.getPoint(triIndices[0], vertices[0], MSpace::kWorld);
-    meshFn.getPoint(triIndices[1], vertices[1], MSpace::kWorld);
-    meshFn.getPoint(triIndices[2], vertices[2], MSpace::kWorld);
+    meshFn.getPoint(vertIndices[0], vertices[0], MSpace::kWorld);
+    meshFn.getPoint(vertIndices[1], vertices[1], MSpace::kWorld);
+    meshFn.getPoint(vertIndices[2], vertices[2], MSpace::kWorld);
 
     Triangle triangle;
-    triangle.indices = triIndices;
+    triangle.indices = vertIndices;
     triangle.normal = ((vertices[1] - vertices[0]) ^ (vertices[2] - vertices[0])).normal();
 
     triangle.boundingBox.expand(vertices[0]);
@@ -158,6 +158,7 @@ void Voxelizer::getSurfaceVoxels(
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
     MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
 
+    int triIdx = 0;
     for (const Triangle& tri : triangles) {
         MPoint voxelMin = MPoint(
             std::max(0, static_cast<int>(std::floor((tri.boundingBox.min().x - gridMin.x) / voxelSize))),
@@ -181,12 +182,12 @@ void Voxelizer::getSurfaceVoxels(
                     
                     voxels.occupied[index] = true;
                     voxels.isSurface[index] = true;
-                    voxels.triangleIndices[index].append(tri.indices[0]);
-                    voxels.triangleIndices[index].append(tri.indices[1]);
-                    voxels.triangleIndices[index].append(tri.indices[2]);
+                    voxels.triangleIndices[index].append(triIdx);
                 }
             }
         }
+
+        ++triIdx;
     }
 }
 
@@ -356,7 +357,7 @@ MDagPath Voxelizer::createVoxels(
 
     // TODO: if no boolean, should get rid of non-manifold geometry
     MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(combinedMeshName, meshNamesConcatenated, originalMeshName, originalPivot, voxelSize);
-    // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh
+    // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh (or just allow for undo)
     MGlobal::executeCommand("delete " + originalMeshName, false, true); // Delete the original mesh to clean up the scene
 
     return finalizedVoxelMeshDagPath;
@@ -458,15 +459,6 @@ MString Voxelizer::selectSurfaceFaces(MFnMesh& meshFn, const MString& meshName, 
     return surfaceFaces;
 }
 
-int faceIndices[6][4] = {
-    {0, 4, 6, 2}, // Bottom
-    {1, 3, 7, 5}, // Top
-    {0, 1, 5, 4}, // Front
-    {4, 5, 7, 6}, // Right
-    {6, 7, 3, 2}, // Back
-    {2, 3, 1, 0}  // Left
-};
-
 void Voxelizer::addVoxelToMesh(
     const MPoint& voxelMin,
     float voxelSize,
@@ -484,9 +476,9 @@ void Voxelizer::addVoxelToMesh(
     for (const auto& vertex : cubeMesh.vertices()) {
         const auto& point = cubeMesh.point(vertex);
         positions.corners[i++] = glm::vec3(
-            static_cast<float>(point.x()),
-            static_cast<float>(point.y()),
-            static_cast<float>(point.z())
+            CGAL::to_double(point.x()),
+            CGAL::to_double(point.y()),
+            CGAL::to_double(point.z())
         );
     }
 
@@ -513,6 +505,7 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
         sortedVoxels.corners[i] = voxels.corners[voxelIndices[i]];
         sortedVoxels.mortonCodes[i] = voxels.mortonCodes[voxelIndices[i]];
         sortedVoxels.mortonCodesToSortedIdx[voxels.mortonCodes[voxelIndices[i]]] = static_cast<uint32_t>(i);
+        sortedVoxels.triangleIndices[i] = voxels.triangleIndices[voxelIndices[i]];
     }
 
     sortedVoxels.numOccupied = voxels.numOccupied;
@@ -546,11 +539,11 @@ MObject Voxelizer::intersectVoxelWithOriginalMesh(
 
     // Combine the two (now booleaned) meshes into one, watertight result.
     MString meshesToUnite = MFnDependencyNode(intersectedCube).name() + " " + MFnDependencyNode(originalMeshPieceObj).name();
-    MString uniteCommandResult;
+    MStringArray uniteCommandResult;
     MGlobal::executeCommand(MString("polyUnite -ch 0 -mergeUVSets 1 ") + meshesToUnite, uniteCommandResult, false, false);
     
     MSelectionList selectionList;
-    selectionList.add(uniteCommandResult);
+    selectionList.add(uniteCommandResult[0]);
     MObject combinedMesh;
     selectionList.getDependNode(0, combinedMesh);
 
