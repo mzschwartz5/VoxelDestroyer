@@ -388,36 +388,20 @@ MDagPath Voxelizer::finalizeVoxelMesh(
 
     // Use MEL to transferAttributes the normals from the original mesh to the new voxelized/combined one
     MString interiorFaces;
-    MGlobal::executeCommand(MString("select -r ") + originalMeshName, false, true); // Select the original mesh first
+    MGlobal::executeCommand("select -r " + originalMeshName, false, false); // Select the original mesh first
+    // MGlobal::executeCommand("select -add " + combinedMeshName, false, false); // Then add the new mesh to the selection
     MString surfaceFaces = selectSurfaceFaces(resultMeshFn, combinedMeshName, voxelSize, interiorFaces);
     MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
 
-    // Add a shading group to the new mesh
-    // Retrieve the shading groups assigned to the original mesh and assign the first one to the surface faces of the new mesh
-    MString melCmd;
-    melCmd += "string $sourceObject = \"" + originalMeshName + "\";\n";
-    melCmd += "string $targetObject = \"" + combinedMeshName + "\";\n";
-    melCmd += "string $shapes[] = `listRelatives -s $sourceObject`;\n";
-    melCmd += "string $connections[] = `listConnections $shapes[0]`;\n";
-    melCmd += "string $shadingGroup = \"\";\n";
-    melCmd += "for ($conn in $connections) {\n";
-    melCmd += "    if (`nodeType $conn` == \"shadingEngine\") {\n";
-    melCmd += "        $shadingGroup = $conn;\n";
-    melCmd += "        break;\n";
-    melCmd += "    }\n";
-    melCmd += "}\n";
-    melCmd += "if ($shadingGroup != \"\") {\n";
-    melCmd += "    sets -e -forceElement $shadingGroup $targetObject;\n";
-    melCmd += "} else {\n";
-    melCmd += "    warning(\"No shading group found on \" + $sourceObject);\n";
-    melCmd += "}\n";
+    // Transfer shading group to the new mesh
+    MGlobal::executeCommand("select -r " + originalMeshName, false, false); // Select the original mesh first
+    MGlobal::executeCommand("select -add " + combinedMeshName, false, false); // Then add the new mesh to the selection
+    MGlobal::executeCommand("transferShadingSets", false, false);
 
-    MGlobal::executeCommand(melCmd, false, true);
+    MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + interiorFaces, false, true); // Add the non-surface faces to the initial shading group
 
-    // MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + interiorFaces, false, true); // Add the non-surface faces to the initial shading group
-
-    MGlobal::executeCommand("delete -ch " + combinedMeshName + ";"); // Delete the history of the combined mesh to decouple it from the original mesh
-    MGlobal::executeCommand("select -cl;", false, true); // Clear selection
+    MGlobal::executeCommand("delete -ch " + combinedMeshName); // Delete the history of the combined mesh to decouple it from the original mesh
+    MGlobal::executeCommand("select -cl;", false, false); // Clear selection
 
     return resultMeshDagPath;
 }
