@@ -35,12 +35,13 @@ global proc VoxelizerMenu() {
     string $surfaceCheckbox = `checkBox -label "Surface" -value true`;
     string $solidCheckbox = `checkBox -label "Solid" -value true`;
     string $renderAsVoxelsCheckbox = `checkBox -label "Render As Voxels" -value false`;
+    string $clipTrianglesCheckbox = `checkBox -label "Clip Triangles" -value true`;
 
     // Buttons
     string $cancelButton = `button -label "Cancel" -command ("VoxelizerMenu_close(\"" + $voxelGridDisplayName + "\")")`;
     string $runButton = `button -label "Voxelize" 
         -annotation "Voxelizes a mesh in preparation for VGS simulation. Uses selected mesh or, if none selected, the closest mesh to the center of the grid bounds."
-        -command ("VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", \"" + $positionField + "\", \"" + $scaleField + "\", \"" + $subdivField + "\", \"" + $surfaceCheckbox + "\", \"" + $solidCheckbox + "\", \"" + $renderAsVoxelsCheckbox + "\")")`;
+        -command ("VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", \"" + $positionField + "\", \"" + $scaleField + "\", \"" + $subdivField + "\", \"" + $surfaceCheckbox + "\", \"" + $solidCheckbox + "\", \"" + $renderAsVoxelsCheckbox + "\", \"" + $clipTrianglesCheckbox + "\")")`;
 
     // Attach elements to form layout 
     formLayout -edit
@@ -52,8 +53,9 @@ global proc VoxelizerMenu() {
         -attachForm $surfaceCheckbox "left" 20 -attachControl $surfaceCheckbox "top" 10 $subdivField
         -attachControl $solidCheckbox "left" 10 $surfaceCheckbox -attachControl $solidCheckbox "top" 10 $subdivField
         -attachControl $renderAsVoxelsCheckbox "left" 10 $solidCheckbox -attachControl $renderAsVoxelsCheckbox "top" 10 $subdivField
-        -attachForm $runButton "left" 20 -attachControl $runButton "top" 15 $renderAsVoxelsCheckbox
-        -attachForm $cancelButton "left" 80 -attachControl $cancelButton "top" 15 $renderAsVoxelsCheckbox
+        -attachControl $clipTrianglesCheckbox "left" 10 $renderAsVoxelsCheckbox -attachControl $clipTrianglesCheckbox "top" 10 $subdivField
+        -attachForm $runButton "left" 20 -attachControl $runButton "top" 15 $clipTrianglesCheckbox
+        -attachForm $cancelButton "left" 80 -attachControl $cancelButton "top" 15 $clipTrianglesCheckbox
         -attachForm $runButton "bottom" 10 -attachForm $cancelButton "bottom" 10
         VoxelizerMenuForm;
 
@@ -67,7 +69,7 @@ global proc VoxelizerMenu() {
     scriptJob -attributeChange ($voxelGridDisplayName + ".scaleX") ("VoxelizerMenu_syncScale(\"" + $voxelGridDisplayName + "\", \"" + $scaleField + "\")");
 }
 
-global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $scaleField, string $subdivField, string $surfaceCheckbox, string $solidCheckbox, string $renderAsVoxelsCheckbox) {
+global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $scaleField, string $subdivField, string $surfaceCheckbox, string $solidCheckbox, string $renderAsVoxelsCheckbox, string $clipTrianglesCheckbox) {
     float $posX = `floatFieldGrp -query -value1 $positionField`;
     float $posY = `floatFieldGrp -query -value2 $positionField`;
     float $posZ = `floatFieldGrp -query -value3 $positionField`;
@@ -76,13 +78,14 @@ global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $s
     int $surface = `checkBox -query -value $surfaceCheckbox`;
     int $solid = `checkBox -query -value $solidCheckbox`;
     int $renderAsVoxels = `checkBox -query -value $renderAsVoxelsCheckbox`;
+    int $clipTriangles = `checkBox -query -value $clipTrianglesCheckbox`;
     
     // Deselect the cube if it's currently selected, so it's not a voxelization target itself
     if (`objExists $cubeName` && `objExists ($cubeName + ".visibility")`) {
         select -deselect $cubeName;
     }
 
-    int $type = $surface + ($solid * 2) + ($renderAsVoxels * 4); // Convert checkboxes to a single integer
+    int $type = $surface + ($solid * 2) + ($renderAsVoxels * 4) + ($clipTriangles * 8); // Convert checkboxes to a single integer
 
     // Construct the VoxelDestroyer command with the passed arguments
     string $command = "VoxelDestroyer -px " + $posX + " -py " + $posY + " -pz " + $posZ +

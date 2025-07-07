@@ -91,6 +91,7 @@ public:
         bool voxelizeSurface,
         bool voxelizeInterior,
         bool doBoolean,
+        bool clipTriangles,
         MStatus& status
     );
 
@@ -146,7 +147,8 @@ private:
         MPoint gridCenter,      
         MFnMesh& originalSurface,
         const std::vector<Triangle>& triangles,
-        bool doBoolean
+        bool doBoolean,
+        bool clipTriangles
     );
 
     void addVoxelToMesh(
@@ -162,12 +164,13 @@ private:
 
     MString intersectVoxelWithOriginalMesh(
         Voxels& voxels,
-        const MFnMesh& originalMesh,
+        const MPointArray& originalVertices,
         SurfaceMesh& cube,
         const std::vector<Triangle>& triangles,
         const SideTester& sideTester,
         int index,
-        bool doBoolean
+        bool doBoolean,
+        bool clipTriangles
     );
 
     /*

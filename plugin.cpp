@@ -77,6 +77,7 @@ MStatus plugin::doIt(const MArgList& argList)
 		pluginArgs.voxelizeSurface,
 		pluginArgs.voxelizeInterior,
 		!pluginArgs.renderAsVoxels,
+		pluginArgs.clipTriangles,
 		status
 	);
 	
@@ -158,6 +159,7 @@ PluginArgs plugin::parsePluginArgs(const MArgList& args) {
 		pluginArgs.voxelizeSurface = (type & 0x1) != 0;
 		pluginArgs.voxelizeInterior = (type & 0x2) != 0;
 		pluginArgs.renderAsVoxels = (type & 0x4) != 0;
+		pluginArgs.clipTriangles = (type & 0x8) != 0;
 	}
 
 	return pluginArgs;

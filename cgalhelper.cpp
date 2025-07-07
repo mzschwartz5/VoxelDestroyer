@@ -56,17 +56,13 @@ SurfaceMesh cube(
 }
 
 SurfaceMesh toSurfaceMesh(
-    const MFnMesh& meshFn,
+    const MPointArray& vertices,
     const std::vector<int> triangleIndices,
     const std::vector<Triangle>& triangles
 ){
     SurfaceMesh cgalMesh;
     std::unordered_map<int, SurfaceMesh::Vertex_index> mayaVertIdxToCgalIdx;
     std::array<SurfaceMesh::Vertex_index, 3> cgalTriIndices;
-    
-    MStatus status;
-    MPointArray vertices;
-    status = meshFn.getPoints(vertices, MSpace::kWorld);
 
     // Iterate over all triangles and add them to the CGAL mesh
     for (const auto& triangleIdx : triangleIndices) {
@@ -82,7 +78,7 @@ SurfaceMesh toSurfaceMesh(
             }
 
             // Otherwise, we need to add the vertex to the CGAL mesh
-            // And record the index it returns
+            // And record the index it returns in our map.
             const MPoint& vertex = vertices[vertIdx];
             SurfaceMesh::Vertex_index cgalIdx = cgalMesh.add_vertex(Point_3(vertex.x, vertex.y, vertex.z));
             cgalTriIndices[i] = cgalIdx;
@@ -97,33 +93,43 @@ SurfaceMesh toSurfaceMesh(
 
 MObject toMayaMesh(const SurfaceMesh& cgalMesh) {
     MStatus status;
-    // TODO: similar tactic as in toSurfaceMesh(): iterate just once over faces. 
-    // 1. Extract vertices from CGAL mesh
     MPointArray mayaPoints;
-    for (auto v : cgalMesh.vertices()) {
-        const Point_3& p = cgalMesh.point(v);
-        mayaPoints.append(
-            CGAL::to_double(p.x()),
-            CGAL::to_double(p.y()),
-            CGAL::to_double(p.z())
-        );
-    }
+    MIntArray polygonCounts;
+    MIntArray polygonConnects;
+    std::unordered_map<SurfaceMesh::Vertex_index, int> cgalVertIdxToMaya;
 
-    // 2. Extract polygon counts and vertex indices
-    MIntArray polygonCounts;   // number of vertices per polygon
-    MIntArray polygonConnects; // all vertex indices flattened
-    for (auto face : cgalMesh.faces()) {
-        int count = 0;
-        for (auto v : CGAL::vertices_around_face(cgalMesh.halfedge(face), cgalMesh)) {
-            polygonConnects.append(static_cast<int>(v)); // implicitly convertible to int
-            ++count;
+    // Iterate over all triangles of the CGAL mesh to create Maya points and polygons
+    // Assumes mesh is triangulated
+    for (const auto& triangle : cgalMesh.faces()) {
+        int vertsPerFace = 0; // should be 3 always, but lets keep it general.
+        // Iterate the 3 vertices of this face
+        for (auto vertIdx : vertices_around_face(cgalMesh.halfedge(triangle), cgalMesh)) {
+            vertsPerFace++;
+
+            // If we've seen this vertex before, use the existing Maya index
+            if (cgalVertIdxToMaya.find(vertIdx) != cgalVertIdxToMaya.end()) {
+                polygonConnects.append(cgalVertIdxToMaya[vertIdx]);
+                continue;
+            }
+
+            // Otherwise, we need to add the vertex to the Maya mesh
+            // And record the index it returns in our map.
+            int mayaIdx = mayaPoints.length();
+            cgalVertIdxToMaya[vertIdx] = mayaIdx;
+            const Point_3& point = cgalMesh.point(vertIdx);
+            mayaPoints.append(MPoint(
+                CGAL::to_double(point.x()), 
+                CGAL::to_double(point.y()), 
+                CGAL::to_double(point.z()))
+            );
+            polygonConnects.append(mayaIdx);
         }
-        polygonCounts.append(count);
+        polygonCounts.append(vertsPerFace);
     }
 
-    // 3. Create Maya mesh
-    //    Note: the new mesh currently has no shading group or vertex attributes.
-    //    (In the Voxelizer process, these things are transferred from the old mesh at the end of the process.)
+    // Create Maya mesh
+    // Note: the new mesh currently has no shading group or vertex attributes.
+    // (In the Voxelizer process, these things are transferred from the old mesh at the end of the process.)
     MFnMesh fnMesh;
     MObject newMesh = fnMesh.create(
         mayaPoints.length(),
@@ -141,23 +147,32 @@ MObject toMayaMesh(const SurfaceMesh& cgalMesh) {
 void openMeshBooleanIntersection(
     SurfaceMesh& openMesh,
     SurfaceMesh& closedMesh,
-    const SideTester& sideTester
+    const SideTester& sideTester,
+    bool clipTriangles
 ) {
-    // TODO: add a "clip" flag to allow first clipping the open mesh's triangles to the closed mesh.
-    // Rather than using PMP::clip(), might be able to just not set do_not_modify on split(). I think it may clip the splitter if so.
-
-    // Add edges to the closed mesh where it intersects with the open mesh
-    CGAL::Polygon_mesh_processing::split(
-        closedMesh,    // (target mesh)
-        openMesh,      // (splitter mesh)
-        CGAL::parameters::default_values(),      // np_tm (target mesh)
-        CGAL::parameters::do_not_modify(true)    // np_s (splitter mesh)
-    );
+    // Split adds edges to the target mesh where the two meshes intersect. Clip does the same thing, but also clips the triangles of the open mesh
+    // to the closed mesh boundary. The choice here is mostly aesthetic, though clipping has a small upfront performance cost but has savings during simulation time.
+    if (clipTriangles) {
+        CGAL::Polygon_mesh_processing::clip(
+          openMesh,       // (target mesh)
+          closedMesh,     // (clipper mesh)
+            CGAL::parameters::default_values(),      // np_tm (target mesh)
+            CGAL::parameters::default_values()    // np_s (clipper mesh)
+        );
+    }
+    else {
+        CGAL::Polygon_mesh_processing::split(
+            closedMesh,    // (target mesh)
+            openMesh,      // (splitter mesh)
+            CGAL::parameters::default_values(),      // np_tm (target mesh)
+            CGAL::parameters::do_not_modify(true)    // np_s (splitter mesh)
+        );
+    }
 
     // Then iterate through the triangles of the closed mesh, discarding any
     // that are outside the SideTester reference mesh.
     for (auto face : closedMesh.faces()) {
-        // No triangles will straddle the surface of the reference mesh, so the centroid will always tell the truth.
+        // By construction, no triangles will straddle the surface of the reference mesh, so the centroid will always tell the truth about which side the triangle is on.
         auto halfedge = closedMesh.halfedge(face);
         const auto& p0 = closedMesh.point(source(halfedge, closedMesh));
         const auto& p1 = closedMesh.point(target(halfedge, closedMesh));
