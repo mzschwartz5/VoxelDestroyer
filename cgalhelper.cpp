@@ -62,7 +62,7 @@ SurfaceMesh toSurfaceMesh(
 ){
     SurfaceMesh cgalMesh;
     std::unordered_map<int, SurfaceMesh::Vertex_index> mayaVertIdxToCgalIdx;
-    std::array<SurfaceMesh::Vertex_index, 3> cgalTriIndices;
+    std::array<SurfaceMesh::Vertex_index, 3> cgalTriIndices; // Unlike in toMayaMesh, we don't have the number of unique vertices a priori, so we can't reserve space.
 
     // Iterate over all triangles and add them to the CGAL mesh
     for (const auto& triangleIdx : triangleIndices) {
@@ -97,6 +97,7 @@ MObject toMayaMesh(const SurfaceMesh& cgalMesh) {
     MIntArray polygonCounts;
     MIntArray polygonConnects;
     std::unordered_map<SurfaceMesh::Vertex_index, int> cgalVertIdxToMaya;
+    cgalVertIdxToMaya.reserve(cgalMesh.vertices().size());
 
     // Iterate over all triangles of the CGAL mesh to create Maya points and polygons
     // Assumes mesh is triangulated
