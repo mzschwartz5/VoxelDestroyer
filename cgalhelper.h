@@ -5,7 +5,7 @@
 
 #include <CGAL/Polygon_mesh_processing/clip.h>
 #include <CGAL/Polygon_mesh_processing/repair.h>
-#include <CGAL/Exact_predicates_exact_constructions_kernel.h>
+#include <CGAL/Simple_cartesian.h>
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/AABB_face_graph_triangle_primitive.h>
 #include <CGAL/AABB_traits_3.h>
@@ -16,7 +16,7 @@
 struct Triangle;
 
 namespace CGALHelper {
-    using Kernel       = CGAL::Exact_predicates_exact_constructions_kernel;
+    using Kernel       = CGAL::Simple_cartesian<double>;
     using Point_3      = Kernel::Point_3;
     using SurfaceMesh  = CGAL::Surface_mesh<Point_3>;
     using Primitive    = CGAL::AABB_face_graph_triangle_primitive<SurfaceMesh>;
