@@ -39,7 +39,7 @@ namespace CGALHelper {
      * and the former can be a subset of those triangles.
      */
     SurfaceMesh toSurfaceMesh(
-        const MFnMesh& meshFn,
+        const MPointArray& vertices,
         const std::vector<int> triangleIndices,
         const std::vector<Triangle>& triangles
     );
@@ -57,18 +57,19 @@ namespace CGALHelper {
      * 
      * Instead, here, we use a reference mesh (which *is* closed) to determine "inside" and "outside".
      * We start by splitting the closedMesh by the openMesh, and then we use the sideTester based on the reference mesh
-     * to discard triangles that are not inside the closedMesh.
+     * to discard triangles that are not inside the closedMesh. Optionally, triangles can be clipped to the closedMesh boundary.
      * 
      * This is useful for voxelization, where each voxel is small compared to the overall mesh, and
      * each voxel is independent of each other. This way, each voxel can calculate a boolean with just a piece of
      * the whole mesh, which is much faster than calculating the boolean for the whole mesh for each voxel. It's also parallelizable!
      * 
-     * See the note in the implementation about the return value (void). The openMesh and closedMesh, after modification, form the resulting intersection.
+     * See the note in the implementation about the return value (void). The union of the openMesh and closedMesh, after modification, form the resulting intersection.
      */
     void openMeshBooleanIntersection(
         SurfaceMesh& openMesh,
         SurfaceMesh& closedMesh,
-        const SideTester& sideTester
+        const SideTester& sideTester,
+        bool clipTriangles
     );
 
 } // namespace CGALHelper
