@@ -39,16 +39,22 @@ namespace CGALHelper {
      * and the former can be a subset of those triangles.
      */
     SurfaceMesh toSurfaceMesh(
-        const MPointArray& vertices,
-        const std::vector<int> triangleIndices,
-        const std::vector<Triangle>& triangles
+        const MPointArray* const vertices,
+        const std::vector<int>& triangleIndices,
+        const std::vector<Triangle>* const triangles
     );
 
     /**
      * Converts a CGAL SurfaceMesh back to a Maya mesh.
-     * Returns a transform node-type MObject (with the mesh shape node as a child).
+     * Parameters are in/out so you can call successively to combine multiple meshes.
      */
-    MObject toMayaMesh(const SurfaceMesh& cgalMesh);
+    void toMayaMesh(
+        const SurfaceMesh& cgalMesh,
+        std::unordered_map<SurfaceMesh::Vertex_index, int>& cgalVertIdxToMaya,
+        MPointArray& mayaPoints,
+        MIntArray& polygonCounts,
+        MIntArray& polygonConnects
+    );
 
     /**
      * Performs a boolean intersection between two meshes where the first mesh
@@ -68,7 +74,7 @@ namespace CGALHelper {
     void openMeshBooleanIntersection(
         SurfaceMesh& openMesh,
         SurfaceMesh& closedMesh,
-        const SideTester& sideTester,
+        const SideTester* const sideTester,
         bool clipTriangles
     );
 

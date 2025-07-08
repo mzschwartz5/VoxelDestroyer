@@ -56,17 +56,17 @@ SurfaceMesh cube(
 }
 
 SurfaceMesh toSurfaceMesh(
-    const MPointArray& vertices,
-    const std::vector<int> triangleIndices,
-    const std::vector<Triangle>& triangles
+    const MPointArray* const vertices,
+    const std::vector<int>& triangleIndices,
+    const std::vector<Triangle>* const triangles
 ){
     SurfaceMesh cgalMesh;
     std::unordered_map<int, SurfaceMesh::Vertex_index> mayaVertIdxToCgalIdx;
-    std::array<SurfaceMesh::Vertex_index, 3> cgalTriIndices; // Unlike in toMayaMesh, we don't have the number of unique vertices a priori, so we can't reserve space.
+    std::array<SurfaceMesh::Vertex_index, 3> cgalTriIndices;
 
     // Iterate over all triangles and add them to the CGAL mesh
     for (const auto& triangleIdx : triangleIndices) {
-        Triangle triangle = triangles[triangleIdx];
+        Triangle triangle = (*triangles)[triangleIdx];
 
         for (int i = 0; i < 3; ++i) {
             int vertIdx = triangle.indices[i];
@@ -79,7 +79,7 @@ SurfaceMesh toSurfaceMesh(
 
             // Otherwise, we need to add the vertex to the CGAL mesh
             // And record the index it returns in our map.
-            const MPoint& vertex = vertices[vertIdx];
+            const MPoint& vertex = (*vertices)[vertIdx];
             SurfaceMesh::Vertex_index cgalIdx = cgalMesh.add_vertex(Point_3(vertex.x, vertex.y, vertex.z));
             cgalTriIndices[i] = cgalIdx;
             mayaVertIdxToCgalIdx[vertIdx] = cgalIdx;
@@ -91,13 +91,14 @@ SurfaceMesh toSurfaceMesh(
     return cgalMesh;
 }
 
-MObject toMayaMesh(const SurfaceMesh& cgalMesh) {
+void toMayaMesh(
+    const SurfaceMesh& cgalMesh,
+    std::unordered_map<SurfaceMesh::Vertex_index, int>& cgalVertIdxToMaya,
+    MPointArray& mayaPoints,
+    MIntArray& polygonCounts,
+    MIntArray& polygonConnects
+) {
     MStatus status;
-    MPointArray mayaPoints;
-    MIntArray polygonCounts;
-    MIntArray polygonConnects;
-    std::unordered_map<SurfaceMesh::Vertex_index, int> cgalVertIdxToMaya;
-    cgalVertIdxToMaya.reserve(cgalMesh.vertices().size());
 
     // Iterate over all triangles of the CGAL mesh to create Maya points and polygons
     // Assumes mesh is triangulated
@@ -127,28 +128,12 @@ MObject toMayaMesh(const SurfaceMesh& cgalMesh) {
         }
         polygonCounts.append(vertsPerFace);
     }
-
-    // Create Maya mesh
-    // Note: the new mesh currently has no shading group or vertex attributes.
-    // (In the Voxelizer process, these things are transferred from the old mesh at the end of the process.)
-    MFnMesh fnMesh;
-    MObject newMesh = fnMesh.create(
-        mayaPoints.length(),
-        polygonCounts.length(),
-        mayaPoints,
-        polygonCounts,
-        polygonConnects,
-        MObject::kNullObj, // No parent transform (could enhance later to allow a parent to be passed in)
-        &status
-    );
-
-    return newMesh;
 }
 
 void openMeshBooleanIntersection(
     SurfaceMesh& openMesh,
     SurfaceMesh& closedMesh,
-    const SideTester& sideTester,
+    const SideTester* const sideTester,
     bool clipTriangles
 ) {
     // Split adds edges to the target mesh where the two meshes intersect. Clip does the same thing, but also clips the triangles of the open mesh
@@ -180,7 +165,7 @@ void openMeshBooleanIntersection(
         const auto& p2 = closedMesh.point(target(next(halfedge, closedMesh), closedMesh));
         Point_3 centroid = CGAL::centroid(p0, p1, p2);
 
-        const auto side = sideTester(centroid);
+        const auto side = (*sideTester)(centroid);
         if (side == CGAL::ON_UNBOUNDED_SIDE) {
             // It's fine to modify the mesh while iterating over it,
             // because this only marks faces for removal, does not delete them immediately.
