@@ -93,7 +93,7 @@ SurfaceMesh toSurfaceMesh(
 
 void toMayaMesh(
     const SurfaceMesh& cgalMesh,
-    std::unordered_map<SurfaceMesh::Vertex_index, int>& cgalVertIdxToMaya,
+    std::unordered_map<Point_3, int, CGALHelper::Point3Hash>& cgalVertexToMayaIdx,
     MPointArray& mayaPoints,
     MIntArray& polygonCounts,
     MIntArray& polygonConnects
@@ -107,23 +107,19 @@ void toMayaMesh(
         // Iterate the 3 vertices of this face
         for (auto vertIdx : vertices_around_face(cgalMesh.halfedge(triangle), cgalMesh)) {
             vertsPerFace++;
+            const Point_3& point = cgalMesh.point(vertIdx);
 
             // If we've seen this vertex before, use the existing Maya index
-            if (cgalVertIdxToMaya.find(vertIdx) != cgalVertIdxToMaya.end()) {
-                polygonConnects.append(cgalVertIdxToMaya[vertIdx]);
+            if (cgalVertexToMayaIdx.find(point) != cgalVertexToMayaIdx.end()) {
+                polygonConnects.append(cgalVertexToMayaIdx[point]);
                 continue;
             }
 
             // Otherwise, we need to add the vertex to the Maya mesh
             // And record the index it returns in our map.
             int mayaIdx = mayaPoints.length();
-            cgalVertIdxToMaya[vertIdx] = mayaIdx;
-            const Point_3& point = cgalMesh.point(vertIdx);
-            mayaPoints.append(MPoint(
-                CGAL::to_double(point.x()), 
-                CGAL::to_double(point.y()), 
-                CGAL::to_double(point.z()))
-            );
+            cgalVertexToMayaIdx[point] = mayaIdx;
+            mayaPoints.append(MPoint(point.x(), point.y(), point.z()));
             polygonConnects.append(mayaIdx);
         }
         polygonCounts.append(vertsPerFace);
