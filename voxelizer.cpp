@@ -357,8 +357,8 @@ MDagPath Voxelizer::createVoxels(
     MFnTransform transform(transformPath);
     MPoint originalPivot = transform.rotatePivot(MSpace::kWorld);
     MString originalMeshName = transformPath.partialPathName();
-    MString combinedMeshName = originalMeshName + "_voxelized";
     MStringArray resultMeshNames; // the names of each voxel after intersection with the original mesh
+    resultMeshNames.setLength(overlappedVoxels.numOccupied); 
 
     VoxelIntersectionTaskData taskData {
         &overlappedVoxels,
@@ -378,11 +378,12 @@ MDagPath Voxelizer::createVoxels(
 
     MString resultMeshNamesConcatenated;
     for (const MString& meshName : resultMeshNames) {
+        if (meshName.length() == 0) continue; // Skip empty names
         resultMeshNamesConcatenated += meshName + " ";
     }
 
     // TODO: if no boolean, should get rid of non-manifold geometry
-    MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(combinedMeshName, resultMeshNamesConcatenated, originalMeshName, originalPivot, voxelSize);
+    MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(resultMeshNamesConcatenated, originalMeshName, originalPivot, voxelSize);
     // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh (or just allow for undo)
     MGlobal::executeCommand("delete " + originalMeshName, false, true); // Delete the original mesh to clean up the scene
 
@@ -390,7 +391,6 @@ MDagPath Voxelizer::createVoxels(
 }
 
 MDagPath Voxelizer::finalizeVoxelMesh(
-    const MString& combinedMeshName,
     const MString& resultMeshNamesConcatenated,
     const MString& originalMeshName,
     const MPoint& originalPivot,
@@ -398,6 +398,7 @@ MDagPath Voxelizer::finalizeVoxelMesh(
 ) {
     MStatus status;
     // Use MEL to combine all the voxels into one mesh
+    MString combinedMeshName = originalMeshName + "_voxelized";
     MGlobal::executeCommand(MString("polyUnite -ch 0 -mergeUVSets 1 -name ") + combinedMeshName + " " + resultMeshNamesConcatenated, false, true);
     MGlobal::executeCommand(MString("select -r ") + combinedMeshName, false, true);
     MGlobal::executeCommand("polySetToFaceNormal;", false, true); // Helps with the step where we select surface faces (use normals as ray marcing direction)
@@ -485,11 +486,7 @@ void Voxelizer::addVoxelToMesh(
     int i = 0;
     for (const auto& vertex : cubeMesh.vertices()) {
         const auto& point = cubeMesh.point(vertex);
-        positions.corners[i++] = glm::vec3(
-            CGAL::to_double(point.x()),
-            CGAL::to_double(point.y()),
-            CGAL::to_double(point.z())
-        );
+        positions.corners[i++] = glm::vec3( point.x(), point.y(), point.z());
     }
 
     voxels.corners[index] = positions;
@@ -525,33 +522,30 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
 
 void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) {
     VoxelIntersectionTaskData* taskData = static_cast<VoxelIntersectionTaskData*>(data);
-    const Voxels* voxels = taskData->voxels;
-    bool doBoolean = taskData->doBoolean;
-    bool clipTriangles = taskData->clipTriangles;
+    Voxels* voxels = taskData->voxels;
     MStringArray* resultMeshNames = taskData->resultMeshNames;
 
     // Threads will write the outputs of the boolean operations to these vectors
-    std::vector<MPointArray> meshPointsAfterIntersection;
-    std::vector<MIntArray> polyCountsAfterIntersection;
-    std::vector<MIntArray> polyConnectsAfterIntersection;
-    meshPointsAfterIntersection.reserve(voxels->numOccupied);
-    polyCountsAfterIntersection.reserve(voxels->numOccupied);
-    polyConnectsAfterIntersection.reserve(voxels->numOccupied);
+    std::vector<MPointArray> meshPointsAfterIntersection(voxels->numOccupied);
+    std::vector<MIntArray> polyCountsAfterIntersection(voxels->numOccupied);
+    std::vector<MIntArray> polyConnectsAfterIntersection(voxels->numOccupied);
 
+    std::vector<VoxelIntersectionThreadData> threadData(voxels->numOccupied); // Could avoid this by passing a pointer to everything but index
     for (int i = 0; i < voxels->numOccupied; ++i) {
-        VoxelIntersectionThreadData threadData {
-            taskData,
-            &meshPointsAfterIntersection,
-            &polyCountsAfterIntersection,
-            &polyConnectsAfterIntersection,
-            i
-        };
+        threadData[i].taskData = taskData;
+        threadData[i].threadIdx = i;
+        threadData[i].meshPointsAfterIntersection = &meshPointsAfterIntersection;
+        threadData[i].polyCountsAfterIntersection = &polyCountsAfterIntersection;
+        threadData[i].polyConnectsAfterIntersection = &polyConnectsAfterIntersection;
 
-        MThreadPool::createTask(Voxelizer::getSingleVoxelMeshIntersection, (void *)&threadData, rootTask);
+        MThreadPool::createTask(Voxelizer::getSingleVoxelMeshIntersection, (void *)&threadData[i], rootTask);
     }
     MThreadPool::executeAndJoin(rootTask);
+    threadData.clear();
 
     for (int i = 0; i < voxels->numOccupied; ++i) {
+        voxels->vertStartIdx[i] = voxels->totalVerts;
+        
         // Create Maya mesh
         // Note: the new mesh currently has no shading group or vertex attributes.
         // (In the Voxelizer process, these things are transferred from the old mesh at the end of the process.)
@@ -567,6 +561,8 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
             &status
         );
 
+        voxels->totalVerts += fnMesh.numVertices();
+
         MString newMeshName = MFnDependencyNode(newMesh).name();
         (*resultMeshNames)[i] = newMeshName;
 
@@ -574,17 +570,11 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
         meshPointsAfterIntersection[i].clear();
         polyCountsAfterIntersection[i].clear();
         polyConnectsAfterIntersection[i].clear();
-        
-        // If we clipped the originalMesh's triangles, its vertices are duplicates of the voxel's vertices.
-        // We can do a polyVertexMerge to clean them up. (This isn't true without clipping, the original triangles may extend beyond the voxel's bounds)
-        if (clipTriangles) {
-            MGlobal::executeCommand("polyMergeVertex -d 0.001 -am 1 -ch 0 " + newMeshName, false, false);
-        }
     }
 }
 
 MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
-    VoxelIntersectionThreadData* data = static_cast<VoxelIntersectionThreadData*>(threadData);
+    const VoxelIntersectionThreadData* data = static_cast<VoxelIntersectionThreadData*>(threadData);
     const VoxelIntersectionTaskData* taskData = data->taskData;
 
     int voxelIndex = data->threadIdx;
@@ -592,16 +582,16 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
     MPointArray& meshPointsAfterIntersection = (*data->meshPointsAfterIntersection)[voxelIndex];
     MIntArray& polyCountsAfterIntersection = (*data->polyCountsAfterIntersection)[voxelIndex];
     MIntArray& polyConnectsAfterIntersection = (*data->polyConnectsAfterIntersection)[voxelIndex];
-    std::unordered_map<SurfaceMesh::Vertex_index, int> cgalVertIdxToMaya;
+    std::unordered_map<Point_3, int, CGALHelper::Point3Hash> cgalVertexToMayaIdx;
 
     const Voxels* voxels = taskData->voxels;
 
     // In this case, we just return the points of the cube without intersection.
     if (!voxels->isSurface[voxelIndex] || !doBoolean) {
-        cgalVertIdxToMaya.reserve(8); // 8 vertices for a cube
+        cgalVertexToMayaIdx.reserve(8); // 8 vertices for a cube
         CGALHelper::toMayaMesh(
             voxels->cgalMeshes[voxelIndex],
-            cgalVertIdxToMaya,
+            cgalVertexToMayaIdx,
             meshPointsAfterIntersection,
             polyCountsAfterIntersection,
             polyConnectsAfterIntersection
@@ -618,7 +608,7 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
     );
     SurfaceMesh cube = voxels->cgalMeshes[voxelIndex];
 
-    cgalVertIdxToMaya.reserve(originalMeshPiece.vertices().size() + cube.vertices().size());
+    cgalVertexToMayaIdx.reserve(originalMeshPiece.vertices().size() + cube.vertices().size());
 
     CGALHelper::openMeshBooleanIntersection(
         originalMeshPiece,
@@ -631,7 +621,7 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
     // Use same map and arrays for both calls to make one singular mesh.
     CGALHelper::toMayaMesh(
         originalMeshPiece,
-        cgalVertIdxToMaya,
+        cgalVertexToMayaIdx,
         meshPointsAfterIntersection,
         polyCountsAfterIntersection,
         polyConnectsAfterIntersection
@@ -639,7 +629,7 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
 
     CGALHelper::toMayaMesh(
         cube,
-        cgalVertIdxToMaya,
+        cgalVertexToMayaIdx,
         meshPointsAfterIntersection,
         polyCountsAfterIntersection,
         polyConnectsAfterIntersection

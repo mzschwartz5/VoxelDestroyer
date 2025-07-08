@@ -62,6 +62,7 @@ struct Voxels {
     std::unordered_map<uint32_t, uint32_t> mortonCodesToSortedIdx;
     std::vector<std::vector<int>> triangleIndices; // Indices of triangles that overlap with the voxel
     
+    int totalVerts = 0; // total number of vertices in the voxelized mesh
     int numOccupied = 0;
     
     int size() const { return static_cast<int>(occupied.size()); }
@@ -166,7 +167,7 @@ private:
      * Payload for the function that sets up all threads.
      */
     struct VoxelIntersectionTaskData {
-        const Voxels* voxels;
+        Voxels* voxels;
         const MPointArray* const originalVertices;
         const std::vector<Triangle>* const triangles;
         const SideTester* const sideTester;
@@ -176,7 +177,7 @@ private:
     };
 
     struct VoxelIntersectionThreadData {
-        const VoxelIntersectionTaskData* const taskData;
+        const VoxelIntersectionTaskData* taskData;
         std::vector<MPointArray>* meshPointsAfterIntersection;
         std::vector<MIntArray>* polyCountsAfterIntersection;
         std::vector<MIntArray>* polyConnectsAfterIntersection;
@@ -195,7 +196,6 @@ private:
      * assigning shading groups, and deleting history are also done here.
      */
     MDagPath finalizeVoxelMesh(
-        const MString& combinedMeshName,
         const MString& meshNamesConcatenated,
         const MString& originalMesh,
         const MPoint& originalPivot,

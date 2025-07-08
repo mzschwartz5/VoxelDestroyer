@@ -25,6 +25,19 @@ namespace CGALHelper {
     using SideTester   = CGAL::Side_of_triangle_mesh<SurfaceMesh, Kernel>;
 
     /**
+     * So we can map Point_3 to indices in unordered_map.
+     * Only works when using a CGAL::Simple_cartesian<double> kernel.
+     */
+    struct Point3Hash {
+        std::size_t operator()(const Point_3& p) const {
+            std::size_t hx = std::hash<double>()(p.x());
+            std::size_t hy = std::hash<double>()(p.y());
+            std::size_t hz = std::hash<double>()(p.z());
+            return hx ^ (hy << 1) ^ (hz << 2); // Simple hash combiner
+        }
+    };
+
+    /**
      * Creates a cube mesh centered at the given point with the specified edge length.
      */
     SurfaceMesh cube(
@@ -50,7 +63,7 @@ namespace CGALHelper {
      */
     void toMayaMesh(
         const SurfaceMesh& cgalMesh,
-        std::unordered_map<SurfaceMesh::Vertex_index, int>& cgalVertIdxToMaya,
+        std::unordered_map<Point_3, int, CGALHelper::Point3Hash>& cgalVertexToMayaIdx,
         MPointArray& mayaPoints,
         MIntArray& polygonCounts,
         MIntArray& polygonConnects
