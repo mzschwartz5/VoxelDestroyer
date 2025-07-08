@@ -11,6 +11,7 @@
 
 #include "utils.h"
 #include "glm/glm.hpp"
+#include <maya/MThreadPool.h>
 
 #include <CGAL/Simple_cartesian.h>
 #include <CGAL/Surface_mesh.h>
@@ -61,7 +62,6 @@ struct Voxels {
     std::unordered_map<uint32_t, uint32_t> mortonCodesToSortedIdx;
     std::vector<std::vector<int>> triangleIndices; // Indices of triangles that overlap with the voxel
     
-    int totalVerts = 0;                   // total number of vertices in the voxelized mesh
     int numOccupied = 0;
     
     int size() const { return static_cast<int>(occupied.size()); }
@@ -162,16 +162,33 @@ private:
         const Voxels& voxels
     );
 
-    MString intersectVoxelWithOriginalMesh(
-        Voxels& voxels,
-        const MPointArray& originalVertices,
-        SurfaceMesh& cube,
-        const std::vector<Triangle>& triangles,
-        const SideTester& sideTester,
-        int index,
-        bool doBoolean,
-        bool clipTriangles
+    /**
+     * Payload for the function that sets up all threads.
+     */
+    struct VoxelIntersectionTaskData {
+        const Voxels* voxels;
+        const MPointArray* const originalVertices;
+        const std::vector<Triangle>* const triangles;
+        const SideTester* const sideTester;
+        bool doBoolean;
+        bool clipTriangles;
+        MStringArray* resultMeshNames; // Output mesh names of each voxel after intersection
+    };
+
+    struct VoxelIntersectionThreadData {
+        const VoxelIntersectionTaskData* const taskData;
+        std::vector<MPointArray>* meshPointsAfterIntersection;
+        std::vector<MIntArray>* polyCountsAfterIntersection;
+        std::vector<MIntArray>* polyConnectsAfterIntersection;
+        int threadIdx;
+    };
+
+    static void getVoxelMeshIntersection(
+        void* taskData,
+        MThreadRootTask* rootTask
     );
+
+    static MThreadRetVal getSingleVoxelMeshIntersection(void* threadData);
 
     /*
      * Take the boolean voxel pieces of the mesh and combine them. Other book keeping items like transferring attributes,
