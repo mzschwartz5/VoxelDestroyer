@@ -139,7 +139,7 @@ void openMeshBooleanIntersection(
           openMesh,       // (target mesh)
           closedMesh,     // (clipper mesh)
             CGAL::parameters::default_values(),      // np_tm (target mesh)
-            CGAL::parameters::default_values()    // np_s (clipper mesh)
+            CGAL::parameters::default_values()       // np_s (clipper mesh)
         );
     }
     else {

@@ -173,7 +173,7 @@ private:
         const SideTester* const sideTester;
         bool doBoolean;
         bool clipTriangles;
-        MStringArray* resultMeshNames; // Output mesh names of each voxel after intersection
+        MString newMeshName;
     };
 
     struct VoxelIntersectionThreadData {
@@ -196,7 +196,7 @@ private:
      * assigning shading groups, and deleting history are also done here.
      */
     MDagPath finalizeVoxelMesh(
-        const MString& meshNamesConcatenated,
+        const MString& newMeshName,
         const MString& originalMesh,
         const MPoint& originalPivot,
         float voxelSize

@@ -357,8 +357,7 @@ MDagPath Voxelizer::createVoxels(
     MFnTransform transform(transformPath);
     MPoint originalPivot = transform.rotatePivot(MSpace::kWorld);
     MString originalMeshName = transformPath.partialPathName();
-    MStringArray resultMeshNames; // the names of each voxel after intersection with the original mesh
-    resultMeshNames.setLength(overlappedVoxels.numOccupied); 
+    MString newMeshName = originalMeshName + "_voxelized";
 
     VoxelIntersectionTaskData taskData {
         &overlappedVoxels,
@@ -367,7 +366,7 @@ MDagPath Voxelizer::createVoxels(
         &sideTester,
         doBoolean,
         clipTriangles,
-        &resultMeshNames
+        newMeshName
     };
 
     MThreadPool::newParallelRegion(
@@ -376,14 +375,8 @@ MDagPath Voxelizer::createVoxels(
     );
     MThreadPool::release(); // reduce reference count incurred by opening a new parallel region
 
-    MString resultMeshNamesConcatenated;
-    for (const MString& meshName : resultMeshNames) {
-        if (meshName.length() == 0) continue; // Skip empty names
-        resultMeshNamesConcatenated += meshName + " ";
-    }
-
     // TODO: if no boolean, should get rid of non-manifold geometry
-    MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(resultMeshNamesConcatenated, originalMeshName, originalPivot, voxelSize);
+    MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, voxelSize);
     // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh (or just allow for undo)
     MGlobal::executeCommand("delete " + originalMeshName, false, true); // Delete the original mesh to clean up the scene
 
@@ -391,21 +384,18 @@ MDagPath Voxelizer::createVoxels(
 }
 
 MDagPath Voxelizer::finalizeVoxelMesh(
-    const MString& resultMeshNamesConcatenated,
+    const MString& newMeshName,
     const MString& originalMeshName,
     const MPoint& originalPivot,
     float voxelSize
 ) {
     MStatus status;
-    // Use MEL to combine all the voxels into one mesh
-    MString combinedMeshName = originalMeshName + "_voxelized";
-    MGlobal::executeCommand(MString("polyUnite -ch 0 -mergeUVSets 1 -name ") + combinedMeshName + " " + resultMeshNamesConcatenated, false, true);
-    MGlobal::executeCommand(MString("select -r ") + combinedMeshName, false, true);
+    MGlobal::executeCommand(MString("select -r ") + newMeshName, false, true);
     MGlobal::executeCommand("polySetToFaceNormal;", false, true); // Helps with the step where we select surface faces (use normals as ray marcing direction)
 
     // Retrieve the MObject of the resulting mesh
     MSelectionList resultSelectionList;
-    resultSelectionList.add(combinedMeshName);
+    resultSelectionList.add(newMeshName);
     MObject resultMeshObject;
     resultSelectionList.getDependNode(0, resultMeshObject);
     MDagPath resultMeshDagPath;
@@ -417,18 +407,18 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     // Use MEL to transferAttributes the normals from the original mesh to the new voxelized/combined one
     MString interiorFaces;
     MGlobal::executeCommand("select -r " + originalMeshName, false, false); // Select the original mesh first
-    // MGlobal::executeCommand("select -add " + combinedMeshName, false, false); // Then add the new mesh to the selection
-    MString surfaceFaces = selectSurfaceFaces(resultMeshFn, combinedMeshName, voxelSize, interiorFaces);
+    // MGlobal::executeCommand("select -add " + newMeshName, false, false); // Then add the new mesh to the selection
+    MString surfaceFaces = selectSurfaceFaces(resultMeshFn, newMeshName, voxelSize, interiorFaces);
     MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
 
     // Transfer shading group to the new mesh
     MGlobal::executeCommand("select -r " + originalMeshName, false, false); // Select the original mesh first
-    MGlobal::executeCommand("select -add " + combinedMeshName, false, false); // Then add the new mesh to the selection
+    MGlobal::executeCommand("select -add " + newMeshName, false, false); // Then add the new mesh to the selection
     MGlobal::executeCommand("transferShadingSets", false, false);
 
     MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + interiorFaces, false, true); // Add the non-surface faces to the initial shading group
 
-    MGlobal::executeCommand("delete -ch " + combinedMeshName); // Delete the history of the combined mesh to decouple it from the original mesh
+    MGlobal::executeCommand("delete -ch " + newMeshName); // Delete the history of the combined mesh to decouple it from the original mesh
     MGlobal::executeCommand("select -cl;", false, false); // Clear selection
 
     return resultMeshDagPath;
@@ -523,7 +513,7 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
 void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) {
     VoxelIntersectionTaskData* taskData = static_cast<VoxelIntersectionTaskData*>(data);
     Voxels* voxels = taskData->voxels;
-    MStringArray* resultMeshNames = taskData->resultMeshNames;
+    const MString& newMeshName = taskData->newMeshName;
 
     // Threads will write the outputs of the boolean operations to these vectors
     std::vector<MPointArray> meshPointsAfterIntersection(voxels->numOccupied);
@@ -543,34 +533,49 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
     MThreadPool::executeAndJoin(rootTask);
     threadData.clear();
 
+    // Merge together all the mesh points, poly counts, and poly connects into one mesh
+    MPointArray allMeshPoints;
+    MIntArray allPolyCounts;
+    MIntArray allPolyConnects;
     for (int i = 0; i < voxels->numOccupied; ++i) {
         voxels->vertStartIdx[i] = voxels->totalVerts;
+        voxels->totalVerts += meshPointsAfterIntersection[i].length();
         
-        // Create Maya mesh
-        // Note: the new mesh currently has no shading group or vertex attributes.
-        // (In the Voxelizer process, these things are transferred from the old mesh at the end of the process.)
-        MStatus status;
-        MFnMesh fnMesh;
-        MObject newMesh = fnMesh.create(
-            meshPointsAfterIntersection[i].length(),
-            polyCountsAfterIntersection[i].length(),
-            meshPointsAfterIntersection[i],
-            polyCountsAfterIntersection[i],
-            polyConnectsAfterIntersection[i],
-            MObject::kNullObj, // No parent transform (could enhance later to allow a parent to be passed in)
-            &status
-        );
+        for (unsigned int j = 0; j < meshPointsAfterIntersection[i].length(); ++j) {
+            allMeshPoints.append(meshPointsAfterIntersection[i][j]);
+        }
 
-        voxels->totalVerts += fnMesh.numVertices();
+        for (unsigned int j = 0; j < polyCountsAfterIntersection[i].length(); ++j) {
+            allPolyCounts.append(polyCountsAfterIntersection[i][j]);
+        }
+        
+        for (unsigned int j = 0; j < polyConnectsAfterIntersection[i].length(); ++j) {
+            allPolyConnects.append(polyConnectsAfterIntersection[i][j] + voxels->vertStartIdx[i]); // Offset the vertex indices by the start index of this voxel
+        }
 
-        MString newMeshName = MFnDependencyNode(newMesh).name();
-        (*resultMeshNames)[i] = newMeshName;
-
-        // Erase vector entries at current index to avoid potential memory pressure issues
+        // To reduce memory usage at any given time:
         meshPointsAfterIntersection[i].clear();
         polyCountsAfterIntersection[i].clear();
         polyConnectsAfterIntersection[i].clear();
     }
+
+    // Create Maya mesh
+    // Note: the new mesh currently has no shading group or vertex attributes.
+    // (In the Voxelizer process, these things are transferred from the old mesh at the end of the process.)
+    MStatus status;
+    MFnMesh fnMesh;
+    MObject newMesh = fnMesh.create(
+        allMeshPoints.length(),
+        allPolyCounts.length(),
+        allMeshPoints,
+        allPolyCounts,
+        allPolyConnects,
+        MObject::kNullObj, // No parent transform (could enhance later to allow a parent to be passed in)
+        &status
+    );
+
+    MFnDagNode dagNode(newMesh, &status);
+    dagNode.setName(newMeshName);
 }
 
 MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
