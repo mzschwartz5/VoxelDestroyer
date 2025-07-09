@@ -359,11 +359,13 @@ MDagPath Voxelizer::createVoxels(
     MString originalMeshName = transformPath.partialPathName();
     MString newMeshName = originalMeshName + "_voxelized";
 
+    MString selectSurfaceFacesCommand = "select -add "; // This string will be built up in getVoxelMeshIntersection
     VoxelIntersectionTaskData taskData {
         &overlappedVoxels,
         &originalVertices,
         &meshTris,
         &sideTester,
+        &selectSurfaceFacesCommand,
         doBoolean,
         clipTriangles,
         newMeshName
@@ -376,7 +378,7 @@ MDagPath Voxelizer::createVoxels(
     MThreadPool::release(); // reduce reference count incurred by opening a new parallel region
 
     // TODO: if no boolean, should get rid of non-manifold geometry
-    MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, voxelSize);
+    MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, voxelSize, selectSurfaceFacesCommand);
     // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh (or just allow for undo)
     MGlobal::executeCommand("delete " + originalMeshName, false, true); // Delete the original mesh to clean up the scene
 
@@ -387,13 +389,11 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     const MString& newMeshName,
     const MString& originalMeshName,
     const MPoint& originalPivot,
-    float voxelSize
+    float voxelSize,
+    const MString& selectSurfaceFacesCommand
 ) {
-    MStatus status;
-    MGlobal::executeCommand(MString("select -r ") + newMeshName, false, true);
-    MGlobal::executeCommand("polySetToFaceNormal;", false, true); // Helps with the step where we select surface faces (use normals as ray marcing direction)
-
     // Retrieve the MObject of the resulting mesh
+    MStatus status;
     MSelectionList resultSelectionList;
     resultSelectionList.add(newMeshName);
     MObject resultMeshObject;
@@ -405,59 +405,16 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     resultTransformFn.setRotatePivot(originalPivot, MSpace::kTransform, false); // Set the pivot to the original mesh's pivot
 
     // Use MEL to transferAttributes the normals from the original mesh to the new voxelized/combined one
-    MString interiorFaces;
-    MGlobal::executeCommand("select -r " + originalMeshName, false, false); // Select the original mesh first
-    // MGlobal::executeCommand("select -add " + newMeshName, false, false); // Then add the new mesh to the selection
-    MString surfaceFaces = selectSurfaceFaces(resultMeshFn, newMeshName, voxelSize, interiorFaces);
+    MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + newMeshName, false, true); // First make the whole mesh have the initialShadingGroup
+    MGlobal::executeCommand("select -r " + originalMeshName, false, false); 
+    MGlobal::executeCommand(selectSurfaceFacesCommand, false, false);
     MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
-
-    // Transfer shading group to the new mesh
-    MGlobal::executeCommand("select -r " + originalMeshName, false, false); // Select the original mesh first
-    MGlobal::executeCommand("select -add " + newMeshName, false, false); // Then add the new mesh to the selection
     MGlobal::executeCommand("transferShadingSets", false, false);
-
-    MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + interiorFaces, false, true); // Add the non-surface faces to the initial shading group
 
     MGlobal::executeCommand("delete -ch " + newMeshName); // Delete the history of the combined mesh to decouple it from the original mesh
     MGlobal::executeCommand("select -cl;", false, false); // Clear selection
 
     return resultMeshDagPath;
-}
-
-/**
- * Use raycasting to find and select the surface faces of the voxelized mesh (after combining all voxels).
- * Only surface faces will not have any intersections with the mesh along their normal direction.
- */
-MString Voxelizer::selectSurfaceFaces(MFnMesh& meshFn, const MString& meshName, float voxelSize, MString& interiorFaces) {
-    // Can short circuit raycasting by bounding the ray length to the diagonal of a voxel. If no intersection is found by then, it must be a surface face.
-    float maxDistance = 1.73f * 1.1f * voxelSize; // 1.73 is the diagonal of a cube with edge length 1.0
-    MMeshIsectAccelParams accelParams = MFnMesh::autoUniformGridParams();
-    MItMeshPolygon faceIter(meshFn.object());
-
-    MString surfaceFaces = "";
-    MString faceSelectionCommand = "select -add ";
-    while (!faceIter.isDone()) {
-        MVector normal;
-        faceIter.getNormal(normal, MSpace::kWorld);
-        MPoint faceCenter = faceIter.center(MSpace::kWorld);
-        MPoint raySource = faceCenter + normal * 0.01; // Offset slightly along the normal
-        MVector rayDirection = normal;
-
-        MFloatPoint hitPoint;
-        bool hit = meshFn.anyIntersection(raySource, rayDirection, nullptr, nullptr, false, MSpace::kWorld, maxDistance, false, &accelParams, hitPoint, nullptr, nullptr, nullptr, nullptr, nullptr);
-
-        if (!hit) {
-            surfaceFaces += meshName + ".f[" + faceIter.index() + "] ";
-            faceIter.next();
-            continue;
-        }
-        
-        interiorFaces += meshName + ".f[" + faceIter.index() + "] ";
-        faceIter.next();
-    }
-
-    MGlobal::executeCommand(faceSelectionCommand + surfaceFaces, false, true);
-    return surfaceFaces;
 }
 
 void Voxelizer::addVoxelToMesh(
@@ -513,20 +470,25 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
 void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) {
     VoxelIntersectionTaskData* taskData = static_cast<VoxelIntersectionTaskData*>(data);
     Voxels* voxels = taskData->voxels;
+    MString* selectSurfaceFacesCommand = taskData->selectSurfaceFacesCommand;
     const MString& newMeshName = taskData->newMeshName;
 
     // Threads will write the outputs of the boolean operations to these vectors
     std::vector<MPointArray> meshPointsAfterIntersection(voxels->numOccupied);
     std::vector<MIntArray> polyCountsAfterIntersection(voxels->numOccupied);
     std::vector<MIntArray> polyConnectsAfterIntersection(voxels->numOccupied);
+    std::vector<int> numSurfaceFacesAfterIntersection(voxels->numOccupied, 0);
+    std::vector<int> numTotalFacesAfterIntersection(voxels->numOccupied, 0);
 
-    std::vector<VoxelIntersectionThreadData> threadData(voxels->numOccupied); // Could avoid this by passing a pointer to everything but index
+    std::vector<VoxelIntersectionThreadData> threadData(voxels->numOccupied);
     for (int i = 0; i < voxels->numOccupied; ++i) {
         threadData[i].taskData = taskData;
         threadData[i].threadIdx = i;
         threadData[i].meshPointsAfterIntersection = &meshPointsAfterIntersection;
         threadData[i].polyCountsAfterIntersection = &polyCountsAfterIntersection;
         threadData[i].polyConnectsAfterIntersection = &polyConnectsAfterIntersection;
+        threadData[i].numSurfaceFacesAfterIntersection = &numSurfaceFacesAfterIntersection;
+        threadData[i].numTotalFacesAfterIntersection = &numTotalFacesAfterIntersection;
 
         MThreadPool::createTask(Voxelizer::getSingleVoxelMeshIntersection, (void *)&threadData[i], rootTask);
     }
@@ -537,10 +499,17 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
     MPointArray allMeshPoints;
     MIntArray allPolyCounts;
     MIntArray allPolyConnects;
+    int startFaceIdx = 0;
     for (int i = 0; i < voxels->numOccupied; ++i) {
         voxels->vertStartIdx[i] = voxels->totalVerts;
         voxels->totalVerts += meshPointsAfterIntersection[i].length();
-        
+
+        int numSurfaceFaces = numSurfaceFacesAfterIntersection[i];
+        if (numSurfaceFaces > 0) {
+            (*selectSurfaceFacesCommand) += newMeshName + MString(".f[") + startFaceIdx + MString(":") + (startFaceIdx + numSurfaceFaces - 1) + MString("] ");
+            startFaceIdx += numTotalFacesAfterIntersection[i];
+        }
+
         for (unsigned int j = 0; j < meshPointsAfterIntersection[i].length(); ++j) {
             allMeshPoints.append(meshPointsAfterIntersection[i][j]);
         }
@@ -587,6 +556,8 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
     MPointArray& meshPointsAfterIntersection = (*data->meshPointsAfterIntersection)[voxelIndex];
     MIntArray& polyCountsAfterIntersection = (*data->polyCountsAfterIntersection)[voxelIndex];
     MIntArray& polyConnectsAfterIntersection = (*data->polyConnectsAfterIntersection)[voxelIndex];
+    int& numSurfaceFacesAfterIntersection = (*data->numSurfaceFacesAfterIntersection)[voxelIndex];
+    int& numTotalFacesAfterIntersection = (*data->numTotalFacesAfterIntersection)[voxelIndex];
     std::unordered_map<Point_3, int, CGALHelper::Point3Hash> cgalVertexToMayaIdx;
 
     const Voxels* voxels = taskData->voxels;
@@ -621,6 +592,7 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
         taskData->sideTester,
         taskData->clipTriangles
     );
+    numSurfaceFacesAfterIntersection = static_cast<int>(originalMeshPiece.faces().size());
 
     // Convert CGAL meshes back to Maya representation.
     // Use same map and arrays for both calls to make one singular mesh.
@@ -640,5 +612,6 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
         polyConnectsAfterIntersection
     );
 
+    numTotalFacesAfterIntersection = polyCountsAfterIntersection.length();
     return (MThreadRetVal)0;
 }

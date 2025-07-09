@@ -171,6 +171,7 @@ private:
         const MPointArray* const originalVertices;
         const std::vector<Triangle>* const triangles;
         const SideTester* const sideTester;
+        MString* const selectSurfaceFacesCommand; // pass by pointer as this string will be very long and modified by the task
         bool doBoolean;
         bool clipTriangles;
         MString newMeshName;
@@ -178,9 +179,12 @@ private:
 
     struct VoxelIntersectionThreadData {
         const VoxelIntersectionTaskData* taskData;
+        // TODO: rather than pass the whole vector to each thread, just pass the relevant bit.
         std::vector<MPointArray>* meshPointsAfterIntersection;
         std::vector<MIntArray>* polyCountsAfterIntersection;
         std::vector<MIntArray>* polyConnectsAfterIntersection;
+        std::vector<int>* numSurfaceFacesAfterIntersection;
+        std::vector<int>* numTotalFacesAfterIntersection;
         int threadIdx;
     };
 
@@ -199,7 +203,8 @@ private:
         const MString& newMeshName,
         const MString& originalMesh,
         const MPoint& originalPivot,
-        float voxelSize
+        float voxelSize,
+        const MString& selectSurfaceFacesCommand
     );
 
     MString selectSurfaceFaces(MFnMesh& mesh, const MString& meshName, float voxelSize, MString& interiorFaces);
