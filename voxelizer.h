@@ -184,7 +184,6 @@ private:
         std::vector<MIntArray>* polyCountsAfterIntersection;
         std::vector<MIntArray>* polyConnectsAfterIntersection;
         std::vector<int>* numSurfaceFacesAfterIntersection;
-        std::vector<int>* numTotalFacesAfterIntersection;
         int threadIdx;
     };
 
