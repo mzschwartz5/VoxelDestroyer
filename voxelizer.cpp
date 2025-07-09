@@ -404,9 +404,14 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MFnTransform resultTransformFn(resultMeshDagPath, &status);
     resultTransformFn.setRotatePivot(originalPivot, MSpace::kTransform, false); // Set the pivot to the original mesh's pivot
 
+    // First make the whole mesh have the initialShadingGroup by default, and normals set to faces (mainly for interior voxels)
+    MGlobal::executeCommand("select -r " + newMeshName, false, false); 
+    MGlobal::executeCommand("polySetToFaceNormal;", false, false);
+    MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + newMeshName, false, false); 
+    
     // Use MEL to transferAttributes the normals from the original mesh to the new voxelized/combined one
-    MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + newMeshName, false, true); // First make the whole mesh have the initialShadingGroup
     MGlobal::executeCommand("select -r " + originalMeshName, false, false); 
+    MGlobal::executeCommand("select -add " + newMeshName, false, false); 
     MGlobal::executeCommand(selectSurfaceFacesCommand, false, false);
     MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
     MGlobal::executeCommand("transferShadingSets", false, false);
@@ -478,7 +483,6 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
     std::vector<MIntArray> polyCountsAfterIntersection(voxels->numOccupied);
     std::vector<MIntArray> polyConnectsAfterIntersection(voxels->numOccupied);
     std::vector<int> numSurfaceFacesAfterIntersection(voxels->numOccupied, 0);
-    std::vector<int> numTotalFacesAfterIntersection(voxels->numOccupied, 0);
 
     std::vector<VoxelIntersectionThreadData> threadData(voxels->numOccupied);
     for (int i = 0; i < voxels->numOccupied; ++i) {
@@ -488,7 +492,6 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
         threadData[i].polyCountsAfterIntersection = &polyCountsAfterIntersection;
         threadData[i].polyConnectsAfterIntersection = &polyConnectsAfterIntersection;
         threadData[i].numSurfaceFacesAfterIntersection = &numSurfaceFacesAfterIntersection;
-        threadData[i].numTotalFacesAfterIntersection = &numTotalFacesAfterIntersection;
 
         MThreadPool::createTask(Voxelizer::getSingleVoxelMeshIntersection, (void *)&threadData[i], rootTask);
     }
@@ -507,8 +510,8 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
         int numSurfaceFaces = numSurfaceFacesAfterIntersection[i];
         if (numSurfaceFaces > 0) {
             (*selectSurfaceFacesCommand) += newMeshName + MString(".f[") + startFaceIdx + MString(":") + (startFaceIdx + numSurfaceFaces - 1) + MString("] ");
-            startFaceIdx += numTotalFacesAfterIntersection[i];
         }
+        startFaceIdx += polyCountsAfterIntersection[i].length();
 
         for (unsigned int j = 0; j < meshPointsAfterIntersection[i].length(); ++j) {
             allMeshPoints.append(meshPointsAfterIntersection[i][j]);
@@ -557,7 +560,6 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
     MIntArray& polyCountsAfterIntersection = (*data->polyCountsAfterIntersection)[voxelIndex];
     MIntArray& polyConnectsAfterIntersection = (*data->polyConnectsAfterIntersection)[voxelIndex];
     int& numSurfaceFacesAfterIntersection = (*data->numSurfaceFacesAfterIntersection)[voxelIndex];
-    int& numTotalFacesAfterIntersection = (*data->numTotalFacesAfterIntersection)[voxelIndex];
     std::unordered_map<Point_3, int, CGALHelper::Point3Hash> cgalVertexToMayaIdx;
 
     const Voxels* voxels = taskData->voxels;
@@ -572,6 +574,9 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
             polyCountsAfterIntersection,
             polyConnectsAfterIntersection
         );
+
+        // If we're not doing bool ops, and this is a surface voxel, just call all 6 faces surface faces.
+        if (voxels->isSurface[voxelIndex]) numSurfaceFacesAfterIntersection = 6;
         return (MThreadRetVal)0;
     }
 
@@ -612,6 +617,5 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
         polyConnectsAfterIntersection
     );
 
-    numTotalFacesAfterIntersection = polyCountsAfterIntersection.length();
     return (MThreadRetVal)0;
 }
