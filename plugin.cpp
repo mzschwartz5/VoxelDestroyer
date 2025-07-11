@@ -5,9 +5,8 @@
 #include <maya/MFnMessageAttribute.h>
 #include <windows.h>
 #include "custommayaconstructs/voxeldragcontextcommand.h"
-#include <maya/MTimerMessage.h>
-#include <maya/MTime.h>
 #include <maya/MAnimControl.h>
+#include <maya/MProgressWindow.h>
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -48,6 +47,11 @@ MSyntax plugin::syntax()
 // Plugin doIt function
 MStatus plugin::doIt(const MArgList& argList)
 {
+	MProgressWindow::reserve();
+    // MProgressWindow::setInterruptable(true); // TODO: 
+	MProgressWindow::setTitle("Mesh Preparation Progress");
+	MProgressWindow::startProgress();
+
 	MStatus status;
 
 	PluginArgs pluginArgs = parsePluginArgs(argList);
@@ -93,6 +97,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	VoxelRendererOverride::setPBD(&plugin::pbdSimulator);
 	VoxelDeformerCPUNode::instantiateAndAttachToMesh(plugin::voxelizedMeshDagPath);
 
+	MProgressWindow::endProgress();
 	return status;
 }
 

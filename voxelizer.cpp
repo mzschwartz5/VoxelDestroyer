@@ -8,6 +8,7 @@
 #include <maya/MFloatPointArray.h>
 #include <numeric>
 #include "cgalhelper.h"
+#include <maya/MProgressWindow.h>
 
 Voxels Voxelizer::voxelizeSelectedMesh(
     float gridEdgeLength,
@@ -371,6 +372,8 @@ MDagPath Voxelizer::createVoxels(
         newMeshName
     };
 
+    MProgressWindow::setProgressStatus("Calculating intersections between each voxel and the mesh...");
+    MProgressWindow::setProgressRange(0, overlappedVoxels.numOccupied);
     MThreadPool::newParallelRegion(
         Voxelizer::getVoxelMeshIntersection,
         (void*)&taskData
@@ -495,8 +498,14 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
         threadData[i].numInteriorFacesAfterIntersection = &numInteriorFacesAfterIntersection;
 
         MThreadPool::createTask(Voxelizer::getSingleVoxelMeshIntersection, (void *)&threadData[i], rootTask);
+
+        if (i % 100 == 0) {
+            MThreadPool::executeAndJoin(rootTask);
+            MProgressWindow::advanceProgress(100);
+        }
     }
-    MThreadPool::executeAndJoin(rootTask);
+    MThreadPool::executeAndJoin(rootTask); // Execute any remaining tasks
+    MProgressWindow::setProgress(voxels->numOccupied);
     threadData.clear();
 
     // Merge together all the mesh points, poly counts, and poly connects into one mesh
