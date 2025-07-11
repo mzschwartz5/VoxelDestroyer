@@ -360,13 +360,15 @@ MDagPath Voxelizer::createVoxels(
     MString originalMeshName = transformPath.partialPathName();
     MString newMeshName = originalMeshName + "_voxelized";
 
-    MString selectSurfaceFacesCommand = "select -add "; // This string will be built up in getVoxelMeshIntersection
+    MString surfaceFaces = ""; // This string will be built up in getVoxelMeshIntersection
+    MString interiorFaces = "";
     VoxelIntersectionTaskData taskData {
         &overlappedVoxels,
         &originalVertices,
         &meshTris,
         &sideTester,
-        &selectSurfaceFacesCommand,
+        &surfaceFaces,
+        &interiorFaces,
         doBoolean,
         clipTriangles,
         newMeshName
@@ -381,7 +383,7 @@ MDagPath Voxelizer::createVoxels(
     MThreadPool::release(); // reduce reference count incurred by opening a new parallel region
 
     // TODO: if no boolean, should get rid of non-manifold geometry
-    MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, voxelSize, selectSurfaceFacesCommand);
+    MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, voxelSize, surfaceFaces, interiorFaces);
     // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh (or just allow for undo)
     MGlobal::executeCommand("delete " + originalMeshName, false, true); // Delete the original mesh to clean up the scene
 
@@ -393,7 +395,8 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     const MString& originalMeshName,
     const MPoint& originalPivot,
     float voxelSize,
-    const MString& selectSurfaceFacesCommand
+    const MString& surfaceFaces,
+    const MString& interiorFaces
 ) {
     // Retrieve the MObject of the resulting mesh
     MStatus status;
@@ -407,16 +410,17 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MFnTransform resultTransformFn(resultMeshDagPath, &status);
     resultTransformFn.setRotatePivot(originalPivot, MSpace::kTransform, false); // Set the pivot to the original mesh's pivot
 
-    // First make the whole mesh have the initialShadingGroup by default, and normals set to faces (mainly for interior voxels)
-    MGlobal::executeCommand("select -r " + newMeshName, false, false); 
-    MGlobal::executeCommand("polySetToFaceNormal;", false, false);
-    MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + newMeshName, false, false); 
-    
     // Use MEL to transferAttributes the normals / uvs / etc. from the original mesh to the new voxelized/combined one
     MGlobal::executeCommand("select -r " + originalMeshName, false, false); 
-    MGlobal::executeCommand(selectSurfaceFacesCommand, false, false);
+    MGlobal::executeCommand("select -add " + surfaceFaces, false, false);
     MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
     MGlobal::executeCommand("transferShadingSets", false, false);
+
+    // For now at least, let the interior faces be grey and flat shaded.
+    // (Otherwise, they try to extend the shading and normals from the surface and look weird).
+    MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + interiorFaces, false, false); 
+    MGlobal::executeCommand("select -r " + interiorFaces, false, false);
+    MGlobal::executeCommand("polySetToFaceNormal;", false, false);
 
     MGlobal::executeCommand("delete -ch " + newMeshName); // Delete the history of the combined mesh to decouple it from the original mesh
     MGlobal::executeCommand("select -cl;", false, false); // Clear selection
@@ -477,7 +481,8 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
 void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) {
     VoxelIntersectionTaskData* taskData = static_cast<VoxelIntersectionTaskData*>(data);
     Voxels* voxels = taskData->voxels;
-    MString* selectSurfaceFacesCommand = taskData->selectSurfaceFacesCommand;
+    MString* surfaceFaces = taskData->surfaceFaces;
+    MString* interiorFaces = taskData->interiorFaces;
     const MString& newMeshName = taskData->newMeshName;
 
     // Threads will write the outputs of the boolean operations to these vectors
@@ -515,11 +520,16 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
         voxels->vertStartIdx[i] = voxels->totalVerts;
         voxels->totalVerts += meshPointsAfterIntersection[i].length();
 
+        int totalFaceCount = polyCountsAfterIntersection[i].length();
         int numSurfaceFaces = numSurfaceFacesAfterIntersection[i];
+        int numInteriorFaces = totalFaceCount - numSurfaceFaces;
         if (numSurfaceFaces > 0) {
-            (*selectSurfaceFacesCommand) += newMeshName + MString(".f[") + startFaceIdx + MString(":") + (startFaceIdx + numSurfaceFaces - 1) + MString("] ");
+            (*surfaceFaces) += newMeshName + MString(".f[") + startFaceIdx + MString(":") + (startFaceIdx + numSurfaceFaces - 1) + MString("] ");
         }
-        startFaceIdx += polyCountsAfterIntersection[i].length();
+        if (numInteriorFaces > 0) {
+            (*interiorFaces) += newMeshName + MString(".f[") + (startFaceIdx + numSurfaceFaces) + MString(":") + (startFaceIdx + totalFaceCount - 1) + MString("] ");
+        }
+        startFaceIdx += totalFaceCount;
 
         for (unsigned int j = 0; j < meshPointsAfterIntersection[i].length(); ++j) {
             allMeshPoints.append(meshPointsAfterIntersection[i][j]);

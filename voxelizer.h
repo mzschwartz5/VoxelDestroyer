@@ -171,7 +171,8 @@ private:
         const MPointArray* const originalVertices;
         const std::vector<Triangle>* const triangles;
         const SideTester* const sideTester;
-        MString* const selectSurfaceFacesCommand; // pass by pointer as this string will be very long and modified by the task
+        MString* const surfaceFaces; // pass by pointer as this string will be very long and modified by the task
+        MString* const interiorFaces;
         bool doBoolean;
         bool clipTriangles;
         MString newMeshName;
@@ -203,8 +204,7 @@ private:
         const MString& originalMesh,
         const MPoint& originalPivot,
         float voxelSize,
-        const MString& selectSurfaceFacesCommand
+        const MString& surfaceFaces,
+        const MString& interiorFaces
     );
-
-    MString selectSurfaceFaces(MFnMesh& mesh, const MString& meshName, float voxelSize, MString& interiorFaces);
 };
