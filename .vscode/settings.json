@@ -92,7 +92,12 @@
         "strstream": "cpp",
         "typeindex": "cpp",
         "unordered_set": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "any": "cpp",
+        "cinttypes": "cpp",
+        "execution": "cpp",
+        "filesystem": "cpp",
+        "future": "cpp"
     },
     "cmake.ignoreCMakeListsMissing": true
 }
