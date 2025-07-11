@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project=".\ExternalDependencies.props" />
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -69,6 +70,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <TargetExt>.mll</TargetExt>
+    <OutDir>$(MAYA_PLUGIN_DIR)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -76,6 +78,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.mll</TargetExt>
+    <OutDir>$(MAYA_PLUGIN_DIR)</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -95,7 +98,6 @@
       <AdditionalIncludeDirectories>
         C:\Program Files\Autodesk\Maya2025\include;
         $(ProjectDir)glm;
-        C:\Users\mzsch\vcpkg\installed\x64-windows-static-md\include;
         %(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
       <AdditionalOptions>/std:c++17 /bigobj %(AdditionalOptions)</AdditionalOptions>
@@ -106,7 +108,6 @@
       <OutputFile>$(OutDir)$(ProjectName).mll</OutputFile>
       <AdditionalLibraryDirectories>
         C:\Program Files\Autodesk\Maya2025\lib;
-        C:\Users\mzsch\vcpkg\installed\x64-windows-static-md\lib <!-- TODO: replace with system-independent path  -->
       </AdditionalLibraryDirectories>
       <AdditionalDependencies>
         Foundation.lib;
@@ -119,8 +120,6 @@
         opengl32.lib;
         D3DCompiler.lib;
         clew.lib;
-        gmp.lib;
-        mpfr.lib;
         %(AdditionalDependencies)
       </AdditionalDependencies>
       <AdditionalOptions>/NODEFAULTLIB:MSVCRT %(AdditionalOptions)</AdditionalOptions>
@@ -146,10 +145,9 @@
       <AdditionalIncludeDirectories>
         C:\Program Files\Autodesk\Maya2025\include;
         $(ProjectDir)glm;
-        C:\Users\mzsch\vcpkg\installed\x64-windows-static-md\include;
         %(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalOptions>/std:c++17 /bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -160,7 +158,6 @@
       <OutputFile>$(OutDir)$(ProjectName).mll</OutputFile>
       <AdditionalLibraryDirectories>
         C:\Program Files\Autodesk\Maya2025\lib;
-        C:\Users\mzsch\vcpkg\installed\x64-windows-static-md\lib <!-- TODO: replace with system-independent path  -->
       </AdditionalLibraryDirectories>
       <AdditionalDependencies>
         Foundation.lib;
@@ -173,8 +170,6 @@
         opengl32.lib;
         D3DCompiler.lib;
         clew.lib;
-        gmp.lib;
-        mpfr.lib;
         %(AdditionalDependencies)
       </AdditionalDependencies>
     </Link>
@@ -202,7 +197,6 @@
     <ClInclude Include="directx\compute\dragparticlescompute.h" />
     <ClInclude Include="directx\compute\buildcollisiongridcompute.h" />
     <ClInclude Include="directx\compute\solvecollisionscompute.h" />
-
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="plugin.cpp" />
