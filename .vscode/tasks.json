@@ -8,8 +8,6 @@
                 "/m",
                 "/p:Configuration=Debug",
                 "/p:Platform=x64",
-                "/p:OutDir=${workspaceFolder}/x64/Debug/",
-                "/p:IntDir=${workspaceFolder}/x64/Debug/",
                 "${workspaceFolder}/VoxelDestroyer.vcxproj"
             ],
             "type": "shell",
@@ -26,8 +24,6 @@
                 "/m",
                 "/p:Configuration=Release",
                 "/p:Platform=x64",
-                "/p:OutDir=${workspaceFolder}/x64/Release/",
-                "/p:IntDir=${workspaceFolder}/x64/Release/",
                 "${workspaceFolder}/VoxelDestroyer.vcxproj"
             ],
             "type": "shell",

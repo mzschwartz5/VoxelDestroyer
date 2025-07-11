@@ -1,0 +1,17 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <!-- locate vcpkg: first from env VCPKG_ROOT, then %USERPROFILE%\vcpkg -->
+    <VcpkgRoot Condition="'$(VcpkgRoot)'==''">$(VCPKG_ROOT)</VcpkgRoot>
+    <VcpkgRoot Condition="'$(VcpkgRoot)'==''">$(UserProfile)\vcpkg</VcpkgRoot>
+    <VcpkgEnableManifest>true</VcpkgEnableManifest>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <VcpkgUseStatic>true</VcpkgUseStatic>
+    <VcpkgTriplet>x64-windows-static</VcpkgTriplet>
+  </PropertyGroup>
+
+  <Import
+    Project="$(VcpkgRoot)\scripts\buildsystems\msbuild\vcpkg.targets"
+    Condition="Exists('$(VcpkgRoot)\scripts\buildsystems\msbuild\vcpkg.targets')"
+  />
+</Project>
