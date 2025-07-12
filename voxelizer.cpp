@@ -22,19 +22,20 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     bool clipTriangles,
     MStatus& status
 ) {
+    MFnMesh selectedMesh(selectedMeshPath, &status);
+    MDagPath transformPath = selectedMesh.dagPath();
+    transformPath.pop(); // Move up to the transform node
+    MFnTransform transform(transformPath);
+    MPoint originalPivot = transform.rotatePivot(MSpace::kWorld);
+    MString originalMeshName = transformPath.partialPathName();
+    MString newMeshName = originalMeshName + "_voxelized";
 
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
     Voxels voxels;
     voxels.resize(voxelsPerEdge * voxelsPerEdge * voxelsPerEdge);
     status = MThreadPool::init();
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("Failed to initialize Maya thread pool for voxelization.");
-        return voxels;
-    }
     
-    MFnMesh selectedMesh(selectedMeshPath, &status);
-    // This is what Maya does when you select a mesh and click Modify > Freeze Transformations
-    // It's neceessary for the boolean operations to work correctly.
+    // Freeze transformations on the original mesh before any processing
     MGlobal::executeCommand(MString("makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 -pn 1"), false, true);
 
     MProgressWindow::setProgressStatus("Processing mesh triangles...");
@@ -64,16 +65,29 @@ Voxels Voxelizer::voxelizeSelectedMesh(
         );
     }
 
-    voxelizedMeshPath = createVoxels(
+    MProgressWindow::setProgressStatus("Creating voxels...");
+    createVoxels(
         voxels,
         gridEdgeLength,
         voxelSize,
-        gridCenter,
+        gridCenter
+    );
+
+    MProgressWindow::setProgressStatus("Sorting voxels by Morton code...");
+    voxels = sortVoxelsByMortonCode(voxels);
+
+    MProgressWindow::setProgressStatus("Calculating voxel-mesh intersections...");
+    const FaceSelectionStrings faceSelectionStrings = prepareForAndDoVoxelIntersection(
+        voxels,
         selectedMesh,
         meshTris,
+        newMeshName,
         doBoolean,
         clipTriangles
     );
+
+    voxelizedMeshPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, voxelSize, faceSelectionStrings); // TODO: if no boolean, should get rid of non-manifold geometry
+    MGlobal::executeCommand("delete " + originalMeshName, false, true); // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh (or just allow for undo)
 
     MThreadPool::release(); // reduce reference count incurred by init()
     return voxels;
@@ -347,23 +361,23 @@ double Voxelizer::getTriangleVoxelCenterIntercept(
     return X_intercept;
 }
 
-MDagPath Voxelizer::createVoxels(
+void Voxelizer::createVoxels(
     Voxels& overlappedVoxels,
     float gridEdgeLength, 
     float voxelSize,       
-    MPoint gridCenter,      
-    MFnMesh& originalMesh,
-    const std::vector<Triangle>& meshTris,
-    bool doBoolean,
-    bool clipTriangles
-) {
+    MPoint gridCenter
+) {    
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
     MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
+
+    MProgressWindow::setProgressRange(0, voxelsPerEdge * voxelsPerEdge * voxelsPerEdge);
+    MProgressWindow::setProgress(0);
 
     for (int x = 0; x < voxelsPerEdge; ++x) {
         for (int y = 0; y < voxelsPerEdge; ++y) {
             for (int z = 0; z < voxelsPerEdge; ++z) {
                 int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
+                if (index % 100 == 0) MProgressWindow::advanceProgress(100);
                 if (!overlappedVoxels.occupied[index]) continue;
                 
                 overlappedVoxels.mortonCodes[index] = Utils::toMortonCode(x, y, z);
@@ -379,8 +393,17 @@ MDagPath Voxelizer::createVoxels(
             }
         }
     }
+}
 
-    overlappedVoxels = sortVoxelsByMortonCode(overlappedVoxels);
+Voxelizer::FaceSelectionStrings Voxelizer::prepareForAndDoVoxelIntersection(
+    Voxels& voxels,      
+    MFnMesh& originalMesh,
+    const std::vector<Triangle>& meshTris,
+    const MString& newMeshName,
+    bool doBoolean,
+    bool clipTriangles
+) 
+{
 
     // Prepare for boolean operations
     // We only want to create the acceleration structure once (which is why we do it here, before all the boolean ops begin)
@@ -392,41 +415,28 @@ MDagPath Voxelizer::createVoxels(
     Tree aabbTree(originalMeshCGAL.faces().first, originalMeshCGAL.faces().second, originalMeshCGAL);
     SideTester sideTester(aabbTree);
 
-    MDagPath transformPath = originalMesh.dagPath();
-    transformPath.pop(); // Move up to the transform node
-    MFnTransform transform(transformPath);
-    MPoint originalPivot = transform.rotatePivot(MSpace::kWorld);
-    MString originalMeshName = transformPath.partialPathName();
-    MString newMeshName = originalMeshName + "_voxelized";
-
-    MString surfaceFaces = ""; // This string will be built up in getVoxelMeshIntersection
-    MString interiorFaces = "";
+    // These strings will be built up in getVoxelMeshIntersection
+    FaceSelectionStrings faceSelectionStrings;
     VoxelIntersectionTaskData taskData {
-        &overlappedVoxels,
+        &voxels,
         &originalVertices,
         &meshTris,
         &sideTester,
-        &surfaceFaces,
-        &interiorFaces,
+        &faceSelectionStrings.surfaceFaces,
+        &faceSelectionStrings.interiorFaces,
         doBoolean,
         clipTriangles,
         newMeshName
     };
 
-    MProgressWindow::setProgressStatus("Calculating intersections between each voxel and the mesh...");
-    MProgressWindow::setProgressRange(0, overlappedVoxels.numOccupied);
+    MProgressWindow::setProgressRange(0, voxels.numOccupied);
     MThreadPool::newParallelRegion(
         Voxelizer::getVoxelMeshIntersection,
         (void*)&taskData
     );
     MThreadPool::release(); // reduce reference count incurred by opening a new parallel region
 
-    // TODO: if no boolean, should get rid of non-manifold geometry
-    MDagPath finalizedVoxelMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, voxelSize, surfaceFaces, interiorFaces);
-    // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh (or just allow for undo)
-    MGlobal::executeCommand("delete " + originalMeshName, false, true); // Delete the original mesh to clean up the scene
-
-    return finalizedVoxelMeshDagPath;
+    return faceSelectionStrings;
 }
 
 MDagPath Voxelizer::finalizeVoxelMesh(
@@ -434,8 +444,7 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     const MString& originalMeshName,
     const MPoint& originalPivot,
     float voxelSize,
-    const MString& surfaceFaces,
-    const MString& interiorFaces
+    const FaceSelectionStrings& faceSelectionStrings
 ) {
     MProgressWindow::setProgressRange(0, 100);
     MProgressWindow::setProgress(0);
@@ -459,7 +468,7 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     // Use MEL to transferAttributes the normals / uvs / etc. from the original mesh to the new voxelized/combined one
     MProgressWindow::setProgressStatus("Transferring attributes from original mesh...");
     MGlobal::executeCommand("select -r " + originalMeshName, false, false); 
-    MGlobal::executeCommand("select -add " + surfaceFaces, false, false);
+    MGlobal::executeCommand("select -add " + faceSelectionStrings.surfaceFaces, false, false);
     MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
     MProgressWindow::advanceProgress(progressIncrement);
     MProgressWindow::setProgressStatus("Transferring shading sets from original mesh...");
@@ -469,8 +478,8 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     // For now at least, let the interior faces be grey and flat shaded.
     // (Otherwise, they try to extend the shading and normals from the surface and look weird).
     MProgressWindow::setProgressStatus("Setting normals and shading on interior faces...");
-    MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + interiorFaces, false, false); 
-    MGlobal::executeCommand("select -r " + interiorFaces, false, false);
+    MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + faceSelectionStrings.interiorFaces, false, false); 
+    MGlobal::executeCommand("select -r " + faceSelectionStrings.interiorFaces, false, false);
     MGlobal::executeCommand("polySetToFaceNormal;", false, false);
     MProgressWindow::advanceProgress(progressIncrement);
 

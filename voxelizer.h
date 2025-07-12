@@ -100,6 +100,7 @@ public:
 
 private:
 
+    // Iterates over Maya triangles and processes each one, calculating quantities needed for voxelization
     std::vector<Triangle> getTrianglesOfMesh(MFnMesh& mesh, float voxelSize, MStatus& status);
 
     Triangle processMayaTriangle(
@@ -118,6 +119,7 @@ private:
         const MFnMesh& selectedMesh
     );
 
+    // Does an interior voxelization
     void getInteriorVoxels(
         const std::vector<Triangle>& triangles, // triangles to check against
         float gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
@@ -151,15 +153,13 @@ private:
         const MFnMesh& selectedMesh
     );
 
-    MDagPath createVoxels(
+    // Iterates over voxels and, for each that is occupied (overlaps or is contained in the mesh), 
+    // creates a cube mesh for it.
+    void createVoxels(
         Voxels& occupiedVoxels,
         float gridEdgeLength, 
         float voxelSize,       
-        MPoint gridCenter,      
-        MFnMesh& originalSurface,
-        const std::vector<Triangle>& triangles,
-        bool doBoolean,
-        bool clipTriangles
+        MPoint gridCenter
     );
 
     void addVoxelToMesh(
@@ -169,13 +169,28 @@ private:
         int index
     );
 
+    // Sorts the voxels by their Morton code, which helps later on with efficient GPU memory access.
     Voxels sortVoxelsByMortonCode(
         const Voxels& voxels
     );
 
-    /**
-     * Payload for the function that sets up all threads.
-     */
+    struct FaceSelectionStrings {
+        MString surfaceFaces;
+        MString interiorFaces;
+    };
+
+    // Sets up the CGAL acceleration tree and launches the MThreadPool (which, itself sets up each thread).
+    // (There are too many "do intersection" here functions IMO, but Maya's thread pool forces you into a pattern of manager functions that don't do much themselves)
+    FaceSelectionStrings prepareForAndDoVoxelIntersection(
+        Voxels& voxels,      
+        MFnMesh& originalMesh,
+        const std::vector<Triangle>& meshTris,
+        const MString& newMeshName,
+        bool doBoolean,
+        bool clipTriangles
+    );
+
+    // Payload for the function that sets up all threads.
     struct VoxelIntersectionTaskData {
         Voxels* voxels;
         const MPointArray* const originalVertices;
@@ -198,11 +213,14 @@ private:
         int threadIdx;
     };
 
+    // The Maya thradpool callback for setting up all the threads and their data.
+    // Also processes the results afterwards and creates the resulting MObject mesh.
     static void getVoxelMeshIntersection(
         void* taskData,
         MThreadRootTask* rootTask
     );
 
+    // A per-thread function that does the actual intersection of the voxel mesh with the triangles.
     static MThreadRetVal getSingleVoxelMeshIntersection(void* threadData);
 
     /*
@@ -215,7 +233,6 @@ private:
         const MString& originalMesh,
         const MPoint& originalPivot,
         float voxelSize,
-        const MString& surfaceFaces,
-        const MString& interiorFaces
+        const FaceSelectionStrings& faceSelectionStrings
     );
 };
