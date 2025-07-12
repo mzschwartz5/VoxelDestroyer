@@ -13,13 +13,13 @@
 #include "glm/glm.hpp"
 #include <maya/MThreadPool.h>
 
-#include <CGAL/Simple_cartesian.h>
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/AABB_face_graph_triangle_primitive.h>
 #include <CGAL/AABB_traits_3.h>
 #include <CGAL/AABB_tree.h>
 #include <CGAL/Side_of_triangle_mesh.h>
-using Kernel       = CGAL::Simple_cartesian<double>;
+using Kernel       = CGAL::Exact_predicates_inexact_constructions_kernel;
 using Point_3      = Kernel::Point_3;
 using SurfaceMesh  = CGAL::Surface_mesh<Point_3>;
 using Primitive    = CGAL::AABB_face_graph_triangle_primitive<SurfaceMesh>;

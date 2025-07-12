@@ -433,12 +433,12 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     resultTransformFn.setRotatePivot(originalPivot, MSpace::kTransform, false); // Set the pivot to the original mesh's pivot
 
     // Use MEL to transferAttributes the normals / uvs / etc. from the original mesh to the new voxelized/combined one
-    MProgressWindow::setProgressStatus("Transferring attributes from original mesh to voxelized mesh...");
+    MProgressWindow::setProgressStatus("Transferring attributes from original mesh...");
     MGlobal::executeCommand("select -r " + originalMeshName, false, false); 
     MGlobal::executeCommand("select -add " + surfaceFaces, false, false);
     MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
     MProgressWindow::advanceProgress(progressIncrement);
-    MProgressWindow::setProgressStatus("Transferring shading sets from original mesh to voxelized mesh...");
+    MProgressWindow::setProgressStatus("Transferring shading sets from original mesh...");
     MGlobal::executeCommand("transferShadingSets", false, false);
     MProgressWindow::advanceProgress(progressIncrement);
 
