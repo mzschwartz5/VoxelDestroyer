@@ -37,9 +37,11 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     // It's neceessary for the boolean operations to work correctly.
     MGlobal::executeCommand(MString("makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 -pn 1"), false, true);
 
+    MProgressWindow::setProgressStatus("Processing mesh triangles...");
     std::vector<Triangle> meshTris = getTrianglesOfMesh(selectedMesh, voxelSize, status);
 
     if (voxelizeInterior) {
+        MProgressWindow::setProgressStatus("Performing interior voxelization...");
         getInteriorVoxels(
             meshTris,
             gridEdgeLength,
@@ -51,6 +53,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     }
 
     if (voxelizeSurface) {
+        MProgressWindow::setProgressStatus("Performing surface voxelization...");
         getSurfaceVoxels(
             meshTris,
             gridEdgeLength,
@@ -79,11 +82,13 @@ std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxel
     MIntArray triangleCounts;
     MIntArray vertexIndices;
     status = meshFn.getTriangles(triangleCounts, vertexIndices);
+    int numTriangles = static_cast<int>(vertexIndices.length() / 3);
+    MProgressWindow::setProgressRange(0, numTriangles);
+    MProgressWindow::setProgress(0);
 
-    // This will later be done on the gpu, one thread per triangle
     std::vector<Triangle> triangles;
     std::array<int, 3> vertIndices;
-    for (unsigned int i = 0; i < vertexIndices.length() / 3; ++i) {
+    for (int i = 0; i < numTriangles; ++i) {
 
         vertIndices[0] = vertexIndices[3 * i];
         vertIndices[1] = vertexIndices[3 * i + 1];
@@ -91,8 +96,11 @@ std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxel
 
         Triangle triangle = processMayaTriangle(meshFn, vertIndices, voxelSize);
         triangles.push_back(triangle);
+        
+        if (i % 100 == 0) MProgressWindow::advanceProgress(100);
     }
 
+    MProgressWindow::setProgress(numTriangles);
 	status = MS::kSuccess;
     return triangles;
 }
@@ -162,6 +170,8 @@ void Voxelizer::getSurfaceVoxels(
     MPoint gridCenter,
     Voxels& voxels
 ) {
+    MProgressWindow::setProgressRange(0, static_cast<int>(triangles.size()));
+    MProgressWindow::setProgress(0);
     
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
     MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
@@ -196,6 +206,7 @@ void Voxelizer::getSurfaceVoxels(
         }
 
         ++triIdx;
+        if (triIdx % 100 == 0) MProgressWindow::advanceProgress(100);
     }
 }
 
@@ -225,10 +236,13 @@ void Voxelizer::getInteriorVoxels(
     Voxels& voxels,
     const MFnMesh& selectedMesh
 ) {
+    MProgressWindow::setProgressRange(0, static_cast<int>(triangles.size()));
+    MProgressWindow::setProgress(0);
     
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
     MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
 
+    int progressCounter = 0;
     for (const Triangle& tri : triangles) {
         // The algorithm for interior voxels only examines the YZ plane of the triangle
         // Then we search over every voxel in each X column whose YZ center is overlapped by the triangle.
@@ -263,6 +277,9 @@ void Voxelizer::getInteriorVoxels(
                 }
             }
         }
+
+        ++progressCounter;
+        if (progressCounter % 100 == 0) MProgressWindow::advanceProgress(100);
     }
 }
 
@@ -398,6 +415,11 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     const MString& surfaceFaces,
     const MString& interiorFaces
 ) {
+    MProgressWindow::setProgressRange(0, 100);
+    MProgressWindow::setProgress(0);
+    int numSubsteps = 3; // purely for progress bar
+    int progressIncrement = 100 / numSubsteps;
+
     // Retrieve the MObject of the resulting mesh
     MStatus status;
     MSelectionList resultSelectionList;
@@ -411,16 +433,22 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     resultTransformFn.setRotatePivot(originalPivot, MSpace::kTransform, false); // Set the pivot to the original mesh's pivot
 
     // Use MEL to transferAttributes the normals / uvs / etc. from the original mesh to the new voxelized/combined one
+    MProgressWindow::setProgressStatus("Transferring attributes from original mesh to voxelized mesh...");
     MGlobal::executeCommand("select -r " + originalMeshName, false, false); 
     MGlobal::executeCommand("select -add " + surfaceFaces, false, false);
     MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
+    MProgressWindow::advanceProgress(progressIncrement);
+    MProgressWindow::setProgressStatus("Transferring shading sets from original mesh to voxelized mesh...");
     MGlobal::executeCommand("transferShadingSets", false, false);
+    MProgressWindow::advanceProgress(progressIncrement);
 
     // For now at least, let the interior faces be grey and flat shaded.
     // (Otherwise, they try to extend the shading and normals from the surface and look weird).
+    MProgressWindow::setProgressStatus("Setting normals and shading on interior faces...");
     MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + interiorFaces, false, false); 
     MGlobal::executeCommand("select -r " + interiorFaces, false, false);
     MGlobal::executeCommand("polySetToFaceNormal;", false, false);
+    MProgressWindow::advanceProgress(progressIncrement);
 
     MGlobal::executeCommand("delete -ch " + newMeshName); // Delete the history of the combined mesh to decouple it from the original mesh
     MGlobal::executeCommand("select -cl;", false, false); // Clear selection

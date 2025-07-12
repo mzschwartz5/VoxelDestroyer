@@ -69,8 +69,7 @@ MStatus plugin::doIt(const MArgList& argList)
 		MGlobal::setActiveSelectionList(selectionList);
 	}
 
-	MGlobal::displayInfo("Selected mesh: " + selectedMeshDagPath.fullPathName());
-
+	// Progress window message updates done within the voxelizer (for finer-grained control)
 	float voxelSize = static_cast<float>(pluginArgs.scale / pluginArgs.voxelsPerEdge);
 	Voxels voxels = voxelizer.voxelizeSelectedMesh(
 		static_cast<float>(pluginArgs.scale),
@@ -85,11 +84,10 @@ MStatus plugin::doIt(const MArgList& argList)
 		status
 	);
 	
-	MGlobal::displayInfo("Mesh voxelized. Dag path: " + plugin::voxelizedMeshDagPath.fullPathName());
-
 	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
+	MProgressWindow::setProgressStatus("Creating PBD particles and face constraints..."); MProgressWindow::setProgressRange(0, 100); MProgressWindow::setProgress(0);
 	plugin::pbdSimulator.initialize(voxels, voxelSize, plugin::voxelizedMeshDagPath);
-	MGlobal::displayInfo("PBD particles initialized.");
+	MProgressWindow::setProgress(100);
 
 	plugin::createVoxelSimulationNode();
 		
@@ -178,7 +176,6 @@ MDagPath plugin::getSelectedObject(const MPoint& voxelGridCenter, double voxelGr
 
     // Check if the selection is empty
     if (selection.isEmpty()) {
-        MGlobal::displayWarning("No mesh selected.");
         status = MS::kFailure;
         return MDagPath();
     }
