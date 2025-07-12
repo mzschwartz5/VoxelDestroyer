@@ -60,7 +60,8 @@ struct Voxels {
     std::vector<uint32_t> mortonCodes;
     // Answers the question: for a given voxel morton code, what is the index of the corresponding voxel in the sorted array of voxels?
     std::unordered_map<uint32_t, uint32_t> mortonCodesToSortedIdx;
-    std::vector<std::vector<int>> triangleIndices; // Indices of triangles that overlap with the voxel
+    std::vector<std::vector<int>> containedTris;   // Indices of triangles whose centroids are contained within the voxel
+    std::vector<std::vector<int>> overlappingTris; // Indicies of triangles that overlap the voxel, but whose centroids are not contained within the voxel
     
     int totalVerts = 0; // total number of vertices in the voxelized mesh
     int numOccupied = 0;
@@ -73,7 +74,8 @@ struct Voxels {
         corners.resize(size, VoxelPositions());
 		vertStartIdx.resize(size, -1);
         mortonCodes.resize(size, UINT_MAX);
-        triangleIndices.resize(size);
+        containedTris.resize(size);
+        overlappingTris.resize(size);
     }
 };
 
@@ -112,7 +114,8 @@ private:
         float gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
         float voxelSize,                        // edge length of a single voxel
         MPoint gridCenter,                      // center of the grid in world space
-        Voxels& voxels
+        Voxels& voxels,
+        const MFnMesh& selectedMesh
     );
 
     void getInteriorVoxels(
@@ -139,6 +142,13 @@ private:
         const Triangle& triangle,     // triangle to check against
         const MVector& voxelCenterYZ, // YZ coords of the voxel column center
         const MFnMesh& selectedMesh   // the original mesh to use for boolean operations
+    );
+
+    bool isTriangleCentroidInVoxel(
+        const Triangle& triangle,  
+        const MVector& voxelMin,
+        double voxelSize,
+        const MFnMesh& selectedMesh
     );
 
     MDagPath createVoxels(
@@ -196,8 +206,9 @@ private:
     static MThreadRetVal getSingleVoxelMeshIntersection(void* threadData);
 
     /*
-     * Take the boolean voxel pieces of the mesh and combine them. Other book keeping items like transferring attributes,
-     * assigning shading groups, and deleting history are also done here.
+     * Miscellaneous steps to finish the voxelization process
+     * Transfers attributes (uvs, normals), transfers shading sets, etc.
+     * Currently, this takes the majority of the time in the voxelization process.
      */
     MDagPath finalizeVoxelMesh(
         const MString& newMeshName,
