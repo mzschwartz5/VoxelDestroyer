@@ -59,7 +59,8 @@ Voxels Voxelizer::voxelizeSelectedMesh(
             gridEdgeLength,
             voxelSize,
             gridCenter,
-            voxels
+            voxels,
+            selectedMesh
         );
     }
 
@@ -168,7 +169,8 @@ void Voxelizer::getSurfaceVoxels(
     float gridEdgeLength,
     float voxelSize,
     MPoint gridCenter,
-    Voxels& voxels
+    Voxels& voxels,
+    const MFnMesh& selectedMesh
 ) {
     MProgressWindow::setProgressRange(0, static_cast<int>(triangles.size()));
     MProgressWindow::setProgress(0);
@@ -200,7 +202,10 @@ void Voxelizer::getSurfaceVoxels(
                     
                     voxels.occupied[index] = true;
                     voxels.isSurface[index] = true;
-                    voxels.triangleIndices[index].push_back(triIdx);
+                    
+                    isTriangleCentroidInVoxel(tri, voxelMinCorner, voxelSize, selectedMesh) ? 
+                        voxels.containedTris[index].push_back(triIdx) :
+                        voxels.overlappingTris[index].push_back(triIdx);
                 }
             }
         }
@@ -226,6 +231,23 @@ bool Voxelizer::doesTriangleOverlapVoxel(
     }
 
     return true;
+}
+
+bool Voxelizer::isTriangleCentroidInVoxel(
+    const Triangle& triangle,
+    const MVector& voxelMin,
+    double voxelSize,
+    const MFnMesh& selectedMesh
+) {
+    MPoint centroid, point1, point2, point3;
+    selectedMesh.getPoint(triangle.indices[0], point1, MSpace::kWorld);
+    selectedMesh.getPoint(triangle.indices[1], point2, MSpace::kWorld);
+    selectedMesh.getPoint(triangle.indices[2], point3, MSpace::kWorld);
+    centroid = (point1 + point2 + point3) / 3.0;
+
+    return centroid.x >= voxelMin.x && centroid.x < voxelMin.x + voxelSize &&
+        centroid.y >= voxelMin.y && centroid.y < voxelMin.y + voxelSize &&
+        centroid.z >= voxelMin.z && centroid.z < voxelMin.z + voxelSize;
 }
 
 void Voxelizer::getInteriorVoxels(
@@ -417,10 +439,11 @@ MDagPath Voxelizer::finalizeVoxelMesh(
 ) {
     MProgressWindow::setProgressRange(0, 100);
     MProgressWindow::setProgress(0);
-    int numSubsteps = 3; // purely for progress bar
+    int numSubsteps = 4; // purely for progress bar
     int progressIncrement = 100 / numSubsteps;
 
     // Retrieve the MObject of the resulting mesh
+    MProgressWindow::setProgressStatus("Transferring pivot...");
     MStatus status;
     MSelectionList resultSelectionList;
     resultSelectionList.add(newMeshName);
@@ -431,6 +454,7 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MFnMesh resultMeshFn(resultMeshDagPath, &status);
     MFnTransform resultTransformFn(resultMeshDagPath, &status);
     resultTransformFn.setRotatePivot(originalPivot, MSpace::kTransform, false); // Set the pivot to the original mesh's pivot
+    MProgressWindow::advanceProgress(progressIncrement);
 
     // Use MEL to transferAttributes the normals / uvs / etc. from the original mesh to the new voxelized/combined one
     MProgressWindow::setProgressStatus("Transferring attributes from original mesh...");
@@ -498,7 +522,8 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
         sortedVoxels.corners[i] = voxels.corners[voxelIndices[i]];
         sortedVoxels.mortonCodes[i] = voxels.mortonCodes[voxelIndices[i]];
         sortedVoxels.mortonCodesToSortedIdx[voxels.mortonCodes[voxelIndices[i]]] = static_cast<uint32_t>(i);
-        sortedVoxels.triangleIndices[i] = voxels.triangleIndices[voxelIndices[i]];
+        sortedVoxels.containedTris[i] = voxels.containedTris[voxelIndices[i]];
+        sortedVoxels.overlappingTris[i] = voxels.overlappingTris[voxelIndices[i]];
     }
 
     sortedVoxels.numOccupied = voxels.numOccupied;
@@ -626,16 +651,20 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
         return (MThreadRetVal)0;
     }
 
-    // Each voxel contains the triangles of the original mesh that overlap it
-    // This is what we want to use for the boolean intersection. Convert this subset of the original mesh to a CGAL SurfaceMesh.
+    // Each voxel tracks triangles that are contained within it and triangles that just overlap it. 
+    // For the boolean intersection, we want the union of these two sets. Then onvert this subset of the original mesh to a CGAL SurfaceMesh.
+    std::vector<int> originalMeshTriIndices;
+    originalMeshTriIndices.reserve(voxels->containedTris[voxelIndex].size() + voxels->overlappingTris[voxelIndex].size());
+    originalMeshTriIndices.insert(originalMeshTriIndices.end(), voxels->containedTris[voxelIndex].begin(), voxels->containedTris[voxelIndex].end());
+    originalMeshTriIndices.insert(originalMeshTriIndices.end(), voxels->overlappingTris[voxelIndex].begin(), voxels->overlappingTris[voxelIndex].end());
+
     SurfaceMesh originalMeshPiece = CGALHelper::toSurfaceMesh(
         taskData->originalVertices,
-        voxels->triangleIndices[voxelIndex],
+        originalMeshTriIndices,
         taskData->triangles
     );
     SurfaceMesh cube = voxels->cgalMeshes[voxelIndex];
-
-    cgalVertexToMayaIdx.reserve(originalMeshPiece.vertices().size() + cube.vertices().size());
+    originalMeshTriIndices.clear();
 
     CGALHelper::openMeshBooleanIntersection(
         originalMeshPiece,
@@ -643,10 +672,21 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
         taskData->sideTester,
         taskData->clipTriangles
     );
+    
+    // If we're not clipping triangles, the originalMeshPiece should be reduced to only the triangles
+    // that are completely contained within the voxel. That way, we don't duplicate tris across voxels and get z-fighting.
+    if (!taskData->clipTriangles) {
+        originalMeshPiece = CGALHelper::toSurfaceMesh(
+            taskData->originalVertices,
+            voxels->containedTris[voxelIndex],
+            taskData->triangles
+        );
+    }
     numSurfaceFacesAfterIntersection = static_cast<int>(originalMeshPiece.faces().size());
 
     // Convert CGAL meshes back to Maya representation.
     // Use same map and arrays for both calls to make one singular mesh.
+    cgalVertexToMayaIdx.reserve(originalMeshPiece.vertices().size() + cube.vertices().size());
     CGALHelper::toMayaMesh(
         originalMeshPiece,
         cgalVertexToMayaIdx,
