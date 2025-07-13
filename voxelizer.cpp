@@ -655,8 +655,8 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
             polyConnectsAfterIntersection
         );
 
-        // If we're not doing bool ops, and this is a surface voxel, just call all 6 faces surface faces.
-        if (voxels->isSurface[voxelIndex]) numSurfaceFacesAfterIntersection = 6;
+        // If we're not doing bool ops, and this is a surface voxel, just call all surface faces
+        if (voxels->isSurface[voxelIndex]) numSurfaceFacesAfterIntersection = 12; // 12 because cube = 6 * 2 (triangulated)
         return (MThreadRetVal)0;
     }
 
