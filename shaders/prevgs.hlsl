@@ -18,10 +18,9 @@ void main(uint3 gId : SV_DispatchThreadID)
 {
     // Check for out of bounds?
     
-    if (weights[gId.x] == 0.0f) {
-        return;
-    }
+    if (weights[gId.x] == 0.0f) return;
 
+    velocities[gId.x] = (positions[gId.x] - oldPositions[gId.x]) / TIMESTEP;
     oldPositions[gId.x] = positions[gId.x];
     
     int voxelIndex = gId.x >> 3;
