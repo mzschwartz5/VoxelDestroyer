@@ -16,7 +16,9 @@ cbuffer VoxelSimBuffer : register(b0)
 [numthreads(VGS_THREADS, 1, 1)]
 void main(uint3 gId : SV_DispatchThreadID) 
 {
+    // TODOs:
     // Check for out of bounds?
+    // Consider accumulating or taking a max velocity while dragging and then applying it after the drag ends.
     
     if (weights[gId.x] == 0.0f) return;
 
@@ -27,10 +29,6 @@ void main(uint3 gId : SV_DispatchThreadID)
     if (!isDragging[voxelIndex]) {
         velocities[gId.x] += float4(0, GRAVITY_STRENGTH, 0, 0) * TIMESTEP; // Gravity
         positions[gId.x].xyz += (velocities[gId.x] * TIMESTEP).xyz; // Update position
-    }
-    else {
-        // Reset for next frame; the drag shader must re-set this to true every frame.
-        isDragging[voxelIndex] = false; 
     }
 
     // For now, lump ground collision into this shader
