@@ -84,7 +84,19 @@ public:
             this->dragValues.lastX = dragValues.lastX;
             this->dragValues.lastY = dragValues.lastY;
         }
+
+        // If we just stopped dragging, reset the isDraggingBuffer to false for all voxels.
+        if (wasDragging && !isDragging) {
+            resetDragValues();
+        }
+
         wasDragging = isDragging;
+    }
+
+    void resetDragValues() {
+        // See docs: 4 values are required even though only the first will be used, in our case.
+        UINT clearValues[4] = { 0, 0, 0, 0 };
+        DirectX::getContext()->ClearUnorderedAccessViewUint(isDraggingUAV.Get(), clearValues);
     }
 
     // TODO: make this a virtual method on the base compute class?
@@ -208,6 +220,7 @@ private:
         uavDesc.Buffer.NumElements = numVoxels;
 
         DirectX::getDevice()->CreateUnorderedAccessView(isDraggingBuffer.Get(), &uavDesc, &isDraggingUAV);
+        resetDragValues();
     };
 
     void tearDown() override

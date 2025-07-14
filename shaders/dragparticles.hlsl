@@ -50,7 +50,10 @@ void main( uint3 gId : SV_DispatchThreadID )
     float voxelCameraDepth = -viewSpaceVoxelCenter.z;    // Later, we need to have the view-space depth of the voxel.
     
     // The voxel is behind or very near the camera, don't drag it.
-    if (voxelCameraDepth < eps) return;
+    if (voxelCameraDepth < eps) {
+        isDragging[gId.x] = false; 
+        return;
+    }
 
     float4 pixelSpaceVoxelCenter = mul(viewSpaceVoxelCenter, projMatrix);
     pixelSpaceVoxelCenter /= pixelSpaceVoxelCenter.w; // Perspective divide
@@ -58,7 +61,10 @@ void main( uint3 gId : SV_DispatchThreadID )
     pixelSpaceVoxelCenter.y = (pixelSpaceVoxelCenter.y + 1.0f) * 0.5f * viewportHeight;
 
     // Compare the voxel center's depth to the scene depth value. If voxel is visible, move it.
-    if (depthValue < pixelSpaceVoxelCenter.z) return;
+    if (depthValue < pixelSpaceVoxelCenter.z) {
+        isDragging[gId.x] = false;
+        return;
+    }
 
     // Also compare the distance from the mouse to the voxel center
     float2 lastMousePos = float2(lastMouseX, lastMouseY);
@@ -69,7 +75,10 @@ void main( uint3 gId : SV_DispatchThreadID )
     // Approximate its size by the average of two diagonal particles, and then account for perspective.
     float perspectiveVoxelSize = (0.5 * voxelSize / voxelCameraDepth) * max(viewportHeight, viewportWidth);
 
-    if (dist > selectRadius + perspectiveVoxelSize) return; 
+    if (dist > selectRadius + perspectiveVoxelSize) {
+        isDragging[gId.x] = false;
+        return; 
+    }
 
     isDragging[gId.x] = true;
 
