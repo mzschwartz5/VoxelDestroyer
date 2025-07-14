@@ -56,27 +56,26 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 
 	simInfo = glm::vec4(GRAVITY_STRENGTH, GROUND_COLLISION_ENABLED, GROUND_COLLISION_Y, TIMESTEP);
 
+    dragParticlesCompute = std::make_unique<DragParticlesCompute>(
+        vgsCompute->getParticlesUAV(),
+        voxels.size()
+    );
+
     preVGSCompute = std::make_unique<PreVGSCompute>(
         particles.numParticles,
         particles.oldPositions.data(),
         particles.velocities.data(),
 		&simInfo,
         vgsCompute->getWeightsSRV(),
-        vgsCompute->getParticlesUAV()
+        vgsCompute->getParticlesUAV(),
+        dragParticlesCompute->getIsDraggingUAV()
     );
     
-    dragParticlesCompute = std::make_unique<DragParticlesCompute>(
-        vgsCompute->getParticlesUAV(),
-        preVGSCompute->getOldPositionsSRV(),
-        voxels.size()
-    );
-
     postVGSCompute = std::make_unique<PostVGSCompute>(
         vgsCompute->getWeightsSRV(),
         vgsCompute->getParticlesSRV(),
         preVGSCompute->getOldPositionsSRV(),
-        preVGSCompute->getVelocitiesUAV(),
-        dragParticlesCompute->getIsDraggingUAV()
+        preVGSCompute->getVelocitiesUAV()
     );
 
     solveCollisionsCompute = std::make_unique<SolveCollisionsCompute>(

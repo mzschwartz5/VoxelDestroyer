@@ -36,9 +36,8 @@ class DragParticlesCompute : public ComputeShader
 public:
     DragParticlesCompute(
         const ComPtr<ID3D11UnorderedAccessView>& particlesUAV,
-        const ComPtr<ID3D11ShaderResourceView>& oldParticlesSRV,
         int numVoxels
-    ) : ComputeShader(IDR_SHADER7), particlesUAV(particlesUAV), oldParticlesSRV(oldParticlesSRV)
+    ) : ComputeShader(IDR_SHADER7), particlesUAV(particlesUAV)
     {
         initializeBuffers(numVoxels);
     };
@@ -141,7 +140,6 @@ public:
 
 private:
     ComPtr<ID3D11UnorderedAccessView> particlesUAV;
-    ComPtr<ID3D11ShaderResourceView> oldParticlesSRV;
     ComPtr<ID3D11ShaderResourceView> depthSRV;
     ComPtr<ID3D11UnorderedAccessView> isDraggingUAV;
     ComPtr<ID3D11Buffer> constantBuffer;
@@ -158,7 +156,7 @@ private:
         ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get(), isDraggingUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
-        ID3D11ShaderResourceView* srvs[] = { oldParticlesSRV.Get(), depthSRV.Get() };
+        ID3D11ShaderResourceView* srvs[] = { depthSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs); 
 
         ID3D11Buffer* cbvs[] = { constantBuffer.Get() };
@@ -170,7 +168,7 @@ private:
         ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr); 
 
-        ID3D11ShaderResourceView* srvs[] = { nullptr, nullptr };
+        ID3D11ShaderResourceView* srvs[] = { nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
 

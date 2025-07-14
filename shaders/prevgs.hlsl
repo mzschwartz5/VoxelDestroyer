@@ -3,6 +3,7 @@ StructuredBuffer<float> weights : register(t0);
 RWStructuredBuffer<float4> positions : register(u0);
 RWStructuredBuffer<float4> oldPositions : register(u1);
 RWStructuredBuffer<float4> velocities : register(u2); 
+RWStructuredBuffer<bool> isDragging : register(u3);
 
 cbuffer VoxelSimBuffer : register(b0)
 {
@@ -22,9 +23,16 @@ void main(uint3 gId : SV_DispatchThreadID)
     }
 
     oldPositions[gId.x] = positions[gId.x];
-    // TODO: it may be possible to do this velocity update at the end of the PBD step, and not have to bind it to this shader.
-    velocities[gId.x] += float4(0, GRAVITY_STRENGTH, 0, 0) * TIMESTEP; // Gravity
-    positions[gId.x].xyz += (velocities[gId.x] * TIMESTEP).xyz; // Update position
+    
+    int voxelIndex = gId.x >> 3;
+    if (!isDragging[voxelIndex]) {
+        velocities[gId.x] += float4(0, GRAVITY_STRENGTH, 0, 0) * TIMESTEP; // Gravity
+        positions[gId.x].xyz += (velocities[gId.x] * TIMESTEP).xyz; // Update position
+    }
+    else {
+        // Reset for next frame; the drag shader must re-set this to true every frame.
+        isDragging[voxelIndex] = false; 
+    }
 
     // For now, lump ground collision into this shader
     if (GROUND_ENABLED == 1.f && positions[gId.x].y < GROUND_Y) {
