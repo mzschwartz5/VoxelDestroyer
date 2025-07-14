@@ -1,7 +1,6 @@
 RWStructuredBuffer<float4> particles : register(u0);
 RWStructuredBuffer<bool> isDragging : register(u1);
-StructuredBuffer<float4> oldParticles : register(t0);
-Texture2D<float> depthBuffer : register(t1);
+Texture2D<float> depthBuffer : register(t0);
 
 static const float eps = 1e-8f;
 
@@ -32,14 +31,14 @@ void main( uint3 gId : SV_DispatchThreadID )
 
     // Calculate the voxel's center from the average position of the 8 voxel particles
     uint start_idx = gId.x << 3;
-    float4 p0 = oldParticles[start_idx];
-    float4 p1 = oldParticles[start_idx + 1];
-    float4 p2 = oldParticles[start_idx + 2];
-    float4 p3 = oldParticles[start_idx + 3];
-    float4 p4 = oldParticles[start_idx + 4];
-    float4 p5 = oldParticles[start_idx + 5];
-    float4 p6 = oldParticles[start_idx + 6];
-    float4 p7 = oldParticles[start_idx + 7];
+    float4 p0 = particles[start_idx];
+    float4 p1 = particles[start_idx + 1];
+    float4 p2 = particles[start_idx + 2];
+    float4 p3 = particles[start_idx + 3];
+    float4 p4 = particles[start_idx + 4];
+    float4 p5 = particles[start_idx + 5];
+    float4 p6 = particles[start_idx + 6];
+    float4 p7 = particles[start_idx + 7];
 
     float voxelSize = length(p0 - p7);
     float4 voxelCenter = p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7;

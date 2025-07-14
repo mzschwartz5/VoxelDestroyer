@@ -11,8 +11,9 @@ public:
         const glm::vec4* initialVelocities,
         const glm::vec4* simConstants,
         const ComPtr<ID3D11ShaderResourceView>& weightsSRV,
-		const ComPtr<ID3D11UnorderedAccessView>& positionsUAV
-	) : ComputeShader(IDR_SHADER5), positionsUAV(positionsUAV), weightsSRV(weightsSRV)
+		const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
+        const ComPtr<ID3D11UnorderedAccessView>& isDraggingUAV
+	) : ComputeShader(IDR_SHADER5), positionsUAV(positionsUAV), weightsSRV(weightsSRV), isDraggingUAV(isDraggingUAV)
     {
         initializeBuffers(numParticles, initialOldPositions, initialVelocities, simConstants);
     };
@@ -43,6 +44,7 @@ private:
     ComPtr<ID3D11ShaderResourceView> oldPositionsSRV;
     ComPtr<ID3D11UnorderedAccessView> oldPositionsUAV;
     ComPtr<ID3D11UnorderedAccessView> velocitiesUAV;
+    ComPtr<ID3D11UnorderedAccessView> isDraggingUAV;
     ComPtr<ID3D11Buffer> simConstantsBuffer; //gravity on, ground on, ground collision y, padding
 
     void bind() override
@@ -52,7 +54,7 @@ private:
         ID3D11ShaderResourceView* srvs[] = { weightsSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
-		ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), oldPositionsUAV.Get(), velocitiesUAV.Get() };
+		ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), oldPositionsUAV.Get(), velocitiesUAV.Get(), isDraggingUAV.Get() };
 		DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
 		ID3D11Buffer* cbvs[] = { simConstantsBuffer.Get() };
@@ -66,7 +68,7 @@ private:
         ID3D11ShaderResourceView* srvs[] = { nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
-        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr };
+        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
 		ID3D11Buffer* cbvs[] = { nullptr };
