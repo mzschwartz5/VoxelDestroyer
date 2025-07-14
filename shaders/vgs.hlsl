@@ -2,6 +2,8 @@
 RWStructuredBuffer<float4> positions : register(u0);
 StructuredBuffer<float> weights : register(t0);
 
+static const float eps = 1e-8f;
+
 cbuffer VoxelSimBuffer : register(b0)
 {
     float RELAXATION;
@@ -16,7 +18,22 @@ cbuffer VoxelSimBuffer : register(b0)
 
 float3 project(float3 v, float3 onto)
 {
-    return onto * (dot(v, onto) / dot(onto, onto));
+    float denom = dot(onto, onto);
+    if (abs(denom) < eps) denom = eps;
+    return onto * (dot(v, onto) / denom);
+}
+
+// Normalization that avoids division by zero, and also allows for the added epsilon
+// to be along a specific axis, in case multiple basis vectors are 0-length (so that they aren't degenerate).
+float3 safeNormal(float3 u, int axis) {
+    float3 normal = u;
+    float len = length(u);
+    if (len < eps) {
+        normal[axis] = eps;
+        len = eps;
+    }
+
+    return normal / len;
 }
 
 [numthreads(VGS_THREADS, 1, 1)]
@@ -46,30 +63,50 @@ void main(
         float4 center = p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7;
         center *= 0.125f;
 
-        // Calculate basis vectors
+        // Calculate basis vectors (average of edges for each axis)
         float4 v0 = ((p1 - p0) + (p3 - p2) + (p5 - p4) + (p7 - p6)) * 0.25f;
         float4 v1 = ((p2 - p0) + (p3 - p1) + (p6 - p4) + (p7 - p5)) * 0.25f;
         float4 v2 = ((p4 - p0) + (p5 - p1) + (p6 - p2) + (p7 - p3)) * 0.25f;
 
-        // Apply Gram-Schmidt orthogonalization - CORRECTED to match CPU implementation
+        // Apply relaxed Gram-Schmidt orthonormalization
         float3 u0 = v0.xyz - RELAXATION * (project(v0.xyz, v1.xyz) + project(v0.xyz, v2.xyz));
-        float3 u1 = v1.xyz - RELAXATION * (project(v1.xyz, v2.xyz) + project(v1.xyz, v0.xyz)); // Changed from u0 to v0.xyz
-        float3 u2 = v2.xyz - RELAXATION * (project(v2.xyz, v0.xyz) + project(v2.xyz, v1.xyz)); // Changed from u0/u1 to v0.xyz/v1.xyz
+        float3 u1 = v1.xyz - RELAXATION * (project(v1.xyz, v2.xyz) + project(v1.xyz, v0.xyz)); 
+        float3 u2 = v2.xyz - RELAXATION * (project(v2.xyz, v0.xyz) + project(v2.xyz, v1.xyz)); 
 
         // Normalize and scale
-        u0 = normalize(u0) * ((1.0f - BETA) * PARTICLE_RADIUS + (BETA * length(v0.xyz) * 0.5f));
-        u1 = normalize(u1) * ((1.0f - BETA) * PARTICLE_RADIUS + (BETA * length(v1.xyz) * 0.5f));
-        u2 = normalize(u2) * ((1.0f - BETA) * PARTICLE_RADIUS + (BETA * length(v2.xyz) * 0.5f));
+        u0 = safeNormal(u0, 0) * ((1.0f - BETA) * PARTICLE_RADIUS + (BETA * (length(v0.xyz) + eps) * 0.5f));
+        u1 = safeNormal(u1, 1) * ((1.0f - BETA) * PARTICLE_RADIUS + (BETA * (length(v1.xyz) + eps) * 0.5f));
+        u2 = safeNormal(u2, 2) * ((1.0f - BETA) * PARTICLE_RADIUS + (BETA * (length(v2.xyz) + eps) * 0.5f));
 
         // Volume preservation
         float volume = dot(cross(u0, u1), u2);
-        float mult = 0.5f * pow((VOXEL_REST_VOLUME / volume), 1.0f / 3.0f);
+        // Per mcgraw et al., if the voxel has been inverted (negative volume), flip the shortest edge to correct it.
+        if (volume < 0.0f) {
+            volume = -volume;
+            float len0 = length(u0);
+            float len1 = length(u1);
+            float len2 = length(u2);
+            float minLen = min(len0, min(len1, len2));
 
+            if (len0 == minLen) {
+                u0 = -u0;
+            } else if (len1 == minLen) {
+                u1 = -u1;
+            } else if (len2 == minLen) {
+                u2 = -u2;
+            }
+        }
+
+        // If the volume is zero, that means the voxel bases are degenerate. Trying to preserve volume will result in NaNs.
+        // However, the safe normalization and other epsilon adjusments above will yield slight adjustments so that, next iteration, the bases are not degenerate.
+        // So, for this iteration, simply skip volume preservation by setting the voxel's volume to its rest volume.
+        if (volume == 0) volume = VOXEL_REST_VOLUME;
+
+        float mult = 0.5f * pow((VOXEL_REST_VOLUME / volume), 1.0f / 3.0f);
         u0 *= mult;
         u1 *= mult;
         u2 *= mult;
 
-        // Update positions based on weights - CORRECTED to match CPU implementation
         if (weights[start_idx] != 0.0f) {
             positions[start_idx] = center - float4(u0, 0.0f) - float4(u1, 0.0f) - float4(u2, 0.0f);
         }

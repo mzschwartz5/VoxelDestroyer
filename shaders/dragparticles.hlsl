@@ -3,6 +3,8 @@ RWStructuredBuffer<bool> isDragging : register(u1);
 StructuredBuffer<float4> oldParticles : register(t0);
 Texture2D<float> depthBuffer : register(t1);
 
+static const float eps = 1e-8f;
+
 cbuffer DragValues : register(b0)
 {
     int lastMouseX;
@@ -47,6 +49,12 @@ void main( uint3 gId : SV_DispatchThreadID )
     float4 viewSpaceVoxelCenter = mul(voxelCenter, viewMatrix);
     viewSpaceVoxelCenter.z += (voxelSize * 0.5f);        // Bias the voxel towards the camera so the depth test later is really measuring the surface of the voxel.
     float voxelCameraDepth = -viewSpaceVoxelCenter.z;    // Later, we need to have the view-space depth of the voxel.
+    
+    // The voxel is behind or very near the camera, don't drag it.
+    if (voxelCameraDepth < eps) {
+        isDragging[gId.x] = false; 
+        return;
+    }
 
     float4 pixelSpaceVoxelCenter = mul(viewSpaceVoxelCenter, projMatrix);
     pixelSpaceVoxelCenter /= pixelSpaceVoxelCenter.w; // Perspective divide

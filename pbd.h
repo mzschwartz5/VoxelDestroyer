@@ -48,9 +48,6 @@ public:
     ~PBD() = default;
     void initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath);
     void simulateStep();
-    void updateMeshVertices();
-
-	Particles getParticles() const { return particles; }
 
 	void setRelaxation(float relaxation) { RELAXATION = relaxation; }
 	void setBeta(float beta) { BETA = beta; }
