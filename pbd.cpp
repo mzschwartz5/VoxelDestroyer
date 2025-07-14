@@ -70,13 +70,6 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         vgsCompute->getParticlesUAV(),
         dragParticlesCompute->getIsDraggingUAV()
     );
-    
-    postVGSCompute = std::make_unique<PostVGSCompute>(
-        vgsCompute->getWeightsSRV(),
-        vgsCompute->getParticlesSRV(),
-        preVGSCompute->getOldPositionsSRV(),
-        preVGSCompute->getVelocitiesUAV()
-    );
 
     solveCollisionsCompute = std::make_unique<SolveCollisionsCompute>(
         voxelSize,
@@ -160,8 +153,8 @@ void PBD::simulateStep()
 }
 
 void PBD::simulateSubstep() {
-    int numPreAndPostVgsComputeWorkgroups = (particles.numParticles + VGS_THREADS + 1) / (VGS_THREADS);
-    preVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);
+    int numPreVgsComputeWorkgroups = (particles.numParticles + VGS_THREADS + 1) / (VGS_THREADS);
+    preVGSCompute->dispatch(numPreVgsComputeWorkgroups);
 
     // Way to do this once per step instead of once per substep?
     int numCollisionGridCells = 216; // hardcoded 6x6x6 for now
@@ -183,8 +176,6 @@ void PBD::simulateSubstep() {
 
     int numCollisionSolveWorkgroups = (numCollisionGridCells + SOLVE_COLLISION_THREADS - 1) / SOLVE_COLLISION_THREADS;
     // solveCollisionsCompute->dispatch(numCollisionSolveWorkgroups);
-
-    postVGSCompute->dispatch(numPreAndPostVgsComputeWorkgroups);
 }
 
 void PBD::setSimValuesFromUI() {

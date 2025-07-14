@@ -11,7 +11,6 @@
 #include "directx/compute/computeshader.h"
 #include "directx/compute/vgscompute.h"
 #include "directx/compute/prevgscompute.h"
-#include "directx/compute/postvgscompute.h"
 #include "directx/compute/faceconstraintscompute.h"
 #include "directx/compute/dragparticlescompute.h"
 #include "directx/compute/buildcollisiongridcompute.h"
@@ -103,7 +102,6 @@ private:
     std::unique_ptr<VGSCompute> vgsCompute;
 	std::unique_ptr<FaceConstraintsCompute> faceConstraintsCompute;
     std::unique_ptr<PreVGSCompute> preVGSCompute;
-    std::unique_ptr<PostVGSCompute> postVGSCompute;
     std::unique_ptr<DragParticlesCompute> dragParticlesCompute;
     std::unique_ptr<BuildCollisionGridCompute> buildCollisionGridCompute;
     std::unique_ptr<SolveCollisionsCompute> solveCollisionsCompute;
