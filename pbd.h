@@ -35,7 +35,6 @@ struct Particles
 {
     std::vector<vec4> positions;
     std::vector<vec4> oldPositions;
-    std::vector<vec4> velocities;
     std::vector<float> w; // inverse mass
     int numParticles{ 0 };
 };
