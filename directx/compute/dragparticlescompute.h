@@ -14,7 +14,6 @@ struct DragValues
     int currX{ 0 };
     int currY{ 0 };
     float dragRadius{ 0.0f };
-    float padding{ 0.0f };
 };
 
 struct CameraMatrices
@@ -27,8 +26,16 @@ struct CameraMatrices
 };
 
 struct ConstantBuffer{
-    DragValues dragValues;
-    CameraMatrices cameraMatrices;
+    // Difference in world space between the last and current mouse positions
+    // for a hypothetical unit depth.
+    glm::vec3 dragWorldDiff{ 0.0f, 0.0f, 0.0f }; 
+    int lastX{ 0 };
+    int lastY{ 0 };
+    float dragRadius{ 0.0f };
+    float viewportWidth{ 0.0f };
+    float viewportHeight{ 0.0f };
+    glm::mat4 viewMatrix;
+    glm::mat4 projMatrix;
 };
 
 class DragParticlesCompute : public ComputeShader
@@ -36,8 +43,9 @@ class DragParticlesCompute : public ComputeShader
 public:
     DragParticlesCompute(
         const ComPtr<ID3D11UnorderedAccessView>& particlesUAV,
-        int numVoxels
-    ) : ComputeShader(IDR_SHADER7), particlesUAV(particlesUAV)
+        int numVoxels,
+        int numSubsteps
+    ) : ComputeShader(IDR_SHADER7), particlesUAV(particlesUAV), numSubsteps(numSubsteps)
     {
         initializeBuffers(numVoxels);
     };
@@ -74,12 +82,12 @@ public:
     void updateDragValues(const DragValues& dragValues, bool isDragging)
     {
         // Accumulate the drag values (e.g. update current position but not last) 
-        // This accounts for mouse events potentially occuring at a higher frame rate than the simulation.
+        // This accounts for mouse events potentially occuring at a higher rate than the simulation.
         this->dragValues.currX = dragValues.currX;
         this->dragValues.currY = dragValues.currY;
         this->dragValues.dragRadius = dragValues.dragRadius;
 
-        // And if we just started dragging, update the last pos as well so we don't "remember" the last position from the previous drag.
+        // And if we just started dragging, update the last pos as well so we forget the last pos from the previous drag.
         if (!wasDragging && isDragging) {
             this->dragValues.lastX = dragValues.lastX;
             this->dragValues.lastY = dragValues.lastY;
@@ -91,33 +99,7 @@ public:
         }
 
         wasDragging = isDragging;
-    }
-
-    void resetDragValues() {
-        // See docs: 4 values are required even though only the first will be used, in our case.
-        UINT clearValues[4] = { 0, 0, 0, 0 };
-        DirectX::getContext()->ClearUnorderedAccessViewUint(isDraggingUAV.Get(), clearValues);
-    }
-
-    // TODO: make this a virtual method on the base compute class?
-    void copyConstantBufferToGPU()
-    {
-        ConstantBuffer cb{
-            dragValues,
-            cameraMatrices
-        };
-
-        D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = DirectX::getContext()->Map(constantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-        if (SUCCEEDED(hr))
-        {
-            memcpy(mappedResource.pData, &cb, sizeof(ConstantBuffer));
-            DirectX::getContext()->Unmap(constantBuffer.Get(), 0);
-        }
-        else
-        {
-            MGlobal::displayError("Failed to map drag values buffer.");
-        }
+        copyConstantBufferToGPU();
     }
 
     void updateCameraMatrices(const CameraMatrices& cameraMatrices)
@@ -137,8 +119,6 @@ public:
             return;
         }
         
-        copyConstantBufferToGPU();
-
         bind();
         DirectX::getContext()->Dispatch(threadGroupCount, 1, 1); 
         unbind();
@@ -160,6 +140,54 @@ private:
     CameraMatrices cameraMatrices;
     DragValues dragValues;
     bool wasDragging = false;
+    float numSubsteps;
+
+    void resetDragValues() {
+        // See docs: 4 values are required even though only the first will be used, in our case.
+        UINT clearValues[4] = { 0, 0, 0, 0 };
+        DirectX::getContext()->ClearUnorderedAccessViewUint(isDraggingUAV.Get(), clearValues);
+    }
+
+    // TODO: make this a virtual method on the base compute class?
+    void copyConstantBufferToGPU()
+    {
+        ConstantBuffer cb{
+            calculateDragWorldDiff(),
+            dragValues.lastX,
+            dragValues.lastY,
+            dragValues.dragRadius,
+            cameraMatrices.viewportWidth,
+            cameraMatrices.viewportHeight,
+            cameraMatrices.viewMatrix,
+            cameraMatrices.projMatrix,
+        };
+
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        HRESULT hr = DirectX::getContext()->Map(constantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        if (SUCCEEDED(hr))
+        {
+            memcpy(mappedResource.pData, &cb, sizeof(ConstantBuffer));
+            DirectX::getContext()->Unmap(constantBuffer.Get(), 0);
+        }
+        else
+        {
+            MGlobal::displayError("Failed to map drag values buffer.");
+        }
+    }
+
+    // Reverse-project the mouse start and end points to world space at a unit depth.
+    // Get the difference and amortize it across the number of substeps in one simulation step.
+    glm::vec3 calculateDragWorldDiff() {
+        glm::vec2 mouseStartNDC = glm::vec2((dragValues.lastX / cameraMatrices.viewportWidth) * 2.0f - 1.0f,
+                                            (dragValues.lastY / cameraMatrices.viewportHeight) * 2.0f - 1.0f);
+        glm::vec4 mouseStartWorld =  glm::vec4(mouseStartNDC, 1.0f, 1.0f) * cameraMatrices.invViewProjMatrix;
+
+        glm::vec2 mouseEndNDC = glm::vec2((dragValues.currX / cameraMatrices.viewportWidth) * 2.0f - 1.0f,
+                                          (dragValues.currY / cameraMatrices.viewportHeight) * 2.0f - 1.0f);
+        glm::vec4 mouseEndWorld = glm::vec4(mouseEndNDC, 1.0f, 1.0f) * cameraMatrices.invViewProjMatrix;
+
+        return (mouseEndWorld - mouseStartWorld) / numSubsteps;
+    }
 
     void bind() override
     {
