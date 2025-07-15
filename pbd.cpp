@@ -64,7 +64,6 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
     preVGSCompute = std::make_unique<PreVGSCompute>(
         particles.numParticles,
         particles.oldPositions.data(),
-        particles.velocities.data(),
 		&simInfo,
         vgsCompute->getWeightsSRV(),
         vgsCompute->getParticlesUAV(),
@@ -137,7 +136,6 @@ void PBD::createParticles(const Voxels& voxels) {
         for (const auto& position : voxels.corners[i].corners) {
             particles.positions.push_back(vec4(position, 1.0f));
             particles.oldPositions.push_back(vec4(position, 1.0f));
-            particles.velocities.push_back(vec4(0.0f));
             particles.w.push_back(1.0f);
             particles.numParticles++;
         }
