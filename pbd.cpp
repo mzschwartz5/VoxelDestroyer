@@ -58,7 +58,8 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 
     dragParticlesCompute = std::make_unique<DragParticlesCompute>(
         vgsCompute->getParticlesUAV(),
-        voxels.size()
+        voxels.size(),
+        substeps
     );
 
     preVGSCompute = std::make_unique<PreVGSCompute>(
@@ -143,7 +144,7 @@ void PBD::createParticles(const Voxels& voxels) {
 }
 
 void PBD::simulateStep()
-{
+{   
     for (int i = 0; i < substeps; i++)
     {
         simulateSubstep();

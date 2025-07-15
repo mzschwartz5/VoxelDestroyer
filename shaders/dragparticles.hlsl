@@ -6,17 +6,14 @@ static const float eps = 1e-8f;
 
 cbuffer DragValues : register(b0)
 {
+    float3 dragWorldDiff;
     int lastMouseX;
     int lastMouseY;
-    int currMouseX;
-    int currMouseY;
     float selectRadius;
-    float padding;
     float viewportWidth;
     float viewportHeight;
     float4x4 viewMatrix;
     float4x4 projMatrix;
-    float4x4 invViewProj;
 };
 
 /*
@@ -84,25 +81,16 @@ void main( uint3 gId : SV_DispatchThreadID )
 
     // OK: the voxel is visible and within the selection radius. Move its particles by the drag amount in world space.
     // To do this, we'll reverse-project the mouse start/end points to world space, get the difference, and apply it to each particle.
-    float2 mouseStartNDC = float2((lastMouseX / viewportWidth) * 2.0f - 1.0f,
-                                  (lastMouseY / viewportHeight) * 2.0f - 1.0f);
-    float4 mouseStartClip = voxelCameraDepth * float4(mouseStartNDC, pixelSpaceVoxelCenter.z, 1.0f);
-    float4 mouseStartWorld = mul(mouseStartClip, invViewProj);
+    // For performance, the reverse-projection happens on the CPU to an imaginary voxel at unit-distance, then we just scale it here by the voxel's depth.
+    // It looks weird unintuitive but it's just the mathematical result of some commutativity. Intuitively, it works because similar triangles.
+    float4 scaledDragWorldDiff = float4(voxelCameraDepth * pixelSpaceVoxelCenter.z * dragWorldDiff, 0.0f);
 
-    float2 mouseEndNDC = float2((currMouseX / viewportWidth) * 2.0f - 1.0f,
-                                (currMouseY / viewportHeight) * 2.0f - 1.0f);
-    float4 mouseEndClip = voxelCameraDepth * float4(mouseEndNDC, pixelSpaceVoxelCenter.z, 1.0f);
-    float4 mouseEndWorld = mul(mouseEndClip, invViewProj);
-
-    float4 dragWorldDiff = mouseEndWorld - mouseStartWorld;
-    dragWorldDiff.w = 0.0f; // Ignore the w component
-
-    particles[start_idx] = p0 + dragWorldDiff;
-    particles[start_idx + 1] = p1 + dragWorldDiff;
-    particles[start_idx + 2] = p2 + dragWorldDiff;
-    particles[start_idx + 3] = p3 + dragWorldDiff;
-    particles[start_idx + 4] = p4 + dragWorldDiff;
-    particles[start_idx + 5] = p5 + dragWorldDiff;
-    particles[start_idx + 6] = p6 + dragWorldDiff;
-    particles[start_idx + 7] = p7 + dragWorldDiff;
+    particles[start_idx] = p0 + scaledDragWorldDiff;
+    particles[start_idx + 1] = p1 + scaledDragWorldDiff;
+    particles[start_idx + 2] = p2 + scaledDragWorldDiff;
+    particles[start_idx + 3] = p3 + scaledDragWorldDiff;
+    particles[start_idx + 4] = p4 + scaledDragWorldDiff;
+    particles[start_idx + 5] = p5 + scaledDragWorldDiff;
+    particles[start_idx + 6] = p6 + scaledDragWorldDiff;
+    particles[start_idx + 7] = p7 + scaledDragWorldDiff;
 }
