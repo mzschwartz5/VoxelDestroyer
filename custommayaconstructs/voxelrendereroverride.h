@@ -33,9 +33,9 @@ public:
             return MStatus::kFailure;
         }
 
-        MMatrix viewMatrix = mFrameContext->getMatrix(MFrameContext::kViewMtx);
-        MMatrix projMatrix = mFrameContext->getMatrix(MFrameContext::kProjectionMtx);
-        MMatrix invViewProjMatrix = mFrameContext->getMatrix(MFrameContext::kViewProjInverseMtx);
+        const MMatrix& viewMatrix = mFrameContext->getMatrix(MFrameContext::kViewMtx);
+        const MMatrix& projMatrix = mFrameContext->getMatrix(MFrameContext::kProjectionMtx);
+        const MMatrix& invViewProjMatrix = mFrameContext->getMatrix(MFrameContext::kViewProjInverseMtx);
 
         int viewPortWidth, viewPortHeight, viewPortOriginX, viewPortOriginY;
         mFrameContext->getViewportDimensions(viewPortOriginX, viewPortOriginY, viewPortWidth, viewPortHeight);

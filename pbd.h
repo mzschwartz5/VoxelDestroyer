@@ -80,7 +80,7 @@ public:
         dragParticlesCompute->updateDepthBuffer(depthResourceHandle);
     }
 
-    void updateCameraMatrices(MMatrix viewMatrix, MMatrix projMatrix, MMatrix invViewProjMatrix, int viewportWidth, int viewportHeight) {
+    void updateCameraMatrices(const MMatrix& viewMatrix, const MMatrix& projMatrix, const MMatrix& invViewProjMatrix, int viewportWidth, int viewportHeight) {
         dragParticlesCompute->updateCameraMatrices({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), mayaMatrixToGlm(viewMatrix), mayaMatrixToGlm(projMatrix), mayaMatrixToGlm(invViewProjMatrix)});
     }
     
