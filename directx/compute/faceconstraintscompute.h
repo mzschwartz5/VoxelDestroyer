@@ -3,6 +3,11 @@
 #include "directx/compute/computeshader.h"
 #include "glm.hpp"
 
+struct FaceIndicesConstantBuffer {
+	glm::uvec4 faceOneIndices;
+	glm::uvec4 faceTwoIndices;
+};
+
 struct FaceConstraint {
 	int voxelOneIdx;
 	int voxelTwoIdx;
@@ -31,23 +36,18 @@ public:
         unbind();
     };
 
-    const ComPtr<ID3D11ShaderResourceView>& getWeightsSRV() const { return weightsSRV; }
+	void updateActiveConstraintAxis(int axis) {
+		activeConstraintAxis = axis;
+	}
 
 private:
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
-    ComPtr<ID3D11ShaderResourceView> weightsSRV;
-
-    ComPtr<ID3D11UnorderedAccessView> xConstraintsUAV;
-	ComPtr<ID3D11Buffer> xConstraintsBuffer;
-
-	ComPtr<ID3D11UnorderedAccessView> yConstraintsUAV;
-	ComPtr<ID3D11Buffer> yConstraintsBuffer;
-
-	ComPtr<ID3D11UnorderedAccessView> zConstraintsUAV;
-	ComPtr<ID3D11Buffer> zConstraintsBuffer;
-
+	int activeConstraintAxis = 0; // x = 0, y = 1, z = 2
+	std::array<ComPtr<ID3D11UnorderedAccessView>, 3> faceConstraintUAVs;
+	std::array<ComPtr<ID3D11Buffer>, 3> faceIndicesConstantBuffers;
+	std::array<ComPtr<ID3D11Buffer>, 3> constraintBuffers;
     ComPtr<ID3D11Buffer> voxelSimInfoBuffer;
-
+    ComPtr<ID3D11ShaderResourceView> weightsSRV;
 	ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV;
 
     void bind() override
@@ -57,10 +57,10 @@ private:
         ID3D11ShaderResourceView* srvs[] = { weightsSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
-        ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), xConstraintsUAV.Get(), yConstraintsUAV.Get(), zConstraintsUAV.Get(), isSurfaceUAV.Get() };
+        ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), faceConstraintUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
-        ID3D11Buffer* cbvs[] = { voxelSimInfoBuffer.Get() };
+        ID3D11Buffer* cbvs[] = { voxelSimInfoBuffer.Get(), faceIndicesConstantBuffers[activeConstraintAxis].Get() };
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
@@ -71,10 +71,10 @@ private:
         ID3D11ShaderResourceView* srvs[] = { nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
-        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
-        ID3D11Buffer* cbvs[] = { nullptr };
+        ID3D11Buffer* cbvs[] = { nullptr, nullptr };
 		DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
@@ -90,7 +90,7 @@ private:
 		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[0].data();
-		CreateBuffer(&bufferDesc, &initData, &xConstraintsBuffer);
+		CreateBuffer(&bufferDesc, &initData, &constraintBuffers[0]);
 
 		// Create the UAV for the X constraints buffer
 		D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -98,53 +98,63 @@ private:
         uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
         uavDesc.Buffer.FirstElement = 0;
         uavDesc.Buffer.NumElements = UINT(constraints[0].size());
-		DirectX::getDevice()->CreateUnorderedAccessView(xConstraintsBuffer.Get(), &uavDesc, &xConstraintsUAV);
+		DirectX::getDevice()->CreateUnorderedAccessView(constraintBuffers[0].Get(), &uavDesc, &faceConstraintUAVs[0]);
 
 		// Initialize Y constraints buffer and its UAV
-		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 		bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[1].size());
-		bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-		bufferDesc.CPUAccessFlags = 0;
-		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[1].data();
-		CreateBuffer(&bufferDesc, &initData, &yConstraintsBuffer);
+		CreateBuffer(&bufferDesc, &initData, &constraintBuffers[1]);
 
 		// Create the UAV for the Y constraints buffer
-		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
-		uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-		uavDesc.Buffer.FirstElement = 0;
 		uavDesc.Buffer.NumElements = UINT(constraints[1].size());
-		DirectX::getDevice()->CreateUnorderedAccessView(yConstraintsBuffer.Get(), &uavDesc, &yConstraintsUAV);
+		DirectX::getDevice()->CreateUnorderedAccessView(constraintBuffers[1].Get(), &uavDesc, &faceConstraintUAVs[1]);
 
 		// Initialize Z constraints buffer and its UAV
-		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 		bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[2].size());
-		bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-		bufferDesc.CPUAccessFlags = 0;
-		bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[2].data();
-		CreateBuffer(&bufferDesc, &initData, &zConstraintsBuffer);
+		CreateBuffer(&bufferDesc, &initData, &constraintBuffers[2]);
 
 		// Create the UAV for the Z constraints buffer
-		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
-		uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-		uavDesc.Buffer.FirstElement = 0;
 		uavDesc.Buffer.NumElements = UINT(constraints[2].size());
-		DirectX::getDevice()->CreateUnorderedAccessView(zConstraintsBuffer.Get(), &uavDesc, &zConstraintsUAV);
+		DirectX::getDevice()->CreateUnorderedAccessView(constraintBuffers[2].Get(), &uavDesc, &faceConstraintUAVs[2]);
 
+		// Initialize constant buffer for X-drection face indices
+		bufferDesc.Usage = D3D11_USAGE_DYNAMIC; // Dynamic for CPU updates
+        bufferDesc.ByteWidth = sizeof(FaceIndicesConstantBuffer);  // Size of the constant buffer
+        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; // Bind as a constant buffer
+        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // Allow CPU writes
+        bufferDesc.MiscFlags = 0;
+        FaceIndicesConstantBuffer xFaceIndices = {{1, 3, 5, 7}, {0, 2, 4, 6}};
+        initData.pSysMem = &xFaceIndices;
+        CreateBuffer(&bufferDesc, &initData, &faceIndicesConstantBuffers[0]);
+
+        // Initialize constant buffer for Y-direction face indices
+        FaceIndicesConstantBuffer yFaceIndices = {{2, 3, 6, 7}, {0, 1, 4, 5}};
+        initData.pSysMem = &yFaceIndices;
+        CreateBuffer(&bufferDesc, &initData, &faceIndicesConstantBuffers[1]);
+
+        // Initialize constant buffer for Z-direction face indices
+        FaceIndicesConstantBuffer zFaceIndices = {{4, 5, 6, 7}, {0, 1, 2, 3}};
+        initData.pSysMem = &zFaceIndices;
+        CreateBuffer(&bufferDesc, &initData, &faceIndicesConstantBuffers[2]);
     }
 
     void tearDown() override
     {
         ComputeShader::tearDown();
-		xConstraintsBuffer.Reset();
-		xConstraintsUAV.Reset();
-		yConstraintsBuffer.Reset();
-		yConstraintsUAV.Reset();
-		zConstraintsBuffer.Reset();
-		zConstraintsUAV.Reset();
+		for (auto& buffer : constraintBuffers) {
+			buffer.Reset();
+		}
+
+		for (auto& uav : faceConstraintUAVs) {
+			uav.Reset();
+		}
+
+		for (auto& buffer : faceIndicesConstantBuffers) {
+			buffer.Reset();
+		}
     };
 
 };
