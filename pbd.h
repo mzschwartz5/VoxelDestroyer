@@ -54,7 +54,16 @@ public:
 	void setGravityStrength(float strength) { GRAVITY_STRENGTH = strength; }
 
     void updateVGSInfo() {
-        vgsCompute->updateConstantBuffer({RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0, 0.0, FTF_RELAXATION, FTF_BETA});
+        vgsCompute->updateConstantBuffer({
+            RELAXATION, 
+            BETA, 
+            PARTICLE_RADIUS, 
+            VOXEL_REST_VOLUME, 
+            3.0,            // iter ocunt
+            FTF_RELAXATION, 
+            FTF_BETA, 
+            0.0f
+        });
     }
 
     void updateSimInfo() {

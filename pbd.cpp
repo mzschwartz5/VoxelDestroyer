@@ -16,7 +16,7 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         particles.numParticles,
         particles.w.data(),
         particles.positions,
-        VGSConstantBuffer{ RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0f, 0.0f, FTF_RELAXATION, FTF_BETA }
+        VGSConstantBuffer{ RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, 0.0f }
     );
 
     VoxelDeformerGPUNode::initializeExternalKernelArgs(

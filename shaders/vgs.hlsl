@@ -11,7 +11,7 @@ cbuffer VoxelSimBuffer : register(b0)
     float PARTICLE_RADIUS;
     float VOXEL_REST_VOLUME;
     float ITER_COUNT;
-    float AXIS;
+    float PADDING_0;
     float PADDING_1;
     float PADDING_2;
 };

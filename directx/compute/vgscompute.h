@@ -9,9 +9,9 @@ struct VGSConstantBuffer {
     float particleRadius;
     float voxelRestVolume;
     float iterCount;
-    float axis;
     float ftfRelaxation;
     float ftfEdgeUniformity;
+    float padding;
 };
 
 class VGSCompute : public ComputeShader
