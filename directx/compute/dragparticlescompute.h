@@ -148,7 +148,6 @@ private:
         DirectX::getContext()->ClearUnorderedAccessViewUint(isDraggingUAV.Get(), clearValues);
     }
 
-    // TODO: make this a virtual method on the base compute class?
     void copyConstantBufferToGPU()
     {
         ConstantBuffer cb{
@@ -162,17 +161,7 @@ private:
             cameraMatrices.projMatrix,
         };
 
-        D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = DirectX::getContext()->Map(constantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-        if (SUCCEEDED(hr))
-        {
-            memcpy(mappedResource.pData, &cb, sizeof(ConstantBuffer));
-            DirectX::getContext()->Unmap(constantBuffer.Get(), 0);
-        }
-        else
-        {
-            MGlobal::displayError("Failed to map drag values buffer.");
-        }
+        updateConstantBuffer(constantBuffer, cb);
     }
 
     // Reverse-project the mouse start and end points to world space at a unit depth.

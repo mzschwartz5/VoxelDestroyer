@@ -56,6 +56,21 @@ protected:
         return hr;
     }
 
+    /**
+     * Generic method to update a constant buffer with new data.
+     */
+    template<typename T>
+    void updateConstantBuffer(const ComPtr<ID3D11Buffer>& buffer, const T& data) {
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        HRESULT hr = DirectX::getContext()->Map(buffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        if (SUCCEEDED(hr)) {
+            memcpy(mappedResource.pData, &data, sizeof(T));
+            DirectX::getContext()->Unmap(buffer.Get(), 0);
+        } else {
+            MGlobal::displayError("Failed to map constant buffer.");
+        }
+    }
+
     void load() {
         void* data = nullptr;
         DWORD size = Utils::loadResourceFile(DirectX::getPluginInstance(), id, L"SHADER", &data);

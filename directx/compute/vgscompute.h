@@ -36,18 +36,7 @@ public:
     };
 
     void updateConstantBuffer(const VGSConstantBuffer& newCB) {
-        D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = DirectX::getContext()->Map(voxelSimInfoBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-        if (SUCCEEDED(hr))
-        {
-            // Copy the flag to the constant buffer
-            memcpy(mappedResource.pData, &newCB, sizeof(VGSConstantBuffer));
-            DirectX::getContext()->Unmap(voxelSimInfoBuffer.Get(), 0);
-        }
-        else
-        {
-            MGlobal::displayError("Failed to map constant buffer.");
-        }
+        ComputeShader::updateConstantBuffer(voxelSimInfoBuffer, newCB);
     }
 
     const ComPtr<ID3D11ShaderResourceView>& getWeightsSRV() const { return weightsSRV; }
@@ -143,7 +132,7 @@ private:
 
         //Initialize constant buffer
         bufferDesc.Usage = D3D11_USAGE_DYNAMIC; // Dynamic for CPU updates
-        bufferDesc.ByteWidth = sizeof(std::array<glm::vec4, 2>);  // Size of the constant buffer
+        bufferDesc.ByteWidth = sizeof(VGSConstantBuffer);  // Size of the constant buffer
         bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; // Bind as a constant buffer
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // Allow CPU writes
         bufferDesc.MiscFlags = 0;
