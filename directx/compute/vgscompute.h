@@ -3,6 +3,17 @@
 #include "directx/compute/computeshader.h"
 #include "glm.hpp"
 
+struct VGSConstantBuffer {
+    float relaxation;
+    float edgeUniformity;
+    float particleRadius;
+    float voxelRestVolume;
+    float iterCount;
+    float axis;
+    float ftfRelaxation;
+    float ftfEdgeUniformity;
+};
+
 class VGSCompute : public ComputeShader
 {
 public:
@@ -10,7 +21,7 @@ public:
         int numParticles,
         const float* weights,
         const std::vector<glm::vec4>& particlePositions,
-        std::array<glm::vec4, 2> voxelSimInfo
+        const VGSConstantBuffer& voxelSimInfo
 	) : ComputeShader(IDR_SHADER3)
     {
         // TODO: weights should just be the unused 4th float component of the particle positions
@@ -24,13 +35,13 @@ public:
         unbind();
     };
 
-    void updateVoxelSimInfo(std::array<glm::vec4, 2> newInfo) {
+    void updateConstantBuffer(const VGSConstantBuffer& newCB) {
         D3D11_MAPPED_SUBRESOURCE mappedResource;
         HRESULT hr = DirectX::getContext()->Map(voxelSimInfoBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         if (SUCCEEDED(hr))
         {
             // Copy the flag to the constant buffer
-            memcpy(mappedResource.pData, &newInfo, sizeof(std::array<glm::vec4, 2>));
+            memcpy(mappedResource.pData, &newCB, sizeof(VGSConstantBuffer));
             DirectX::getContext()->Unmap(voxelSimInfoBuffer.Get(), 0);
         }
         else
@@ -81,7 +92,7 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
-    void initializeBuffers(int numParticles, const float* weights, const std::vector<glm::vec4>& particlePositions, std::array<glm::vec4, 2> voxelSimInfo) {
+    void initializeBuffers(int numParticles, const float* weights, const std::vector<glm::vec4>& particlePositions, const VGSConstantBuffer& voxelSimInfo) {
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SUBRESOURCE_DATA initData = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -136,7 +147,7 @@ private:
         bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; // Bind as a constant buffer
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // Allow CPU writes
         bufferDesc.MiscFlags = 0;
-        initData.pSysMem = voxelSimInfo.data();
+        initData.pSysMem = &voxelSimInfo;
         CreateBuffer(&bufferDesc, &initData, &voxelSimInfoBuffer);
     }
 
