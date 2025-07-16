@@ -54,9 +54,7 @@ public:
 	void setGravityStrength(float strength) { GRAVITY_STRENGTH = strength; }
 
     void updateVGSInfo() {
-        vgsInfo[0] = glm::vec4(RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME);
-        vgsInfo[1] = glm::vec4(3.0, 0.0, FTF_RELAXATION, FTF_BETA);
-        vgsCompute->updateVoxelSimInfo(vgsInfo);
+        vgsCompute->updateConstantBuffer({RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0, 0.0, FTF_RELAXATION, FTF_BETA});
     }
 
     void updateSimInfo() {
@@ -91,7 +89,6 @@ private:
     float timeStep;
     MDagPath meshDagPath;
 
-    std::array<glm::vec4, 2> vgsInfo;
     glm::vec4 simInfo;
     bool initialized = false;
     bool isDragging = false;
@@ -136,11 +133,6 @@ private:
     }
 
     void addFaceConstraint(FaceConstraint constraint, int axis) { faceConstraints[axis].push_back(constraint); };
-
-    void updateAxis(int axis) {
-        vgsInfo[1][1] = float(axis);
-        vgsCompute->updateVoxelSimInfo(vgsInfo);
-    }
 
     inline glm::mat4 mayaMatrixToGlm(const MMatrix& matrix) {
         return glm::mat4(
