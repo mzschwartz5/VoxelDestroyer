@@ -126,6 +126,8 @@ private:
     float PARTICLE_RADIUS{ 0.1f };
 
     float RELAXATION{ 0.5f };
+    // This is really the rest volume of the volume between particles, which are offset one particle radius from each corner of the voxel
+    // towards the center of the voxel. So with a particle radius = 1/4 voxel edge length, the rest volume is (2 * 1/4 edge length)^3 or 8 * (particle radius^3) 
     float VOXEL_REST_VOLUME{ 1.0f };
 
     float FTF_BETA{ 0.f };
@@ -138,7 +140,7 @@ private:
 
     void setRadiusAndVolumeFromLength(float edge_length) {
         PARTICLE_RADIUS = edge_length * 0.25f;
-        VOXEL_REST_VOLUME = edge_length * edge_length * edge_length;
+        VOXEL_REST_VOLUME = 8.0f * PARTICLE_RADIUS * PARTICLE_RADIUS * PARTICLE_RADIUS;
     }
 
     void addFaceConstraint(FaceConstraint constraint, int axis) { faceConstraints[axis].push_back(constraint); };
