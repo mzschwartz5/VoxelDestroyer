@@ -9,8 +9,8 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
     this->meshDagPath = meshDagPath;
     timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
     constructFaceToFaceConstraints(voxels, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX);
-    createParticles(voxels);
     setRadiusAndVolumeFromLength(voxelSize);
+    createParticles(voxels);
 
     vgsCompute = std::make_unique<VGSCompute>(
         particles.numParticles,
@@ -128,7 +128,11 @@ void PBD::constructFaceToFaceConstraints(const Voxels& voxels,
 
 void PBD::createParticles(const Voxels& voxels) {
     for (int i = 0; i < voxels.numOccupied; i++) {
-        for (const auto& position : voxels.corners[i].corners) {
+        glm::vec3 voxelCenter = 0.5f * (voxels.corners[i].corners[0] + voxels.corners[i].corners[7]);
+
+        for (const auto& corner : voxels.corners[i].corners) {
+            // Offset the corner towards the center by the radius of the particle
+            const glm::vec3& position = corner - (PARTICLE_RADIUS * glm::sign(corner - voxelCenter));
             particles.positions.push_back(vec4(position, 1.0f));
             particles.oldPositions.push_back(vec4(position, 1.0f));
             particles.w.push_back(1.0f);
