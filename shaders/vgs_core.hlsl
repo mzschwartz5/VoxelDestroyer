@@ -1,8 +1,6 @@
 static const float eps = 1e-8f;
 static const float oneThird = 1.0f / 3.0f;
 
-// TODO: args are reverse order form vgs.hlsl
-// Make them consistent and refactor into a common header
 float3 project(float3 onto, float3 v)
 {
     float denom = dot(onto, onto);
@@ -23,12 +21,13 @@ float3 safeNormal(float3 u, int axis) {
 
 bool doVGSIterations(
     inout float3 pos[8],
-    inout float w[8],
+    float w[8],
     float particleRadius,
     float voxelRestVolume,
     float iterCount,
     float relaxation,
-    float edgeUniformity
+    float edgeUniformity,
+    bool bailOnInverted
 ) {
     for (int iter = 0; iter < iterCount; iter++)
     {
@@ -51,8 +50,32 @@ bool doVGSIterations(
 
         // Check for flipping
         float volume = dot(cross(u0, u1), u2);
-        if (volume <= 0.0f) return false;
+        // If the volume is zero, that means the voxel bases are degenerate. Trying to preserve volume will result in NaNs.
+        // However, the safe normalization and other epsilon adjusments above will yield slight adjustments so that, next iteration, the bases are not degenerate.
+        // So, for this iteration, simply skip volume preservation by setting the voxel's volume to its rest volume.
+        if (volume == 0.0f) volume = voxelRestVolume;
 
+        if (volume < 0.0f) {
+            if (bailOnInverted) return false;
+
+            // Per mcgraw et al., if the voxel has been inverted (negative volume), flip the shortest edge to correct it.
+            // Only for VGS within voxels, not for face-to-face VGS (thus the option to bail).
+            volume = -volume;
+            float len0 = length(u0);
+            float len1 = length(u1);
+            float len2 = length(u2);
+            float minLen = min(len0, min(len1, len2));
+
+            if (len0 == minLen) {
+                u0 = -u0;
+            } else if (len1 == minLen) {
+                u1 = -u1;
+            } else if (len2 == minLen) {
+                u2 = -u2;
+            }
+        }
+
+        // Volume preservation
         float mult = 0.5f * pow((voxelRestVolume / volume), oneThird);
         u0 *= mult;
         u1 *= mult;

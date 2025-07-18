@@ -93,7 +93,8 @@ void main(
         VOXEL_REST_VOLUME,
         ITER_COUNT,
         FTF_RELAXATION,
-        FTF_BETA
+        FTF_BETA,
+        true
     );
 
     if (!constraintIntact) {
