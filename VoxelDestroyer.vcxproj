@@ -197,6 +197,7 @@
     <ClInclude Include="directx\compute\dragparticlescompute.h" />
     <ClInclude Include="directx\compute\buildcollisiongridcompute.h" />
     <ClInclude Include="directx\compute\solvecollisionscompute.h" />
+    <ClInclude Include="directx\d3dincludehandler.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="plugin.cpp" />
@@ -205,6 +206,7 @@
     <ClCompile Include="directx\directx.cpp" />
     <ClCompile Include="voxelizer.cpp" />
     <ClCompile Include="cgalhelper.cpp" />
+    <ClCompile Include="directx\d3dincludehandler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resources.rc" />
