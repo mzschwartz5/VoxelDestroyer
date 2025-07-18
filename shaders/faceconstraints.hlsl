@@ -1,5 +1,4 @@
-static const float eps = 1e-8f;
-static const float oneThird = 1.0f / 3.0f;
+#include "vgs_core.hlsl"
 
 // Face constraint structure
 struct FaceConstraint {
@@ -31,26 +30,6 @@ RWStructuredBuffer<float4> positions : register(u0);
 RWStructuredBuffer<FaceConstraint> faceConstraints : register(u1);
 RWStructuredBuffer<uint> isSurfaceVoxel : register(u2);
 StructuredBuffer<float> weights : register(t0);
-
-// TODO: args are reverse order form vgs.hlsl
-// Make them consistent and refactor into a common header
-float3 project(float3 onto, float3 v)
-{
-    float denom = dot(onto, onto);
-    if (abs(denom) < eps) denom = eps;
-    return onto * (dot(v, onto) / denom);
-}
-
-float3 safeNormal(float3 u, int axis) {
-    float3 normal = u;
-    float len = length(u);
-    if (len < eps) {
-        normal[axis] = eps;
-        len = eps;
-    }
-
-    return normal / len;
-}
 
 void breakConstraint(int constraintIdx, int voxelAIdx, int voxelBIdx) {
     isSurfaceVoxel[voxelAIdx] = 1;
@@ -107,62 +86,19 @@ void main(
     }
 
     // Now we do VGS iterations on the imaginary "voxel" formed by the particles of the two voxels' faces.
-    for (int iter = 0; iter < ITER_COUNT; iter++)
-    {
-        float3 center = 0.125 * (pos[0] + pos[1] + pos[2] + pos[3] + pos[4] + pos[5] + pos[6] + pos[7]);
+    bool constraintIntact = doVGSIterations(
+        pos,
+        w,
+        PARTICLE_RADIUS,
+        VOXEL_REST_VOLUME,
+        ITER_COUNT,
+        FTF_RELAXATION,
+        FTF_BETA
+    );
 
-        // Calculate basis vectors (average of edges for each axis)
-        float3 v0 = (pos[1] - pos[0]) + (pos[3] - pos[2]) + (pos[5] - pos[4]) + (pos[7] - pos[6]);
-        float3 v1 = (pos[2] - pos[0]) + (pos[3] - pos[1]) + (pos[6] - pos[4]) + (pos[7] - pos[5]);
-        float3 v2 = (pos[4] - pos[0]) + (pos[5] - pos[1]) + (pos[6] - pos[2]) + (pos[7] - pos[3]);
-
-        // Apply relaxed Gram-Schmidt orthonormalization
-        float3 u0 = v0 - FTF_RELAXATION * (project(v1, v0) + project(v2, v0));
-        float3 u1 = v1 - FTF_RELAXATION * (project(v0, v1) + project(v2, v1));
-        float3 u2 = v2 - FTF_RELAXATION * (project(v0, v2) + project(v1, v2));
-
-        // Normalize and scale
-        u0 = safeNormal(u0, 0) * ((1.0f - FTF_BETA) * PARTICLE_RADIUS + (FTF_BETA * (length(v0) + eps) * 0.5f));
-        u1 = safeNormal(u1, 1) * ((1.0f - FTF_BETA) * PARTICLE_RADIUS + (FTF_BETA * (length(v1) + eps) * 0.5f));
-        u2 = safeNormal(u2, 2) * ((1.0f - FTF_BETA) * PARTICLE_RADIUS + (FTF_BETA * (length(v2) + eps) * 0.5f));
-
-        // Check for flipping
-        float volume = dot(cross(u0, u1), u2);
-        if (volume <= 0.0f)
-        {
-            breakConstraint(constraintIdx, voxelAIdx, voxelBIdx);
-            return;
-        }
-
-        float mult = 0.5f * pow((VOXEL_REST_VOLUME / volume), oneThird);
-        u0 *= mult;
-        u1 *= mult;
-        u2 *= mult;
-
-        if (w[0] != 0.0f) {
-            pos[0] = center - u0 - u1 - u2;
-        }
-        if (w[1] != 0.0f) {
-            pos[1] = center + u0 - u1 - u2;
-        }
-        if (w[2] != 0.0f) {
-            pos[2] = center - u0 + u1 - u2;
-        }
-        if (w[3] != 0.0f) {
-            pos[3] = center + u0 + u1 - u2;
-        }
-        if (w[4] != 0.0f) {
-            pos[4] = center - u0 - u1 + u2;
-        }
-        if (w[5] != 0.0f) {
-            pos[5] = center + u0 - u1 + u2;
-        }
-        if (w[6] != 0.0f) {
-            pos[6] = center - u0 + u1 + u2;
-        }
-        if (w[7] != 0.0f) {
-            pos[7] = center + u0 + u1 + u2;
-        }
+    if (!constraintIntact) {
+        breakConstraint(constraintIdx, voxelAIdx, voxelBIdx);
+        return;
     }
 
     // Write back the updated positions to global memory
