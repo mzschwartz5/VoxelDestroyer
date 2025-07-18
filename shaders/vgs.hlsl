@@ -3,6 +3,7 @@ RWStructuredBuffer<float4> positions : register(u0);
 StructuredBuffer<float> weights : register(t0);
 
 static const float eps = 1e-8f;
+static const float oneThird = 1.0f / 3.0f;
 
 cbuffer VoxelSimBuffer : register(b0)
 {
@@ -50,6 +51,7 @@ void main(
     for (uint i = 0; i < ITER_COUNT; i++)
     {
         // Load positions
+        // TODO: only load positions once at start and write once at end. Each iteration should read and write to a local array.
         float4 p0 = positions[start_idx];
         float4 p1 = positions[start_idx + 1];
         float4 p2 = positions[start_idx + 2];
@@ -102,7 +104,7 @@ void main(
         // So, for this iteration, simply skip volume preservation by setting the voxel's volume to its rest volume.
         if (volume == 0) volume = VOXEL_REST_VOLUME;
 
-        float mult = 0.5f * pow((VOXEL_REST_VOLUME / volume), 1.0f / 3.0f);
+        float mult = 0.5f * pow((VOXEL_REST_VOLUME / volume), oneThird);
         u0 *= mult;
         u1 *= mult;
         u2 *= mult;
