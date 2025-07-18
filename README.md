@@ -1,7 +1,7 @@
 # VoxelDestroyer
 A Maya plugin for simulation of deformable-body destruction, using a voxelized control-mesh.
 
-# Developming the plug-in
+# Developing the plug-in
 
 Requirements:
 - vcpkg: (clone from https://github.com/microsoft/vcpkg.git , go to the directory, and run the bootstrap: .\bootstrap-vcpkg.bat)
@@ -18,4 +18,4 @@ Release configuration: builds dependencies as static libs. Slower to build, but 
 
 Requirements: Windows OS (for DirectX11 + Maya Viewport 2.0)
 
-Simply download the `.mll` file and put it in yoru plug-in directory. Then load it up from Maya's plugin manager. (WIP: instructions on using the plug-in)
+Simply download the `.mll` file and put it in your plug-in directory. Then load it up from Maya's plugin manager. (WIP: instructions on using the plug-in)
