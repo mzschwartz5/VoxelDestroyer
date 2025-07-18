@@ -6,6 +6,7 @@
 #define IDR_SHADER3                     105
 #define IDR_SHADER4                     106
 #define IDR_SHADER5                     107
+#define IDR_SHADER6                     108
 #define IDR_SHADER7                     109
 #define IDR_SHADER8                     110
 #define IDR_SHADER9                     111
