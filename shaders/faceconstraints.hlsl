@@ -1,8 +1,10 @@
+static const float eps = 1e-8f;
+static const float oneThird = 1.0f / 3.0f;
 
 // Face constraint structure
 struct FaceConstraint {
-    int voxelOneIdx;
-    int voxelTwoIdx;
+    int voxelAIdx;
+    int voxelBIdx;
     float tensionLimit;
     float compressionLimit;
 };
@@ -21,8 +23,8 @@ cbuffer VoxelSimBuffer : register(b0)
 
 cbuffer FaceIndicesBuffer : register(b1)
 {
-    uint faceOneIndices[4];
-    uint faceTwoIndices[4];
+    uint4 faceAParticles;
+    uint4 faceBParticles;
 };
 
 RWStructuredBuffer<float4> positions : register(u0);
@@ -30,20 +32,38 @@ RWStructuredBuffer<FaceConstraint> faceConstraints : register(u1);
 RWStructuredBuffer<uint> isSurfaceVoxel : register(u2);
 StructuredBuffer<float> weights : register(t0);
 
-float3 project(float3 u, float3 v)
+// TODO: args are reverse order form vgs.hlsl
+// Make them consistent and refactor into a common header
+float3 project(float3 onto, float3 v)
 {
-    const float eps = 1e-12f;
-    return dot(v, u) / (dot(u, u) + eps) * u;
+    float denom = dot(onto, onto);
+    if (abs(denom) < eps) denom = eps;
+    return onto * (dot(v, onto) / denom);
 }
 
-void breakConstraint(int constraintIdx, int voxelOneIdx, int voxelTwoIdx) {
-    isSurfaceVoxel[voxelOneIdx] = 1;
-    isSurfaceVoxel[voxelTwoIdx] = 1;
+float3 safeNormal(float3 u, int axis) {
+    float3 normal = u;
+    float len = length(u);
+    if (len < eps) {
+        normal[axis] = eps;
+        len = eps;
+    }
 
-    faceConstraints[constraintIdx].voxelOneIdx = -1;
-    faceConstraints[constraintIdx].voxelTwoIdx = -1;
+    return normal / len;
 }
 
+void breakConstraint(int constraintIdx, int voxelAIdx, int voxelBIdx) {
+    isSurfaceVoxel[voxelAIdx] = 1;
+    isSurfaceVoxel[voxelBIdx] = 1;
+
+    faceConstraints[constraintIdx].voxelAIdx = -1;
+    faceConstraints[constraintIdx].voxelBIdx = -1;
+}
+
+/**
+* Solves face constraints for a pair of voxels using the VGS method.
+* One thread = one face constraint. 
+*/
 [numthreads(VGS_THREADS, 1, 1)]
 void main(
     uint3 globalThreadId : SV_DispatchThreadID,
@@ -52,177 +72,108 @@ void main(
 )
 {
     uint constraintIdx = globalThreadId.x;
-
-    // Get the constraint data from the buffer
     FaceConstraint constraint;
     constraint = faceConstraints[constraintIdx];
     
-    int voxelOneIdx = constraint.voxelOneIdx;
-    int voxelTwoIdx = constraint.voxelTwoIdx;
+    // A face constraint deals with two voxels, which we'll refer to as A and B throughout this shader.
+    int voxelAIdx = constraint.voxelAIdx;
+    int voxelBIdx = constraint.voxelBIdx;
 
-    if (voxelOneIdx == -1 || voxelTwoIdx == -1)
-    {
-        return;
-    }
+    // Face constraint is already broken.
+    if (voxelAIdx == -1 || voxelBIdx == -1) return;
 
-    uint voxelOneStartIdx = voxelOneIdx << 3;
-    uint voxelTwoStartIdx = voxelTwoIdx << 3;
+    uint voxelAParticlesIdx = voxelAIdx << 3;
+    uint voxelBParticlesIdx = voxelBIdx << 3;
 
-    // Calculate voxel centers
-    float3 v1Center = (
-        positions[voxelOneStartIdx + 0].xyz +
-        positions[voxelOneStartIdx + 1].xyz +
-        positions[voxelOneStartIdx + 2].xyz +
-        positions[voxelOneStartIdx + 3].xyz +
-        positions[voxelOneStartIdx + 4].xyz +
-        positions[voxelOneStartIdx + 5].xyz +
-        positions[voxelOneStartIdx + 6].xyz +
-        positions[voxelOneStartIdx + 7].xyz
-        ) * 0.125f;
+    float3 pos[8];
+    float w[8];
+    for (int i = 0; i < 4; ++i) {
+        // Note: this is NOT a mistake. The face indices of the opposite voxel tell us where to index
+        // the particles of the first voxel. Each face*Particles array tells us which particles to use from each voxel,
+        // but we leverage the order within each array to avoid axis-specific control flow.
+        pos[faceBParticles[i]] = positions[voxelAParticlesIdx + faceAParticles[i]].xyz;
+        pos[faceAParticles[i]] = positions[voxelBParticlesIdx + faceBParticles[i]].xyz;
 
-    float3 v2Center = (
-        positions[voxelTwoStartIdx + 0].xyz +
-        positions[voxelTwoStartIdx + 1].xyz +
-        positions[voxelTwoStartIdx + 2].xyz +
-        positions[voxelTwoStartIdx + 3].xyz +
-        positions[voxelTwoStartIdx + 4].xyz +
-        positions[voxelTwoStartIdx + 5].xyz +
-        positions[voxelTwoStartIdx + 6].xyz +
-        positions[voxelTwoStartIdx + 7].xyz
-        ) * 0.125f;
-
-    // Calculate midpoint positions
-    float3 v1MidPositions[8];
-    float3 v2MidPositions[8];
-
-    for (int i = 0; i < 8; i++)
-    {
-        v1MidPositions[i] = (positions[voxelOneStartIdx + i].xyz + v1Center) * 0.5f;
-        v2MidPositions[i] = (positions[voxelTwoStartIdx + i].xyz + v2Center) * 0.5f;
-    }
-
-    // Get face corners and weights
-    float3 faceOne[4];
-    float3 faceTwo[4];
-    float faceOneW[4];
-    float faceTwoW[4];
-
-    for (int i = 0; i < 4; i++)
-    {
-        faceOne[i] = v1MidPositions[faceOneIndices[i]];
-        faceTwo[i] = v2MidPositions[faceTwoIndices[i]];
-        faceOneW[i] = weights[voxelOneStartIdx + faceOneIndices[i]];
-        faceTwoW[i] = weights[voxelTwoStartIdx + faceTwoIndices[i]];
-    }
-
-    // Check if constraint should be broken due to tension/compression
-    for (int i = 0; i < 4; i++)
-    {
-        float3 u = faceTwo[i] - faceOne[i];
-        float L = length(u);
-        float strain = (L - 2.0f * PARTICLE_RADIUS) / (2.0f * PARTICLE_RADIUS);
-
-        // Assuming tension/compression limits
-        float tensionLimit = constraint.tensionLimit;
-        float compressionLimit = constraint.compressionLimit;
-
-        if (strain > tensionLimit || strain < compressionLimit)
-        {
-            breakConstraint(constraintIdx, voxelOneIdx, voxelTwoIdx);
-            break;
-        }
-    }
-
-    // Calculate midpoint face center
-    float3 centerOfVoxels = float3(0.0f, 0.0f, 0.0f);
-    for (int i = 0; i < 4; i++)
-    {
-        centerOfVoxels += faceOne[i] + faceTwo[i];
-    }
-    centerOfVoxels *= 0.125f;
-
-    // Edge vectors for shape preservation
-    float3 dp[3];
-
-    for (int iter = 0; iter < ITER_COUNT; iter++)
-    {
-        // Calculate edge vectors
-        dp[0] = (faceTwo[0] - faceOne[0]) + (faceTwo[1] - faceOne[1]) +
-            (faceTwo[2] - faceOne[2]) + (faceTwo[3] - faceOne[3]);
-
-        dp[1] = (faceOne[1] - faceOne[0]) + (faceOne[3] - faceOne[2]) +
-            (faceTwo[1] - faceTwo[0]) + (faceTwo[3] - faceTwo[2]);
-
-        dp[2] = (faceOne[2] - faceOne[0]) + (faceOne[3] - faceOne[1]) +
-            (faceTwo[2] - faceTwo[0]) + (faceTwo[3] - faceTwo[1]);
-
-        // Recalculate center
-        centerOfVoxels = float3(0.0f, 0.0f, 0.0f);
-        for (int i = 0; i < 4; i++)
-        {
-            centerOfVoxels += faceOne[i] + faceTwo[i];
-        }
-        centerOfVoxels *= 0.125f;
-
-        // Apply orthogonalization
-        float3 u0 = dp[0] - FTF_RELAXATION * (project(dp[1], dp[0]) + project(dp[2], dp[0]));
-        float3 u1 = dp[1] - FTF_RELAXATION * (project(dp[0], dp[1]) + project(dp[2], dp[1]));
-        float3 u2 = dp[2] - FTF_RELAXATION * (project(dp[0], dp[2]) + project(dp[1], dp[2]));
-
-        // Check for flipping
-        float V = dot(cross(u0, u1), u2);
-        if (V < 0.0f)
-        {
-            // Break constraint due to flipping
-            // this is also broken...
-            breakConstraint(constraintIdx, voxelOneIdx, voxelTwoIdx);
+        // Check if the constraint between these two voxels should be broken due to tension/compression
+        float3 edgeLength = length(pos[faceAParticles[i]] - pos[faceBParticles[i]]);
+        float strain = (edgeLength - 2.0f * PARTICLE_RADIUS) / (2.0f * PARTICLE_RADIUS);
+        if (strain > constraint.tensionLimit || strain < constraint.compressionLimit) {
+            breakConstraint(constraintIdx, voxelAIdx, voxelBIdx);
             return;
         }
 
-        // Calculate normalized and scaled edge vectors
-        float3 lenu = float3(length(u0), length(u1), length(u2)) + float3(1e-12f, 1e-12f, 1e-12f);
-        float3 lenp = float3(length(dp[0]), length(dp[1]), length(dp[2])) + float3(1e-12f, 1e-12f, 1e-12f);
+        w[faceBParticles[i]] = weights[voxelAParticlesIdx + faceAParticles[i]];
+        w[faceAParticles[i]] = weights[voxelBParticlesIdx + faceBParticles[i]];
+    }
 
-        float r_v = pow(PARTICLE_RADIUS * PARTICLE_RADIUS * PARTICLE_RADIUS / (lenp.x * lenp.y * lenp.z), 0.3333f);
+    // Now we do VGS iterations on the imaginary "voxel" formed by the particles of the two voxels' faces.
+    for (int iter = 0; iter < ITER_COUNT; iter++)
+    {
+        float3 center = 0.125 * (pos[0] + pos[1] + pos[2] + pos[3] + pos[4] + pos[5] + pos[6] + pos[7]);
 
-        // Scale change in position based on beta
-        dp[0] = u0 / lenu.x * lerp(PARTICLE_RADIUS, lenp.x * r_v, FTF_BETA);
-        dp[1] = u1 / lenu.y * lerp(PARTICLE_RADIUS, lenp.y * r_v, FTF_BETA);
-        dp[2] = u2 / lenu.z * lerp(PARTICLE_RADIUS, lenp.z * r_v, FTF_BETA);
+        // Calculate basis vectors (average of edges for each axis)
+        float3 v0 = (pos[1] - pos[0]) + (pos[3] - pos[2]) + (pos[5] - pos[4]) + (pos[7] - pos[6]);
+        float3 v1 = (pos[2] - pos[0]) + (pos[3] - pos[1]) + (pos[6] - pos[4]) + (pos[7] - pos[5]);
+        float3 v2 = (pos[4] - pos[0]) + (pos[5] - pos[1]) + (pos[6] - pos[2]) + (pos[7] - pos[3]);
 
-        // Save original midpoint positions
-        float3 origFaceOne[4];
-        float3 origFaceTwo[4];
-        for (int i = 0; i < 4; i++)
+        // Apply relaxed Gram-Schmidt orthonormalization
+        float3 u0 = v0 - FTF_RELAXATION * (project(v1, v0) + project(v2, v0));
+        float3 u1 = v1 - FTF_RELAXATION * (project(v0, v1) + project(v2, v1));
+        float3 u2 = v2 - FTF_RELAXATION * (project(v0, v2) + project(v1, v2));
+
+        // Normalize and scale
+        u0 = safeNormal(u0, 0) * ((1.0f - FTF_BETA) * PARTICLE_RADIUS + (FTF_BETA * (length(v0) + eps) * 0.5f));
+        u1 = safeNormal(u1, 1) * ((1.0f - FTF_BETA) * PARTICLE_RADIUS + (FTF_BETA * (length(v1) + eps) * 0.5f));
+        u2 = safeNormal(u2, 2) * ((1.0f - FTF_BETA) * PARTICLE_RADIUS + (FTF_BETA * (length(v2) + eps) * 0.5f));
+
+        // Check for flipping
+        float volume = dot(cross(u0, u1), u2);
+        if (volume <= 0.0f)
         {
-            origFaceOne[i] = faceOne[i];
-            origFaceTwo[i] = faceTwo[i];
+            breakConstraint(constraintIdx, voxelAIdx, voxelBIdx);
+            return;
         }
 
-        // Update midpoint positions
-        if (faceOneW[0] != 0.0f) faceOne[0] = centerOfVoxels - dp[0] - dp[1] - dp[2];
-        if (faceOneW[1] != 0.0f) faceOne[1] = centerOfVoxels + dp[0] - dp[1] - dp[2];
-        if (faceOneW[2] != 0.0f) faceOne[2] = centerOfVoxels - dp[0] + dp[1] - dp[2];
-        if (faceOneW[3] != 0.0f) faceOne[3] = centerOfVoxels + dp[0] + dp[1] - dp[2];
-        if (faceTwoW[0] != 0.0f) faceTwo[0] = centerOfVoxels - dp[0] - dp[1] + dp[2];
-        if (faceTwoW[1] != 0.0f) faceTwo[1] = centerOfVoxels + dp[0] - dp[1] + dp[2];
-        if (faceTwoW[2] != 0.0f) faceTwo[2] = centerOfVoxels - dp[0] + dp[1] + dp[2];
-        if (faceTwoW[3] != 0.0f) faceTwo[3] = centerOfVoxels + dp[0] + dp[1] + dp[2];
+        float mult = 0.5f * pow((VOXEL_REST_VOLUME / volume), oneThird);
+        u0 *= mult;
+        u1 *= mult;
+        u2 *= mult;
 
-        // Apply delta from midpoint positions back to particle positions
-        for (int i = 0; i < 4; i++)
-        {
-            if (faceOneW[i] != 0.0f)
-            {
-                float3 delta = faceOne[i] - origFaceOne[i];
-                positions[voxelOneStartIdx + faceOneIndices[i]].xyz += delta;
-            }
+        if (w[0] != 0.0f) {
+            pos[0] = center - u0 - u1 - u2;
+        }
+        if (w[1] != 0.0f) {
+            pos[1] = center + u0 - u1 - u2;
+        }
+        if (w[2] != 0.0f) {
+            pos[2] = center - u0 + u1 - u2;
+        }
+        if (w[3] != 0.0f) {
+            pos[3] = center + u0 + u1 - u2;
+        }
+        if (w[4] != 0.0f) {
+            pos[4] = center - u0 - u1 + u2;
+        }
+        if (w[5] != 0.0f) {
+            pos[5] = center + u0 - u1 + u2;
+        }
+        if (w[6] != 0.0f) {
+            pos[6] = center - u0 + u1 + u2;
+        }
+        if (w[7] != 0.0f) {
+            pos[7] = center + u0 + u1 + u2;
+        }
+    }
 
-            if (faceTwoW[i] != 0.0f)
-            {
-                float3 delta = faceTwo[i] - origFaceTwo[i];
-                positions[voxelTwoStartIdx + faceTwoIndices[i]].xyz += delta;
-            }
+    // Write back the updated positions to global memory
+    for (int i = 0; i < 4; ++i) {
+        // Again, the mixing of A and B is actually not a mistake. It's a result of how we defined the face indices,
+        // taking advantage of the ordering to be able to write one shader for all axes with no branching.
+        if (w[i] != 0.0f) {
+            positions[voxelAParticlesIdx + faceAParticles[i]] = float4(pos[faceBParticles[i]], 1.0f);
+        }
+        if (w[i] != 0.0f) {
+            positions[voxelBParticlesIdx + faceBParticles[i]] = float4(pos[faceAParticles[i]], 1.0f);
         }
     }
 }
