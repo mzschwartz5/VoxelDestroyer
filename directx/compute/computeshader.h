@@ -4,6 +4,7 @@
 #include <wrl/client.h>
 #include "../../utils.h"
 #include "../../resource.h"
+#include "../d3dincludehandler.h"
 #include "../directx.h"
 using namespace Microsoft::WRL;
 
@@ -97,7 +98,7 @@ protected:
 
         ID3D10Blob* pPSBuf = NULL;    
         ID3D10Blob* pErrorBlob = NULL;
-        HRESULT hr = D3DCompile(data, size, NULL, SHADER_MACROS, NULL, "main", "cs_5_0", 0, 0, &pPSBuf, &pErrorBlob);
+        HRESULT hr = D3DCompile(data, size, NULL, SHADER_MACROS, &D3DIncludeHandler::instance(), "main", "cs_5_0", 0, 0, &pPSBuf, &pErrorBlob);
 
         if (FAILED(hr)) {
             if (pErrorBlob) {
