@@ -62,13 +62,12 @@ public:
             3.0,            // iter ocunt
             FTF_RELAXATION, 
             FTF_BETA, 
-            0.0f
+            particles.numParticles / 8
         });
     }
 
     void updateSimInfo() {
-        simInfo = glm::vec4(GRAVITY_STRENGTH, GROUND_COLLISION_ENABLED, GROUND_COLLISION_Y, TIMESTEP);
-        preVGSCompute->updateSimConstants(&simInfo);
+        preVGSCompute->updateSimConstants({GRAVITY_STRENGTH, GROUND_COLLISION_ENABLED, TIMESTEP, particles.numParticles});
     }
 
     bool isInitialized() const { return initialized; }
@@ -122,8 +121,8 @@ private:
 
     void setSimValuesFromUI();
 
-    float BETA{ 0.99f };
-    float PARTICLE_RADIUS{ 0.1f };
+    float BETA{ 0.0f };
+    float PARTICLE_RADIUS{ 0.25f };
 
     float RELAXATION{ 0.5f };
     // This is really the rest volume of the volume between particles, which are offset one particle radius from each corner of the voxel
@@ -131,7 +130,7 @@ private:
     float VOXEL_REST_VOLUME{ 1.0f };
 
     float FTF_BETA{ 0.f };
-    float FTF_RELAXATION{ 0.75f };
+    float FTF_RELAXATION{ 0.5f };
 
 	float GRAVITY_STRENGTH { -10.f };
 	float GROUND_COLLISION_ENABLED{ 1.f };

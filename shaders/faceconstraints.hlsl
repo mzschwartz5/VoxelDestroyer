@@ -17,13 +17,17 @@ cbuffer VoxelSimBuffer : register(b0)
     float ITER_COUNT;
     float FTF_RELAXATION;
     float FTF_BETA;
-    float padding;
+    float NUM_VOXELS;
 };
 
-cbuffer FaceIndicesBuffer : register(b1)
+cbuffer FaceConstraintsCB : register(b1)
 {
     uint4 faceAParticles;
     uint4 faceBParticles;
+    int numConstraints;
+    int padding0;
+    int padding1;
+    int padding2;
 };
 
 RWStructuredBuffer<float4> positions : register(u0);
@@ -51,6 +55,8 @@ void main(
 )
 {
     uint constraintIdx = globalThreadId.x;
+    if (constraintIdx >= numConstraints) return;
+
     FaceConstraint constraint;
     constraint = faceConstraints[constraintIdx];
     

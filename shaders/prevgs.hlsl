@@ -7,31 +7,35 @@ RWStructuredBuffer<bool> isDragging : register(u2);
 cbuffer VoxelSimBuffer : register(b0)
 {
     float GRAVITY_STRENGTH;
-    float GROUND_ENABLED;
     float GROUND_Y;
     float TIMESTEP;
+    int numParticles;
 };
 
 [numthreads(VGS_THREADS, 1, 1)]
 void main(uint3 gId : SV_DispatchThreadID) 
 {
-    // TODOs:
-    // Check for out of bounds?
+    if (gId.x >= numParticles) return; 
     
     if (weights[gId.x] == 0.0f) return;
+    float4 pos = positions[gId.x];
+    float4 oldPos = oldPositions[gId.x];
+    oldPositions[gId.x] = pos;
 
-    float4 velocity = (positions[gId.x] - oldPositions[gId.x]) / TIMESTEP;
-    oldPositions[gId.x] = positions[gId.x];
+    float4 velocity = (pos - oldPos) / TIMESTEP;
     
     int voxelIndex = gId.x >> 3;
     if (!isDragging[voxelIndex]) {
         velocity += float4(0, GRAVITY_STRENGTH, 0, 0) * TIMESTEP; // Gravity
-        positions[gId.x].xyz += (velocity * TIMESTEP).xyz; // Update position
+        pos.xyz += (velocity * TIMESTEP).xyz; // Update position
     }
 
     // For now, lump ground collision into this shader
-    if (GROUND_ENABLED == 1.f && positions[gId.x].y < GROUND_Y) {
-        positions[gId.x] = oldPositions[gId.x];
-        positions[gId.x].y = GROUND_Y;
+    if (pos.y < GROUND_Y) {
+        pos = oldPos;
+        pos.y = GROUND_Y;
     }
+
+    // Write back to global memory
+    positions[gId.x] = pos;
 }
