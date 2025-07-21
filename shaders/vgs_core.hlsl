@@ -26,7 +26,7 @@ float safeLength(float3 v) {
     return len;
 }
 
-bool doVGSIterations(
+void doVGSIterations(
     inout float3 pos[8],
     float w[8],
     float particleRadius,
@@ -44,6 +44,9 @@ bool doVGSIterations(
         float3 v0 = 0.25 * ((pos[1] - pos[0]) + (pos[3] - pos[2]) + (pos[5] - pos[4]) + (pos[7] - pos[6]));
         float3 v1 = 0.25 * ((pos[2] - pos[0]) + (pos[3] - pos[1]) + (pos[6] - pos[4]) + (pos[7] - pos[5]));
         float3 v2 = 0.25 * ((pos[4] - pos[0]) + (pos[5] - pos[1]) + (pos[6] - pos[2]) + (pos[7] - pos[3]));
+        if (dot(cross(v0, v1), v2) == 0.0f) {
+            v2 = normalize(cross(v0, v1)) * particleRadius;
+        }
         
         // Apply relaxed Gram-Schmidt orthonormalization
         float3 u0 = v0 - relaxation * (safeProject(v0, v1) + safeProject(v0, v2));
@@ -57,13 +60,8 @@ bool doVGSIterations(
 
         // Check for flipping
         float volume = dot(cross(u0, u1), u2);
-        // If the volume is zero, that means the voxel bases are degenerate. Trying to preserve volume will result in NaNs.
-        // However, the safe normalization and other epsilon adjusments above will yield slight adjustments so that, next iteration, the bases are not degenerate.
-        // So, for this iteration, simply skip volume preservation by setting the voxel's volume to its rest volume.
-        if (volume == 0.0f) volume = voxelRestVolume;
-
         if (volume < 0.0f) {
-            if (bailOnInverted) return false;
+            if (bailOnInverted) return;
             volume = -volume;
 
             // Per mcgraw et al., if the voxel has been inverted (negative volume), flip the shortest edge to correct it.
@@ -113,6 +111,4 @@ bool doVGSIterations(
             pos[7] = center + u0 + u1 + u2;
         }
     }
-
-    return true;
 }
