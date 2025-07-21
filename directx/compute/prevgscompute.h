@@ -2,13 +2,20 @@
 
 #include "directx/compute/computeshader.h"
 
+struct PreVGSConstantBuffer {
+    float gravityStrength;
+    float groundCollisionY;
+    float timeStep;
+    int numParticles;
+};
+
 class PreVGSCompute : public ComputeShader
 {
 public:
     PreVGSCompute(
         int numParticles,
         const glm::vec4* initialOldPositions,
-        const glm::vec4* simConstants,
+        const PreVGSConstantBuffer& simConstants,
         const ComPtr<ID3D11ShaderResourceView>& weightsSRV,
 		const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
         const ComPtr<ID3D11UnorderedAccessView>& isDraggingUAV
@@ -17,19 +24,8 @@ public:
         initializeBuffers(numParticles, initialOldPositions, simConstants);
     };
 
-    void updateSimConstants(glm::vec4* newInfo) {
-        D3D11_MAPPED_SUBRESOURCE mappedResource;
-        HRESULT hr = DirectX::getContext()->Map(simConstantsBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-        if (SUCCEEDED(hr))
-        {
-            // Copy the flag to the constant buffer
-            memcpy(mappedResource.pData, newInfo, sizeof(glm::vec4));
-            DirectX::getContext()->Unmap(simConstantsBuffer.Get(), 0);
-        }
-        else
-        {
-            MGlobal::displayError("Failed to map constant buffer.");
-        }
+    void updateSimConstants(const PreVGSConstantBuffer& newCB) {
+        updateConstantBuffer(simConstantsBuffer, newCB);
     }
 
     const ComPtr<ID3D11ShaderResourceView>& getOldPositionsSRV() const { return oldPositionsSRV; }
@@ -71,7 +67,7 @@ private:
 		DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
-    void initializeBuffers(int numParticles, const glm::vec4* initialOldPositions, const glm::vec4* simConstants) {
+    void initializeBuffers(int numParticles, const glm::vec4* initialOldPositions, const PreVGSConstantBuffer& simConstants) {
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -107,7 +103,7 @@ private:
 		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
         bufferDesc.MiscFlags = 0;
-		initData.pSysMem = simConstants;
+		initData.pSysMem = &simConstants;
 		CreateBuffer(&bufferDesc, &initData, &simConstantsBuffer);
 
     }

@@ -3,9 +3,13 @@
 #include "directx/compute/computeshader.h"
 #include "glm.hpp"
 
-struct FaceIndicesConstantBuffer {
+struct FaceContraintsCB {
 	glm::uvec4 faceOneIndices;
 	glm::uvec4 faceTwoIndices;
+    int numContraints;
+    int padding0;
+    int padding1;
+    int padding2;
 };
 
 struct FaceConstraint {
@@ -44,7 +48,7 @@ private:
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
 	int activeConstraintAxis = 0; // x = 0, y = 1, z = 2
 	std::array<ComPtr<ID3D11UnorderedAccessView>, 3> faceConstraintUAVs;
-	std::array<ComPtr<ID3D11Buffer>, 3> faceIndicesConstantBuffers;
+	std::array<ComPtr<ID3D11Buffer>, 3> faceContraintsCBs;
 	std::array<ComPtr<ID3D11Buffer>, 3> constraintBuffers;
     ComPtr<ID3D11Buffer> voxelSimInfoBuffer;
     ComPtr<ID3D11ShaderResourceView> weightsSRV;
@@ -60,7 +64,7 @@ private:
         ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), faceConstraintUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
-        ID3D11Buffer* cbvs[] = { voxelSimInfoBuffer.Get(), faceIndicesConstantBuffers[activeConstraintAxis].Get() };
+        ID3D11Buffer* cbvs[] = { voxelSimInfoBuffer.Get(), faceContraintsCBs[activeConstraintAxis].Get() };
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
@@ -107,38 +111,38 @@ private:
 		CreateBuffer(&bufferDesc, &initData, &constraintBuffers[1]);
 
 		// Create the UAV for the Y constraints buffer
-		uavDesc.Buffer.NumElements = UINT(constraints[1].size());
+		uavDesc.Buffer.NumElements = static_cast<uint>((constraints[1].size()));
 		DirectX::getDevice()->CreateUnorderedAccessView(constraintBuffers[1].Get(), &uavDesc, &faceConstraintUAVs[1]);
 
 		// Initialize Z constraints buffer and its UAV
-		bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[2].size());
+		bufferDesc.ByteWidth = static_cast<uint>(sizeof(FaceConstraint) * constraints[2].size());
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[2].data();
 		CreateBuffer(&bufferDesc, &initData, &constraintBuffers[2]);
 
 		// Create the UAV for the Z constraints buffer
-		uavDesc.Buffer.NumElements = UINT(constraints[2].size());
+		uavDesc.Buffer.NumElements = static_cast<uint>((constraints[2].size()));
 		DirectX::getDevice()->CreateUnorderedAccessView(constraintBuffers[2].Get(), &uavDesc, &faceConstraintUAVs[2]);
 
 		// Initialize constant buffer for X-drection face indices
 		bufferDesc.Usage = D3D11_USAGE_DYNAMIC; // Dynamic for CPU updates
-        bufferDesc.ByteWidth = sizeof(FaceIndicesConstantBuffer);  // Size of the constant buffer
+        bufferDesc.ByteWidth = sizeof(FaceContraintsCB);  // Size of the constant buffer
         bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; // Bind as a constant buffer
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // Allow CPU writes
         bufferDesc.MiscFlags = 0;
-        FaceIndicesConstantBuffer xFaceIndices = {{1, 3, 5, 7}, {0, 2, 4, 6}};
+        FaceContraintsCB xFaceIndices = {{1, 3, 5, 7}, {0, 2, 4, 6}, static_cast<int>(constraints[0].size()), 0, 0, 0};
         initData.pSysMem = &xFaceIndices;
-        CreateBuffer(&bufferDesc, &initData, &faceIndicesConstantBuffers[0]);
+        CreateBuffer(&bufferDesc, &initData, &faceContraintsCBs[0]);
 
         // Initialize constant buffer for Y-direction face indices
-        FaceIndicesConstantBuffer yFaceIndices = {{2, 3, 6, 7}, {0, 1, 4, 5}};
+        FaceContraintsCB yFaceIndices = {{2, 3, 6, 7}, {0, 1, 4, 5}, static_cast<int>(constraints[1].size()), 0, 0, 0};
         initData.pSysMem = &yFaceIndices;
-        CreateBuffer(&bufferDesc, &initData, &faceIndicesConstantBuffers[1]);
+        CreateBuffer(&bufferDesc, &initData, &faceContraintsCBs[1]);
 
         // Initialize constant buffer for Z-direction face indices
-        FaceIndicesConstantBuffer zFaceIndices = {{4, 5, 6, 7}, {0, 1, 2, 3}};
+        FaceContraintsCB zFaceIndices = {{4, 5, 6, 7}, {0, 1, 2, 3}, static_cast<int>(constraints[2].size()), 0, 0, 0};
         initData.pSysMem = &zFaceIndices;
-        CreateBuffer(&bufferDesc, &initData, &faceIndicesConstantBuffers[2]);
+        CreateBuffer(&bufferDesc, &initData, &faceContraintsCBs[2]);
     }
 
     void tearDown() override
@@ -152,7 +156,7 @@ private:
 			uav.Reset();
 		}
 
-		for (auto& buffer : faceIndicesConstantBuffers) {
+		for (auto& buffer : faceContraintsCBs) {
 			buffer.Reset();
 		}
     };

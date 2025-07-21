@@ -16,7 +16,7 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         particles.numParticles,
         particles.w.data(),
         particles.positions,
-        VGSConstantBuffer{ RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, 0.0f }
+        VGSConstantBuffer{ RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, voxels.size() }
     );
 
     VoxelDeformerGPUNode::initializeExternalKernelArgs(
@@ -48,18 +48,17 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         buildCollisionGridCompute->getIsSurfaceUAV()
 	);
 
-	simInfo = glm::vec4(GRAVITY_STRENGTH, GROUND_COLLISION_ENABLED, GROUND_COLLISION_Y, TIMESTEP);
-
     dragParticlesCompute = std::make_unique<DragParticlesCompute>(
         vgsCompute->getParticlesUAV(),
         voxels.size(),
         substeps
     );
 
+    PreVGSConstantBuffer preVGSConstants{GRAVITY_STRENGTH, GROUND_COLLISION_Y, TIMESTEP, particles.numParticles};
     preVGSCompute = std::make_unique<PreVGSCompute>(
         particles.numParticles,
         particles.oldPositions.data(),
-		&simInfo,
+		preVGSConstants,
         vgsCompute->getWeightsSRV(),
         vgsCompute->getParticlesUAV(),
         dragParticlesCompute->getIsDraggingUAV()

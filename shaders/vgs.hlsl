@@ -12,7 +12,7 @@ cbuffer VoxelSimBuffer : register(b0)
     float ITER_COUNT;
     float PADDING_0;
     float PADDING_1;
-    float PADDING_2;
+    int NUM_VOXELS;
 };
 
 [numthreads(VGS_THREADS, 1, 1)]
@@ -23,6 +23,8 @@ void main(
 )
 {
     uint voxel_idx = globalThreadId.x;
+    if (voxel_idx >= NUM_VOXELS) return;
+
     uint start_idx = voxel_idx << 3;
     
     float3 pos[8];
