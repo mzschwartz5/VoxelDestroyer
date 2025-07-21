@@ -92,7 +92,7 @@ void main(
     }
 
     // Now we do VGS iterations on the imaginary "voxel" formed by the particles of the two voxels' faces.
-    bool constraintIntact = doVGSIterations(
+    doVGSIterations(
         pos,
         w,
         PARTICLE_RADIUS,
@@ -102,11 +102,6 @@ void main(
         FTF_BETA,
         true
     );
-
-    if (!constraintIntact) {
-        breakConstraint(constraintIdx, voxelAIdx, voxelBIdx);
-        return;
-    }
 
     // Write back the updated positions to global memory
     for (int i = 0; i < 4; ++i) {
