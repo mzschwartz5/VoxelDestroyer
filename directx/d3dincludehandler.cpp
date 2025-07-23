@@ -5,7 +5,8 @@
 
 // Map of shaders that may be included, to their Windows Resource ID.
 const std::unordered_map<std::string, int> D3DIncludeHandler::shaderNameToID = {
-    {"vgs_core.hlsl", IDR_SHADER6}
+    {"vgs_core.hlsl", IDR_SHADER6},
+    {"particle_collisions_shared.hlsl", IDR_SHADER10}
 };
 
 HRESULT D3DIncludeHandler::Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes) {
