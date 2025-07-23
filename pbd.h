@@ -13,6 +13,7 @@
 #include "directx/compute/prevgscompute.h"
 #include "directx/compute/faceconstraintscompute.h"
 #include "directx/compute/dragparticlescompute.h"
+#include "directx/compute/buildcollisiongridcompute.h"
 
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
@@ -105,6 +106,7 @@ private:
 	std::unique_ptr<FaceConstraintsCompute> faceConstraintsCompute;
     std::unique_ptr<PreVGSCompute> preVGSCompute;
     std::unique_ptr<DragParticlesCompute> dragParticlesCompute;
+    std::unique_ptr<BuildCollisionGridCompute> buildCollisionGridCompute;
     
     void simulateSubstep();
 
