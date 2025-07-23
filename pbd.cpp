@@ -34,6 +34,13 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         vgsCompute->getVoxelSimInfoBuffer()
 	);
 
+    buildCollisionGridCompute = std::make_unique<BuildCollisionGridCompute>(
+        particles.numParticles,
+        PARTICLE_RADIUS,
+        vgsCompute->getParticlesSRV(),
+        faceConstraintsCompute->getIsSurfaceSRV()
+    );
+
     dragParticlesCompute = std::make_unique<DragParticlesCompute>(
         vgsCompute->getParticlesUAV(),
         voxels.size(),
@@ -141,6 +148,10 @@ void PBD::simulateSubstep() {
         faceConstraintsCompute->updateActiveConstraintAxis(i);
 		faceConstraintsCompute->dispatch(static_cast<int>((faceConstraints[i].size() + VGS_THREADS + 1) / VGS_THREADS));
     }
+
+    int numBuildCollisionGridWorkgroups = (particles.numParticles + BUILD_COLLISION_GRID_THREADS + 1) / BUILD_COLLISION_GRID_THREADS;
+    buildCollisionGridCompute->clearCollisionCellParticleCounts();
+    buildCollisionGridCompute->dispatch(numBuildCollisionGridWorkgroups);
 }
 
 void PBD::setSimValuesFromUI() {
