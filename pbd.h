@@ -13,8 +13,6 @@
 #include "directx/compute/prevgscompute.h"
 #include "directx/compute/faceconstraintscompute.h"
 #include "directx/compute/dragparticlescompute.h"
-#include "directx/compute/buildcollisiongridcompute.h"
-#include "directx/compute/solvecollisionscompute.h"
 
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
@@ -92,7 +90,7 @@ public:
     
 private:
     Particles particles;
-    std::array<std::vector<FaceConstraint>, 3> faceConstraints; //0 = x, 1 = y, 2 = z
+    std::array<std::vector<FaceConstraint>, 3> faceConstraints; //x = 0, y = 1, z = 2
     int substeps = 10;
     float timeStep;
     MDagPath meshDagPath;
@@ -107,8 +105,6 @@ private:
 	std::unique_ptr<FaceConstraintsCompute> faceConstraintsCompute;
     std::unique_ptr<PreVGSCompute> preVGSCompute;
     std::unique_ptr<DragParticlesCompute> dragParticlesCompute;
-    std::unique_ptr<BuildCollisionGridCompute> buildCollisionGridCompute;
-    std::unique_ptr<SolveCollisionsCompute> solveCollisionsCompute;
     
     void simulateSubstep();
 

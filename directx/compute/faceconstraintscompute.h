@@ -24,13 +24,13 @@ class FaceConstraintsCompute : public ComputeShader
 public:
     FaceConstraintsCompute(
         const std::array<std::vector<FaceConstraint>, 3>& constraints,
+        const std::vector<uint>& isSurface,
         const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
 		const ComPtr<ID3D11ShaderResourceView>& weightsSRV,
-        const ComPtr<ID3D11Buffer>& voxelSimInfoBuffer,
-		const ComPtr<ID3D11UnorderedAccessView>& isSurfaceUAV
-    ) : ComputeShader(IDR_SHADER4), positionsUAV(positionsUAV), weightsSRV(weightsSRV), voxelSimInfoBuffer(voxelSimInfoBuffer), isSurfaceUAV(isSurfaceUAV)
+        const ComPtr<ID3D11Buffer>& voxelSimInfoBuffer
+    ) : ComputeShader(IDR_SHADER4), positionsUAV(positionsUAV), weightsSRV(weightsSRV), voxelSimInfoBuffer(voxelSimInfoBuffer)
     {
-        initializeBuffers(constraints);
+        initializeBuffers(constraints, isSurface);
     };
 
     void dispatch(int numWorkgroups) override
@@ -44,15 +44,19 @@ public:
 		activeConstraintAxis = axis;
 	}
 
+    const ComPtr<ID3D11ShaderResourceView>& getIsSurfaceSRV() const { return isSurfaceSRV; }
+
 private:
-    ComPtr<ID3D11UnorderedAccessView> positionsUAV;
-	int activeConstraintAxis = 0; // x = 0, y = 1, z = 2
-	std::array<ComPtr<ID3D11UnorderedAccessView>, 3> faceConstraintUAVs;
-	std::array<ComPtr<ID3D11Buffer>, 3> faceContraintsCBs;
-	std::array<ComPtr<ID3D11Buffer>, 3> constraintBuffers;
+    int activeConstraintAxis = 0; // x = 0, y = 1, z = 2
+    std::array<ComPtr<ID3D11UnorderedAccessView>, 3> faceConstraintUAVs;
+    std::array<ComPtr<ID3D11Buffer>, 3> faceContraintsCBs;
+    std::array<ComPtr<ID3D11Buffer>, 3> constraintBuffers;
+    ComPtr<ID3D11Buffer> isSurfaceBuffer;
     ComPtr<ID3D11Buffer> voxelSimInfoBuffer;
     ComPtr<ID3D11ShaderResourceView> weightsSRV;
-	ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV;
+    ComPtr<ID3D11ShaderResourceView> isSurfaceSRV;
+    ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV;
+    ComPtr<ID3D11UnorderedAccessView> positionsUAV;
 
     void bind() override
     {
@@ -82,9 +86,12 @@ private:
 		DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
-    void initializeBuffers(const std::array<std::vector<FaceConstraint>, 3>& constraints) {
+    void initializeBuffers(const std::array<std::vector<FaceConstraint>, 3>& constraints, const std::vector<uint>& isSurface) {
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SUBRESOURCE_DATA initData = {};
+		D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        int numVoxels = static_cast<int>(isSurface.size());
 
 		// Initialize X constraints buffer and its UAV
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -97,7 +104,6 @@ private:
 		CreateBuffer(&bufferDesc, &initData, &constraintBuffers[0]);
 
 		// Create the UAV for the X constraints buffer
-		D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         uavDesc.Format = DXGI_FORMAT_UNKNOWN;
         uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
         uavDesc.Buffer.FirstElement = 0;
@@ -143,6 +149,27 @@ private:
         FaceContraintsCB zFaceIndices = {{4, 5, 6, 7}, {0, 1, 2, 3}, static_cast<int>(constraints[2].size()), 0, 0, 0};
         initData.pSysMem = &zFaceIndices;
         CreateBuffer(&bufferDesc, &initData, &faceContraintsCBs[2]);
+
+        // Create the isSurface buffer and its SRV and UAV
+        bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        bufferDesc.ByteWidth = sizeof(uint) * numVoxels;
+        bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
+        bufferDesc.CPUAccessFlags = 0;
+        bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+        bufferDesc.StructureByteStride = sizeof(uint);
+
+        initData.pSysMem = isSurface.data();
+
+        CreateBuffer(&bufferDesc, &initData, &isSurfaceBuffer);
+        
+        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+        srvDesc.Buffer.FirstElement = 0;
+        srvDesc.Buffer.NumElements = numVoxels;
+        DirectX::getDevice()->CreateShaderResourceView(isSurfaceBuffer.Get(), &srvDesc, &isSurfaceSRV);
+
+        uavDesc.Buffer.NumElements = numVoxels;
+        DirectX::getDevice()->CreateUnorderedAccessView(isSurfaceBuffer.Get(), &uavDesc, &isSurfaceUAV);
     }
 
     void tearDown() override
