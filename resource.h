@@ -8,8 +8,6 @@
 #define IDR_SHADER5                     107
 #define IDR_SHADER6                     108
 #define IDR_SHADER7                     109
-#define IDR_SHADER8                     110
-#define IDR_SHADER9                     111
 #define IDR_MEL1                        112
 #define IDR_MEL2                        113
 
