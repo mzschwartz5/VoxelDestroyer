@@ -2,7 +2,7 @@
 
 StructuredBuffer<float4> particlePositions : register(t0);
 StructuredBuffer<uint> isSurfaceVoxel : register(t1);
-RWBuffer<uint> collisionCellParticleCounts : register(u0); // ID3DX11Scan, used after this, requires a typed buffer
+RWStructuredBuffer<uint> collisionCellParticleCounts : register(u0);
 
 /**
  * In this shader, each thread represents a particle. We take a hash of the particle's grid position to bin it into a cell,

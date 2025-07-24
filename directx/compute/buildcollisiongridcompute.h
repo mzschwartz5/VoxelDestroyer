@@ -29,13 +29,9 @@ public:
         unbind();
     }
 
-    void clearCollisionCellParticleCounts() {
-        // See docs: 4 values are required even though only the first will be used, in our case.
-        UINT clearValues[4] = { 0, 0, 0, 0 };
-        DirectX::getContext()->ClearUnorderedAccessViewUint(collisionCellParticleCountsUAV.Get(), clearValues);
-    }
-
     const ComPtr<ID3D11Buffer>& getParticleCollisionCB() const { return particleCollisionCB; }
+
+    const ComPtr<ID3D11UnorderedAccessView>& getCollisionCellParticleCountsUAV() const { return collisionCellParticleCountsUAV; }
 
     void updateParticleCollisionCB(int numParticles, float particleSize) {
         ParticleCollisionCB cb;
@@ -86,26 +82,27 @@ private:
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 
-        // Create the collision cell particle counts buffer (typed, not structured or raw, so it can be used with ID3DX11Scan)
+        // Create the collision cell particle counts buffer
         bufferDesc.Usage = D3D11_USAGE_DEFAULT;
         bufferDesc.ByteWidth = sizeof(uint) * (numParticles + 1); // +1 as guard for the last cell
         bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
         bufferDesc.CPUAccessFlags = 0;
+        bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+        bufferDesc.StructureByteStride = sizeof(uint);
         DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &collisionCellParticleCountsBuffer);
 
         // Create the SRV for the collision cell particle counts buffer
-        srvDesc.Format = DXGI_FORMAT_R32_UINT;
+        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
         srvDesc.Buffer.FirstElement = 0;
         srvDesc.Buffer.NumElements = numParticles + 1;
         DirectX::getDevice()->CreateShaderResourceView(collisionCellParticleCountsBuffer.Get(), &srvDesc, &collisionCellParticleCountsSRV);
 
         // Create the UAV for the collision cell particle counts buffer
-        uavDesc.Format = DXGI_FORMAT_R32_UINT;
+        uavDesc.Format = DXGI_FORMAT_UNKNOWN;
         uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
         uavDesc.Buffer.FirstElement = 0;
         uavDesc.Buffer.NumElements = numParticles + 1;
-        uavDesc.Buffer.Flags = 0;
         DirectX::getDevice()->CreateUnorderedAccessView(collisionCellParticleCountsBuffer.Get(), &uavDesc, &collisionCellParticleCountsUAV);
 
         // Create the particle collision constant buffer
@@ -117,6 +114,12 @@ private:
 
         CreateBuffer(&bufferDesc, nullptr, &particleCollisionCB);
         updateParticleCollisionCB(numParticles, particleSize);
+    }
+
+    void clearCollisionCellParticleCounts() {
+        // See docs: 4 values are required even though only the first will be used, in our case.
+        UINT clearValues[4] = { 0, 0, 0, 0 };
+        DirectX::getContext()->ClearUnorderedAccessViewUint(collisionCellParticleCountsUAV.Get(), clearValues);
     }
 
     void tearDown() override {
