@@ -1,6 +1,6 @@
 StructuredBuffer<float4> particlePositions : register(t0);
 StructuredBuffer<uint> isSurfaceVoxel : register(t1);
-RWBuffer<uint> collisionCellParticleCounts : register(u0); // ID3DX11Scan, used before this, requires a typed buffer
+RWStructuredBuffer<uint> collisionCellParticleCounts : register(u0);
 RWStructuredBuffer<float4> particlePositionsByCollisionCell : register(u1);
 
 [numthreads(BUILD_COLLISION_PARTICLES_THREADS, 1, 1)]
