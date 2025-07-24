@@ -150,7 +150,6 @@ void PBD::simulateSubstep() {
     }
 
     int numBuildCollisionGridWorkgroups = (particles.numParticles + BUILD_COLLISION_GRID_THREADS + 1) / BUILD_COLLISION_GRID_THREADS;
-    buildCollisionGridCompute->clearCollisionCellParticleCounts();
     buildCollisionGridCompute->dispatch(numBuildCollisionGridWorkgroups);
 }
 
