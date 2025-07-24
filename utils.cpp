@@ -1,6 +1,7 @@
 #include "utils.h"
 #include <maya/MGlobal.h>
 #include <windows.h>
+#include <sstream>
 
 // Anonymous namespace to keep this constant's linkage internal to this file.
 namespace {
@@ -77,6 +78,45 @@ DWORD loadResourceFile(HINSTANCE pluginInstance, int id, const wchar_t* type, vo
     }
 
     return resourceSize;
+}
+
+std::string HResultToString(const HRESULT& hr) {
+    std::string result;
+    char* msgBuf = nullptr;
+
+    DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
+    DWORD langId = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
+
+    // Try to get system message string for the HRESULT
+    if (FormatMessageA(flags, nullptr, hr, langId, (LPSTR)&msgBuf, 0, nullptr) && msgBuf) {
+        result = msgBuf;
+        LocalFree(msgBuf);
+    } else {
+        result = "Unknown error";
+    }
+
+    // Append HRESULT hex
+    std::stringstream ss;
+    ss << " (HRESULT: 0x" << std::hex << std::uppercase << static_cast<unsigned long>(hr);
+
+    // Extract facility and code
+    WORD facility = HRESULT_FACILITY(hr);
+    WORD code = HRESULT_CODE(hr);
+    ss << ", Facility: " << std::dec << facility << ", Code: " << code;
+
+    // Check if it's a wrapped Win32 error
+    if (facility == FACILITY_WIN32) {
+        char* win32Msg = nullptr;
+        if (FormatMessageA(flags, nullptr, code, langId, (LPSTR)&win32Msg, 0, nullptr) && win32Msg) {
+            ss << ", Win32 message: \"" << win32Msg << "\"";
+            LocalFree(win32Msg);
+        }
+    }
+
+    ss << ")";
+    result += ss.str();
+
+    return result;
 }
 
 } // namespace Utils

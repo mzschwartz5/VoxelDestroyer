@@ -22,6 +22,8 @@ public:
     };
 
     void dispatch(int numWorkgroups) override {
+        clearCollisionCellParticleCounts();
+
         bind();
         DirectX::getContext()->Dispatch(numWorkgroups, 1, 1);
         unbind();
