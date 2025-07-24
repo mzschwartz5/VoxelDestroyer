@@ -1,12 +1,20 @@
 #pragma once
 
 #include "directx/compute/computeshader.h"
+#include <d3dcsx.h>
+#include <windows.h>
+#include <wrl/client.h>
+#include "../utils.h"
+
+// For dynamically loading the d3dcsx scan library function
+using PFN_D3DX11CreateScan = HRESULT (WINAPI*)(
+    ID3D11DeviceContext*, UINT, UINT, ID3DX11Scan**);
 
 struct ParticleCollisionCB {
     float inverseCellSize;
     int hashGridSize;
     int numParticles;
-    int padding1 = 0;
+    int padding0 = 0;
 };
 
 class BuildCollisionGridCompute : public ComputeShader
@@ -17,7 +25,8 @@ public:
         float particleSize,
         const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV,
         const ComPtr<ID3D11ShaderResourceView>& isSurfaceSRV
-    ) : ComputeShader(IDR_SHADER8), particlePositionsSRV(particlePositionsSRV), isSurfaceSRV(isSurfaceSRV) {
+    ) : ComputeShader(IDR_SHADER8), particlePositionsSRV(particlePositionsSRV), isSurfaceSRV(isSurfaceSRV), numParticles(numParticles) {
+        loadD3DCSXScanLibrary();
         initializeBuffers(numParticles, particleSize);
     };
 
@@ -27,17 +36,26 @@ public:
         bind();
         DirectX::getContext()->Dispatch(numWorkgroups, 1, 1);
         unbind();
-    }
 
-    void clearCollisionCellParticleCounts() {
-        // See docs: 4 values are required even though only the first will be used, in our case.
-        UINT clearValues[4] = { 0, 0, 0, 0 };
-        DirectX::getContext()->ClearUnorderedAccessViewUint(collisionCellParticleCountsUAV.Get(), clearValues);
+        // Perform the exclusive prefix sum scan on the collision cell particle counts
+        HRESULT hr = exclusivePrefixSumScanner->Scan(
+            D3DX11_SCAN_DATA_TYPE_UINT,
+            D3DX11_SCAN_OPCODE_ADD,
+            numParticles + 1,
+            collisionCellParticleCountsUAV.Get(),
+            collisionCellParticleCountsUAV.Get()
+        );
+
+        if (FAILED(hr)) {
+            MGlobal::displayError(MString("Failed to perform exclusive prefix sum scan: ") + Utils::HResultToString(hr).c_str());
+        }
     }
 
     const ComPtr<ID3D11Buffer>& getParticleCollisionCB() const { return particleCollisionCB; }
 
-    void updateParticleCollisionCB(int numParticles, float particleSize) {
+    void updateParticleCollisionConstants(int numParticles, float particleSize) {
+        this->numParticles = numParticles;
+
         ParticleCollisionCB cb;
         cb.inverseCellSize = 1.0f / particleSize;
         // Note that the hash grid size is the number of particles, even though the grid buffer size is numParticles + 1
@@ -45,6 +63,9 @@ public:
         cb.hashGridSize = numParticles;
         cb.numParticles = numParticles;
         ComputeShader::updateConstantBuffer(particleCollisionCB, cb);
+
+        // Recreate the exclusive prefix sum scanner with the new number of particles
+        createExclusivePrefixSumScanner(numParticles);
     }
 
 private:
@@ -54,6 +75,15 @@ private:
     ComPtr<ID3D11UnorderedAccessView> collisionCellParticleCountsUAV;
     ComPtr<ID3D11ShaderResourceView> particlePositionsSRV;
     ComPtr<ID3D11ShaderResourceView> isSurfaceSRV;
+    ID3DX11Scan* exclusivePrefixSumScanner = nullptr;
+    PFN_D3DX11CreateScan d3dCreateScanFunction;
+    int numParticles = 0;
+
+    void clearCollisionCellParticleCounts() {
+        // See docs: 4 values are required even though only the first will be used, in our case.
+        UINT clearValues[4] = { 0, 0, 0, 0 };
+        DirectX::getContext()->ClearUnorderedAccessViewUint(collisionCellParticleCountsUAV.Get(), clearValues);
+    }
 
     void bind() override {
         DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
@@ -116,7 +146,44 @@ private:
         bufferDesc.MiscFlags = 0;
 
         CreateBuffer(&bufferDesc, nullptr, &particleCollisionCB);
-        updateParticleCollisionCB(numParticles, particleSize);
+        updateParticleCollisionConstants(numParticles, particleSize);
+    }
+
+    void loadD3DCSXScanLibrary() {
+        HMODULE hModule = LoadLibrary(D3DCSX_DLL_W);
+        if (!hModule) {
+            MGlobal::displayError("Failed to load d3dcsx.dll");
+            return;
+        }
+
+        d3dCreateScanFunction = reinterpret_cast<PFN_D3DX11CreateScan>(GetProcAddress(hModule, "D3DX11CreateScan"));
+        if (!d3dCreateScanFunction) {
+            MGlobal::displayError("Failed to get D3DX11CreateScan function address");
+            return;
+        }
+    }
+
+    void createExclusivePrefixSumScanner(int numParticles) {
+        if (exclusivePrefixSumScanner) {
+            exclusivePrefixSumScanner->Release();
+            exclusivePrefixSumScanner = nullptr;
+        }
+
+        if (!d3dCreateScanFunction) {
+            MGlobal::displayError("D3DX11CreateScan function not loaded");
+            return;
+        }
+
+        HRESULT hr = d3dCreateScanFunction(
+            DirectX::getContext(),
+            numParticles + 1, // +1 for the guard
+            1,                // no multiscan
+            &exclusivePrefixSumScanner
+        );
+
+        if (FAILED(hr)) {
+            MGlobal::displayError(MString("Failed to create exclusive prefix sum scanner: ") + Utils::HResultToString(hr).c_str());
+        }
     }
 
     void tearDown() override {
@@ -124,5 +191,6 @@ private:
         collisionCellParticleCountsBuffer.Reset();
         collisionCellParticleCountsSRV.Reset();
         collisionCellParticleCountsUAV.Reset();
+        exclusivePrefixSumScanner->Release();
     }
 };
