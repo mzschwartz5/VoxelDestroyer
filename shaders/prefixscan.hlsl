@@ -6,9 +6,21 @@ RWStructuredBuffer<uint> partialSums : register(u1);
 #define LOG_NUM_BANKS 5
 #define CONFLICT_FREE_OFFSET(threadIdx) ((threadIdx) >> LOG_NUM_BANKS)
 
+int ilog2(int x) {
+    int lg = 0;
+    while (x >>= 1) {
+        ++lg;
+    }
+    return lg;
+}
+
+int ilog2ceil(int x) {
+    return x == 1 ? 0 : ilog2(x - 1) + 1;
+}
+
 // Two elements per thread, PREFIX_SCAN_THREADS threads per workgroup, four bytes per uint
 // And then we add overflow for the conflict-free offset
-groupshared int s_particleCounts[(2 * PREFIX_SCAN_THREADS + CONFLICT_FREE_OFFSET(2 * PREFIX_SCAN_THREADS - 1)) * 4];
+groupshared uint s_particleCounts[(2 * PREFIX_SCAN_THREADS + CONFLICT_FREE_OFFSET(2 * PREFIX_SCAN_THREADS - 1)) * 4];
 
 [numthreads(PREFIX_SCAN_THREADS, 1, 1)]
 void main(uint3 globalId : SV_DispatchThreadID, uint3 groupId : SV_GroupID, uint3 groupThreadId : SV_GroupThreadID)
@@ -23,13 +35,19 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupId : SV_GroupID, uint
     uint originalRightValue =  collisionCellParticleCounts[2 * globalId.x + 1];
     s_particleCounts[(2 * groupThreadId.x + 1) + CONFLICT_FREE_OFFSET(2 * groupThreadId.x + 1)] = originalRightValue;
 
-    // Upsweep phase (structured for optimal thread-level parallelism)
-    int numLevels = 0;
-    for (int stride = PREFIX_SCAN_THREADS; stride > 0; stride >>= 1) {
-        numLevels++;
+    // Upsweep phase
+    int depth = ilog2ceil(2 * PREFIX_SCAN_THREADS);
+    for (int stride = 0; stride < depth; ++stride) {
         GroupMemoryBarrierWithGroupSync();
-        if (groupThreadId.x < stride) {
-            s_particleCounts[groupThreadId.x + stride] = s_particleCounts[groupThreadId.x];
+
+        int twoToTheStridePlusOne = 1 << (stride + 1);
+        int twoToTheStride = 1 << stride;
+        int rightChildIdx = groupThreadId.x * twoToTheStridePlusOne + twoToTheStridePlusOne - 1;
+        int leftChildIdx = groupThreadId.x * twoToTheStridePlusOne + twoToTheStride - 1;
+
+        if (rightChildIdx < 2 * PREFIX_SCAN_THREADS) {
+            s_particleCounts[rightChildIdx + CONFLICT_FREE_OFFSET(rightChildIdx)]
+                += s_particleCounts[leftChildIdx + CONFLICT_FREE_OFFSET(leftChildIdx)];
         }
     }
     GroupMemoryBarrierWithGroupSync();
@@ -44,8 +62,8 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupId : SV_GroupID, uint
         s_particleCounts[lastEntryIdx + CONFLICT_FREE_OFFSET(lastEntryIdx)] = 0;
     }
 
-    // Downsweep phase (as far as I know, this can't be restructured for good thread-level parallelism)
-    for (int stride = numLevels - 1; stride >= 1; --stride)
+    // Downsweep phase
+    for (int stride = depth - 1; stride >= 1; --stride)
     {
         GroupMemoryBarrierWithGroupSync();
 

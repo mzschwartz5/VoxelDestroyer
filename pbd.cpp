@@ -42,7 +42,6 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
     );
 
     prefixScanCompute = std::make_unique<PrefixScanCompute>(
-        particles.numParticles + 1,
         buildCollisionGridCompute->getCollisionCellParticleCountsUAV()
     );
 
@@ -156,6 +155,8 @@ void PBD::simulateSubstep() {
 
     int numBuildCollisionGridWorkgroups = (particles.numParticles + BUILD_COLLISION_GRID_THREADS + 1) / BUILD_COLLISION_GRID_THREADS;
     buildCollisionGridCompute->dispatch(numBuildCollisionGridWorkgroups);
+
+    prefixScanCompute->dispatch(0); // dummy dispatch #. Shader handles the size internally. (It's a todo to refactor dispatches to all do it internally)
 }
 
 void PBD::setSimValuesFromUI() {
