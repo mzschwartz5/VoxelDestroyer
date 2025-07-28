@@ -1,6 +1,7 @@
 #pragma once
 
 #include "directx/compute/computeshader.h"
+#include "../../utils.h"
 
 struct ParticleCollisionCB {
     float inverseCellSize;
@@ -82,9 +83,13 @@ private:
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 
+        // Add one as a guard for the last cell.
+        // Round up to the nearest power of two so it can be prefix scanned.
+        int numBufferElements = pow(2, Utils::ilogbaseceil(numParticles + 1, 2)); 
+
         // Create the collision cell particle counts buffer
         bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        bufferDesc.ByteWidth = sizeof(uint) * (numParticles + 1); // +1 as guard for the last cell
+        bufferDesc.ByteWidth = sizeof(uint) * numBufferElements;
         bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
         bufferDesc.CPUAccessFlags = 0;
         bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
@@ -95,14 +100,14 @@ private:
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
         srvDesc.Buffer.FirstElement = 0;
-        srvDesc.Buffer.NumElements = numParticles + 1;
+        srvDesc.Buffer.NumElements = numBufferElements;
         DirectX::getDevice()->CreateShaderResourceView(collisionCellParticleCountsBuffer.Get(), &srvDesc, &collisionCellParticleCountsSRV);
 
         // Create the UAV for the collision cell particle counts buffer
         uavDesc.Format = DXGI_FORMAT_UNKNOWN;
         uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
         uavDesc.Buffer.FirstElement = 0;
-        uavDesc.Buffer.NumElements = numParticles + 1;
+        uavDesc.Buffer.NumElements = numBufferElements;
         DirectX::getDevice()->CreateUnorderedAccessView(collisionCellParticleCountsBuffer.Get(), &uavDesc, &collisionCellParticleCountsUAV);
 
         // Create the particle collision constant buffer
