@@ -8,9 +8,17 @@
 class PrefixScanCollectCompute : public ComputeShader
 {
 public:
-    PrefixScanCollectCompute(
-        const ComPtr<ID3D11UnorderedAccessView>& collisionCellParticleCountsUAV
-    ) : ComputeShader(IDR_SHADER11), collisionCellParticleCountsUAV(collisionCellParticleCountsUAV) {}
+    PrefixScanCollectCompute() : ComputeShader(IDR_SHADER11) {}
+
+    void collect(
+        const ComPtr<ID3D11UnorderedAccessView>& originalBufferUAV,
+        const ComPtr<ID3D11ShaderResourceView>& partialSumsSRV,
+        int numWorkgroups
+    ) {
+        this->originalBufferUAV = originalBufferUAV;
+        this->partialSumsSRV = partialSumsSRV;
+        dispatch(numWorkgroups);
+    }
 
     void dispatch(int numWorkgroups) override {
         bind();
@@ -19,17 +27,24 @@ public:
     }
     
 private:
-    ComPtr<ID3D11UnorderedAccessView> collisionCellParticleCountsUAV;
+    ComPtr<ID3D11UnorderedAccessView> originalBufferUAV;
+    ComPtr<ID3D11ShaderResourceView> partialSumsSRV;
 
     void bind() override {
         DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
 
-        ID3D11UnorderedAccessView* uavs[] = { collisionCellParticleCountsUAV.Get() };
+        ID3D11ShaderResourceView* srvs[] = { partialSumsSRV.Get() };
+        DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
+
+        ID3D11UnorderedAccessView* uavs[] = { originalBufferUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
     }
 
     void unbind() override {
         DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+
+        ID3D11ShaderResourceView* srvs[] = { nullptr };
+        DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
         ID3D11UnorderedAccessView* uavs[] = { nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);

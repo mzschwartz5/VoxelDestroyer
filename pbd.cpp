@@ -41,6 +41,11 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         faceConstraintsCompute->getIsSurfaceSRV()
     );
 
+    prefixScanCompute = std::make_unique<PrefixScanCompute>(
+        particles.numParticles + 1,
+        buildCollisionGridCompute->getCollisionCellParticleCountsUAV()
+    );
+
     dragParticlesCompute = std::make_unique<DragParticlesCompute>(
         vgsCompute->getParticlesUAV(),
         voxels.size(),
