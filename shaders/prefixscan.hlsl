@@ -18,7 +18,7 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupId : SV_GroupID, uint
 
     // Pull array elements into shared memory
     uint originalLeftValue = collisionCellParticleCounts[2 * globalId.x];
-    s_particleCounts[2 * groupThreadId.x + CONFLICT_FREE_OFFSET(2 * groupThreadId.x)] = originalLeftValue
+    s_particleCounts[2 * groupThreadId.x + CONFLICT_FREE_OFFSET(2 * groupThreadId.x)] = originalLeftValue;
 
     uint originalRightValue =  collisionCellParticleCounts[2 * globalId.x + 1];
     s_particleCounts[(2 * groupThreadId.x + 1) + CONFLICT_FREE_OFFSET(2 * groupThreadId.x + 1)] = originalRightValue;
@@ -28,11 +28,9 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupId : SV_GroupID, uint
     for (int stride = PREFIX_SCAN_THREADS; stride > 0; stride >>= 1) {
         numLevels++;
         GroupMemoryBarrierWithGroupSync();
-        if (groupThreadId.x >= stride) {
-            continue;
+        if (groupThreadId.x < stride) {
+            s_particleCounts[groupThreadId.x + stride] = s_particleCounts[groupThreadId.x];
         }
-
-        s_particleCounts[groupThreadId.x + stride] = s_particleCounts[groupThreadId.x];
     }
     GroupMemoryBarrierWithGroupSync();
 
@@ -56,15 +54,13 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupId : SV_GroupID, uint
         int rightChildIdx = groupThreadId.x * twoToTheStridePlusOne + twoToTheStridePlusOne - 1;
         int leftChildIdx = groupThreadId.x * twoToTheStridePlusOne + twoToTheStride - 1;
 
-        if (rightChildIdx >= 2 * PREFIX_SCAN_THREADS) {
-            continue; 
+        if (rightChildIdx < 2 * PREFIX_SCAN_THREADS) {
+            int leftVal = s_particleCounts[leftChildIdx + CONFLICT_FREE_OFFSET(leftChildIdx)];
+            s_particleCounts[leftChildIdx + CONFLICT_FREE_OFFSET(leftChildIdx)]
+                = s_particleCounts[rightChildIdx + CONFLICT_FREE_OFFSET(rightChildIdx)];
+
+            s_particleCounts[rightChildIdx + CONFLICT_FREE_OFFSET(rightChildIdx)] += leftVal;
         }
-
-        int leftVal = s_particleCounts[leftChildIdx + CONFLICT_FREE_OFFSET(leftChildIdx)];
-        s_particleCounts[leftChildIdx + CONFLICT_FREE_OFFSET(leftChildIdx)]
-            = s_particleCounts[rightChildIdx + CONFLICT_FREE_OFFSET(rightChildIdx)];
-
-        s_particleCounts[rightChildIdx + CONFLICT_FREE_OFFSET(rightChildIdx)] += leftVal;
     }
     GroupMemoryBarrierWithGroupSync();
 
