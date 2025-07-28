@@ -12,15 +12,6 @@ const uint32_t magicBitsMask3DDecode[] = {
 
 namespace Utils {
 
-uint32_t morton3DGetThirdBits(uint32_t coord) {
-    uint32_t x = coord & magicBitsMask3DDecode[5];
-    x = (x ^ (x >> 2)) & magicBitsMask3DDecode[4];
-    x = (x ^ (x >> 4)) & magicBitsMask3DDecode[3];
-    x = (x ^ (x >> 8)) & magicBitsMask3DDecode[2];
-    x = (x ^ (x >> 16)) & magicBitsMask3DDecode[1];
-    return x;
-}
-
 uint32_t toMortonCode(uint32_t x, uint32_t y, uint32_t z) {
     auto spreadBits = [](uint32_t value) -> uint32_t {
         value = (value | (value << 16)) & 0x030000FF;
