@@ -43,11 +43,10 @@ class DragParticlesCompute : public ComputeShader
 public:
     DragParticlesCompute(
         const ComPtr<ID3D11UnorderedAccessView>& particlesUAV,
-        int numVoxels,
         int numSubsteps
     ) : ComputeShader(IDR_SHADER7), particlesUAV(particlesUAV), numSubsteps(numSubsteps)
     {
-        initializeBuffers(numVoxels);
+        initializeBuffers();
     };
 
     void updateDepthBuffer(void* depthResourceHandle)
@@ -140,6 +139,7 @@ private:
     int numWorkgroups;
     bool wasDragging = false;
     float numSubsteps;
+    D3D11_UNORDERED_ACCESS_VIEW_DESC uavQueryDesc;
 
     void copyConstantBufferToGPU()
     {
@@ -198,11 +198,13 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
-    void initializeBuffers(int numVoxels)
+    void initializeBuffers()
     {
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        particlesUAV->GetDesc(&uavQueryDesc);
+        int numVoxels = uavQueryDesc.Buffer.NumElements / 8;
         numWorkgroups = Utils::divideRoundUp(numVoxels, VGS_THREADS);
 
         // Create CBV for the drag values (mouse position, drag distance, grab radius)

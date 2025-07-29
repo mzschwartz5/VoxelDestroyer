@@ -13,12 +13,11 @@ class BuildCollisionGridCompute : public ComputeShader
 {
 public:
     BuildCollisionGridCompute(
-        int numParticles,
         float particleSize,
         const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV,
         const ComPtr<ID3D11ShaderResourceView>& isSurfaceSRV
     ) : ComputeShader(IDR_SHADER8), particlePositionsSRV(particlePositionsSRV), isSurfaceSRV(isSurfaceSRV) {
-        initializeBuffers(numParticles, particleSize);
+        initializeBuffers(particleSize);
     };
 
     void dispatch() override {
@@ -49,6 +48,7 @@ private:
     ComPtr<ID3D11UnorderedAccessView> collisionCellParticleCountsUAV;
     ComPtr<ID3D11ShaderResourceView> particlePositionsSRV;
     ComPtr<ID3D11ShaderResourceView> isSurfaceSRV;
+    D3D11_SHADER_RESOURCE_VIEW_DESC srvQueryDesc;
 
     void bind() override {
         DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
@@ -76,10 +76,12 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     }
 
-    void initializeBuffers(int numParticles, float particleSize) {
+    void initializeBuffers(float particleSize) {
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        particlePositionsSRV->GetDesc(&srvQueryDesc);
+        int numParticles = srvQueryDesc.Buffer.NumElements;
         numWorkgroups = Utils::divideRoundUp(numParticles, BUILD_COLLISION_GRID_THREADS);
 
         // Round up to the nearest power of two so it can be prefix scanned.

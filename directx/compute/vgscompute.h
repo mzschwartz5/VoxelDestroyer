@@ -18,7 +18,6 @@ class VGSCompute : public ComputeShader
 {
 public:
     VGSCompute(
-        int numParticles,
         const float* weights,
         const std::vector<glm::vec4>& particlePositions,
         const VGSConstantBuffer& voxelSimInfo
@@ -26,7 +25,7 @@ public:
     {
         // TODO: weights should just be the unused 4th float component of the particle positions
         // (TODO 2: pack particle radius alongside weight into fourth component, at half precision)
-        initializeBuffers(numParticles, weights, particlePositions, voxelSimInfo);
+        initializeBuffers(weights, particlePositions, voxelSimInfo);
     };
 
     void dispatch() override
@@ -81,11 +80,12 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
-    void initializeBuffers(int numParticles, const float* weights, const std::vector<glm::vec4>& particlePositions, const VGSConstantBuffer& voxelSimInfo) {
+    void initializeBuffers(const float* weights, const std::vector<glm::vec4>& particlePositions, const VGSConstantBuffer& voxelSimInfo) {
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SUBRESOURCE_DATA initData = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        int numParticles = static_cast<int>(particlePositions.size());
         numWorkgroups = Utils::divideRoundUp(numParticles / 8, VGS_THREADS);
 
         // Initialize weights buffer and its SRV
