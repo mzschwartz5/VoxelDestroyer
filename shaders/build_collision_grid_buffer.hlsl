@@ -20,6 +20,17 @@ void main(uint3 gId : SV_DispatchThreadID)
     }
 
     float4 position = particlePositions[gId.x];
-    int cellHash = getParticleCellHash(position.xyz);
-    InterlockedAdd(collisionCellParticleCounts[cellHash], 1);
+    int3 gridMinOverlap = int3(floor((position.xyz - particleRadius) * inverseCellSize));
+    int3 gridMaxOverlap = int3(floor((position.xyz + particleRadius) * inverseCellSize));
+
+    // Increment the particle count for all cells that the particle overlaps.
+    // Because we make the cells as large as the largest particle, this will be at most 8 cells.
+    for (int z = gridMinOverlap.z; z <= gridMaxOverlap.z; ++z) {
+        for (int y = gridMinOverlap.y; y <= gridMaxOverlap.y; ++y) {
+            for (int x = gridMinOverlap.x; x <= gridMaxOverlap.x; ++x) {
+                int cellHash = getParticleCellHash(x, y, z);
+                InterlockedAdd(collisionCellParticleCounts[cellHash], 1);
+            }
+        }
+    }
 }

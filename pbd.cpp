@@ -45,6 +45,14 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         buildCollisionGridCompute->getCollisionCellParticleCountsUAV()
     );
 
+    buildCollisionParticleCompute = std::make_unique<BuildCollisionParticlesCompute>(
+        particles.numParticles,
+        vgsCompute->getParticlesSRV(),
+        buildCollisionGridCompute->getCollisionCellParticleCountsUAV(),
+        buildCollisionGridCompute->getParticleCollisionCB(),
+        faceConstraintsCompute->getIsSurfaceSRV()
+    );
+
     dragParticlesCompute = std::make_unique<DragParticlesCompute>(
         vgsCompute->getParticlesUAV(),
         voxels.size(),
@@ -157,6 +165,7 @@ void PBD::simulateSubstep() {
     buildCollisionGridCompute->dispatch(numBuildCollisionGridWorkgroups);
 
     prefixScanCompute->dispatch(0); // dummy dispatch #. Shader handles the size internally. (It's a todo to refactor dispatches to all do it internally)
+    buildCollisionParticleCompute->dispatch(0); // dummy dispath
 }
 
 void PBD::setSimValuesFromUI() {

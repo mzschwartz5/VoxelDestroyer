@@ -25,6 +25,7 @@ public:
 	) : ComputeShader(IDR_SHADER3)
     {
         // TODO: weights should just be the unused 4th float component of the particle positions
+        // (TODO 2: pack particle radius alongside weight into fourth component, at half precision)
         initializeBuffers(numParticles, weights, particlePositions, voxelSimInfo);
     };
 
