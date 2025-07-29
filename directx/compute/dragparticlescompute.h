@@ -95,7 +95,7 @@ public:
 
         // If we just stopped dragging, reset the isDraggingBuffer to false for all voxels.
         if (wasDragging && !isDragging) {
-            resetDragValues();
+            clearUintBuffer(isDraggingUAV);
         }
 
         wasDragging = isDragging;
@@ -141,12 +141,6 @@ private:
     DragValues dragValues;
     bool wasDragging = false;
     float numSubsteps;
-
-    void resetDragValues() {
-        // See docs: 4 values are required even though only the first will be used, in our case.
-        UINT clearValues[4] = { 0, 0, 0, 0 };
-        DirectX::getContext()->ClearUnorderedAccessViewUint(isDraggingUAV.Get(), clearValues);
-    }
 
     void copyConstantBufferToGPU()
     {
@@ -237,7 +231,7 @@ private:
         uavDesc.Buffer.NumElements = numVoxels;
 
         DirectX::getDevice()->CreateUnorderedAccessView(isDraggingBuffer.Get(), &uavDesc, &isDraggingUAV);
-        resetDragValues();
+        clearUintBuffer(isDraggingUAV);
     };
 
     void tearDown() override

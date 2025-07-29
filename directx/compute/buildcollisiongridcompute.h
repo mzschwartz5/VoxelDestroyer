@@ -23,8 +23,7 @@ public:
     };
 
     void dispatch(int numWorkgroups) override {
-        clearCollisionCellParticleCounts();
-
+        clearUintBuffer(collisionCellParticleCountsUAV);
         bind();
         DirectX::getContext()->Dispatch(numWorkgroups, 1, 1);
         unbind();
@@ -119,12 +118,6 @@ private:
 
         CreateBuffer(&bufferDesc, nullptr, &particleCollisionCB);
         updateParticleCollisionCB(numParticles, particleSize);
-    }
-
-    void clearCollisionCellParticleCounts() {
-        // See docs: 4 values are required even though only the first will be used, in our case.
-        UINT clearValues[4] = { 0, 0, 0, 0 };
-        DirectX::getContext()->ClearUnorderedAccessViewUint(collisionCellParticleCountsUAV.Get(), clearValues);
     }
 
     void tearDown() override {

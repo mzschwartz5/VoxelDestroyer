@@ -72,6 +72,15 @@ protected:
         }
     }
 
+    /*
+    * Clears a UINT buffer with the value 0.
+    */
+    void clearUintBuffer(const ComPtr<ID3D11UnorderedAccessView>& uav) {
+        // See docs: 4 values are required even though only the first will be used, in our case.
+        UINT clearValues[4] = { 0, 0, 0, 0 };
+        DirectX::getContext()->ClearUnorderedAccessViewUint(uav.Get(), clearValues);
+    }
+
     void load() {
         void* data = nullptr;
         DWORD size = Utils::loadResourceFile(DirectX::getPluginInstance(), id, L"SHADER", &data);

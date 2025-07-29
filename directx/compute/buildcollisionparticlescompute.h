@@ -22,7 +22,7 @@ public:
     }
 
     void dispatch(int dummy) override {
-        clearParticlesByCollisionCell();
+        clearUintBuffer(particlesByCollisionCellUAV);
         bind();
         DirectX::getContext()->Dispatch(numWorkgroups, 1, 1);
         unbind();
@@ -67,12 +67,6 @@ private:
 
         ID3D11Buffer* cbvs[] = { nullptr };
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
-    }
-
-    void clearParticlesByCollisionCell() {
-        // See docs: 4 values are required even though only the first will be used, in our case.
-        UINT clearValues[4] = { 0, 0, 0, 0 };
-        DirectX::getContext()->ClearUnorderedAccessViewUint(particlesByCollisionCellUAV.Get(), clearValues);
     }
 
     void initializeBuffers(int numParticles) {
