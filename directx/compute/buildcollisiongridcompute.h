@@ -6,8 +6,8 @@
 struct ParticleCollisionCB {
     float inverseCellSize;
     int hashGridSize;
-    int numParticles;
-    int padding1 = 0;
+    unsigned int numParticles;
+    float particleRadius;
 };
 
 class BuildCollisionGridCompute : public ComputeShader
@@ -34,13 +34,14 @@ public:
 
     const ComPtr<ID3D11UnorderedAccessView>& getCollisionCellParticleCountsUAV() const { return collisionCellParticleCountsUAV; }
 
+    const ComPtr<ID3D11ShaderResourceView>& getCollisionCellParticleCountsSRV() const { return collisionCellParticleCountsSRV; }
+
     void updateParticleCollisionCB(int numParticles, float particleSize) {
         ParticleCollisionCB cb;
-        cb.inverseCellSize = 1.0f / particleSize;
-        // Note that the hash grid size is the number of particles, even though the grid buffer size is numParticles + 1
-        // The +1 is just a guard, but we don't want to include it when modulo'ing the particle index.
+        cb.inverseCellSize = 1.0f / (2.0f * particleSize);
         cb.hashGridSize = numParticles;
         cb.numParticles = numParticles;
+        cb.particleRadius = particleSize;
         ComputeShader::updateConstantBuffer(particleCollisionCB, cb);
     }
 
@@ -83,9 +84,8 @@ private:
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 
-        // Add one as a guard for the last cell.
         // Round up to the nearest power of two so it can be prefix scanned.
-        int numBufferElements = pow(2, Utils::ilogbaseceil(numParticles + 1, 2)); 
+        int numBufferElements = pow(2, Utils::ilogbaseceil(numParticles, 2)); 
 
         // Create the collision cell particle counts buffer
         bufferDesc.Usage = D3D11_USAGE_DEFAULT;

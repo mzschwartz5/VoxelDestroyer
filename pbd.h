@@ -15,6 +15,7 @@
 #include "directx/compute/dragparticlescompute.h"
 #include "directx/compute/buildcollisiongridcompute.h"
 #include "directx/compute/prefixscancompute.h"
+#include "directx/compute/buildcollisionparticlescompute.h"
 
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
@@ -109,6 +110,7 @@ private:
     std::unique_ptr<DragParticlesCompute> dragParticlesCompute;
     std::unique_ptr<BuildCollisionGridCompute> buildCollisionGridCompute;
     std::unique_ptr<PrefixScanCompute> prefixScanCompute;
+    std::unique_ptr<BuildCollisionParticlesCompute> buildCollisionParticleCompute;
     
     void simulateSubstep();
 
