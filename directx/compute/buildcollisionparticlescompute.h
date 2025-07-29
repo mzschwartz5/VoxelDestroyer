@@ -98,4 +98,11 @@ private:
         uavDesc.Buffer.NumElements = numBufferElements;
         DirectX::getDevice()->CreateUnorderedAccessView(particlesByCollisionCellBuffer.Get(), &uavDesc, &particlesByCollisionCellUAV);
     }
+
+    void tearDown() override {
+        ComputeShader::tearDown();
+        particlesByCollisionCellBuffer.Reset();
+        particlesByCollisionCellUAV.Reset();
+        particlesByCollisionCellSRV.Reset();
+    }
 };
