@@ -31,17 +31,21 @@ public:
 
     const ComPtr<ID3D11ShaderResourceView>& getCollisionCellParticleCountsSRV() const { return collisionCellParticleCountsSRV; }
 
+    int getHashGridSize() const {
+        return particleCollisionCBData.hashGridSize;
+    }
+
     void updateParticleCollisionCB(int numParticles, float particleSize) {
-        ParticleCollisionCB cb;
-        cb.inverseCellSize = 1.0f / (2.0f * particleSize);
-        cb.hashGridSize = numParticles;
-        cb.numParticles = numParticles;
-        cb.particleRadius = particleSize;
-        ComputeShader::updateConstantBuffer(particleCollisionCB, cb);
+        particleCollisionCBData.inverseCellSize = 1.0f / (2.0f * particleSize);
+        particleCollisionCBData.hashGridSize = numParticles;
+        particleCollisionCBData.numParticles = numParticles;
+        particleCollisionCBData.particleRadius = particleSize;
+        ComputeShader::updateConstantBuffer(particleCollisionCB, particleCollisionCBData);
     }
 
 private:
     int numWorkgroups = 0;
+    ParticleCollisionCB particleCollisionCBData;
     ComPtr<ID3D11Buffer> particleCollisionCB;
     ComPtr<ID3D11Buffer> collisionCellParticleCountsBuffer;
     ComPtr<ID3D11ShaderResourceView> collisionCellParticleCountsSRV;

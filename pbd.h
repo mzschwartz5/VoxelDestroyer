@@ -16,6 +16,7 @@
 #include "directx/compute/buildcollisiongridcompute.h"
 #include "directx/compute/prefixscancompute.h"
 #include "directx/compute/buildcollisionparticlescompute.h"
+#include "directx/compute/solvecollisionscompute.h"
 
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
@@ -111,6 +112,7 @@ private:
     std::unique_ptr<BuildCollisionGridCompute> buildCollisionGridCompute;
     std::unique_ptr<PrefixScanCompute> prefixScanCompute;
     std::unique_ptr<BuildCollisionParticlesCompute> buildCollisionParticleCompute;
+    std::unique_ptr<SolveCollisionsCompute> solveCollisionsCompute;
     
     void simulateSubstep();
 

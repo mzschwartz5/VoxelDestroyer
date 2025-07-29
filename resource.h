@@ -13,14 +13,15 @@
 #define IDR_SHADER9                     111
 #define IDR_SHADER10                    112
 #define IDR_SHADER11                    113
-#define IDR_MEL1                        114
-#define IDR_MEL2                        115
+#define IDR_SHADER12                    114
+#define IDR_MEL1                        115
+#define IDR_MEL2                        116
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        116
+#define _APS_NEXT_RESOURCE_VALUE        117
 #define _APS_NEXT_COMMAND_VALUE         40001
 #define _APS_NEXT_CONTROL_VALUE         1001
 #define _APS_NEXT_SYMED_VALUE           101

@@ -199,6 +199,7 @@
     <ClInclude Include="directx\compute\buildcollisionparticlescompute.h" />
     <ClInclude Include="directx\compute\prefixscancompute.h" />
     <ClInclude Include="directx\compute\prefixscancollectcompute.h" />
+    <ClInclude Include="directx\compute\solvecollisioncompute.h" />
     <ClInclude Include="directx\d3dincludehandler.h" />
   </ItemGroup>
   <ItemGroup>

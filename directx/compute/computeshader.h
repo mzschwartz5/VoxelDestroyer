@@ -97,12 +97,14 @@ protected:
         const std::string buildCollisionGridStr = std::to_string(BUILD_COLLISION_GRID_THREADS);
         const std::string buildCollisionParticleStr = std::to_string(BUILD_COLLISION_PARTICLE_THREADS);
         const std::string prefixScanThreadsStr = std::to_string(PREFIX_SCAN_THREADS);
+        const std::string solveCollisionThreadsStr = std::to_string(SOLVE_COLLISION_THREADS);
         D3D_SHADER_MACRO SHADER_MACROS[] = {
             { "TRANSFORM_VERTICES_THREADS", transformVerticesThreadsStr.c_str() },
             { "VGS_THREADS", vgsThreadsStr.c_str() },
             { "BUILD_COLLISION_GRID_THREADS", buildCollisionGridStr.c_str() },
             { "BUILD_COLLISION_PARTICLE_THREADS", buildCollisionParticleStr.c_str() },
             { "PREFIX_SCAN_THREADS", prefixScanThreadsStr.c_str() },
+            { "SOLVE_COLLISION_THREADS", solveCollisionThreadsStr.c_str() },
             { NULL, NULL } // Terminate the array
         };
 
