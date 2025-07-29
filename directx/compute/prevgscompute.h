@@ -1,5 +1,4 @@
 #pragma once
-
 #include "directx/compute/computeshader.h"
 
 struct PreVGSConstantBuffer {
@@ -30,7 +29,12 @@ public:
 
     const ComPtr<ID3D11ShaderResourceView>& getOldPositionsSRV() const { return oldPositionsSRV; }
 
+    void dispatch() override {
+        ComputeShader::dispatch(numWorkgroups);
+    }
+
 private:
+    int numWorkgroups;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
     ComPtr<ID3D11Buffer> oldPositionsBuffer;
     ComPtr<ID3D11ShaderResourceView> weightsSRV;
@@ -68,6 +72,7 @@ private:
     };
 
     void initializeBuffers(int numParticles, const glm::vec4* initialOldPositions, const PreVGSConstantBuffer& simConstants) {
+        numWorkgroups = Utils::divideRoundUp(numParticles, VGS_THREADS);
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};

@@ -112,16 +112,14 @@ public:
         return isDraggingUAV;
     }
 
-    void dispatch(int threadGroupCount) override
+    void dispatch() override
     {
         // May happen if the override render has not yet been setup
         if (!depthSRV) {
             return;
         }
         
-        bind();
-        DirectX::getContext()->Dispatch(threadGroupCount, 1, 1); 
-        unbind();
+        ComputeShader::dispatch(numWorkgroups);
 
         // Reset drag values (because mouse drag event isn't called every frame, only when the mouse is moved).
         if (dragValues.currX != dragValues.lastX || dragValues.currY != dragValues.lastY) {
@@ -139,6 +137,7 @@ private:
     ID3D11DepthStencilView* depthStencilView;
     CameraMatrices cameraMatrices;
     DragValues dragValues;
+    int numWorkgroups;
     bool wasDragging = false;
     float numSubsteps;
 
@@ -204,6 +203,7 @@ private:
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        numWorkgroups = Utils::divideRoundUp(numVoxels, VGS_THREADS);
 
         // Create CBV for the drag values (mouse position, drag distance, grab radius)
         bufferDesc.Usage = D3D11_USAGE_DYNAMIC;

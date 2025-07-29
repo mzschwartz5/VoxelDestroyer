@@ -2,7 +2,6 @@
 #include "constants.h"
 #include <d3d11.h>
 #include <wrl/client.h>
-#include "../../utils.h"
 #include "../../resource.h"
 #include "../d3dincludehandler.h"
 #include "../directx.h"
@@ -21,6 +20,8 @@ public:
     
     ID3D11ComputeShader*& getShaderPtr()  { return shaderPtr; };
     
+    virtual void dispatch() = 0;
+
     virtual void dispatch(int threadGroupCount) {
         bind();
         DirectX::getContext()->Dispatch(threadGroupCount, 1, 1); 

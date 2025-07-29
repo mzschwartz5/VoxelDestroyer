@@ -1,7 +1,6 @@
 #pragma once
 #include "directx/compute/computeshader.h"
 #include "./prefixscancollectcompute.h"
-#include "../../utils.h"
 #include <memory>
 #include <algorithm>
 #include "constants.h"
@@ -22,33 +21,24 @@ public:
         initializeBuffers();
     }
 
-    // TODO: compute passes should calculate the number of workgroups themselves based on internal state, not be passed in.
-    // In this case, it's not even possible to pass in the right arg here, so just call it dummy.
-    void dispatch(int dummy) override {
+    void dispatch() override {
         activeUAVForScan = collisionCellParticleCountsUAV;
-        bind();
-        DirectX::getContext()->Dispatch(Utils::divideRoundUp(numElements, 2 * PREFIX_SCAN_THREADS), 1, 1);
-        unbind();
+        ComputeShader::dispatch(numWorkgroupsForScan[0]);
 
         // Scan the partial sums, and the partial sums of the partial sums (if necessary), etc.
         // Written to be iterative (using analytically prederived `numScans`) rather than recursive
         // Note that, for realistic buffer / workgroup sizes, this is generally 0-3 scans (and most often just 1).
         for (scanIdx = 1; scanIdx < numScans; ++scanIdx) {
             activeUAVForScan = partialSumsUAVs[scanIdx - 1];
-            activeUAVForScan->GetDesc(&uavQueryDesc);
-            bind();
-            DirectX::getContext()->Dispatch(Utils::divideRoundUp(uavQueryDesc.Buffer.NumElements, 2 * PREFIX_SCAN_THREADS), 1, 1);
-            unbind();
+            ComputeShader::dispatch(numWorkgroupsForScan[scanIdx - 1]);
         }
 
         // Now go back up the chain, adding the partial sums to the scanned data they came from.
         for (scanIdx = numScans - 1; scanIdx > 0; --scanIdx) {
-            partialSumsUAVs[scanIdx - 1]->GetDesc(&uavQueryDesc);
-            
             collectComputePass->collect(
-                partialSumsUAVs[scanIdx - 1], // collect into the scan sums from one level higher up
-                partialSumsSRVs[scanIdx],     // read sums from the current level
-                Utils::divideRoundUp(uavQueryDesc.Buffer.NumElements, PREFIX_SCAN_THREADS) // No factor of 2 here. Unlike in the scan, each thread here operates on a single element.
+                partialSumsUAVs[scanIdx - 1],           // collect into the scan sums from one level higher up
+                partialSumsSRVs[scanIdx],               // read sums from the current level
+                2 * numWorkgroupsForScan[scanIdx - 1]   // Factor of 2 bc each collect thread only processes one element; each scan thread processes two.
             );
         }
     }
@@ -60,10 +50,11 @@ private:
     std::vector<ComPtr<ID3D11Buffer>> partialSumsBuffers; // Tracks partial sums from each workgroup
     std::vector<ComPtr<ID3D11ShaderResourceView>> partialSumsSRVs; 
     std::vector<ComPtr<ID3D11UnorderedAccessView>> partialSumsUAVs;
+    std::vector<int> numWorkgroupsForScan;
     ComPtr<ID3D11UnorderedAccessView> activeUAVForScan;
     ComPtr<ID3D11UnorderedAccessView> collisionCellParticleCountsUAV;
     std::unique_ptr<PrefixScanCollectCompute> collectComputePass;
-    D3D11_UNORDERED_ACCESS_VIEW_DESC uavQueryDesc; 
+    D3D11_UNORDERED_ACCESS_VIEW_DESC uavQueryDesc;
     int numElements = 0;
     int numScans = 0;
     int scanIdx = 0;
@@ -95,7 +86,8 @@ private:
         int base = 2 * PREFIX_SCAN_THREADS;
         numScans = Utils::ilogbaseceil(numElements, base);
         
-        int numElementsInBuffer = numElements; 
+        int numElementsInBuffer = numElements;
+        numWorkgroupsForScan.resize(numScans); 
         partialSumsBuffers.resize(numScans);
         partialSumsSRVs.resize(numScans);
         partialSumsUAVs.resize(numScans);
@@ -103,6 +95,7 @@ private:
             numElementsInBuffer /= base; 
             // In the event that the scan can be done in a single workgroup, integer division above results in 0 elements.
             numElementsInBuffer = std::max(numElementsInBuffer, 1);
+            numWorkgroupsForScan[i] = Utils::divideRoundUp(numElementsInBuffer, PREFIX_SCAN_THREADS);
 
             // Create the partial sums buffer and its UAV and SRV
             bufferDesc.Usage = D3D11_USAGE_DEFAULT;

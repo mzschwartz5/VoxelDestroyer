@@ -29,11 +29,9 @@ public:
         initializeBuffers(numParticles, weights, particlePositions, voxelSimInfo);
     };
 
-    void dispatch(int numWorkgroups) override
+    void dispatch() override
     {
-        bind();
-        DirectX::getContext()->Dispatch(numWorkgroups, 1, 1);
-        unbind();
+        ComputeShader::dispatch(numWorkgroups);
     };
 
     void updateConstantBuffer(const VGSConstantBuffer& newCB) {
@@ -47,6 +45,7 @@ public:
     const ComPtr<ID3D11Buffer>& getParticlesBuffer() const { return particlesBuffer; }
 
 private:
+    int numWorkgroups = 0;
     ComPtr<ID3D11Buffer> voxelSimInfoBuffer;
     ComPtr<ID3D11Buffer> weightsBuffer;
     ComPtr<ID3D11Buffer> particlesBuffer; 
@@ -87,6 +86,7 @@ private:
         D3D11_SUBRESOURCE_DATA initData = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        numWorkgroups = Utils::divideRoundUp(numParticles / 8, VGS_THREADS);
 
         // Initialize weights buffer and its SRV
         bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
