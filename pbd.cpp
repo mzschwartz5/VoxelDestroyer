@@ -13,7 +13,6 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
     createParticles(voxels);
 
     vgsCompute = std::make_unique<VGSCompute>(
-        particles.numParticles,
         particles.w.data(),
         particles.positions,
         VGSConstantBuffer{ RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, voxels.size() }
@@ -35,7 +34,6 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 	);
 
     buildCollisionGridCompute = std::make_unique<BuildCollisionGridCompute>(
-        particles.numParticles,
         PARTICLE_RADIUS,
         vgsCompute->getParticlesSRV(),
         faceConstraintsCompute->getIsSurfaceSRV()
@@ -46,7 +44,6 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
     );
 
     buildCollisionParticleCompute = std::make_unique<BuildCollisionParticlesCompute>(
-        particles.numParticles,
         vgsCompute->getParticlesSRV(),
         buildCollisionGridCompute->getCollisionCellParticleCountsUAV(),
         buildCollisionGridCompute->getParticleCollisionCB(),
@@ -55,7 +52,6 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
 
     dragParticlesCompute = std::make_unique<DragParticlesCompute>(
         vgsCompute->getParticlesUAV(),
-        voxels.size(),
         substeps
     );
 
