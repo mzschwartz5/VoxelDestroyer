@@ -1,7 +1,6 @@
 #pragma once
 
 #include "directx/compute/computeshader.h"
-#include "../../utils.h"
 
 struct ParticleCollisionCB {
     float inverseCellSize;
@@ -22,11 +21,9 @@ public:
         initializeBuffers(numParticles, particleSize);
     };
 
-    void dispatch(int numWorkgroups) override {
+    void dispatch() override {
         clearUintBuffer(collisionCellParticleCountsUAV);
-        bind();
-        DirectX::getContext()->Dispatch(numWorkgroups, 1, 1);
-        unbind();
+        ComputeShader::dispatch(numWorkgroups);
     }
 
     const ComPtr<ID3D11Buffer>& getParticleCollisionCB() const { return particleCollisionCB; }
@@ -45,6 +42,7 @@ public:
     }
 
 private:
+    int numWorkgroups = 0;
     ComPtr<ID3D11Buffer> particleCollisionCB;
     ComPtr<ID3D11Buffer> collisionCellParticleCountsBuffer;
     ComPtr<ID3D11ShaderResourceView> collisionCellParticleCountsSRV;
@@ -82,6 +80,7 @@ private:
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        numWorkgroups = Utils::divideRoundUp(numParticles, BUILD_COLLISION_GRID_THREADS);
 
         // Round up to the nearest power of two so it can be prefix scanned.
         int numBufferElements = pow(2, Utils::ilogbaseceil(numParticles, 2)); 

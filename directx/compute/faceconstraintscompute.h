@@ -33,11 +33,9 @@ public:
         initializeBuffers(constraints, isSurface);
     };
 
-    void dispatch(int numWorkgroups) override
+    void dispatch() override
     {
-        bind();
-        DirectX::getContext()->Dispatch(numWorkgroups, 1, 1);
-        unbind();
+        ComputeShader::dispatch(numWorkgroups[activeConstraintAxis]);
     };
 
 	void updateActiveConstraintAxis(int axis) {
@@ -48,6 +46,7 @@ public:
 
 private:
     int activeConstraintAxis = 0; // x = 0, y = 1, z = 2
+    std::array<int, 3> numWorkgroups = { 0, 0, 0 };
     std::array<ComPtr<ID3D11UnorderedAccessView>, 3> faceConstraintUAVs;
     std::array<ComPtr<ID3D11Buffer>, 3> faceContraintsCBs;
     std::array<ComPtr<ID3D11Buffer>, 3> constraintBuffers;
@@ -94,6 +93,7 @@ private:
         int numVoxels = static_cast<int>(isSurface.size());
 
 		// Initialize X constraints buffer and its UAV
+        numWorkgroups[0] = Utils::divideRoundUp(constraints[0].size(), VGS_THREADS);
 		bufferDesc.Usage = D3D11_USAGE_DEFAULT;
         bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[0].size());
 		bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
@@ -111,6 +111,7 @@ private:
 		DirectX::getDevice()->CreateUnorderedAccessView(constraintBuffers[0].Get(), &uavDesc, &faceConstraintUAVs[0]);
 
 		// Initialize Y constraints buffer and its UAV
+        numWorkgroups[1] = Utils::divideRoundUp(constraints[1].size(), VGS_THREADS);
 		bufferDesc.ByteWidth = UINT(sizeof(FaceConstraint) * constraints[1].size());
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[1].data();
@@ -121,6 +122,7 @@ private:
 		DirectX::getDevice()->CreateUnorderedAccessView(constraintBuffers[1].Get(), &uavDesc, &faceConstraintUAVs[1]);
 
 		// Initialize Z constraints buffer and its UAV
+        numWorkgroups[2] = Utils::divideRoundUp(constraints[2].size(), VGS_THREADS);
 		bufferDesc.ByteWidth = static_cast<uint>(sizeof(FaceConstraint) * constraints[2].size());
 		bufferDesc.StructureByteStride = sizeof(FaceConstraint);
 		initData.pSysMem = constraints[2].data();

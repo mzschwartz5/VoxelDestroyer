@@ -17,19 +17,17 @@ public:
     ) {
         this->originalBufferUAV = originalBufferUAV;
         this->partialSumsSRV = partialSumsSRV;
-        dispatch(numWorkgroups);
+        ComputeShader::dispatch(numWorkgroups);
     }
 
-    void dispatch(int numWorkgroups) override {
-        bind();
-        DirectX::getContext()->Dispatch(numWorkgroups, 1, 1);
-        unbind();
-    }
     
 private:
     ComPtr<ID3D11UnorderedAccessView> originalBufferUAV;
     ComPtr<ID3D11ShaderResourceView> partialSumsSRV;
 
+    // No-op. This class needs to be given a numWorkgroups.
+    void dispatch() override {}
+    
     void bind() override {
         DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
 

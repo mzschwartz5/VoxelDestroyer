@@ -145,27 +145,22 @@ void PBD::simulateStep()
 }
 
 void PBD::simulateSubstep() {
-    int numPreVgsComputeWorkgroups = (particles.numParticles + VGS_THREADS + 1) / (VGS_THREADS);
-    preVGSCompute->dispatch(numPreVgsComputeWorkgroups);
-
-    int numVgsWorkgroups = ((particles.numParticles >> 3) + VGS_THREADS + 1) / (VGS_THREADS); 
+    preVGSCompute->dispatch();
 
     if (isDragging) {
-        dragParticlesCompute->dispatch(numVgsWorkgroups);
+        dragParticlesCompute->dispatch();
     }
 
-    vgsCompute->dispatch(numVgsWorkgroups);
+    vgsCompute->dispatch();
     
     for (int i = 0; i < faceConstraints.size(); i++) {
         faceConstraintsCompute->updateActiveConstraintAxis(i);
-		faceConstraintsCompute->dispatch(static_cast<int>((faceConstraints[i].size() + VGS_THREADS + 1) / VGS_THREADS));
+		faceConstraintsCompute->dispatch();
     }
 
-    int numBuildCollisionGridWorkgroups = (particles.numParticles + BUILD_COLLISION_GRID_THREADS + 1) / BUILD_COLLISION_GRID_THREADS;
-    buildCollisionGridCompute->dispatch(numBuildCollisionGridWorkgroups);
-
-    prefixScanCompute->dispatch(0); // dummy dispatch #. Shader handles the size internally. (It's a todo to refactor dispatches to all do it internally)
-    buildCollisionParticleCompute->dispatch(0); // dummy dispath
+    buildCollisionGridCompute->dispatch();
+    prefixScanCompute->dispatch(); 
+    buildCollisionParticleCompute->dispatch();
 }
 
 void PBD::setSimValuesFromUI() {

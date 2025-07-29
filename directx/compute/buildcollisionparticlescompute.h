@@ -1,7 +1,6 @@
 #pragma once
 
 #include "directx/compute/computeshader.h"
-#include "../../utils.h"
 
 class BuildCollisionParticlesCompute : public ComputeShader
 {
@@ -21,11 +20,9 @@ public:
         initializeBuffers(numParticles);
     }
 
-    void dispatch(int dummy) override {
+    void dispatch() override {
         clearUintBuffer(particlesByCollisionCellUAV);
-        bind();
-        DirectX::getContext()->Dispatch(numWorkgroups, 1, 1);
-        unbind();
+        ComputeShader::dispatch(numWorkgroups);
     }
 
     const ComPtr<ID3D11ShaderResourceView>& getParticlesByCollisionCellSRV() const { return particlesByCollisionCellSRV; }
