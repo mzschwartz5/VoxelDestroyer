@@ -98,6 +98,8 @@ protected:
         const std::string buildCollisionParticleStr = std::to_string(BUILD_COLLISION_PARTICLE_THREADS);
         const std::string prefixScanThreadsStr = std::to_string(PREFIX_SCAN_THREADS);
         const std::string solveCollisionThreadsStr = std::to_string(SOLVE_COLLISION_THREADS);
+        const std::string threadsPerCollisionCellStr = std::to_string(THREADS_PER_COLLISION_CELL);
+        const std::string threadsPerCollisionCellInvStr = std::to_string(THREADS_PER_COLLISION_CELL_INV);
         D3D_SHADER_MACRO SHADER_MACROS[] = {
             { "TRANSFORM_VERTICES_THREADS", transformVerticesThreadsStr.c_str() },
             { "VGS_THREADS", vgsThreadsStr.c_str() },
@@ -105,6 +107,8 @@ protected:
             { "BUILD_COLLISION_PARTICLE_THREADS", buildCollisionParticleStr.c_str() },
             { "PREFIX_SCAN_THREADS", prefixScanThreadsStr.c_str() },
             { "SOLVE_COLLISION_THREADS", solveCollisionThreadsStr.c_str() },
+            { "THREADS_PER_COLLISION_CELL", threadsPerCollisionCellStr.c_str() },
+            { "THREADS_PER_COLLISION_CELL_INV", threadsPerCollisionCellInvStr.c_str() },
             { NULL, NULL } // Terminate the array
         };
 

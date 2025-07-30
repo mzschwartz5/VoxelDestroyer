@@ -88,8 +88,9 @@ private:
         int numParticles = srvQueryDesc.Buffer.NumElements;
         numWorkgroups = Utils::divideRoundUp(numParticles, BUILD_COLLISION_GRID_THREADS);
 
+        // Add one as a "guard" / so the last cell will contribute to the scan and there will be record of it.
         // Round up to the nearest power of two so it can be prefix scanned.
-        int numBufferElements = pow(2, Utils::ilogbaseceil(numParticles, 2)); 
+        int numBufferElements = pow(2, Utils::ilogbaseceil(numParticles + 1, 2)); 
 
         // Create the collision cell particle counts buffer
         bufferDesc.Usage = D3D11_USAGE_DEFAULT;
