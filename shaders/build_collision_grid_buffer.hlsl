@@ -13,7 +13,7 @@ void main(uint3 gId : SV_DispatchThreadID)
 {
     if (gId.x >= numParticles) return;
 
-    int voxelIdx = gId.x >> 8;
+    int voxelIdx = gId.x >> 3;
     // Optimization: only compute collisions for surface particles by culling non-surface voxels early.
     if (!isSurfaceVoxel[voxelIdx]) {
         return;

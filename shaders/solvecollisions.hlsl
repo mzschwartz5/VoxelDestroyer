@@ -4,47 +4,60 @@ StructuredBuffer<uint> particleIndices : register(t0);
 StructuredBuffer<uint> collisionCellParticleCounts : register(t1);
 RWStructuredBuffer<float4> particles : register(u0);
 
+bool doParticlesOverlap(float4 particleA, float4 particleB, out float distanceSquared, out float3 particleAToB)
+{
+    particleAToB = particleB.xyz - particleA.xyz;
+    distanceSquared = dot(particleAToB, particleAToB);
+    if (distanceSquared < 1e-6f) return false; // Avoid division by zero or NaN
+    return (distanceSquared < (4.0f * particleRadius * particleRadius));
+}
+
 // Max out shared memory. See note below about how many particles each thread can store, based
 // on the number of threads per workgroup and how many threads are assigned to each cell. (And see constants.h for SOLVE_COLLISION_THREADS).
-groupshared float4 s_particles[2048];
+#define SHARED_MEMORY_SIZE 2048
+groupshared float4 s_particles[SHARED_MEMORY_SIZE];
 
 /**
  * Resolve collisions between particles in the same collision cell. (Particles have been pre-binned into all cells they overlap)
- * 
- * This compute pass is a bit tricky in terms of mapping threads / workgroups to work items. We could have one thread to one grid cell, but this has two issues: 
- *    1. It can churn on outlier cells that have above average particle counts, and 
- *    2. With a reasonable number of threads in a workgroup, each thread can only put a small number of particles into the limited shared memory 
- *       (for 256 threads per workgroup, each thread (cell) would only be able to store 8 particles in the 32KB shared memory per workgroup).
- * 
- * We could map a whole workgroup to a cell, but:
- *    1. Many particles contain very few, if any, particles - by design! A workgroup is overkill in these cases.
- *    2. With a typical hash table size equal to the number of particles (common for uniform hash grids), this would be an unwieldy number of workgroups to dispatch many times per frame.
- *
- * The approach taken here is a compromise: small groups of threads (maybe 2-4) within a workgroup collaborate to process a single cell. This increases the number of particles per cell that can 
- * be stored in shared memory by a factor equal to the number of threads working on each cell. For example, for a 256 thread workgroup with 4 threads per cell, each cell can now store up to 32 particles in shared memory.
- * Moreover, outlier cells with many particles now get processed by multiple threads. (And in such a way that avoids divergent behavior within a warp).
 */
 [numthreads(SOLVE_COLLISION_THREADS, 1, 1)]
 void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupThreadID) {
-    uint collisionCellIdx = (uint)(globalId.x * THREADS_PER_COLLISION_CELL_INV);
-    if (collisionCellIdx >= hashGridSize) return;
+    if (globalId.x >= hashGridSize) return;
 
-    uint particleStartIdx = collisionCellParticleCounts[collisionCellIdx];
-    uint particleEndIdx = collisionCellParticleCounts[collisionCellIdx + 1]; // No out of bounds concern because we added a guard (extra buffer entry) for this very purpose.
-
-    uint collisionCellIdxInGroup = (uint)(groupThreadId.x * THREADS_PER_COLLISION_CELL_INV);
-    uint sharedMemoryStartIdx = particleStartIdx - collisionCellParticleCounts[collisionCellIdx - collisionCellIdxInGroup];
+    uint particleStartIdx = collisionCellParticleCounts[globalId.x];
+    uint particleEndIdx = collisionCellParticleCounts[globalId.x + 1]; // No out of bounds concern because we added a guard (extra buffer entry) for this very purpose.
+    uint sharedMemoryStartIdx = particleStartIdx - collisionCellParticleCounts[globalId.x - groupThreadId.x];
 
     // Store particles in shared memory.
     uint numParticlesInCell = particleEndIdx - particleStartIdx;
-    uint particlesPerThread = (uint)(numParticlesInCell * THREADS_PER_COLLISION_CELL_INV);
-    uint threadIdxInCell = globalId.x - collisionCellIdx * THREADS_PER_COLLISION_CELL;
-
-    for (uint i = 0; i < particlesPerThread; ++i) {
-        s_particles[sharedMemoryStartIdx + (threadIdxInCell * particlesPerThread) + i] =
-            particles[particleIndices[particleStartIdx + (threadIdxInCell * particlesPerThread) + i]];
+    for (uint u = 0; u < numParticlesInCell; ++u) {
+        if (sharedMemoryStartIdx + u >= SHARED_MEMORY_SIZE) continue; // Ignore any particles that would overflow shared memory.
+        s_particles[sharedMemoryStartIdx + u] = particles[particleIndices[particleStartIdx + u]];
     }
-    GroupMemoryBarrierWithGroupSync();
 
-    // Now we can finally resolve collisions in shared memory, dividing up the work among the threads collaborating on this cell.
+    for (uint i = 0; i < numParticlesInCell; ++i) {
+        if (sharedMemoryStartIdx + i >= SHARED_MEMORY_SIZE) continue;
+        for (uint j = i + 1; j < numParticlesInCell; ++j) {
+            if (sharedMemoryStartIdx + j >= SHARED_MEMORY_SIZE) continue;
+
+            float4 particleA = s_particles[sharedMemoryStartIdx + i];
+            float4 particleB = s_particles[sharedMemoryStartIdx + j];
+
+            float distanceSquared;
+            float3 particleAToB;
+            if (!doParticlesOverlap(particleA, particleB, distanceSquared, particleAToB)) continue;
+
+            // TODO: augment with the voxel normals to avoid interlock.
+            // TODO: take particle mass into account.
+            float3 delta = normalize(particleAToB) * (2.0f * particleRadius - sqrt(distanceSquared));
+            s_particles[sharedMemoryStartIdx + i].xyz -= delta * 0.5f;
+            s_particles[sharedMemoryStartIdx + j].xyz += delta * 0.5f;
+        }
+    }
+
+    // Write the particles back to global memory.
+    for (uint v = 0; v < numParticlesInCell; ++v) {
+        if (sharedMemoryStartIdx + v >= SHARED_MEMORY_SIZE) continue; // Ignore any particles that would overflow shared memory.
+        particles[particleIndices[particleStartIdx + v]] = s_particles[sharedMemoryStartIdx + v];
+    }
 }

@@ -54,6 +54,7 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         buildCollisionGridCompute->getHashGridSize(),
         vgsCompute->getParticlesUAV(),
         buildCollisionParticleCompute->getParticlesByCollisionCellSRV(),
+        buildCollisionGridCompute->getCollisionCellParticleCountsSRV(),
         buildCollisionGridCompute->getParticleCollisionCB()
     );
 
