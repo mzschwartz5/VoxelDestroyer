@@ -34,12 +34,23 @@ public:
         }
 
         // Now go back up the chain, adding the partial sums to the scanned data they came from.
-        for (scanIdx = numScans - 1; scanIdx > 0; --scanIdx) {
+        for (scanIdx = numScans - 1; scanIdx > 1; --scanIdx) {
             collectComputePass->collect(
-                partialSumsUAVs[scanIdx - 1],           // collect into the scan sums from one level higher up
-                partialSumsSRVs[scanIdx],               // read sums from the current level
+                partialSumsUAVs[scanIdx - 2],           // collect into the scan sums from two levels higher up
+                partialSumsSRVs[scanIdx - 1],           // read sums from the one level up
                 2 * numWorkgroupsForScan[scanIdx - 1]   // Factor of 2 bc each collect thread only processes one element; each scan thread processes two.
             );
+        }
+
+        // Final collect into original collision cell particle count buffer
+        // TODO: consider consolidating this UAV into the vector of partial sums UAVs and treating it just like the others. (Would need some renaming of vars, refactoring index logic, etc.)
+        if (scanIdx == 1) {
+            collectComputePass->collect(
+                collisionCellParticleCountsUAV,         
+                partialSumsSRVs[0],                     
+                2 * numWorkgroupsForScan[0]                 
+            );
+            scanIdx = 0; // Reset scan index for next dispatch
         }
     }
 
@@ -92,10 +103,11 @@ private:
         partialSumsSRVs.resize(numScans);
         partialSumsUAVs.resize(numScans);
         for (int i = 0; i < numScans; ++i) {
-            numElementsInBuffer /= base; 
-            // In the event that the scan can be done in a single workgroup, integer division above results in 0 elements.
-            numElementsInBuffer = std::max(numElementsInBuffer, 1);
             numWorkgroupsForScan[i] = Utils::divideRoundUp(numElementsInBuffer, PREFIX_SCAN_THREADS);
+            
+            // In the event that the scan can be done in a single workgroup, integer division results in 0 elements - so clamp to 1.
+            numElementsInBuffer /= base; 
+            numElementsInBuffer = std::max(numElementsInBuffer, 1);
 
             // Create the partial sums buffer and its UAV and SRV
             bufferDesc.Usage = D3D11_USAGE_DEFAULT;

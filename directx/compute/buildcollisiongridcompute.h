@@ -4,10 +4,12 @@
 
 struct ParticleCollisionCB {
     float inverseCellSize;
-    int hashGridSize;
+    unsigned int hashGridSize;
     unsigned int numParticles;
     float particleRadius;
 };
+
+static constexpr int HASH_TABLE_SIZE_TO_PARTICLES = 2;
 
 class BuildCollisionGridCompute : public ComputeShader
 {
@@ -37,7 +39,7 @@ public:
 
     void updateParticleCollisionCB(int numParticles, float particleSize) {
         particleCollisionCBData.inverseCellSize = 1.0f / (2.0f * particleSize);
-        particleCollisionCBData.hashGridSize = numParticles;
+        particleCollisionCBData.hashGridSize = HASH_TABLE_SIZE_TO_PARTICLES * numParticles;
         particleCollisionCBData.numParticles = numParticles;
         particleCollisionCBData.particleRadius = particleSize;
         ComputeShader::updateConstantBuffer(particleCollisionCB, particleCollisionCBData);
@@ -88,9 +90,10 @@ private:
         int numParticles = srvQueryDesc.Buffer.NumElements;
         numWorkgroups = Utils::divideRoundUp(numParticles, BUILD_COLLISION_GRID_THREADS);
 
+        // Multiplpy by a factor to reduce hash collisions.
         // Add one as a "guard" / so the last cell will contribute to the scan and there will be record of it.
         // Round up to the nearest power of two so it can be prefix scanned.
-        int numBufferElements = pow(2, Utils::ilogbaseceil(numParticles + 1, 2)); 
+        int numBufferElements = pow(2, Utils::ilogbaseceil(HASH_TABLE_SIZE_TO_PARTICLES * numParticles + 1, 2)); 
 
         // Create the collision cell particle counts buffer
         bufferDesc.Usage = D3D11_USAGE_DEFAULT;

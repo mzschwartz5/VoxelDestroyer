@@ -11,7 +11,7 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
     // Divide by two because this pass processes one element per thread,
     // while the scan step processed two elements per thread.
     // Subtract one because the partial sums are scanned inclusively. 
-    int partialSumsIdx = (groupId.x / 2) - 1;
+    int partialSumsIdx = (groupId.x >> 1) - 1;
     if (partialSumsIdx < 0) return; // same as adding 0, which is what these threads would do if we had scanned the partial sums exclusively
     collisionCellParticleCounts[globalId.x] += partialSums[partialSumsIdx];
 }
