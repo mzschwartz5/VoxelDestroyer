@@ -33,11 +33,13 @@ float3 getVoxelCenterOfParticle(float3 particle, uint localParticleIdx) {
 
 // Max out shared memory. See note below about how many particles each thread can store, based
 // on the number of threads per workgroup and how many threads are assigned to each cell. (And see constants.h for SOLVE_COLLISION_THREADS).
-#define SHARED_MEMORY_SIZE 2048
+#define SHARED_MEMORY_SIZE 1638 // maximum number of (float4 + bool)'s can fit in 32KB of shared memory
 groupshared float4 s_particles[SHARED_MEMORY_SIZE];
+groupshared bool s_positionChanged[SHARED_MEMORY_SIZE];
 
 /**
  * Resolve collisions between particles in the same collision cell. (Particles have been pre-binned into all cells they overlap)
+ * Note: no shared memory barriers are needed because each thread writes to its own section of shared memory. (so "shared" is a bit of a misnomer here :D)
 */
 [numthreads(SOLVE_COLLISION_THREADS, 1, 1)]
 void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupThreadID) {
@@ -52,6 +54,7 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
     for (uint u = 0; u < numParticlesInCell; ++u) {
         if (sharedMemoryStartIdx + u >= SHARED_MEMORY_SIZE) continue; // Ignore any particles that would overflow shared memory.
         s_particles[sharedMemoryStartIdx + u] = particles[particleIndices[particleStartIdx + u]];
+        s_positionChanged[sharedMemoryStartIdx + u] = false; // Initialize position changed flags.
     }
 
     for (uint i = 0; i < numParticlesInCell; ++i) {
@@ -81,14 +84,18 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
             }
             
             // TODO: take particle mass into account
-            s_particles[sharedMemoryStartIdx + i].xyz -= delta * 0.5f * augmentedNormal;
-            s_particles[sharedMemoryStartIdx + j].xyz += delta * 0.5f * augmentedNormal;
+            // Factor of 0.35 is somewhat arbitrary. 0.5 would be inifinite stiffness - so this is a little more compliant.
+            s_particles[sharedMemoryStartIdx + i].xyz -= delta * 0.35f * augmentedNormal;
+            s_particles[sharedMemoryStartIdx + j].xyz += delta * 0.35f * augmentedNormal;
+            s_positionChanged[sharedMemoryStartIdx + i] = true;
+            s_positionChanged[sharedMemoryStartIdx + j] = true;
         }
     }
 
     // Write the particles back to global memory.
     for (uint v = 0; v < numParticlesInCell; ++v) {
         if (sharedMemoryStartIdx + v >= SHARED_MEMORY_SIZE) continue; // Ignore any particles that would overflow shared memory.
+        if (!s_positionChanged[sharedMemoryStartIdx + v]) continue;
         particles[particleIndices[particleStartIdx + v]] = s_particles[sharedMemoryStartIdx + v];
     }
 }
