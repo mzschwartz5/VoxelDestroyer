@@ -28,7 +28,6 @@ void plugin::simulate(void* clientData) {
 	if (!plugin::pbdSimulator.isInitialized()) return;
 
 	plugin::pbdSimulator.simulateStep();
-	MGlobal::executeCommand("refresh");
 }
 
 MSyntax plugin::syntax()
@@ -91,7 +90,6 @@ MStatus plugin::doIt(const MArgList& argList)
 
 	plugin::createVoxelSimulationNode();
 		
-	VoxelDragContextCommand::setPBD(&plugin::pbdSimulator);
 	VoxelRendererOverride::setPBD(&plugin::pbdSimulator);
 	VoxelDeformerCPUNode::instantiateAndAttachToMesh(plugin::voxelizedMeshDagPath);
 

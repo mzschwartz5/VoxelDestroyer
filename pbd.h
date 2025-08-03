@@ -8,6 +8,7 @@
 #include <array>
 #include <numeric>
 #include <memory>
+#include <functional>
 #include "directx/compute/computeshader.h"
 #include "directx/compute/vgscompute.h"
 #include "directx/compute/prevgscompute.h"
@@ -44,8 +45,8 @@ struct Particles
 class PBD
 {
 public:
-    PBD() = default;
-    ~PBD() = default;
+    PBD();
+    ~PBD();
     void initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath);
     void simulateStep();
 
@@ -74,12 +75,6 @@ public:
 
     bool isInitialized() const { return initialized; }
     
-    void setIsDragging(bool isDragging) { this->isDragging = isDragging; }
-    
-    void updateDragValues(const DragValues& dragValues) {
-        dragParticlesCompute->updateDragValues(dragValues, isDragging);
-    }
-    
     void updateDepthResourceHandle(void* depthResourceHandle) {
         if (dragParticlesCompute == nullptr) {
             return;
@@ -102,6 +97,9 @@ private:
     glm::vec4 simInfo;
     bool initialized = false;
     bool isDragging = false;
+
+    // Event subscriptions
+    std::function<void()> unsubscribeFromDragStateChange;
 
     // Shaders
 	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.

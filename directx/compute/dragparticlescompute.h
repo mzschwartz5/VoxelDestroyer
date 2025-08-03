@@ -1,19 +1,17 @@
 #pragma once
 #include "computeshader.h"
-#include <maya/MViewport2Renderer.h>
 #include <maya/MRenderTargetManager.h>
 #include <maya/MViewport2Renderer.h>
 #include "glm/glm.hpp"
+#include "../custommayaconstructs/voxeldragcontext.h"
 
 // NOTE: currently, the ConstantBuffer is perfectly 16-byte aligned. Adding any values to these structs
 // or even changing their order can break this shader. Any extra data must fit into the next 16-byte chunk.
 struct DragValues
-{   
-    int lastX{ 0 };
-    int lastY{ 0 };
-    int currX{ 0 };
-    int currY{ 0 };
-    float dragRadius{ 0.0f };
+{
+    MousePosition lastMousePosition;
+    MousePosition currentMousePosition;
+    float selectRadius{ 0.0f };
 };
 
 struct CameraMatrices
@@ -47,6 +45,14 @@ public:
     ) : ComputeShader(IDR_SHADER7), particlesUAV(particlesUAV), numSubsteps(numSubsteps)
     {
         initializeBuffers();
+
+        unsubscribeFromDragStateChange = VoxelDragContext::subscribeToDragStateChange([this](const DragState& dragState) {
+            onDragStateChange(dragState);
+        });
+
+        unsubscribeFromMousePositionChange = VoxelDragContext::subscribeToMousePositionChange([this](const MousePosition& mousePosition) {
+            onMousePositionChanged(mousePosition);
+        });
     };
 
     void updateDepthBuffer(void* depthResourceHandle)
@@ -78,27 +84,21 @@ public:
         }
     };
 
-    void updateDragValues(const DragValues& dragValues, bool isDragging)
-    {
-        // Accumulate the drag values (e.g. update current position but not last) 
-        // This accounts for mouse events potentially occuring at a higher rate than the simulation.
-        this->dragValues.currX = dragValues.currX;
-        this->dragValues.currY = dragValues.currY;
-        this->dragValues.dragRadius = dragValues.dragRadius;
-
-        // And if we just started dragging, update the last pos as well so we forget the last pos from the previous drag.
-        if (!wasDragging && isDragging) {
-            this->dragValues.lastX = dragValues.lastX;
-            this->dragValues.lastY = dragValues.lastY;
-        }
-
-        // If we just stopped dragging, reset the isDraggingBuffer to false for all voxels.
-        if (wasDragging && !isDragging) {
+    void onDragStateChange(const DragState& dragState) {
+        if (dragState.isDragging) {
+            dragValues.currentMousePosition = dragState.mousePosition;
+            dragValues.lastMousePosition = dragState.mousePosition;
+            dragValues.selectRadius = dragState.selectRadius;
+            copyConstantBufferToGPU();
+        } else {
             clearUintBuffer(isDraggingUAV);
         }
+    }
 
-        wasDragging = isDragging;
-        copyConstantBufferToGPU();
+    void onMousePositionChanged(const MousePosition& mousePosition)
+    {
+        this->dragValues.lastMousePosition = this->dragValues.currentMousePosition;
+        this->dragValues.currentMousePosition = mousePosition;
     }
 
     void updateCameraMatrices(const CameraMatrices& cameraMatrices)
@@ -117,14 +117,15 @@ public:
         if (!depthSRV) {
             return;
         }
+
+        // *Could* do this in onMousePositionChanged, but no reason to copy the buffer on
+        // every mouse event, which can fire more frequently than dispatches. Cheaper to do it on dispatch as needed.
+        if (dragValues.currentMousePosition.x != dragValues.lastMousePosition.x ||
+            dragValues.currentMousePosition.y != dragValues.lastMousePosition.y) {
+            copyConstantBufferToGPU();
+        }
         
         ComputeShader::dispatch(numWorkgroups);
-
-        // Reset drag values (because mouse drag event isn't called every frame, only when the mouse is moved).
-        if (dragValues.currX != dragValues.lastX || dragValues.currY != dragValues.lastY) {
-            dragValues.lastX = dragValues.currX;
-            dragValues.lastY = dragValues.currY;
-        }
     };
 
 private:
@@ -137,17 +138,18 @@ private:
     CameraMatrices cameraMatrices;
     DragValues dragValues;
     int numWorkgroups;
-    bool wasDragging = false;
     float numSubsteps;
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavQueryDesc;
+    std::function<void()> unsubscribeFromDragStateChange;
+    std::function<void()> unsubscribeFromMousePositionChange;
 
     void copyConstantBufferToGPU()
     {
         ConstantBuffer cb{
             calculateDragWorldDiff(),
-            dragValues.lastX,
-            dragValues.lastY,
-            dragValues.dragRadius,
+            dragValues.lastMousePosition.x,
+            dragValues.lastMousePosition.y,
+            dragValues.selectRadius,
             cameraMatrices.viewportWidth,
             cameraMatrices.viewportHeight,
             cameraMatrices.viewMatrix,
@@ -160,12 +162,12 @@ private:
     // Reverse-project the mouse start and end points to world space at a unit depth.
     // Get the difference and amortize it across the number of substeps in one simulation step.
     glm::vec3 calculateDragWorldDiff() {
-        glm::vec2 mouseStartNDC = glm::vec2((dragValues.lastX / cameraMatrices.viewportWidth) * 2.0f - 1.0f,
-                                            (dragValues.lastY / cameraMatrices.viewportHeight) * 2.0f - 1.0f);
+        glm::vec2 mouseStartNDC = glm::vec2((dragValues.lastMousePosition.x / cameraMatrices.viewportWidth) * 2.0f - 1.0f,
+                                            (dragValues.lastMousePosition.y / cameraMatrices.viewportHeight) * 2.0f - 1.0f);
         glm::vec4 mouseStartWorld =  glm::vec4(mouseStartNDC, 1.0f, 1.0f) * cameraMatrices.invViewProjMatrix;
 
-        glm::vec2 mouseEndNDC = glm::vec2((dragValues.currX / cameraMatrices.viewportWidth) * 2.0f - 1.0f,
-                                          (dragValues.currY / cameraMatrices.viewportHeight) * 2.0f - 1.0f);
+        glm::vec2 mouseEndNDC = glm::vec2((dragValues.currentMousePosition.x / cameraMatrices.viewportWidth) * 2.0f - 1.0f,
+                                          (dragValues.currentMousePosition.y / cameraMatrices.viewportHeight) * 2.0f - 1.0f);
         glm::vec4 mouseEndWorld = glm::vec4(mouseEndNDC, 1.0f, 1.0f) * cameraMatrices.invViewProjMatrix;
 
         return (mouseEndWorld - mouseStartWorld) / numSubsteps;
@@ -248,6 +250,9 @@ private:
 
         isDraggingBuffer.Reset();
         isDraggingUAV.Reset();
+
+        unsubscribeFromDragStateChange();
+        unsubscribeFromMousePositionChange();
     };
     
 };

@@ -4,6 +4,17 @@
 #include "utils.h"
 #include "constants.h"
 #include "custommayaconstructs/voxeldeformerGPUNode.h"
+#include "custommayaconstructs/voxeldragcontext.h"
+
+PBD::PBD() {
+    unsubscribeFromDragStateChange = VoxelDragContext::subscribeToDragStateChange([this](const DragState& dragState) {
+        isDragging = dragState.isDragging;
+    });
+}
+
+PBD::~PBD() {
+    unsubscribeFromDragStateChange();
+}
 
 void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath) {
     this->meshDagPath = meshDagPath;
