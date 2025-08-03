@@ -1,7 +1,5 @@
 #pragma once
 #include "computeshader.h"
-#include <maya/MRenderTargetManager.h>
-#include <maya/MViewport2Renderer.h>
 #include "glm/glm.hpp"
 #include "../custommayaconstructs/voxeldragcontext.h"
 #include "../custommayaconstructs/voxelrendereroverride.h"
