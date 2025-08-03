@@ -3,8 +3,17 @@
 #include <maya/MRenderTargetManager.h>
 #include <maya/MGlobal.h>
 #include <maya/MMatrix.h>
-#include "pbd.h"
+#include "../event.h"
 using namespace MHWRender;
+
+struct CameraMatrices
+{
+    float viewportWidth{ 0.0f };
+    float viewportHeight{ 0.0f };
+    glm::mat4 viewMatrix;
+    glm::mat4 projMatrix;
+    glm::mat4 invViewProjMatrix;
+};
 
 /**
  * Note: to actually activate a render override, you need to register it and THEN select it from the renderer drop down menu in Maya.
@@ -14,37 +23,24 @@ class VoxelRendererOverride : public MRenderOverride {
 public:
     VoxelRendererOverride(const MString& name) : MRenderOverride(name), name(name) {}
 
-    static void setPBD(PBD* pbd) {
-        pbdSimulator = pbd;
-    }
-
     MStatus setup(const MString& destination) override {
-        // Retrieve the frame context
         const MFrameContext* mFrameContext = getFrameContext();
-        if (!mFrameContext) {
-            MGlobal::displayError("Failed to get frame context during setup.");
-            return MStatus::kFailure;
-        }
-
-        // Access the depth buffer
         const MRenderTarget* depthTarget = mFrameContext->getCurrentDepthRenderTarget();
-        if (!depthTarget) {
-            MGlobal::displayError("Failed to get depth render target.");
-            return MStatus::kFailure;
-        }
 
         const MMatrix& viewMatrix = mFrameContext->getMatrix(MFrameContext::kViewMtx);
         const MMatrix& projMatrix = mFrameContext->getMatrix(MFrameContext::kProjectionMtx);
         const MMatrix& invViewProjMatrix = mFrameContext->getMatrix(MFrameContext::kViewProjInverseMtx);
 
-        int viewPortWidth, viewPortHeight, viewPortOriginX, viewPortOriginY;
-        mFrameContext->getViewportDimensions(viewPortOriginX, viewPortOriginY, viewPortWidth, viewPortHeight);
+        int viewportWidth, viewportHeight, viewportOriginX, viewportOriginY;
+        mFrameContext->getViewportDimensions(viewportOriginX, viewportOriginY, viewportWidth, viewportHeight);
 
-        if (pbdSimulator) {
-            pbdSimulator->updateCameraMatrices(viewMatrix, projMatrix, invViewProjMatrix, viewPortWidth, viewPortHeight);
-            pbdSimulator->updateDepthResourceHandle(depthTarget->resourceHandle());
-        } 
-        
+        if (depthTarget != nullptr && depthTarget != currentDepthTarget) {
+            currentDepthTarget = depthTarget;
+            depthTargetChangedEvent.notify(depthTarget->resourceHandle());
+        }
+
+        cameraInfoChangedEvent.notify({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), mayaMatrixToGlm(viewMatrix), mayaMatrixToGlm(projMatrix), mayaMatrixToGlm(invViewProjMatrix) });
+
         return MStatus::kSuccess;
     }
 
@@ -56,7 +52,27 @@ public:
         return kDirectX11;
     }
 
+    static Event<void*>::Unsubscribe subscribeToDepthTargetChange(Event<void*>::Listener listener) {
+        return depthTargetChangedEvent.subscribe(listener);
+    }
+
+    static Event<CameraMatrices>::Unsubscribe subscribeToCameraInfoChange(Event<CameraMatrices>::Listener listener) {
+        return cameraInfoChangedEvent.subscribe(listener);
+    }
+    
+
 private:
-    inline static PBD* pbdSimulator = nullptr;
+    inline static Event<void*> depthTargetChangedEvent;
+    inline static Event<CameraMatrices> cameraInfoChangedEvent;
     MString name;
+    const MRenderTarget* currentDepthTarget = nullptr;
+
+    inline glm::mat4 mayaMatrixToGlm(const MMatrix& matrix) {
+        return glm::mat4(
+            matrix(0, 0), matrix(1, 0), matrix(2, 0), matrix(3, 0),
+            matrix(0, 1), matrix(1, 1), matrix(2, 1), matrix(3, 1),
+            matrix(0, 2), matrix(1, 2), matrix(2, 2), matrix(3, 2),
+            matrix(0, 3), matrix(1, 3), matrix(2, 3), matrix(3, 3)
+        );
+    }
 };

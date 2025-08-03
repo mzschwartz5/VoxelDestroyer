@@ -8,8 +8,7 @@
 #include <maya/MTimerMessage.h>
 #include <maya/MEventMessage.h>
 #include <maya/MConditionMessage.h>
-#include <functional>
-#include <unordered_map>
+#include "../event.h"
 
 // Maya API does not expose a playback direction enum, nor a way to get the current playback direction,
 // so we define and track it ourselves.
@@ -32,9 +31,6 @@ struct DragState
     MousePosition mousePosition;
 };
 
-using DragStateChangedListener = std::function<void(const DragState&)>;
-using MousePositionChangedListener = std::function<void(const MousePosition&)>;
-
 /**
  * This class implements a custom mouse context tool for dragging voxel simulation objects interactively during animation playback.
  * While dragging, state change events are fired to listeners. (E.g. this is how the PBD drag shader responds to mouse movements.)
@@ -54,29 +50,24 @@ public:
         MEventMessage::removeCallback(timeChangedCallbackId);
     }
 
-    static std::function<void()> subscribeToDragStateChange(const DragStateChangedListener& listener) {
-        int listenerId = nextListenerId++;
-        dragStateChangedListeners[listenerId] = listener;
-        return [listenerId]() {
-            dragStateChangedListeners.erase(listenerId);
-        };
+    static EventBase::Unsubscribe subscribeToDragStateChange(
+        const Event<const DragState&>::Listener& listener) 
+    {
+        return dragStateChangedEvent.subscribe(listener);
     }
 
-    static std::function<void()> subscribeToMousePositionChange(const MousePositionChangedListener& listener) {
-        int listenerId = nextListenerId++;
-        MousePositionChangedListeners[listenerId] = listener;
-        return [listenerId]() {
-            MousePositionChangedListeners.erase(listenerId);
-        };
+    static EventBase::Unsubscribe subscribeToMousePositionChange(
+        const Event<const MousePosition&>::Listener& listener) 
+    {
+        return mousePositionChangedEvent.subscribe(listener);
     }
     
 private:
     inline static double lastTimeValue = MAnimControl::currentTime().value();
     inline static double playbackStartTime = MAnimControl::currentTime().value();
     inline static int playbackDirection = PlaybackDirection::UNSET;
-    inline static std::unordered_map<int, DragStateChangedListener> dragStateChangedListeners = {};
-    inline static std::unordered_map<int, MousePositionChangedListener> MousePositionChangedListeners = {};
-    inline static int nextListenerId = 0;
+    inline static Event<const DragState&> dragStateChangedEvent;
+    inline static Event<const MousePosition&> mousePositionChangedEvent;
 
     int viewportWidth;
     bool isDragging = false;
@@ -87,18 +78,6 @@ private:
     MCallbackId timeChangedCallbackId = 0;
     MCallbackId playbackChangeCallbackId = 0;
     MStatus status;
-
-    void fireDragStateChanged(const DragState& dragState) {
-        for (const auto& listener : dragStateChangedListeners) {
-            listener.second(dragState);
-        }
-    }
-
-    void fireMousePositionChanged(const MousePosition& position) {
-        for (const auto& listener : MousePositionChangedListeners) {
-            listener.second(position);
-        }
-    }
 
     virtual void toolOnSetup(MEvent &event) override {
         MPxContext::toolOnSetup(event);
@@ -126,7 +105,7 @@ private:
         screenDragStartY = mouseY;
                 
         isDragging = true;
-        fireDragStateChanged({ isDragging, selectRadius, { mouseX, mouseY } });
+        dragStateChangedEvent.notify({ isDragging, selectRadius, { mouseX, mouseY } });
         return MS::kSuccess;
     }
 
@@ -140,7 +119,7 @@ private:
             return MS::kSuccess;
         }
 
-        fireMousePositionChanged({ mouseX, mouseY });
+        mousePositionChangedEvent.notify({ mouseX, mouseY });
 
         // Only update the circle position if we're not resizing it.
         mouseX = dragX;
@@ -158,7 +137,7 @@ private:
         event.getPosition(mouseX, mouseY);
 
         isDragging = false;
-        fireDragStateChanged({ isDragging, selectRadius, { mouseX, mouseY } });
+        dragStateChangedEvent.notify({ isDragging, selectRadius, { mouseX, mouseY } });
         return MS::kSuccess;
     }
 
