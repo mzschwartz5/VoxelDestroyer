@@ -3,12 +3,13 @@
 #include <maya/MPxContext.h>
 #include <maya/MViewport2Renderer.h>
 #include <maya/M3dView.h>
-#include "pbd.h"
 #include <algorithm>
 #include <maya/MAnimControl.h>
 #include <maya/MTimerMessage.h>
 #include <maya/MEventMessage.h>
 #include <maya/MConditionMessage.h>
+#include <functional>
+#include <unordered_map>
 
 // Maya API does not expose a playback direction enum, nor a way to get the current playback direction,
 // so we define and track it ourselves.
@@ -18,9 +19,25 @@ enum PlaybackDirection {
     BACKWARD = -1
 };
 
+struct MousePosition
+{   
+    int x{ 0 };
+    int y{ 0 };
+};
+
+struct DragState
+{
+    bool isDragging{ false };
+    float selectRadius{ 50.0f };
+    MousePosition mousePosition;
+};
+
+using DragStateChangedListener = std::function<void(const DragState&)>;
+using MousePositionChangedListener = std::function<void(const MousePosition&)>;
+
 /**
  * This class implements a custom mouse context tool for dragging voxel simulation objects interactively during animation playback.
- * While dragging, mouse position changes are sent to the PBD simulator, which dispatches a compute shader to perform a screen-space drag operation.
+ * While dragging, state change events are fired to listeners. (E.g. this is how the PBD drag shader responds to mouse movements.)
  * 
  * In order to work around Maya limitations regarding interactive playback, this tool also hacks together manually-driven playback control. It's not ideal,
  * but it's the best we can do with the current Maya API. See below for more details.
@@ -28,22 +45,63 @@ enum PlaybackDirection {
 class VoxelDragContext : public MPxContext
 {
 public:
-    VoxelDragContext(PBD* pbdSimulator) : MPxContext(), pbdSimulator(pbdSimulator) {
+    VoxelDragContext() : MPxContext() {
         setTitleString("Voxel Simulation Tool");
     }
-
+    
     ~VoxelDragContext() override {
         MTimerMessage::removeCallback(timerCallbackId);
         MEventMessage::removeCallback(timeChangedCallbackId);
     }
+
+    static std::function<void()> subscribeToDragStateChange(const DragStateChangedListener& listener) {
+        int listenerId = nextListenerId++;
+        dragStateChangedListeners[listenerId] = listener;
+        return [listenerId]() {
+            dragStateChangedListeners.erase(listenerId);
+        };
+    }
+
+    static std::function<void()> subscribeToMousePositionChange(const MousePositionChangedListener& listener) {
+        int listenerId = nextListenerId++;
+        MousePositionChangedListeners[listenerId] = listener;
+        return [listenerId]() {
+            MousePositionChangedListeners.erase(listenerId);
+        };
+    }
     
+private:
+    inline static double lastTimeValue = MAnimControl::currentTime().value();
+    inline static double playbackStartTime = MAnimControl::currentTime().value();
+    inline static int playbackDirection = PlaybackDirection::UNSET;
+    inline static std::unordered_map<int, DragStateChangedListener> dragStateChangedListeners = {};
+    inline static std::unordered_map<int, MousePositionChangedListener> MousePositionChangedListeners = {};
+    inline static int nextListenerId = 0;
+
+    int viewportWidth;
+    bool isDragging = false;
+    short mouseX, mouseY;
+    short screenDragStartX, screenDragStartY;
+    float selectRadius = 50.0f;
+    MCallbackId timerCallbackId = 0;
+    MCallbackId timeChangedCallbackId = 0;
+    MCallbackId playbackChangeCallbackId = 0;
+    MStatus status;
+
+    void fireDragStateChanged(const DragState& dragState) {
+        for (const auto& listener : dragStateChangedListeners) {
+            listener.second(dragState);
+        }
+    }
+
+    void fireMousePositionChanged(const MousePosition& position) {
+        for (const auto& listener : MousePositionChangedListeners) {
+            listener.second(position);
+        }
+    }
+
     virtual void toolOnSetup(MEvent &event) override {
         MPxContext::toolOnSetup(event);
-
-        if (!pbdSimulator) {
-            MGlobal::displayError("PBD simulator not initialized.");
-            return;
-        }
 
         setImage("TypeSeparateMaterials_200.png", MPxContext::kImage1);
 
@@ -68,15 +126,13 @@ public:
         screenDragStartY = mouseY;
                 
         isDragging = true;
-        pbdSimulator->setIsDragging(isDragging);
-        pbdSimulator->updateDragValues({ mouseX, mouseY, mouseX, mouseY, selectRadius });
+        fireDragStateChanged({ isDragging, selectRadius, { mouseX, mouseY } });
         return MS::kSuccess;
     }
 
     virtual MStatus doDrag(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
-        static short dragX, dragY;
-
         // To grow/shrink the circle radius, but not move the drawn circle while doing so, we need separate variables for the drag position and the draw position
+        short dragX, dragY;
         event.getPosition(dragX, dragY);
         short distX = dragX - screenDragStartX;
         if (event.mouseButton() == MEvent::kMiddleMouse) {
@@ -84,8 +140,7 @@ public:
             return MS::kSuccess;
         }
 
-        // For the PBD simulation, we want the mouse position on this event AND the last.
-        pbdSimulator->updateDragValues({ mouseX, mouseY, dragX, dragY, selectRadius });
+        fireMousePositionChanged({ mouseX, mouseY });
 
         // Only update the circle position if we're not resizing it.
         mouseX = dragX;
@@ -103,8 +158,7 @@ public:
         event.getPosition(mouseX, mouseY);
 
         isDragging = false;
-        pbdSimulator->setIsDragging(isDragging);
-        pbdSimulator->updateDragValues({ mouseX, mouseY,  mouseX, mouseY, selectRadius });
+        fireDragStateChanged({ isDragging, selectRadius, { mouseX, mouseY } });
         return MS::kSuccess;
     }
 
@@ -165,6 +219,8 @@ public:
 
         MAnimControl::setCurrentTime(MTime(std::round(currentTime), MTime::uiUnit()));
         lastTimeValue = MTime(currentTime, MTime::uiUnit()).value();
+
+	    MGlobal::executeCommand("refresh");
     }
 
     // Match the timer rate to the playback rate
@@ -192,21 +248,4 @@ public:
         playbackStartTime = MAnimControl::currentTime().value();
         playbackDirection = PlaybackDirection::UNSET;
     }
-
-private:
-    inline static double lastTimeValue = MAnimControl::currentTime().value();
-    inline static double playbackStartTime = MAnimControl::currentTime().value();
-    inline static int playbackDirection = PlaybackDirection::UNSET;
-
-    int viewportWidth;
-    bool isDragging = false;
-    short mouseX, mouseY;
-    short screenDragStartX, screenDragStartY;
-    short mouseButton;
-    float selectRadius = 50.0f;
-    PBD* pbdSimulator = nullptr;
-    MCallbackId timerCallbackId = 0;
-    MCallbackId timeChangedCallbackId = 0;
-    MCallbackId playbackChangeCallbackId = 0;
-    MStatus status;
 };
