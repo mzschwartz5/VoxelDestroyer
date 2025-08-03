@@ -190,6 +190,7 @@
     <ClInclude Include="custommayaconstructs\voxelsimulationnode.h" />
     <ClInclude Include="custommayaconstructs\voxeldeformerCPUNode.h" />
     <ClInclude Include="custommayaconstructs\voxeldeformerGPUNode.h" />
+    <ClInclude Include="custommayaconstructs\voxeldata.h" />
     <ClInclude Include="directx\directx.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\vgscompute.h" />
