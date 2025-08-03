@@ -4,6 +4,7 @@
 #include <maya/MViewport2Renderer.h>
 #include "glm/glm.hpp"
 #include "../custommayaconstructs/voxeldragcontext.h"
+#include "../custommayaconstructs/voxelrendereroverride.h"
 
 // NOTE: currently, the ConstantBuffer is perfectly 16-byte aligned. Adding any values to these structs
 // or even changing their order can break this shader. Any extra data must fit into the next 16-byte chunk.
@@ -12,15 +13,6 @@ struct DragValues
     MousePosition lastMousePosition;
     MousePosition currentMousePosition;
     float selectRadius{ 0.0f };
-};
-
-struct CameraMatrices
-{
-    float viewportWidth{ 0.0f };
-    float viewportHeight{ 0.0f };
-    glm::mat4 viewMatrix;
-    glm::mat4 projMatrix;
-    glm::mat4 invViewProjMatrix;
 };
 
 struct ConstantBuffer{
@@ -53,15 +45,19 @@ public:
         unsubscribeFromMousePositionChange = VoxelDragContext::subscribeToMousePositionChange([this](const MousePosition& mousePosition) {
             onMousePositionChanged(mousePosition);
         });
+
+        unsubscribeFromDepthTargetChange = VoxelRendererOverride::subscribeToDepthTargetChange([this](void* depthResourceHandle) {
+            onDepthTargetChange(depthResourceHandle);
+        });
+        
+        unsubscribeFromCameraMatricesChange = VoxelRendererOverride::subscribeToCameraInfoChange([this](const CameraMatrices& cameraMatrices) {
+            onCameraMatricesChange(cameraMatrices);
+        });
     };
 
-    void updateDepthBuffer(void* depthResourceHandle)
+    void onDepthTargetChange(void* depthResourceHandle)
     {
-        ID3D11DepthStencilView* newDepthStencilView = static_cast<ID3D11DepthStencilView*>(depthResourceHandle);
-        if (newDepthStencilView == depthStencilView) {
-            return; 
-        }
-        depthStencilView = newDepthStencilView;        
+        ID3D11DepthStencilView* depthStencilView = static_cast<ID3D11DepthStencilView*>(depthResourceHandle);
 
         // Get the underlying resource from the depth stencil view, so we can create a shader resource view for it.
         ID3D11Resource* resource = nullptr;
@@ -101,7 +97,7 @@ public:
         this->dragValues.currentMousePosition = mousePosition;
     }
 
-    void updateCameraMatrices(const CameraMatrices& cameraMatrices)
+    void onCameraMatricesChange(const CameraMatrices& cameraMatrices)
     {
         this->cameraMatrices = cameraMatrices;
     }
@@ -134,14 +130,15 @@ private:
     ComPtr<ID3D11UnorderedAccessView> isDraggingUAV;
     ComPtr<ID3D11Buffer> constantBuffer;
     ComPtr<ID3D11Buffer> isDraggingBuffer;
-    ID3D11DepthStencilView* depthStencilView;
     CameraMatrices cameraMatrices;
     DragValues dragValues;
     int numWorkgroups;
     float numSubsteps;
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavQueryDesc;
-    std::function<void()> unsubscribeFromDragStateChange;
-    std::function<void()> unsubscribeFromMousePositionChange;
+    EventBase::Unsubscribe unsubscribeFromDragStateChange;
+    EventBase::Unsubscribe unsubscribeFromMousePositionChange;
+    EventBase::Unsubscribe unsubscribeFromDepthTargetChange;
+    EventBase::Unsubscribe unsubscribeFromCameraMatricesChange;
 
     void copyConstantBufferToGPU()
     {
@@ -253,6 +250,8 @@ private:
 
         unsubscribeFromDragStateChange();
         unsubscribeFromMousePositionChange();
+        unsubscribeFromDepthTargetChange();
+        unsubscribeFromCameraMatricesChange();
     };
     
 };

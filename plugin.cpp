@@ -90,7 +90,6 @@ MStatus plugin::doIt(const MArgList& argList)
 
 	plugin::createVoxelSimulationNode();
 		
-	VoxelRendererOverride::setPBD(&plugin::pbdSimulator);
 	VoxelDeformerCPUNode::instantiateAndAttachToMesh(plugin::voxelizedMeshDagPath);
 
 	MProgressWindow::endProgress();
