@@ -7,27 +7,20 @@
 #include "custommayaconstructs/voxeldragcontextcommand.h"
 #include <maya/MAnimControl.h>
 #include <maya/MProgressWindow.h>
+#include "custommayaconstructs/voxeldata.h"
+#include <maya/MFnPluginData.h>
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
 extern std::thread::id g_mainThreadId = std::this_thread::get_id();
 
 Voxelizer plugin::voxelizer = Voxelizer();
-PBD plugin::pbdSimulator{};
-std::unordered_map<std::string, MCallbackId> plugin::callbacks;
-MDagPath plugin::voxelizedMeshDagPath = MDagPath();
 VoxelRendererOverride* plugin::voxelRendererOverride = nullptr;
 
 // Maya Plugin creator function
 void* plugin::creator()
 {
 	return new plugin;
-}
-
-void plugin::simulate(void* clientData) {
-	if (!plugin::pbdSimulator.isInitialized()) return;
-
-	plugin::pbdSimulator.simulateStep();
 }
 
 MSyntax plugin::syntax()
@@ -46,8 +39,8 @@ MSyntax plugin::syntax()
 // Plugin doIt function
 MStatus plugin::doIt(const MArgList& argList)
 {
+	MGlobal::executeCommand("undoInfo -openChunk", false, false); // make everything from here to the end of the function undoable in one command
 	MProgressWindow::reserve();
-    // MProgressWindow::setInterruptable(true); // TODO: 
 	MProgressWindow::setTitle("Mesh Preparation Progress");
 	MProgressWindow::startProgress();
 
@@ -75,24 +68,22 @@ MStatus plugin::doIt(const MArgList& argList)
 		voxelSize,
 		pluginArgs.position,
 		selectedMeshDagPath,
-		plugin::voxelizedMeshDagPath,
 		pluginArgs.voxelizeSurface,
 		pluginArgs.voxelizeInterior,
 		!pluginArgs.renderAsVoxels,
 		pluginArgs.clipTriangles,
 		status
 	);
+	MDagPath voxelizedMeshDagPath = voxels.voxelizedMeshDagPath;
 	
-	// TODO: With the current set up, this wouldn't allow us to support voxelizing and simulating multiple meshes at once.
 	MProgressWindow::setProgressStatus("Creating PBD particles and face constraints..."); MProgressWindow::setProgressRange(0, 100); MProgressWindow::setProgress(0);
-	plugin::pbdSimulator.initialize(voxels, voxelSize, plugin::voxelizedMeshDagPath);
+	PBD::createPBDNode(std::move(voxels));
 	MProgressWindow::setProgress(100);
 
-	plugin::createVoxelSimulationNode();
-		
-	VoxelDeformerCPUNode::instantiateAndAttachToMesh(plugin::voxelizedMeshDagPath);
+	VoxelDeformerCPUNode::instantiateAndAttachToMesh(voxelizedMeshDagPath);
 
 	MProgressWindow::endProgress();
+	MGlobal::executeCommand("undoInfo -closeChunk", false, false); // close the undo chunk	
 	return status;
 }
 
@@ -252,49 +243,6 @@ bool plugin::isBoundingBoxOverlappingVoxelGrid(const MBoundingBox& objectBoundin
 	);
 }
 
-// TODO: this will need work to support multiple meshes. Perhaps move to the VoxelSimulationNode class.
-void plugin::createVoxelSimulationNode() {
-    MStatus status;
-
-    // Create the VoxelSimulationNode
-    MFnDependencyNode depNodeFn;
-    MObject voxelSimNode = depNodeFn.create(VoxelSimulationNode::id, &status);
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("Failed to create VoxelSimulationNode: " + status.errorString());
-        return;
-    }
-
-    // Add a message attribute to the voxelized mesh's transform node
-    MFnDagNode dagNode(plugin::voxelizedMeshDagPath.transform(&status));
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("Failed to get transform node: " + status.errorString());
-        return;
-    }
-
-    MFnMessageAttribute msgAttrFn;
-    MObject messageAttr;
-    if (!dagNode.hasAttribute("voxelSimulationNode")) {
-        messageAttr = msgAttrFn.create("voxelSimulationNode", "vsn", &status);
-        if (status != MS::kSuccess) {
-            MGlobal::displayError("Failed to create message attribute: " + status.errorString());
-            return;
-        }
-        dagNode.addAttribute(messageAttr);
-    } else {
-        messageAttr = dagNode.attribute("voxelSimulationNode", &status);
-    }
-
-    // Connect the VoxelSimulationNode to the transform node using the message attribute
-	MPlug meshPlug = dagNode.findPlug(messageAttr, false, &status);
-    MPlug simNodePlug = depNodeFn.findPlug("message", false, &status); // The default "message" attribute of the node
-    if (status == MS::kSuccess) {
-        MDGModifier dgModifier;
-        dgModifier.connect(simNodePlug, meshPlug);
-        dgModifier.doIt();
-    }
-
-}
-
 void plugin::loadVoxelSimulationNodeEditorTemplate() {
 	void* data = nullptr;
 	DWORD size = Utils::loadResourceFile(MhInstPlugin, IDR_MEL1, L"MEL", &data);
@@ -362,6 +310,20 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	// Voxel Data (custom node attribute data type that holds voxel info)
+	status = plugin.registerData(VoxelData::fullName, VoxelData::id, VoxelData::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelData: " + status.errorString());
+		return status;
+	}
+
+	// PBD Node
+	status = plugin.registerNode(PBD::pbdNodeName, PBD::id, PBD::creator, PBD::initialize, MPxNode::kDependNode);
+	if (!status) {
+		MGlobal::displayError("Failed to register PBD node: " + status.errorString());
+		return status;
+	}
+
 	// Drag Context command
 	status = plugin.registerContextCommand("voxelDragContextCommand", VoxelDragContextCommand::creator);
 	if (!status) {
@@ -396,9 +358,6 @@ EXPORT MStatus initializePlugin(MObject obj)
 	MString activeModelPanel = plugin::getActiveModelPanel();
 	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
 
-	MCallbackId timeChangedCallbackId = MEventMessage::addEventCallback("timeChanged", plugin::simulate, NULL, &status);
-	plugin::setCallbackId("timeChanged", timeChangedCallbackId);
-
 	plugin::loadVoxelSimulationNodeEditorTemplate();
 	plugin::loadVoxelizerMenu();
 
@@ -411,10 +370,6 @@ EXPORT MStatus initializePlugin(MObject obj)
 EXPORT MStatus uninitializePlugin(MObject obj)
 {
 	MGlobal::executeCommand("VoxelizerMenu_removeFromShelf");
-
-	// Deregister the callbacks
-	MCallbackId timeChangedCallbackId = plugin::getCallbackId("timeChanged");
-	MEventMessage::removeCallback(timeChangedCallbackId);
 
     MStatus status;
     MFnPlugin plugin(obj);
@@ -432,6 +387,15 @@ EXPORT MStatus uninitializePlugin(MObject obj)
     status = plugin.deregisterNode(VoxelSimulationNode::id);
     if (!status)
         MGlobal::displayError("deregisterNode failed on VoxelSimulationNode: " + status.errorString());
+
+	status = plugin.deregisterData(VoxelData::id);
+	if (!status)
+		MGlobal::displayError("deregisterData failed on VoxelData: " + status.errorString());
+
+	// PBD Node
+	status = plugin.deregisterNode(PBD::id);
+	if (!status)
+		MGlobal::displayError("deregisterNode failed on PBD: " + status.errorString());
 
     // Voxel Renderer Override
     MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);

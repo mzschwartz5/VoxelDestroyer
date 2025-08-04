@@ -5,24 +5,131 @@
 #include "constants.h"
 #include "custommayaconstructs/voxeldeformerGPUNode.h"
 #include "custommayaconstructs/voxeldragcontext.h"
+#include "custommayaconstructs/voxeldata.h"
+#include <maya/MFnUnitAttribute.h>
+#include <maya/MFnTypedAttribute.h>
+#include <maya/MFnNumericAttribute.h>
+#include <maya/MFnPluginData.h>
 
-PBD::PBD() {
+MObject PBD::aTime;
+MObject PBD::aVoxelData;
+MObject PBD::aTrigger;
+MTypeId PBD::id(0x0013A7B0);
+MString PBD::pbdNodeName("PBD");
+
+MStatus PBD::initialize() {
+    MStatus status;
+
+    // Time attribute
+    MFnUnitAttribute uTimeAttr;
+    aTime = uTimeAttr.create("time", "tm", MFnUnitAttribute::kTime, 0.0, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    status = addAttribute(aTime);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    uTimeAttr.setCached(false);
+    uTimeAttr.setStorable(false);
+    uTimeAttr.setWritable(true);
+    
+    // Voxel data attribute
+    MFnTypedAttribute tVoxelDataAttr;
+    aVoxelData = tVoxelDataAttr.create("voxeldata", "vxd", VoxelData::id, MObject::kNullObj, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    status = addAttribute(aVoxelData);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    tVoxelDataAttr.setCached(false);
+    tVoxelDataAttr.setStorable(true);
+    tVoxelDataAttr.setWritable(true);
+
+    // Output attribute to trigger downstream updates
+    MFnNumericAttribute nAttr;
+    aTrigger = nAttr.create("trigger", "trg", MFnNumericData::kBoolean, false, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    status = addAttribute(aTrigger);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    nAttr.setStorable(false);
+    nAttr.setWritable(false);
+
+    status = attributeAffects(aTime, aTrigger);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    return MS::kSuccess;
+}
+
+void PBD::postConstructor() {
+    MStatus status;
+    MPxNode::postConstructor();
+    
+    MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onVoxelDataSet, this, &status);
+    callbackIds.append(callbackId);
+    
     unsubscribeFromDragStateChange = VoxelDragContext::subscribeToDragStateChange([this](const DragState& dragState) {
         isDragging = dragState.isDragging;
     });
 }
 
-PBD::~PBD() {
-    unsubscribeFromDragStateChange();
+/**
+ * Static factory method to create a PBD node with the given voxel data as an attribute.
+ */
+void PBD::createPBDNode(Voxels&& voxels) {
+    MStatus status;
+    MDGModifier dgMod;
+    MObject pbdNodeObj = dgMod.createNode(PBD::pbdNodeName, &status);
+	dgMod.doIt();
+
+	MFnPluginData pluginDataFn;
+	MObject pluginDataObj = pluginDataFn.create( VoxelData::id, &status );
+
+	VoxelData* voxelData = static_cast<VoxelData*>(pluginDataFn.data(&status));
+	voxelData->setVoxels(std::move(voxels));
+
+	MFnDependencyNode pbdNode(pbdNodeObj);
+	MPlug voxelDataPlug = pbdNode.findPlug("voxeldata", false, &status);
+	voxelDataPlug.setValue(pluginDataObj);
+
+    MGlobal::executeCommandOnIdle("connectAttr time1.outTime " + pbdNode.name() + ".time", false);
 }
 
-void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& meshDagPath) {
-    this->meshDagPath = meshDagPath;
-    timeStep = (1.0f / 60.0f) / static_cast<float>(substeps);
-    constructFaceToFaceConstraints(voxels, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX);
-    setRadiusAndVolumeFromLength(voxelSize);
-    createParticles(voxels);
+PBD::~PBD() {
+    unsubscribeFromDragStateChange();
+    MMessage::removeCallbacks(callbackIds);
+}
 
+/**
+ * This is effectively our "constructor" for the PBD node, since Maya doesn't expose a constructor with arguments for custom nodes.
+ * When the voxel data attribute is set, this function will be called. Since the voxel data attribute isn't writeable, this only 
+ * occurs on initial creation, file load, or undo/redo events.
+ * 
+ * TODO: protect against redundant calls to this function?
+ */
+void PBD::onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+    // Only respond to changes to the voxel data attribute
+    // Only respond to attribute value changes
+    if (plug != aVoxelData || !(msg & MNodeMessage::kAttributeSet)) {
+        return;
+    }
+
+    MObject voxelDataObj;
+    MStatus status = plug.getValue(voxelDataObj);
+    MFnPluginData fnData(voxelDataObj, &status);
+    VoxelData* voxelData = static_cast<VoxelData*>(fnData.data(&status));
+    const Voxels& voxels = voxelData->getVoxels();
+    // voxels.print();
+    PBD* pbdNode = static_cast<PBD*>(clientData);
+
+    pbdNode->setRadiusAndVolumeFromLength(voxels.voxelSize);
+    Particles particles = pbdNode->createParticles(voxels);
+    std::array<std::vector<FaceConstraint>, 3> faceConstraints 
+        = pbdNode->constructFaceToFaceConstraints(voxels, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX);
+    
+    pbdNode->createComputeShaders(voxels, particles, faceConstraints);
+    pbdNode->setInitialized(true);
+}
+
+void PBD::createComputeShaders(
+    const Voxels& voxels, 
+    const Particles& particles,
+    const std::array<std::vector<FaceConstraint>, 3>& faceConstraints
+) {
     vgsCompute = std::make_unique<VGSCompute>(
         particles.w.data(),
         particles.positions,
@@ -83,14 +190,14 @@ void PBD::initialize(const Voxels& voxels, float voxelSize, const MDagPath& mesh
         vgsCompute->getParticlesUAV(),
         dragParticlesCompute->getIsDraggingUAV()
     );
-
-    initialized = true;
 }
 
-void PBD::constructFaceToFaceConstraints(const Voxels& voxels,
+std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(const Voxels& voxels,
     float xTension, float xCompression,
     float yTension, float yCompression,
     float zTension, float zCompression) {
+    std::array<std::vector<FaceConstraint>, 3> faceConstraints;
+
     for (int i = 0; i < voxels.numOccupied; i++) {
         uint32_t x, y, z;
         Utils::fromMortonCode(voxels.mortonCodes[i], x, y, z);
@@ -107,7 +214,7 @@ void PBD::constructFaceToFaceConstraints(const Voxels& voxels,
             newConstraint.voxelTwoIdx = rightNeighborIndex;
             newConstraint.compressionLimit = xCompression;
             newConstraint.tensionLimit = xTension;
-            addFaceConstraint(newConstraint, 0);
+            faceConstraints[0].push_back(newConstraint);
         }
 
         // Checks that the up voxel is in the grid and is occupied
@@ -119,7 +226,7 @@ void PBD::constructFaceToFaceConstraints(const Voxels& voxels,
             newConstraint.voxelTwoIdx = upNeighborIndex;
             newConstraint.compressionLimit = yCompression;
             newConstraint.tensionLimit = yTension;
-            addFaceConstraint(newConstraint, 1);
+            faceConstraints[1].push_back(newConstraint);
         }
 
         // Checks that the front voxel is in the grid and is occupied
@@ -131,12 +238,15 @@ void PBD::constructFaceToFaceConstraints(const Voxels& voxels,
             newConstraint.voxelTwoIdx = frontNeighborIndex;
             newConstraint.compressionLimit = zCompression;
             newConstraint.tensionLimit = zTension;
-            addFaceConstraint(newConstraint, 2);
+            faceConstraints[2].push_back(newConstraint);
         }
     }
+
+    return faceConstraints;
 }
 
-void PBD::createParticles(const Voxels& voxels) {
+Particles PBD::createParticles(const Voxels& voxels) {
+    Particles particles;
     for (int i = 0; i < voxels.numOccupied; i++) {
         glm::vec3 voxelCenter = 0.5f * (voxels.corners[i].corners[0] + voxels.corners[i].corners[7]);
 
@@ -149,14 +259,26 @@ void PBD::createParticles(const Voxels& voxels) {
             particles.numParticles++;
         }
     }
+
+    numParticles = particles.numParticles;
+    return particles;
 }
 
-void PBD::simulateStep()
+MStatus PBD::compute(const MPlug& plug, MDataBlock& dataBlock) 
 {   
+    if (!initialized) {
+        return MS::kSuccess;
+    }
+
     for (int i = 0; i < substeps; i++)
     {
         simulateSubstep();
     }
+    
+    MDataHandle triggerHandle = dataBlock.outputValue(aTrigger);
+    triggerHandle.setBool(true);
+    triggerHandle.setClean();
+    return MS::kSuccess;
 }
 
 void PBD::simulateSubstep() {
@@ -168,7 +290,7 @@ void PBD::simulateSubstep() {
 
     vgsCompute->dispatch();
     
-    for (int i = 0; i < faceConstraints.size(); i++) {
+    for (int i = 0; i < 3; i++) {
         faceConstraintsCompute->updateActiveConstraintAxis(i);
 		faceConstraintsCompute->dispatch();
     }
@@ -177,92 +299,4 @@ void PBD::simulateSubstep() {
     prefixScanCompute->dispatch(); 
     buildCollisionParticleCompute->dispatch();
     solveCollisionsCompute->dispatch();
-}
-
-void PBD::setSimValuesFromUI() {
-    MStatus status;
-
-    MFnDagNode dagNode(meshDagPath, &status);
-
-    if (status != MS::kSuccess || !dagNode.hasAttribute("voxelSimulationNode")) {
-        MGlobal::displayInfo("Failed to find voxelSimulationNode: " + dagNode.name());
-
-        return;
-    }
-
-    MGlobal::displayInfo("Found mesh with voxelSimulationNode: " + dagNode.name());
-
-    // Get the connected VoxelSimulationNode
-    MPlug voxelSimNodePlug = dagNode.findPlug("voxelSimulationNode", false, &status);
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("Failed to find voxelSimulationNode plug.");
-        return;
-    }
-
-    MPlugArray connectedPlugs;
-    voxelSimNodePlug.connectedTo(connectedPlugs, true, false, &status);
-    if (status != MS::kSuccess || connectedPlugs.length() == 0) {
-        MGlobal::displayError("No VoxelSimulationNode connected to the mesh.");
-        return;
-    }
-
-    MObject voxelSimNodeObj = connectedPlugs[0].node();
-    MFnDependencyNode voxelSimNodeFn(voxelSimNodeObj, &status);
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("Failed to access the VoxelSimulationNode.");
-        return;
-    }
-
-    // Retrieve the relaxation and edgeUniformity attributes
-    MPlug relaxationPlug = voxelSimNodeFn.findPlug("relaxation", false, &status);
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("Failed to find relaxation attribute.");
-        return;
-    }
-
-    MPlug edgeUniformityPlug = voxelSimNodeFn.findPlug("edgeUniformity", false, &status);
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("Failed to find edgeUniformity attribute.");
-        return;
-    }
-
-	MPlug gravityStrengthPlug = voxelSimNodeFn.findPlug("gravityStrength", false, &status);
-	if (status != MS::kSuccess) {
-		MGlobal::displayError("Failed to find gravityStrength attribute.");
-		return;
-	}
-
-	MPlug faceToFaceRelaxationPlug = voxelSimNodeFn.findPlug("faceToFaceRelaxation", false, &status);
-	if (status != MS::kSuccess) {
-		MGlobal::displayError("Failed to find faceToFaceRelaxation attribute.");
-		return;
-	}
-
-	MPlug faceToFaceEdgeUniformityPlug = voxelSimNodeFn.findPlug("faceToFaceEdgeUniformity", false, &status);
-	if (status != MS::kSuccess) {
-		MGlobal::displayError("Failed to find faceToFaceEdgeUniformity attribute.");
-		return;
-	}
-
-    float relaxationValue;
-    float edgeUniformityValue;
-	float gravityStrengthValue;
-	float faceToFaceRelaxationValue;
-	float faceToFaceEdgeUniformityValue;
-
-    relaxationPlug.getValue(relaxationValue);
-    edgeUniformityPlug.getValue(edgeUniformityValue);
-	gravityStrengthPlug.getValue(gravityStrengthValue);
-	faceToFaceRelaxationPlug.getValue(faceToFaceRelaxationValue);
-	faceToFaceEdgeUniformityPlug.getValue(faceToFaceEdgeUniformityValue);
-
-    RELAXATION = relaxationValue;
-	BETA = edgeUniformityValue;
-	GRAVITY_STRENGTH = gravityStrengthValue;
-	FTF_RELAXATION = faceToFaceRelaxationValue;
-	FTF_BETA = faceToFaceEdgeUniformityValue;
-
-	// Update the simulation values
-    updateVGSInfo();
-	updateSimInfo();
 }

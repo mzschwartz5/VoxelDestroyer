@@ -3,7 +3,6 @@
 #include <maya/MObject.h>
 #include <maya/MGlobal.h>
 #include <maya/MSyntax.h>
-#include <maya/MArgList.h>
 #include <maya/MArgDatabase.h>
 #include <maya/MPxCommand.h>
 #include <maya/MFnPlugin.h>
@@ -19,7 +18,6 @@
 #include "utils.h"
 #include "pbd.h"
 #include <vector>
-#include "pbd.h"
 #include "voxelizer.h"
 #include "directx/directx.h"
 #include "constants.h"
@@ -58,10 +56,6 @@ public:
 	static void* creator();
 	static MSyntax syntax();
 	
-	// Callbacks
-	// Called when the animation time changes (i.e. via playback or scrubbing)
-	static void simulate(void* clientData);
-	
 	// Compare the center of an object's bounding box to the center of the voxel grid
 	// to determine the closest object to the voxel grid (used as a fallback if nothing selected)
 	MDagPath findClosestObjectToVoxelGrid(const MPoint& voxelGridCenter, double voxelGridSize, MString gridDisplayName);
@@ -72,23 +66,10 @@ public:
 	static void loadVoxelSimulationNodeEditorTemplate();
 	static void loadVoxelizerMenu();
 	static MString getActiveModelPanel();
-
-	static MCallbackId getCallbackId(std::string callbackName) { 
-		auto it = callbacks.find(callbackName); 
-		if (it != callbacks.end()) return it->second; 
-		return 0; 
-	}
-
-	static void setCallbackId(std::string callbackName, MCallbackId id) { 
-		callbacks[callbackName] = id;
-	}
 	
 	static PBD pbdSimulator;
 	static VoxelRendererOverride* voxelRendererOverride;
 	
 private:
 	static Voxelizer voxelizer;
-	static MDagPath voxelizedMeshDagPath;
-	static std::unordered_map<std::string, MCallbackId> callbacks;
-	static MString mouseInteractionCommandName;
 };

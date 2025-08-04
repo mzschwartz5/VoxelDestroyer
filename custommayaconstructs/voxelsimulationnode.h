@@ -26,7 +26,7 @@ public:
     // Output attribute
     static MObject outputAttr;
 
-    PBD* pbdInstance{};
+    // PBD* pbdInstance{};
     MCallbackIdArray callbackIds;
 
     static void* creator() {
@@ -138,37 +138,37 @@ public:
             return;
         }
 
-        VoxelSimulationNode* node = static_cast<VoxelSimulationNode*>(clientData);
-        if (!node || !node->pbdInstance) {
-            return;
-        }
+        // VoxelSimulationNode* node = static_cast<VoxelSimulationNode*>(clientData);
+        // if (!node || !node->pbdInstance) {
+        //     return;
+        // }
 
-        // Handle attribute changes directly in the callback
-        if (plug.attribute() == relaxationAttr) {
-            float value = plug.asFloat();
-            node->pbdInstance->setRelaxation(value);
-        }
-        else if (plug.attribute() == edgeUniformityAttr) {
-            float value = plug.asFloat();
-            node->pbdInstance->setBeta(value);
-        }
-        else if (plug.attribute() == gravityStrengthAttr) {
-            float value = plug.asFloat();
-            node->pbdInstance->setGravityStrength(value);
-        }
-        else if (plug.attribute() == faceToFaceRelaxationAttr) {
-            float value = plug.asFloat();
-            node->pbdInstance->setFTFRelaxation(value);
-        }
-        else if (plug.attribute() == faceToFaceEdgeUniformityAttr) {
-            float value = plug.asFloat();
-            node->pbdInstance->setFTFBeta(value);
-        }
+        // // Handle attribute changes directly in the callback
+        // if (plug.attribute() == relaxationAttr) {
+        //     float value = plug.asFloat();
+        //     node->pbdInstance->setRelaxation(value);
+        // }
+        // else if (plug.attribute() == edgeUniformityAttr) {
+        //     float value = plug.asFloat();
+        //     node->pbdInstance->setBeta(value);
+        // }
+        // else if (plug.attribute() == gravityStrengthAttr) {
+        //     float value = plug.asFloat();
+        //     node->pbdInstance->setGravityStrength(value);
+        // }
+        // else if (plug.attribute() == faceToFaceRelaxationAttr) {
+        //     float value = plug.asFloat();
+        //     node->pbdInstance->setFTFRelaxation(value);
+        // }
+        // else if (plug.attribute() == faceToFaceEdgeUniformityAttr) {
+        //     float value = plug.asFloat();
+        //     node->pbdInstance->setFTFBeta(value);
+        // }
 
-        // Update simulation info after any attribute change
-        node->pbdInstance->updateSimInfo();
-        node->pbdInstance->updateVGSInfo();
-        MGlobal::displayInfo("Voxel Destroyer updated with new parameters");
+        // // Update simulation info after any attribute change
+        // node->pbdInstance->updateSimInfo();
+        // node->pbdInstance->updateVGSInfo();
+        // MGlobal::displayInfo("Voxel Destroyer updated with new parameters");
     }
 
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override {
@@ -184,7 +184,7 @@ public:
         return MPxNode::compute(plug, dataBlock);
     }
 
-    VoxelSimulationNode() : pbdInstance(&plugin::pbdSimulator) {}
+    VoxelSimulationNode() {}
 };
 
 // Unique ID for the node
