@@ -6,12 +6,21 @@
 
 class VoxelData : public MPxData {
 public:
-    static MTypeId id;
-
-    VoxelData() = default;
+    inline static MTypeId id = MTypeId(0x0007F001);
+    inline static MString fullName = "VoxelData";
+    
+    VoxelData() : voxels() {}
     virtual ~VoxelData() = default;
 
+    static void* creator() {
+        return new VoxelData();
+    }
+
+    // Only serializing the fields of Voxels that this node actually needs
     virtual MStatus writeBinary(std::ostream& out) override {
+        float voxelSize = voxels.voxelSize;
+        out.write(reinterpret_cast<const char*>(&voxelSize), sizeof(voxelSize));
+        
         size_t size = voxels.size();
         out.write(reinterpret_cast<const char*>(&size), sizeof(size));
 
@@ -38,6 +47,8 @@ public:
     }
 
     virtual MStatus readBinary(std::istream& in, unsigned int length) override {
+        in.read(reinterpret_cast<char*>(&voxels.voxelSize), sizeof(voxels.voxelSize));
+
         size_t size;
         in.read(reinterpret_cast<char*>(&size), sizeof(size));
         voxels.resize(static_cast<int>(size));
@@ -74,7 +85,11 @@ public:
 
     // Override typeId and name methods
     virtual MTypeId typeId() const override { return id; }
-    virtual MString name() const override { return "VoxelData"; }
+    virtual MString name() const override { return fullName; }
+    const Voxels& getVoxels() const { return voxels; }
+    void setVoxels(Voxels&& v) {
+        voxels = std::move(v);
+    }
 
 private:
     Voxels voxels;
