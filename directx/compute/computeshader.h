@@ -5,6 +5,7 @@
 #include "../../resource.h"
 #include "../d3dincludehandler.h"
 #include "../directx.h"
+#include <unordered_map>
 using namespace Microsoft::WRL;
 
 class ComputeShader
@@ -18,8 +19,6 @@ public:
     
     int getId() const { return id; };
 
-    const ComPtr<ID3D11ComputeShader>& getShaderPtr() const { return shaderPtr; };
-
     virtual void dispatch() = 0;
 
     virtual void dispatch(int threadGroupCount) {
@@ -29,8 +28,6 @@ public:
     };
     
 protected:    
-    MInt64 heldMemory = 0; // Memory held by this shader, used for Maya's GPU memory tracking
-    int id;
     ComPtr<ID3D11ComputeShader> shaderPtr;
 
     virtual void tearDown() {
@@ -79,6 +76,11 @@ protected:
     }
 
     void load() {
+        if (shaderCache.find(id) != shaderCache.end()) {
+            shaderPtr = shaderCache.at(id);
+            return;
+        }
+
         void* data = nullptr;
         DWORD size = Utils::loadResourceFile(DirectX::getPluginInstance(), id, L"SHADER", &data);
 
@@ -125,6 +127,14 @@ protected:
             return;
         }
         pPSBuf->Release();
+        shaderCache[id] = shaderPtr;
     }
+
+private:
+    // Cache of created shaders to avoid loading and recompiling the same shader multiple times,
+    // as multiple instances of the same shader may be used across different PBD nodes.
+    inline static std::unordered_map<int, ComPtr<ID3D11ComputeShader>> shaderCache;
+    MInt64 heldMemory = 0; // Memory held by this shader, used for Maya's GPU memory tracking
+    int id;
 
 };
