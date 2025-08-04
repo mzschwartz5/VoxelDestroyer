@@ -17,9 +17,9 @@ public:
     ~ComputeShader() { tearDown(); };
     
     int getId() const { return id; };
-    
-    ID3D11ComputeShader*& getShaderPtr()  { return shaderPtr; };
-    
+
+    const ComPtr<ID3D11ComputeShader>& getShaderPtr() const { return shaderPtr; };
+
     virtual void dispatch() = 0;
 
     virtual void dispatch(int threadGroupCount) {
@@ -31,13 +31,9 @@ public:
 protected:    
     MInt64 heldMemory = 0; // Memory held by this shader, used for Maya's GPU memory tracking
     int id;
-    ID3D11ComputeShader* shaderPtr = NULL;
+    ComPtr<ID3D11ComputeShader> shaderPtr;
 
     virtual void tearDown() {
-        if (shaderPtr) {
-            shaderPtr->Release();
-            shaderPtr = NULL;
-        }
         MRenderer::theRenderer()->releaseGPUMemory(heldMemory);
         heldMemory = 0;
     };

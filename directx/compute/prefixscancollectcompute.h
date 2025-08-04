@@ -29,7 +29,7 @@ private:
     void dispatch() override {}
     
     void bind() override {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11ShaderResourceView* srvs[] = { partialSumsSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
@@ -39,7 +39,7 @@ private:
     }
 
     void unbind() override {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11ShaderResourceView* srvs[] = { nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);

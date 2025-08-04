@@ -7,7 +7,6 @@
 #include <vector>
 #include <array>
 #include <numeric>
-#include <memory>
 #include <functional>
 #include "directx/compute/computeshader.h"
 #include "directx/compute/vgscompute.h"
@@ -113,15 +112,14 @@ private:
     std::function<void()> unsubscribeFromDragStateChange;
 
     // Shaders
-	// It seems that they need to be created and managed via unique pointers. Otherwise they dispatch but don't run. Perhaps an issue with copy assignment and DX resources with the non-pointer version.
-    std::unique_ptr<VGSCompute> vgsCompute;
-	std::unique_ptr<FaceConstraintsCompute> faceConstraintsCompute;
-    std::unique_ptr<PreVGSCompute> preVGSCompute;
-    std::unique_ptr<DragParticlesCompute> dragParticlesCompute;
-    std::unique_ptr<BuildCollisionGridCompute> buildCollisionGridCompute;
-    std::unique_ptr<PrefixScanCompute> prefixScanCompute;
-    std::unique_ptr<BuildCollisionParticlesCompute> buildCollisionParticleCompute;
-    std::unique_ptr<SolveCollisionsCompute> solveCollisionsCompute;
+    VGSCompute vgsCompute;
+    FaceConstraintsCompute faceConstraintsCompute;
+    PreVGSCompute preVGSCompute;
+    DragParticlesCompute dragParticlesCompute;
+    BuildCollisionGridCompute buildCollisionGridCompute;
+    PrefixScanCompute prefixScanCompute;
+    BuildCollisionParticlesCompute buildCollisionParticleCompute;
+    SolveCollisionsCompute solveCollisionsCompute;
     
     void simulateSubstep();
 

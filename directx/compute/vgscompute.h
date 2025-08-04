@@ -17,6 +17,8 @@ struct VGSConstantBuffer {
 class VGSCompute : public ComputeShader
 {
 public:
+    VGSCompute() = default;
+
     VGSCompute(
         const float* weights,
         const std::vector<glm::vec4>& particlePositions,
@@ -54,7 +56,7 @@ private:
     
     void bind() override
     {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11ShaderResourceView* srvs[] = {  weightsSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
@@ -68,7 +70,7 @@ private:
 
     void unbind() override
     {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11ShaderResourceView* srvs[] = { nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
@@ -140,13 +142,4 @@ private:
         initData.pSysMem = &voxelSimInfo;
         CreateBuffer(&bufferDesc, &initData, &voxelSimInfoBuffer);
     }
-
-    void tearDown() override
-    {
-        ComputeShader::tearDown();
-        weightsBuffer.Reset();
-        weightsSRV.Reset();
-        voxelSimInfoBuffer.Reset();
-    };
-
 };
