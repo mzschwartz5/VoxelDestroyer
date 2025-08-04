@@ -5,6 +5,7 @@
 #include <maya/MBoundingBox.h>
 #include <maya/MPointArray.h>
 #include <maya/MFnMesh.h>
+#include <maya/MDagPath.h>
 #include <vector>
 #include <array>
 #include <unordered_map>
@@ -62,9 +63,67 @@ struct Voxels {
     std::unordered_map<uint32_t, uint32_t> mortonCodesToSortedIdx;
     std::vector<std::vector<int>> containedTris;   // Indices of triangles whose centroids are contained within the voxel
     std::vector<std::vector<int>> overlappingTris; // Indicies of triangles that overlap the voxel, but whose centroids are not contained within the voxel
+    MDagPath voxelizedMeshDagPath;
     
     int totalVerts = 0; // total number of vertices in the voxelized mesh
     int numOccupied = 0;
+    float voxelSize;
+    
+    Voxels() = default;
+
+    // Copy constructor
+    Voxels(const Voxels& other)
+        : occupied(other.occupied),
+          isSurface(other.isSurface),
+          cgalMeshes(other.cgalMeshes),
+          corners(other.corners),
+          vertStartIdx(other.vertStartIdx),
+          mortonCodes(other.mortonCodes),
+          mortonCodesToSortedIdx(other.mortonCodesToSortedIdx),
+          containedTris(other.containedTris),
+          overlappingTris(other.overlappingTris),
+          voxelizedMeshDagPath(other.voxelizedMeshDagPath),
+          totalVerts(other.totalVerts),
+          numOccupied(other.numOccupied),
+          voxelSize(other.voxelSize)
+    {}
+
+    // Copy assignment operator
+    Voxels& operator=(const Voxels& other) {
+        if (this != &other) {
+            occupied = other.occupied;
+            isSurface = other.isSurface;
+            // cgalMeshes is not copy-assignable, but shouldn't need to copy it anyway
+            corners = other.corners;
+            vertStartIdx = other.vertStartIdx;
+            mortonCodes = other.mortonCodes;
+            mortonCodesToSortedIdx = other.mortonCodesToSortedIdx;
+            containedTris = other.containedTris;
+            overlappingTris = other.overlappingTris;
+            voxelizedMeshDagPath = other.voxelizedMeshDagPath;
+            totalVerts = other.totalVerts;
+            numOccupied = other.numOccupied;
+            voxelSize = other.voxelSize;
+        }
+        return *this;
+    }
+
+    // Move constructor
+    Voxels(Voxels&& other) noexcept
+        : occupied(std::move(other.occupied)),
+          isSurface(std::move(other.isSurface)),
+          cgalMeshes(std::move(other.cgalMeshes)),
+          corners(std::move(other.corners)),
+          vertStartIdx(std::move(other.vertStartIdx)),
+          mortonCodes(std::move(other.mortonCodes)),
+          mortonCodesToSortedIdx(std::move(other.mortonCodesToSortedIdx)),
+          containedTris(std::move(other.containedTris)),
+          overlappingTris(std::move(other.overlappingTris)),
+          voxelizedMeshDagPath(std::move(other.voxelizedMeshDagPath)),
+          totalVerts(other.totalVerts),
+          numOccupied(other.numOccupied),
+          voxelSize(other.voxelSize)
+    {}
     
     int size() const { return static_cast<int>(occupied.size()); }
     void resize(int size) {
@@ -90,7 +149,6 @@ public:
         float voxelSize,
         MPoint gridCenter,
         const MDagPath& selectedMeshDagPath,
-        MDagPath& voxelizedMeshDagPath,
         bool voxelizeSurface,
         bool voxelizeInterior,
         bool doBoolean,

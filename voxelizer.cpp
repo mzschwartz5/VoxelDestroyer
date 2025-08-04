@@ -1,6 +1,5 @@
 #include "voxelizer.h"
 #include <maya/MSelectionList.h>
-#include <maya/MDagPath.h>
 #include <maya/MFnTransform.h>
 #include <algorithm>
 #include <maya/MFnSet.h>
@@ -15,7 +14,6 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     float voxelSize,
     MPoint gridCenter,
     const MDagPath& selectedMeshPath,
-    MDagPath& voxelizedMeshPath,
     bool voxelizeSurface,
     bool voxelizeInterior,
     bool doBoolean,
@@ -32,6 +30,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
 
     int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
     Voxels voxels;
+    voxels.voxelSize = voxelSize;
     voxels.resize(voxelsPerEdge * voxelsPerEdge * voxelsPerEdge);
     status = MThreadPool::init();
     
@@ -74,11 +73,11 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     );
 
     MProgressWindow::setProgressStatus("Sorting voxels by Morton code...");
-    voxels = sortVoxelsByMortonCode(voxels);
+    Voxels sortedVoxels = sortVoxelsByMortonCode(voxels); // note: assign to new var to take advantage of RVO
 
     MProgressWindow::setProgressStatus("Calculating voxel-mesh intersections...");
     const FaceSelectionStrings faceSelectionStrings = prepareForAndDoVoxelIntersection(
-        voxels,
+        sortedVoxels,
         selectedMesh,
         meshTris,
         newMeshName,
@@ -86,11 +85,11 @@ Voxels Voxelizer::voxelizeSelectedMesh(
         clipTriangles
     );
 
-    voxelizedMeshPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, voxelSize, faceSelectionStrings); // TODO: if no boolean, should get rid of non-manifold geometry
+    sortedVoxels.voxelizedMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, voxelSize, faceSelectionStrings); // TODO: if no boolean, should get rid of non-manifold geometry
     MGlobal::executeCommand("delete " + originalMeshName, false, true); // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh (or just allow for undo)
 
     MThreadPool::release(); // reduce reference count incurred by init()
-    return voxels;
+    return sortedVoxels;
 }
 
 std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxelSize, MStatus& status) {
@@ -536,6 +535,7 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
     }
 
     sortedVoxels.numOccupied = voxels.numOccupied;
+    sortedVoxels.voxelSize = voxels.voxelSize;
 
     return sortedVoxels;
 }

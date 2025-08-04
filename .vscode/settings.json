@@ -97,7 +97,8 @@
         "cinttypes": "cpp",
         "execution": "cpp",
         "filesystem": "cpp",
-        "future": "cpp"
+        "future": "cpp",
+        "*.rh": "cpp"
     },
     "cmake.ignoreCMakeListsMissing": true
 }
