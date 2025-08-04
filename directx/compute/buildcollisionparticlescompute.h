@@ -5,6 +5,8 @@
 class BuildCollisionParticlesCompute : public ComputeShader
 {
 public:
+    BuildCollisionParticlesCompute() = default;
+
     BuildCollisionParticlesCompute(
         const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV,
         const ComPtr<ID3D11UnorderedAccessView>& collisionCellParticleCountsUAV,
@@ -41,7 +43,7 @@ private:
     ComPtr<ID3D11ShaderResourceView> particlesByCollisionCellSRV;
     
     void bind() override {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11ShaderResourceView* srvs[] = { particlePositionsSRV.Get(), isSurfaceSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
@@ -54,7 +56,7 @@ private:
     }
 
     void unbind() override {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11ShaderResourceView* srvs[] = { nullptr, nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
@@ -97,12 +99,5 @@ private:
         uavDesc.Buffer.FirstElement = 0;
         uavDesc.Buffer.NumElements = numBufferElements;
         DirectX::getDevice()->CreateUnorderedAccessView(particlesByCollisionCellBuffer.Get(), &uavDesc, &particlesByCollisionCellUAV);
-    }
-
-    void tearDown() override {
-        ComputeShader::tearDown();
-        particlesByCollisionCellBuffer.Reset();
-        particlesByCollisionCellUAV.Reset();
-        particlesByCollisionCellSRV.Reset();
     }
 };

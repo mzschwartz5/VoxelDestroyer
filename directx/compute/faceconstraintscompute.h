@@ -22,6 +22,8 @@ struct FaceConstraint {
 class FaceConstraintsCompute : public ComputeShader
 {
 public:
+    FaceConstraintsCompute() = default;
+
     FaceConstraintsCompute(
         const std::array<std::vector<FaceConstraint>, 3>& constraints,
         const std::vector<uint>& isSurface,
@@ -59,7 +61,7 @@ private:
 
     void bind() override
     {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11ShaderResourceView* srvs[] = { weightsSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
@@ -73,7 +75,7 @@ private:
 
     void unbind() override
     {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11ShaderResourceView* srvs[] = { nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
@@ -173,21 +175,4 @@ private:
         uavDesc.Buffer.NumElements = numVoxels;
         DirectX::getDevice()->CreateUnorderedAccessView(isSurfaceBuffer.Get(), &uavDesc, &isSurfaceUAV);
     }
-
-    void tearDown() override
-    {
-        ComputeShader::tearDown();
-		for (auto& buffer : constraintBuffers) {
-			buffer.Reset();
-		}
-
-		for (auto& uav : faceConstraintUAVs) {
-			uav.Reset();
-		}
-
-		for (auto& buffer : faceContraintsCBs) {
-			buffer.Reset();
-		}
-    };
-
 };

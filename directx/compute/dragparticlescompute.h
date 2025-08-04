@@ -29,6 +29,8 @@ struct ConstantBuffer{
 class DragParticlesCompute : public ComputeShader
 {
 public:
+    DragParticlesCompute() = default;
+
     DragParticlesCompute(
         const ComPtr<ID3D11UnorderedAccessView>& particlesUAV,
         int numSubsteps
@@ -170,7 +172,7 @@ private:
 
     void bind() override
     {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get(), isDraggingUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
@@ -189,7 +191,6 @@ private:
 
         ID3D11ShaderResourceView* srvs[] = { nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
-
 
         ID3D11Buffer* cbvs[] = { nullptr };
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
@@ -236,16 +237,6 @@ private:
     void tearDown() override
     {
         ComputeShader::tearDown();
-        if (depthSRV) {
-            depthSRV->Release();
-            depthSRV = nullptr;
-        }
-
-        constantBuffer.Reset();
-
-        isDraggingBuffer.Reset();
-        isDraggingUAV.Reset();
-
         unsubscribeFromDragStateChange();
         unsubscribeFromMousePositionChange();
         unsubscribeFromDepthTargetChange();

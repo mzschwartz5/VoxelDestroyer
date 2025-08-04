@@ -1,7 +1,6 @@
 #pragma once
 #include "directx/compute/computeshader.h"
 #include "./prefixscancollectcompute.h"
-#include <memory>
 #include <algorithm>
 #include "constants.h"
 
@@ -14,10 +13,11 @@
 class PrefixScanCompute : public ComputeShader
 {
 public:
+    PrefixScanCompute() = default;
+
     PrefixScanCompute(
         const ComPtr<ID3D11UnorderedAccessView>& collisionCellParticleCountsUAV
     ) : ComputeShader(IDR_SHADER2), collisionCellParticleCountsUAV(collisionCellParticleCountsUAV) {
-        collectComputePass = std::make_unique<PrefixScanCollectCompute>();
         initializeBuffers();
     }
 
@@ -35,7 +35,7 @@ public:
 
         // Now go back up the chain, adding the partial sums to the scanned data they came from.
         for (scanIdx = numScans - 1; scanIdx > 1; --scanIdx) {
-            collectComputePass->collect(
+            collectComputePass.collect(
                 partialSumsUAVs[scanIdx - 2],           // collect into the scan sums from two levels higher up
                 partialSumsSRVs[scanIdx - 1],           // read sums from the one level up
                 2 * numWorkgroupsForScan[scanIdx - 1]   // Factor of 2 bc each collect thread only processes one element; each scan thread processes two.
@@ -45,7 +45,7 @@ public:
         // Final collect into original collision cell particle count buffer
         // TODO: consider consolidating this UAV into the vector of partial sums UAVs and treating it just like the others. (Would need some renaming of vars, refactoring index logic, etc.)
         if (scanIdx == 1) {
-            collectComputePass->collect(
+            collectComputePass.collect(
                 collisionCellParticleCountsUAV,         
                 partialSumsSRVs[0],                     
                 2 * numWorkgroupsForScan[0]                 
@@ -64,21 +64,21 @@ private:
     std::vector<int> numWorkgroupsForScan;
     ComPtr<ID3D11UnorderedAccessView> activeUAVForScan;
     ComPtr<ID3D11UnorderedAccessView> collisionCellParticleCountsUAV;
-    std::unique_ptr<PrefixScanCollectCompute> collectComputePass;
+    PrefixScanCollectCompute collectComputePass;
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavQueryDesc;
     int numElements = 0;
     int numScans = 0;
     int scanIdx = 0;
 
     void bind() override {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11UnorderedAccessView* uavs[] = { activeUAVForScan.Get(), partialSumsUAVs[scanIdx].Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
     }
 
     void unbind() override {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
@@ -131,20 +131,5 @@ private:
             DirectX::getDevice()->CreateUnorderedAccessView(partialSumsBuffers[i].Get(), &uavDesc, &partialSumsUAVs[i]);
         }
 
-    }
-
-    void tearDown() override {
-        ComputeShader::tearDown();
-        for (auto& srv : partialSumsSRVs) {
-            srv.Reset();
-        }
-
-        for (auto& uav : partialSumsUAVs) {
-            uav.Reset();
-        }
-
-        for (auto& buffer : partialSumsBuffers) {
-            buffer.Reset();
-        }
     }
 };

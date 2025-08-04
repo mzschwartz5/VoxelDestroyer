@@ -14,6 +14,8 @@ static constexpr int HASH_TABLE_SIZE_TO_PARTICLES = 2;
 class BuildCollisionGridCompute : public ComputeShader
 {
 public:
+    BuildCollisionGridCompute() = default;
+
     BuildCollisionGridCompute(
         float particleSize,
         const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV,
@@ -57,7 +59,7 @@ private:
     D3D11_SHADER_RESOURCE_VIEW_DESC srvQueryDesc;
 
     void bind() override {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11ShaderResourceView* srvs[] = { particlePositionsSRV.Get(), isSurfaceSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
@@ -70,7 +72,7 @@ private:
     }
 
     void unbind() override {
-        DirectX::getContext()->CSSetShader(shaderPtr, NULL, 0);
+        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11ShaderResourceView* srvs[] = { nullptr, nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
@@ -127,12 +129,5 @@ private:
 
         CreateBuffer(&bufferDesc, nullptr, &particleCollisionCB);
         updateParticleCollisionCB(numParticles, particleSize);
-    }
-
-    void tearDown() override {
-        ComputeShader::tearDown();
-        collisionCellParticleCountsBuffer.Reset();
-        collisionCellParticleCountsSRV.Reset();
-        collisionCellParticleCountsUAV.Reset();
     }
 };

@@ -130,7 +130,7 @@ void PBD::createComputeShaders(
     const Particles& particles,
     const std::array<std::vector<FaceConstraint>, 3>& faceConstraints
 ) {
-    vgsCompute = std::make_unique<VGSCompute>(
+    vgsCompute = VGSCompute(
         particles.w.data(),
         particles.positions,
         VGSConstantBuffer{ RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, voxels.size() }
@@ -138,57 +138,57 @@ void PBD::createComputeShaders(
 
     VoxelDeformerGPUNode::initializeExternalKernelArgs(
         voxels.size(),
-        vgsCompute->getParticlesBuffer().Get(),
+        vgsCompute.getParticlesBuffer().Get(),
         particles.positions,
         voxels.vertStartIdx
     );
 
-	faceConstraintsCompute = std::make_unique<FaceConstraintsCompute>(
+	faceConstraintsCompute = FaceConstraintsCompute(
 		faceConstraints,
         voxels.isSurface,
-		vgsCompute->getParticlesUAV(),
-		vgsCompute->getWeightsSRV(),
-        vgsCompute->getVoxelSimInfoBuffer()
+		vgsCompute.getParticlesUAV(),
+		vgsCompute.getWeightsSRV(),
+        vgsCompute.getVoxelSimInfoBuffer()
 	);
 
-    buildCollisionGridCompute = std::make_unique<BuildCollisionGridCompute>(
+    buildCollisionGridCompute = BuildCollisionGridCompute(
         PARTICLE_RADIUS,
-        vgsCompute->getParticlesSRV(),
-        faceConstraintsCompute->getIsSurfaceSRV()
+        vgsCompute.getParticlesSRV(),
+        faceConstraintsCompute.getIsSurfaceSRV()
     );
 
-    prefixScanCompute = std::make_unique<PrefixScanCompute>(
-        buildCollisionGridCompute->getCollisionCellParticleCountsUAV()
+    prefixScanCompute = PrefixScanCompute(
+        buildCollisionGridCompute.getCollisionCellParticleCountsUAV()
     );
 
-    buildCollisionParticleCompute = std::make_unique<BuildCollisionParticlesCompute>(
-        vgsCompute->getParticlesSRV(),
-        buildCollisionGridCompute->getCollisionCellParticleCountsUAV(),
-        buildCollisionGridCompute->getParticleCollisionCB(),
-        faceConstraintsCompute->getIsSurfaceSRV()
+    buildCollisionParticleCompute = BuildCollisionParticlesCompute(
+        vgsCompute.getParticlesSRV(),
+        buildCollisionGridCompute.getCollisionCellParticleCountsUAV(),
+        buildCollisionGridCompute.getParticleCollisionCB(),
+        faceConstraintsCompute.getIsSurfaceSRV()
     );
 
-    solveCollisionsCompute = std::make_unique<SolveCollisionsCompute>(
-        buildCollisionGridCompute->getHashGridSize(),
-        vgsCompute->getParticlesUAV(),
-        buildCollisionParticleCompute->getParticlesByCollisionCellSRV(),
-        buildCollisionGridCompute->getCollisionCellParticleCountsSRV(),
-        buildCollisionGridCompute->getParticleCollisionCB()
+    solveCollisionsCompute = SolveCollisionsCompute(
+        buildCollisionGridCompute.getHashGridSize(),
+        vgsCompute.getParticlesUAV(),
+        buildCollisionParticleCompute.getParticlesByCollisionCellSRV(),
+        buildCollisionGridCompute.getCollisionCellParticleCountsSRV(),
+        buildCollisionGridCompute.getParticleCollisionCB()
     );
 
-    dragParticlesCompute = std::make_unique<DragParticlesCompute>(
-        vgsCompute->getParticlesUAV(),
+    dragParticlesCompute = DragParticlesCompute(
+        vgsCompute.getParticlesUAV(),
         substeps
     );
 
     PreVGSConstantBuffer preVGSConstants{GRAVITY_STRENGTH, GROUND_COLLISION_Y, TIMESTEP, particles.numParticles};
-    preVGSCompute = std::make_unique<PreVGSCompute>(
+    preVGSCompute = PreVGSCompute(
         particles.numParticles,
         particles.oldPositions.data(),
 		preVGSConstants,
-        vgsCompute->getWeightsSRV(),
-        vgsCompute->getParticlesUAV(),
-        dragParticlesCompute->getIsDraggingUAV()
+        vgsCompute.getWeightsSRV(),
+        vgsCompute.getParticlesUAV(),
+        dragParticlesCompute.getIsDraggingUAV()
     );
 }
 
@@ -282,21 +282,21 @@ MStatus PBD::compute(const MPlug& plug, MDataBlock& dataBlock)
 }
 
 void PBD::simulateSubstep() {
-    preVGSCompute->dispatch();
+    preVGSCompute.dispatch();
 
     if (isDragging) {
-        dragParticlesCompute->dispatch();
+        dragParticlesCompute.dispatch();
     }
 
-    vgsCompute->dispatch();
+    vgsCompute.dispatch();
     
     for (int i = 0; i < 3; i++) {
-        faceConstraintsCompute->updateActiveConstraintAxis(i);
-		faceConstraintsCompute->dispatch();
+        faceConstraintsCompute.updateActiveConstraintAxis(i);
+		faceConstraintsCompute.dispatch();
     }
 
-    buildCollisionGridCompute->dispatch();
-    prefixScanCompute->dispatch(); 
-    buildCollisionParticleCompute->dispatch();
-    solveCollisionsCompute->dispatch();
+    buildCollisionGridCompute.dispatch();
+    prefixScanCompute.dispatch(); 
+    buildCollisionParticleCompute.dispatch();
+    solveCollisionsCompute.dispatch();
 }

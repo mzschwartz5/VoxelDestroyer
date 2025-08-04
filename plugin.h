@@ -10,7 +10,6 @@
 #include <maya/MFnMesh.h>
 #include <maya/MPointArray.h>
 #include <maya/MDagPath.h>
-#include <memory>
 #include <maya/MFnDagNode.h>
 #include <maya/MFnTransform.h>
 #include <maya/MVector.h>
