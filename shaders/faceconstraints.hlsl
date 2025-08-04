@@ -17,7 +17,7 @@ cbuffer VoxelSimBuffer : register(b0)
     float ITER_COUNT;
     float FTF_RELAXATION;
     float FTF_BETA;
-    float NUM_VOXELS;
+    int NUM_VOXELS;
 };
 
 cbuffer FaceConstraintsCB : register(b1)
