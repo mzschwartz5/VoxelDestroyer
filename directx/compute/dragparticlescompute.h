@@ -58,7 +58,7 @@ public:
         ID3D11DepthStencilView* depthStencilView = static_cast<ID3D11DepthStencilView*>(depthResourceHandle);
 
         // Get the underlying resource from the depth stencil view, so we can create a shader resource view for it.
-        ID3D11Resource* resource = nullptr;
+        ComPtr<ID3D11Resource> resource;
         depthStencilView->GetResource(&resource);
         if (!resource) {
             MGlobal::displayError("Failed to get resource from depth stencil view.");
@@ -71,7 +71,7 @@ public:
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
         srvDesc.Texture2D.MipLevels = 1;
 
-        HRESULT hr = DirectX::getDevice()->CreateShaderResourceView(resource, &srvDesc, &depthSRV);
+        HRESULT hr = DirectX::getDevice()->CreateShaderResourceView(resource.Get(), &srvDesc, depthSRV.GetAddressOf());
         if (FAILED(hr)) {
             MGlobal::displayError(MString("Failed to create shader resource view for depth buffer.") + std::to_string(hr).c_str());
             return;
