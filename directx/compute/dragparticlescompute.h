@@ -37,7 +37,10 @@ public:
     ) : ComputeShader(IDR_SHADER7), particlesUAV(particlesUAV), numSubsteps(numSubsteps)
     {
         initializeBuffers();
+        initSubscriptions();
+    };
 
+    void initSubscriptions() {
         unsubscribeFromDragStateChange = VoxelDragContext::subscribeToDragStateChange([this](const DragState& dragState) {
             onDragStateChange(dragState);
         });
@@ -53,7 +56,41 @@ public:
         unsubscribeFromCameraMatricesChange = VoxelRendererOverride::subscribeToCameraInfoChange([this](const CameraMatrices& cameraMatrices) {
             onCameraMatricesChange(cameraMatrices);
         });
-    };
+    }
+
+    // This class needs a move assignment operator override because the subscriptions it creates capture the `this` pointer.
+    // We need to unsubscribe on move and re-subscribe in the moved-to object to avoid dangling pointers.
+    // This is used implicitly (via RVO) in PBD initialization.
+    DragParticlesCompute& operator=(DragParticlesCompute&& other) noexcept
+    {
+        if (this != &other)
+        {
+            // Move base class
+            ComputeShader::operator=(std::move(other));
+
+            // Move all members
+            particlesUAV = std::move(other.particlesUAV);
+            depthSRV = std::move(other.depthSRV);
+            isDraggingUAV = std::move(other.isDraggingUAV);
+            constantBuffer = std::move(other.constantBuffer);
+            isDraggingBuffer = std::move(other.isDraggingBuffer);
+            cameraMatrices = std::move(other.cameraMatrices);
+            dragValues = std::move(other.dragValues);
+            numWorkgroups = other.numWorkgroups;
+            numSubsteps = other.numSubsteps;
+            uavQueryDesc = other.uavQueryDesc;
+            
+            // Unsubscribe from events in the moved-from object
+            other.unsubscribeFromDragStateChange();
+            other.unsubscribeFromMousePositionChange();
+            other.unsubscribeFromDepthTargetChange();
+            other.unsubscribeFromCameraMatricesChange();
+
+            // And subscribe in this object
+            initSubscriptions();
+        }
+        return *this;
+    }
 
     void onDepthTargetChange(void* depthResourceHandle)
     {
