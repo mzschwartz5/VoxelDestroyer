@@ -70,7 +70,7 @@ void PBD::postConstructor() {
 /**
  * Static factory method to create a PBD node with the given voxel data as an attribute.
  */
-void PBD::createPBDNode(Voxels&& voxels) {
+MObject PBD::createPBDNode(Voxels&& voxels) {
     MStatus status;
     MDGModifier dgMod;
     MObject pbdNodeObj = dgMod.createNode(PBD::pbdNodeName, &status);
@@ -87,6 +87,7 @@ void PBD::createPBDNode(Voxels&& voxels) {
 	voxelDataPlug.setValue(pluginDataObj);
 
     MGlobal::executeCommandOnIdle("connectAttr time1.outTime " + pbdNode.name() + ".time", false);
+    return pbdNodeObj;
 }
 
 PBD::~PBD() {

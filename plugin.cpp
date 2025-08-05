@@ -78,10 +78,9 @@ MStatus plugin::doIt(const MArgList& argList)
 	MDagPath voxelizedMeshDagPath = voxels.voxelizedMeshDagPath;
 	
 	MProgressWindow::setProgressStatus("Creating PBD particles and face constraints..."); MProgressWindow::setProgressRange(0, 100); MProgressWindow::setProgress(0);
-	PBD::createPBDNode(std::move(voxels));
+	MObject pbdNodeObj = PBD::createPBDNode(std::move(voxels));
+	VoxelDeformerCPUNode::instantiateAndAttachToMesh(voxelizedMeshDagPath, pbdNodeObj);
 	MProgressWindow::setProgress(100);
-
-	VoxelDeformerCPUNode::instantiateAndAttachToMesh(voxelizedMeshDagPath);
 
 	MProgressWindow::endProgress();
 	MGlobal::executeCommand("undoInfo -closeChunk", false, false); // close the undo chunk	

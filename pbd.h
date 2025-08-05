@@ -57,7 +57,7 @@ public:
     // Functions for Maya to create and initialize the node
     static void* creator() { return new PBD(); }
     static MStatus initialize();
-    static void createPBDNode(Voxels&& voxels);
+    static MObject createPBDNode(Voxels&& voxels);
     void postConstructor() override;
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override;
     MPxNode::SchedulingType schedulingType() const override {
