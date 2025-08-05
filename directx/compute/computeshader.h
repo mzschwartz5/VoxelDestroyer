@@ -15,7 +15,7 @@ public:
     ComputeShader(int id) : id(id) {
         load();
     }
-    ~ComputeShader() { tearDown(); };
+    virtual ~ComputeShader() { tearDown(); };
     
     int getId() const { return id; };
 
@@ -26,6 +26,10 @@ public:
         DirectX::getContext()->Dispatch(threadGroupCount, 1, 1); 
         unbind();
     };
+
+    static void clearShaderCache() {
+        shaderCache.clear();
+    }
     
 protected:    
     ComPtr<ID3D11ComputeShader> shaderPtr;

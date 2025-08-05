@@ -9,6 +9,7 @@
 #include <maya/MProgressWindow.h>
 #include "custommayaconstructs/voxeldata.h"
 #include <maya/MFnPluginData.h>
+#include "directx/compute/computeshader.h"
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -412,6 +413,9 @@ EXPORT MStatus uninitializePlugin(MObject obj)
     status = plugin.deregisterNode(VoxelDeformerCPUNode::id);
     if (!status)
         MGlobal::displayError("deregisterNode failed on VoxelDeformerCPUNode: " + status.errorString());
+
+	// Any loaded shaders should be cleared to free resources
+	ComputeShader::clearShaderCache();
 
 	return status;
 }
