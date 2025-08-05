@@ -34,11 +34,7 @@ public:
         int viewportWidth, viewportHeight, viewportOriginX, viewportOriginY;
         mFrameContext->getViewportDimensions(viewportOriginX, viewportOriginY, viewportWidth, viewportHeight);
 
-        if (depthTarget != nullptr && depthTarget != currentDepthTarget) {
-            currentDepthTarget = depthTarget;
-            depthTargetChangedEvent.notify(depthTarget->resourceHandle());
-        }
-
+        depthTargetChangedEvent.notify(depthTarget->resourceHandle());
         cameraInfoChangedEvent.notify({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), mayaMatrixToGlm(viewMatrix), mayaMatrixToGlm(projMatrix), mayaMatrixToGlm(invViewProjMatrix) });
 
         return MStatus::kSuccess;
@@ -65,7 +61,6 @@ private:
     inline static Event<void*> depthTargetChangedEvent;
     inline static Event<CameraMatrices> cameraInfoChangedEvent;
     MString name;
-    const MRenderTarget* currentDepthTarget = nullptr;
 
     inline glm::mat4 mayaMatrixToGlm(const MMatrix& matrix) {
         return glm::mat4(

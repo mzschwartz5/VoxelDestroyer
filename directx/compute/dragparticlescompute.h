@@ -96,13 +96,15 @@ public:
     {
         ID3D11DepthStencilView* depthStencilView = static_cast<ID3D11DepthStencilView*>(depthResourceHandle);
 
-        // Get the underlying resource from the depth stencil view, so we can create a shader resource view for it.
+        // Get the underlying resource from the depth stencil view, so we can create a shader resource view for it,
+        // if it has changed.
+        ComPtr<ID3D11Resource> oldResource;
         ComPtr<ID3D11Resource> resource;
+        if (depthSRV) depthSRV->GetResource(&oldResource);
         depthStencilView->GetResource(&resource);
-        if (!resource) {
-            MGlobal::displayError("Failed to get resource from depth stencil view.");
-            return;
-        }
+        
+        // Safest to check the underlying resource pointer for changes
+        if (resource.Get() == oldResource.Get()) return;
 
         // Create a Shader Resource View for the depth buffer
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
