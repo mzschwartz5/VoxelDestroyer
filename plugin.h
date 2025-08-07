@@ -29,8 +29,6 @@
 #include <maya/MViewport2Renderer.h>
 #include <thread>
 using namespace MHWRender;
-
-
 struct PluginArgs {
 	MPoint position{ 0.0f, 0.0f, 0.0f };
 	double scale{ 1.0f };
