@@ -11,7 +11,6 @@ __kernel void transformVertices(
     __global const float* originalVertPositions, // inputPositions from deformer input
     __global float* transformedPositions         // outputPositions from deformer output
 ) {
-    uint globalThreadId = get_global_id(0);
     uint groupId = get_group_id(0);
     uint localThreadId = get_local_id(0);
     uint localSize = get_local_size(0);

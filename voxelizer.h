@@ -85,7 +85,8 @@ struct Voxels {
           voxelizedMeshDagPath(other.voxelizedMeshDagPath),
           totalVerts(other.totalVerts),
           numOccupied(other.numOccupied),
-          voxelSize(other.voxelSize)
+          voxelSize(other.voxelSize),
+          _size(other._size)
     {}
 
     // Copy assignment operator
@@ -104,6 +105,7 @@ struct Voxels {
             totalVerts = other.totalVerts;
             numOccupied = other.numOccupied;
             voxelSize = other.voxelSize;
+            _size = other._size;
         }
         return *this;
     }
@@ -122,11 +124,14 @@ struct Voxels {
           voxelizedMeshDagPath(std::move(other.voxelizedMeshDagPath)),
           totalVerts(other.totalVerts),
           numOccupied(other.numOccupied),
-          voxelSize(other.voxelSize)
+          voxelSize(other.voxelSize),
+          _size(other._size)
     {}
     
-    int size() const { return static_cast<int>(occupied.size()); }
+    int _size = 0;
+    int size() const { return _size; }
     void resize(int size) {
+        _size = size;
         occupied.resize(size, false);
         isSurface.resize(size, false);
         cgalMeshes.resize(size);

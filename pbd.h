@@ -57,7 +57,7 @@ public:
     // Functions for Maya to create and initialize the node
     static void* creator() { return new PBD(); }
     static MStatus initialize();
-    static MObject createPBDNode(Voxels&& voxels);
+    static MObject createPBDNode(Voxels& voxels);
     void postConstructor() override;
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override;
     MPxNode::SchedulingType schedulingType() const override {
@@ -72,11 +72,10 @@ public:
         float zTension, float zCompression
     );
 
-    Particles createParticles(const Voxels& voxels);
+    void createParticles(const Voxels& voxels);
 
     void createComputeShaders(
         const Voxels& voxels, 
-        const Particles& particles,
         const std::array<std::vector<FaceConstraint>, 3>& faceConstraints
     );
 
@@ -84,8 +83,6 @@ public:
         PARTICLE_RADIUS = edge_length * 0.25f;
         VOXEL_REST_VOLUME = 8.0f * PARTICLE_RADIUS * PARTICLE_RADIUS * PARTICLE_RADIUS;
     }
-
-    void subscribeToDragStateChange();
 
     void setInitialized(bool initialized) {
         this->initialized = initialized;
@@ -98,6 +95,9 @@ private:
     static MObject aVoxelData;
     // Output
     static MObject aTrigger;
+    static MObject aParticleData;
+
+    Particles particles;
 
     int substeps = 10;
     float timeStep;

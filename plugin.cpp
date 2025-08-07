@@ -8,6 +8,8 @@
 #include <maya/MAnimControl.h>
 #include <maya/MProgressWindow.h>
 #include "custommayaconstructs/voxeldata.h"
+#include "custommayaconstructs/particledata.h"
+#include "custommayaconstructs/deformerdata.h"
 #include <maya/MFnPluginData.h>
 #include "directx/compute/computeshader.h"
 
@@ -78,8 +80,8 @@ MStatus plugin::doIt(const MArgList& argList)
 	MDagPath voxelizedMeshDagPath = voxels.voxelizedMeshDagPath;
 	
 	MProgressWindow::setProgressStatus("Creating PBD particles and face constraints..."); MProgressWindow::setProgressRange(0, 100); MProgressWindow::setProgress(0);
-	MObject pbdNodeObj = PBD::createPBDNode(std::move(voxels));
-	VoxelDeformerCPUNode::instantiateAndAttachToMesh(voxelizedMeshDagPath, pbdNodeObj);
+	MObject pbdNodeObj = PBD::createPBDNode(voxels);
+	VoxelDeformerCPUNode::createDeformerNode(voxelizedMeshDagPath, pbdNodeObj, voxels.vertStartIdx);
 	MProgressWindow::setProgress(100);
 
 	MProgressWindow::endProgress();
@@ -317,6 +319,20 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	// Particle data (custom node attribute data type for passing particle info to GPU deformer for initialization)
+	status = plugin.registerData(ParticleData::fullName, ParticleData::id, ParticleData::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register ParticleData: " + status.errorString());
+		return status;
+	}
+
+	// Deformer node state (not passed around, just for initialization)
+	status = plugin.registerData(DeformerData::fullName, DeformerData::id, DeformerData::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register DeformerData: " + status.errorString());
+		return status;
+	}
+
 	// PBD Node
 	status = plugin.registerNode(PBD::pbdNodeName, PBD::id, PBD::creator, PBD::initialize, MPxNode::kDependNode);
 	if (!status) {
@@ -391,6 +407,14 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	status = plugin.deregisterData(VoxelData::id);
 	if (!status)
 		MGlobal::displayError("deregisterData failed on VoxelData: " + status.errorString());
+
+	status = plugin.deregisterData(ParticleData::id);
+	if (!status)
+		MGlobal::displayError("deregisterData failed on ParticleData: " + status.errorString());
+
+	status = plugin.deregisterData(DeformerData::id);
+	if (!status)
+		MGlobal::displayError("deregisterData failed on DeformerData: " + status.errorString());
 
 	// PBD Node
 	status = plugin.deregisterNode(PBD::id);

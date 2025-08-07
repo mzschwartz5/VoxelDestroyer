@@ -6,6 +6,7 @@
 #include "custommayaconstructs/voxeldeformerGPUNode.h"
 #include "custommayaconstructs/voxeldragcontext.h"
 #include "custommayaconstructs/voxeldata.h"
+#include "custommayaconstructs/particledata.h"
 #include <maya/MFnUnitAttribute.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
@@ -14,6 +15,7 @@
 MObject PBD::aTime;
 MObject PBD::aVoxelData;
 MObject PBD::aTrigger;
+MObject PBD::aParticleData;
 MTypeId PBD::id(0x0013A7B0);
 MString PBD::pbdNodeName("PBD");
 
@@ -48,6 +50,16 @@ MStatus PBD::initialize() {
     CHECK_MSTATUS_AND_RETURN_IT(status);
     nAttr.setStorable(false);
     nAttr.setWritable(false);
+    
+    // Output particle data to facilitate GPU buffer resource initialization in the GPU deformer override
+    MFnTypedAttribute tParticleDataAttr;
+    aParticleData = tParticleDataAttr.create("particledata", "dfd", ParticleData::id, MObject::kNullObj, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    tParticleDataAttr.setStorable(false); // NOT storable - just for initialization
+    tParticleDataAttr.setWritable(false);
+    tParticleDataAttr.setReadable(true); 
+    status = addAttribute(aParticleData);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
 
     status = attributeAffects(aTime, aTrigger);
     CHECK_MSTATUS_AND_RETURN_IT(status);
@@ -70,7 +82,7 @@ void PBD::postConstructor() {
 /**
  * Static factory method to create a PBD node with the given voxel data as an attribute.
  */
-MObject PBD::createPBDNode(Voxels&& voxels) {
+MObject PBD::createPBDNode(Voxels& voxels) {
     MStatus status;
     MDGModifier dgMod;
     MObject pbdNodeObj = dgMod.createNode(PBD::pbdNodeName, &status);
@@ -80,7 +92,7 @@ MObject PBD::createPBDNode(Voxels&& voxels) {
 	MObject pluginDataObj = pluginDataFn.create( VoxelData::id, &status );
 
 	VoxelData* voxelData = static_cast<VoxelData*>(pluginDataFn.data(&status));
-	voxelData->setVoxels(std::move(voxels));
+	voxelData->setVoxels(voxels);
 
 	MFnDependencyNode pbdNode(pbdNodeObj);
 	MPlug voxelDataPlug = pbdNode.findPlug("voxeldata", false, &status);
@@ -114,21 +126,19 @@ void PBD::onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug&
     MFnPluginData fnData(voxelDataObj, &status);
     VoxelData* voxelData = static_cast<VoxelData*>(fnData.data(&status));
     const Voxels& voxels = voxelData->getVoxels();
-    // voxels.print();
     PBD* pbdNode = static_cast<PBD*>(clientData);
 
     pbdNode->setRadiusAndVolumeFromLength(voxels.voxelSize);
-    Particles particles = pbdNode->createParticles(voxels);
+    pbdNode->createParticles(voxels);
     std::array<std::vector<FaceConstraint>, 3> faceConstraints 
         = pbdNode->constructFaceToFaceConstraints(voxels, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX);
     
-    pbdNode->createComputeShaders(voxels, particles, faceConstraints);
+    pbdNode->createComputeShaders(voxels, faceConstraints);
     pbdNode->setInitialized(true);
 }
 
 void PBD::createComputeShaders(
     const Voxels& voxels, 
-    const Particles& particles,
     const std::array<std::vector<FaceConstraint>, 3>& faceConstraints
 ) {
     vgsCompute = VGSCompute(
@@ -137,12 +147,21 @@ void PBD::createComputeShaders(
         VGSConstantBuffer{ RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, voxels.size() }
     );
 
-    VoxelDeformerGPUNode::initializeExternalKernelArgs(
-        voxels.size(),
+    // TODO: this logic will change / be moved around a bit when we implement a global
+    // collision solver node. That node will handle / own all particles from all PBD nodes.
+    MStatus status;
+    MFnPluginData particleDataFn;
+    MObject particleDataObj = particleDataFn.create( ParticleData::id, &status );
+    ParticleData* particleData = static_cast<ParticleData*>(particleDataFn.data(&status));
+    particleData->setData({
         vgsCompute.getParticlesBuffer().Get(),
-        particles.positions,
-        voxels.vertStartIdx
-    );
+        particles.numParticles,
+        particles.positions.data()
+    });
+
+    MFnDependencyNode pbdNode(thisMObject());
+    MPlug particleDataPlug = pbdNode.findPlug(aParticleData, false);
+    particleDataPlug.setValue(particleDataObj);
 
 	faceConstraintsCompute = FaceConstraintsCompute(
 		faceConstraints,
@@ -246,8 +265,7 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(c
     return faceConstraints;
 }
 
-Particles PBD::createParticles(const Voxels& voxels) {
-    Particles particles;
+void PBD::createParticles(const Voxels& voxels) {
     for (int i = 0; i < voxels.numOccupied; i++) {
         glm::vec3 voxelCenter = 0.5f * (voxels.corners[i].corners[0] + voxels.corners[i].corners[7]);
 
@@ -262,7 +280,6 @@ Particles PBD::createParticles(const Voxels& voxels) {
     }
 
     numParticles = particles.numParticles;
-    return particles;
 }
 
 MStatus PBD::compute(const MPlug& plug, MDataBlock& dataBlock) 
