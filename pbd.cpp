@@ -11,6 +11,7 @@
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnPluginData.h>
+#include "globalsolver.h"
 
 MObject PBD::aTime;
 MObject PBD::aVoxelData;
@@ -53,7 +54,7 @@ MStatus PBD::initialize() {
     
     // Output particle data to facilitate GPU buffer resource initialization in the GPU deformer override
     MFnTypedAttribute tParticleDataAttr;
-    aParticleData = tParticleDataAttr.create("particledata", "dfd", ParticleData::id, MObject::kNullObj, &status);
+    aParticleData = tParticleDataAttr.create("particledata", "ptd", ParticleData::id, MObject::kNullObj, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     tParticleDataAttr.setStorable(false); // NOT storable - just for initialization
     tParticleDataAttr.setWritable(false);
@@ -88,6 +89,7 @@ MObject PBD::createPBDNode(Voxels& voxels) {
     MObject pbdNodeObj = dgMod.createNode(PBD::pbdNodeName, &status);
 	dgMod.doIt();
 
+    // Set voxel data to node attribute
 	MFnPluginData pluginDataFn;
 	MObject pluginDataObj = pluginDataFn.create( VoxelData::id, &status );
 
@@ -98,7 +100,16 @@ MObject PBD::createPBDNode(Voxels& voxels) {
 	MPlug voxelDataPlug = pbdNode.findPlug("voxeldata", false, &status);
 	voxelDataPlug.setValue(pluginDataObj);
 
+    // Connect global time to node's input time attribute
     MGlobal::executeCommandOnIdle("connectAttr time1.outTime " + pbdNode.name() + ".time", false);
+
+    // Connect the particle data attribute output to the global solver node's particle data input.
+    MObject globalSolverNodeObj = GlobalSolver::getMObject();
+    MPlug globalSolverParticleDataPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug("particledata", false, &status);
+    uint plugIndex = GlobalSolver::getNextParticleDataPlugIndex();
+    MPlug globalSolverParticleDataPlug = globalSolverParticleDataPlugArray.elementByLogicalIndex(plugIndex, &status);
+    MGlobal::executeCommandOnIdle("connectAttr " + pbdNode.name() + ".particledata " + globalSolverParticleDataPlug.name(), false);
+
     return pbdNodeObj;
 }
 
@@ -146,22 +157,6 @@ void PBD::createComputeShaders(
         particles.positions,
         VGSConstantBuffer{ RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, voxels.size() }
     );
-
-    // TODO: this logic will change / be moved around a bit when we implement a global
-    // collision solver node. That node will handle / own all particles from all PBD nodes.
-    MStatus status;
-    MFnPluginData particleDataFn;
-    MObject particleDataObj = particleDataFn.create( ParticleData::id, &status );
-    ParticleData* particleData = static_cast<ParticleData*>(particleDataFn.data(&status));
-    particleData->setData({
-        vgsCompute.getParticlesBuffer().Get(),
-        particles.numParticles,
-        particles.positions.data()
-    });
-
-    MFnDependencyNode pbdNode(thisMObject());
-    MPlug particleDataPlug = pbdNode.findPlug(aParticleData, false);
-    particleDataPlug.setValue(particleDataObj);
 
 	faceConstraintsCompute = FaceConstraintsCompute(
 		faceConstraints,
@@ -278,10 +273,27 @@ void PBD::createParticles(const Voxels& voxels) {
             particles.numParticles++;
         }
     }
-
     numParticles = particles.numParticles;
+
+    // Set the particle data attribute
+    MStatus status;
+    MFnPluginData particleDataFn;
+    MObject particleDataObj = particleDataFn.create( ParticleData::id, &status );
+    ParticleData* particleData = static_cast<ParticleData*>(particleDataFn.data(&status));
+    particleData->setData({
+        particles.numParticles,
+        particles.positions.data()
+    });
+
+    MFnDependencyNode pbdNode(thisMObject());
+    MPlug particleDataPlug = pbdNode.findPlug(aParticleData, false);
+    particleDataPlug.setValue(particleDataObj);
 }
 
+/**
+ * Run a simulation step. Since the only attribute-affects relationship on this node is between
+ * input time and output trigger, this function only runs when time changes and only ever computes the output trigger.
+ */
 MStatus PBD::compute(const MPlug& plug, MDataBlock& dataBlock) 
 {   
     if (!initialized) {

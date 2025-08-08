@@ -76,7 +76,6 @@ public:
 
     // This is sufficient for deep-copy so long as all members of the Voxels struct themselves continue to support deep-copy.
     void copy(const MPxData& src) override {
-        MGlobal::displayInfo("Copying VoxelData"); // debugging
         const VoxelData& voxelData = dynamic_cast<const VoxelData&>(src);
         voxels = voxelData.voxels;
     }
