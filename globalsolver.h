@@ -14,6 +14,9 @@ class GlobalSolver : public MPxNode {
 public:
     static const MTypeId id;
     static const MString globalSolverNodeName;
+    static MObject aParticleData;
+    static MObject aParticleBufferOffset;
+    static MObject globalSolverNodeObject;
 
     static void* creator() { return new GlobalSolver(); }
     static MStatus initialize();
@@ -30,8 +33,5 @@ private:
     GlobalSolver() = default;
     ~GlobalSolver() override;
     void postConstructor() override;
-
-    static MObject aParticleData;
-    static MObject globalSolverNodeObject;
     MCallbackIdArray callbackIds;
 };

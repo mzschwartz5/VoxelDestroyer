@@ -51,6 +51,15 @@ class PBD : public MPxNode
 public:
     static MTypeId id;
     static MString pbdNodeName;
+    // Attributes
+    // Inputs
+    static MObject aTime;
+    static MObject aVoxelData;
+    static MObject aParticleBufferOffsetIn;
+    // Output
+    static MObject aTrigger;
+    static MObject aParticleData;
+    static MObject aParticleBufferOffsetOut;
     
     PBD() = default;
     ~PBD() override;
@@ -64,6 +73,7 @@ public:
         return MPxNode::kUntrusted; // TODO: Compute dispatches must be serial (at least for now - might be able to create deferred DX11 contexts)
     }
     static void onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
+    static void onParticleBufferOffsetChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
 
     std::array<std::vector<FaceConstraint>, 3> constructFaceToFaceConstraints(
         const Voxels& voxels, 
@@ -89,14 +99,6 @@ public:
     }
     
 private:
-    // Attributes
-    // Inputs
-    static MObject aTime;
-    static MObject aVoxelData;
-    // Output
-    static MObject aTrigger;
-    static MObject aParticleData;
-
     Particles particles;
 
     int substeps = 10;

@@ -11,6 +11,7 @@
 #include <thread>
 #include "voxeldeformerCPUNode.h"
 #include <maya/MFnPluginData.h>
+#include <maya/MFnNumericData.h>
 
 extern std::thread::id g_mainThreadId;
 const MString KERNEL_ID = "VoxelTransformVertices";
@@ -45,10 +46,9 @@ public:
             return kDeformerPassThrough;
         }
 
-        // Only support a single input geometry
-        if (inputPlugs.length() != 1) {
-            MGlobal::displayError("VoxelDeformerGPUNode only supports a single input geometry.");
-            return kDeformerFailure;
+        status = initPartcleBufferOffset(block, evaluationNode);
+        if (status != MStatus::kSuccess) {
+            return kDeformerPassThrough;
         }
 
         MAutoCLEventList kernelWaitOnEvents;
@@ -73,6 +73,8 @@ public:
         err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_uint), (void*)&numberVoxels);
         MOpenCLInfo::checkCLErrorStatus(err);
         err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_uint), (void*)&inputElementCount);
+        MOpenCLInfo::checkCLErrorStatus(err);
+        err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_uint), (void*)&m_particleBufferOffset);
         MOpenCLInfo::checkCLErrorStatus(err);
         err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_mem), (void*)m_particlePositionsBuffer.getReadOnlyRef());
         MOpenCLInfo::checkCLErrorStatus(err);
@@ -265,6 +267,23 @@ public:
         return MStatus::kSuccess;
     }
 
+    MStatus initPartcleBufferOffset(
+        MDataBlock& block,
+        const MEvaluationNode& evaluationNode
+    ) {
+        // If the offset has already been initialized and plugs haven't changed, return success.
+        if (m_particleBufferOffset != -1 && !hasAttributeBeenModified(evaluationNode, VoxelDeformerCPUNode::aParticleBufferOffset)) {
+            return MStatus::kSuccess;
+        }
+
+        MStatus status;
+        MDataHandle particleBufferOffsetHandle = block.inputValue(VoxelDeformerCPUNode::aParticleBufferOffset, &status);
+        m_particleBufferOffset = particleBufferOffsetHandle.asInt();
+        if (m_particleBufferOffset == -1) return MStatus::kFailure;
+
+        return MStatus::kSuccess;
+    }
+
 private:
     inline static MAutoCLKernel mKernel;
     inline static MAutoCLMem m_particlePositionsBuffer;
@@ -276,6 +295,10 @@ private:
     size_t m_globalWorkSize;
     size_t m_localWorkSize = TRANSFORM_VERTICES_THREADS;
     bool initialized = false;
+    // Offset into the global particle buffer where this deformer node's particles start
+    // Note: other compute steps use an offset view into the buffer. OpenCL doesn't have views, 
+    // so the offset must be passed to the kernel and used when indexing the buffer.
+    int m_particleBufferOffset = -1; 
 };
 
 class VoxelDeformerGPUNodeInfo : public MGPUDeformerRegistrationInfo {

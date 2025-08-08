@@ -5,6 +5,7 @@
 __kernel void transformVertices(
     const uint numVoxels,
     const uint totalVerts,
+    const uint particleBufferOffset,
     __global const float4* particles,
     __global const uint* vertStartIds,
     __global const float4* originalParticles,
@@ -16,10 +17,10 @@ __kernel void transformVertices(
     uint localSize = get_local_size(0);
 
     uint v0_idx = groupId << 3;
-    float4 v0 = particles[v0_idx];
-    float4 v1 = particles[v0_idx + 1];
-    float4 v2 = particles[v0_idx + 2];
-    float4 v4 = particles[v0_idx + 4];
+    float4 v0 = particles[particleBufferOffset + v0_idx];
+    float4 v1 = particles[particleBufferOffset + v0_idx + 1];
+    float4 v2 = particles[particleBufferOffset + v0_idx + 2];
+    float4 v4 = particles[particleBufferOffset + v0_idx + 4];
 
     // Note: originalParticles contains only one reference particle per voxel, thus the index into it
     // does not need to be multiplied by 8 to account for the 8 particles per voxel.
