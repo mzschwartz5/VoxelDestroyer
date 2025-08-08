@@ -3,9 +3,9 @@
 #include <maya/MPxData.h>
 #include <maya/MTypeId.h>
 #include <maya/MString.h>
+#include "glm/glm.hpp"
 
 struct ParticleDataContainer {
-    ID3D11Buffer* particlePositionsBuffer = nullptr;
     int numParticles = 0;
     const glm::vec4* particlePositionsCPU = nullptr;
 };

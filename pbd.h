@@ -61,7 +61,7 @@ public:
     void postConstructor() override;
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override;
     MPxNode::SchedulingType schedulingType() const override {
-        return MPxNode::kUntrusted; // Compute dispatches must be serial (at least for now - might be able to create deferred DX11 contexts)
+        return MPxNode::kUntrusted; // TODO: Compute dispatches must be serial (at least for now - might be able to create deferred DX11 contexts)
     }
     static void onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
 

@@ -35,12 +35,12 @@ public:
         // provide safe access to the D3D11 / OpenCL device and context.
         if (std::this_thread::get_id() != g_mainThreadId) return kDeformerRetryMainThread;
 
-        MStatus status = maybeInitParticleBuffers(block, evaluationNode);
+        MStatus status = initOrigParticleBuffers(block, evaluationNode);
         if (status != MStatus::kSuccess) {
             return kDeformerPassThrough;
         }
 
-        status = maybeInitVertexOffsetsBuffer(block, evaluationNode);
+        status = initVertexOffsetsBuffer(block, evaluationNode);
         if (status != MStatus::kSuccess) {
             return kDeformerPassThrough;
         }
@@ -143,21 +143,40 @@ public:
     }
 
     /**
-     * This method (re-)initializes the particle buffers needed for the deformer, if and when
-     * the particle data has changed. This occurs the first time the deformer is created (either by the user or on file startup),
-     * or when the particle data has changed (i.e. a new model is voxelized -> the global particle buffer and offsets are updated).
+     * Unlike the other initialization methods below, in this case we're NOT creating a new buffer. Only creating an OpenCL interop handle to the existing D3D11 buffer.
+     * This buffer is the global particles buffer owned by the GlobalSolver node, containing particle positions for every simulated model.
      * 
-     * Note: this method is called on every evaluation, returning early if no changes are detected. While slightly wasteful, there are literally
+     * Since there's only one, the simplest thing to do here is to initialize the handle once, statically, when the GlobalSolver has created the particles buffer.
+     * (And, subsequently, if new models are added or deleted - this will be called again to update the handle). 
+     */
+    static void initGlobalParticlesBuffer(const ComPtr<ID3D11Buffer>& particlesBuffer) {
+        cl_int err = CL_SUCCESS;
+        cl_mem particlePositionsMem = clCreateFromD3D11Buffer(
+            MOpenCLInfo::getOpenCLContext(),
+            CL_MEM_READ_ONLY,
+            particlesBuffer.Get(),
+            &err
+        );
+
+        if (err != CL_SUCCESS) {
+            MGlobal::displayError(MString("Failed to create particlePositionsBuffer from D3D11 buffer: ") + MString(clewErrorString(err)));
+            return;
+        }
+        
+        m_particlePositionsBuffer.attach(particlePositionsMem);
+    }
+
+    /**
+     * Initializes the buffer of original particle positions. Triggered either by the user creating a new simulated model, or on file load.
+     * 
+     * Note: this method is called on every evaluation, returning immediately after the initialization has occurred. While slightly wasteful, there are literally
      * no other events / hooks / functions in the API where such initialization can be done. Even the API examples do initialization in the evaluate() method.
      */
-    MStatus maybeInitParticleBuffers(
+    MStatus initOrigParticleBuffers(
         MDataBlock& block,
         const MEvaluationNode& evaluationNode
     ) {
-        // If the D3D11 interop buffer is already initialized, and the deformer data attribute is clean, exit early.
-        if (m_particlePositionsBuffer.get() && !hasAttributeBeenModified(evaluationNode, VoxelDeformerCPUNode::aDeformerData)) {
-            return MStatus::kSuccess;
-        }
+        if (initialized) return MStatus::kSuccess;
 
         // Get the particle data passed in from the PBD node to the CPU node (via the particledata plug).
         MStatus status;
@@ -175,22 +194,6 @@ public:
         numberVoxels = numParticles / 8;
         m_globalWorkSize = numberVoxels * m_localWorkSize;
         cl_int err = CL_SUCCESS;
-
-        cl_mem particlePositionsMem = clCreateFromD3D11Buffer(
-            MOpenCLInfo::getOpenCLContext(),
-            CL_MEM_READ_ONLY,
-            particleData->getData().particlePositionsBuffer,
-            &err
-        );
-
-        if (err != CL_SUCCESS) {
-            MGlobal::displayError(MString("Failed to create particlePositionsBuffer from D3D11 buffer: ") + MString(clewErrorString(err)));
-            return MStatus::kFailure;
-        }
-        m_particlePositionsBuffer.attach(particlePositionsMem);
-
-        // Only the D3D11 buffer handle needs to be reassigned when the plug changes. The other data is fixed on initialization.
-        if (initialized) return MStatus::kSuccess;
 
         // Store a copy of the original position of a reference particle (lower left corner of each voxel) for the kernel to use
         std::vector<glm::vec4> referenceParticlePositions(numberVoxels);
@@ -220,10 +223,9 @@ public:
     }
 
     /**
-     * Similar to maybeInitParticleBuffers(), this method initializes GPU buffers (specifically, the vertex offsets buffer).
-     * However, this buffer should never change, so we can just check the initialization flag, instead of plugs.
+     * Similar to initOrigParticleBuffers(), this method initializes GPU buffers (specifically, the vertex offsets buffer).
      */
-    MStatus maybeInitVertexOffsetsBuffer(
+    MStatus initVertexOffsetsBuffer(
         MDataBlock& block,
         const MEvaluationNode& evaluationNode
     ) {
@@ -265,8 +267,8 @@ public:
 
 private:
     inline static MAutoCLKernel mKernel;
+    inline static MAutoCLMem m_particlePositionsBuffer;
     unsigned int numberVoxels = 0;
-    MAutoCLMem m_particlePositionsBuffer;
     MAutoCLMem m_vertStartIdsBuffer;
     MAutoCLMem m_originalParticlePositionsBuffer;
     size_t m_vertStartIdsBufferSize = 0;

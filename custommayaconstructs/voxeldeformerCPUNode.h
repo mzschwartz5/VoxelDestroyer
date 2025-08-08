@@ -85,7 +85,7 @@ public:
     /**
      * Factory method for creating a deformer node. This method assumes (via arg) that the PBD node has already been created.
      */
-    static void createDeformerNode(const MDagPath& meshDagPath, const MObject& pbdNodeObj, std::vector<uint>& vertStartIdx) {
+    static MObject createDeformerNode(const MDagPath& meshDagPath, const MObject& pbdNodeObj, std::vector<uint>& vertStartIdx) {
         MStatus status;
         MStringArray deformerNodeNameResult;
         MGlobal::executeCommand("deformer -type " + typeName() + " " + meshDagPath.fullPathName(), deformerNodeNameResult, true, false);
@@ -112,6 +112,8 @@ public:
         // Connect the PBD node's particle data output to the deformer node's particle data input.
         MPlug pbdParticleDataPlug = pbdNode.findPlug("particledata", false);
         MGlobal::executeCommandOnIdle("connectAttr " + pbdParticleDataPlug.name() + " " + deformerNodeName + ".particledata", false);
+
+        return deformerNodeObj;
     }
 
     inline static MTypeId id{0x0012F000};

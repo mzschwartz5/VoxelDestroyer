@@ -12,6 +12,7 @@
 #include "custommayaconstructs/deformerdata.h"
 #include <maya/MFnPluginData.h>
 #include "directx/compute/computeshader.h"
+#include "globalsolver.h"
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -80,8 +81,9 @@ MStatus plugin::doIt(const MArgList& argList)
 	MDagPath voxelizedMeshDagPath = voxels.voxelizedMeshDagPath;
 	
 	MProgressWindow::setProgressStatus("Creating PBD particles and face constraints..."); MProgressWindow::setProgressRange(0, 100); MProgressWindow::setProgress(0);
+	GlobalSolver::createGlobalSolver(); // this is a singleton node, so it will only be actually created once
 	MObject pbdNodeObj = PBD::createPBDNode(voxels);
-	VoxelDeformerCPUNode::createDeformerNode(voxelizedMeshDagPath, pbdNodeObj, voxels.vertStartIdx);
+	MObject deformerNodeObj = VoxelDeformerCPUNode::createDeformerNode(voxelizedMeshDagPath, pbdNodeObj, voxels.vertStartIdx);
 	MProgressWindow::setProgress(100);
 
 	MProgressWindow::endProgress();
@@ -370,6 +372,13 @@ EXPORT MStatus initializePlugin(MObject obj)
 	}
 	VoxelDeformerGPUNode::compileKernel();
 
+	// Global solver node
+	status = plugin.registerNode(GlobalSolver::globalSolverNodeName, GlobalSolver::id, GlobalSolver::creator, GlobalSolver::initialize, MPxNode::kDependNode);
+	if (!status) {
+		MGlobal::displayError("Failed to register GlobalSolver node: " + status.errorString());
+		return status;
+	}
+
 	// TODO: potentially make this more robust / only allow in perspective panel?
 	MString activeModelPanel = plugin::getActiveModelPanel();
 	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
@@ -436,6 +445,11 @@ EXPORT MStatus uninitializePlugin(MObject obj)
     status = plugin.deregisterNode(VoxelDeformerCPUNode::id);
     if (!status)
         MGlobal::displayError("deregisterNode failed on VoxelDeformerCPUNode: " + status.errorString());
+
+	// Global Solver Node
+	status = plugin.deregisterNode(GlobalSolver::id);
+	if (!status)
+		MGlobal::displayError("deregisterNode failed on GlobalSolver: " + status.errorString());
 
 	// Any loaded shaders should be cleared to free resources
 	ComputeShader::clearShaderCache();
