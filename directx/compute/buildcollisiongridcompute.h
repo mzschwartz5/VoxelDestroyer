@@ -17,11 +17,11 @@ public:
     BuildCollisionGridCompute() = default;
 
     BuildCollisionGridCompute(
+        int numParticles,
         float particleSize,
-        const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV,
         const ComPtr<ID3D11ShaderResourceView>& isSurfaceSRV
-    ) : ComputeShader(IDR_SHADER8), particlePositionsSRV(particlePositionsSRV), isSurfaceSRV(isSurfaceSRV) {
-        initializeBuffers(particleSize);
+    ) : ComputeShader(IDR_SHADER8), isSurfaceSRV(isSurfaceSRV) {
+        initializeBuffers(numParticles, particleSize);
     };
 
     void dispatch() override {
@@ -47,6 +47,10 @@ public:
         ComputeShader::updateConstantBuffer(particleCollisionCB, particleCollisionCBData);
     }
 
+    void setParticlePositionsSRV(const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV) {
+        this->particlePositionsSRV = particlePositionsSRV;
+    }
+
 private:
     int numWorkgroups = 0;
     ParticleCollisionCB particleCollisionCBData;
@@ -56,7 +60,6 @@ private:
     ComPtr<ID3D11UnorderedAccessView> collisionCellParticleCountsUAV;
     ComPtr<ID3D11ShaderResourceView> particlePositionsSRV;
     ComPtr<ID3D11ShaderResourceView> isSurfaceSRV;
-    D3D11_SHADER_RESOURCE_VIEW_DESC srvQueryDesc;
 
     void bind() override {
         DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
@@ -84,12 +87,10 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     }
 
-    void initializeBuffers(float particleSize) {
+    void initializeBuffers(int numParticles, float particleSize) {
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        particlePositionsSRV->GetDesc(&srvQueryDesc);
-        int numParticles = srvQueryDesc.Buffer.NumElements;
         numWorkgroups = Utils::divideRoundUp(numParticles, BUILD_COLLISION_GRID_THREADS);
 
         // Multiplpy by a factor to reduce hash collisions.

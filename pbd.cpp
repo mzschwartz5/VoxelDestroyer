@@ -177,7 +177,6 @@ void PBD::onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug&
         = pbdNode->constructFaceToFaceConstraints(voxels, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX);
     
     pbdNode->createComputeShaders(voxels, faceConstraints);
-    pbdNode->setInitialized(true);
 }
 
 void PBD::onParticleBufferOffsetChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
@@ -191,12 +190,23 @@ void PBD::onParticleBufferOffsetChanged(MNodeMessage::AttributeMessage msg, MPlu
 
     PBD* pbdNode = static_cast<PBD*>(clientData);
 
-    // Set the output particle buffer offset attribute
+    // Passthrough the offset to the output particle buffer offset attribute
     MFnDependencyNode pbdNodeFn(pbdNode->thisMObject());
     MPlug particleBufferOffsetOutPlug = pbdNodeFn.findPlug(aParticleBufferOffsetOut, false);
     particleBufferOffsetOutPlug.setValue(newOffset);
 
-    // TODO: use offset to get new UAV for the particles in the global particle buffer
+    ComPtr<ID3D11UnorderedAccessView> particleUAV = GlobalSolver::createParticleUAV(newOffset, pbdNode->numParticles());
+    ComPtr<ID3D11ShaderResourceView> particleSRV = GlobalSolver::createParticleSRV(newOffset, pbdNode->numParticles());
+
+    pbdNode->vgsCompute.setParticlesUAV(particleUAV);
+    pbdNode->faceConstraintsCompute.setPositionsUAV(particleUAV);
+    pbdNode->buildCollisionGridCompute.setParticlePositionsSRV(particleSRV);
+    pbdNode->buildCollisionParticleCompute.setParticlePositionsSRV(particleSRV);
+    pbdNode->solveCollisionsCompute.setParticlePositionsUAV(particleUAV);
+    pbdNode->dragParticlesCompute.setParticlesUAV(particleUAV);
+    pbdNode->preVGSCompute.setPositionsUAV(particleUAV);
+
+    pbdNode->setInitialized(true);
 }
 
 void PBD::createComputeShaders(
@@ -204,22 +214,21 @@ void PBD::createComputeShaders(
     const std::array<std::vector<FaceConstraint>, 3>& faceConstraints
 ) {
     vgsCompute = VGSCompute(
+        numParticles(),
         particles.w.data(),
-        particles.positions,
         VGSConstantBuffer{ RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, voxels.size() }
     );
 
 	faceConstraintsCompute = FaceConstraintsCompute(
 		faceConstraints,
         voxels.isSurface,
-		vgsCompute.getParticlesUAV(),
 		vgsCompute.getWeightsSRV(),
         vgsCompute.getVoxelSimInfoBuffer()
 	);
 
     buildCollisionGridCompute = BuildCollisionGridCompute(
+        numParticles(),
         PARTICLE_RADIUS,
-        vgsCompute.getParticlesSRV(),
         faceConstraintsCompute.getIsSurfaceSRV()
     );
 
@@ -228,7 +237,7 @@ void PBD::createComputeShaders(
     );
 
     buildCollisionParticleCompute = BuildCollisionParticlesCompute(
-        vgsCompute.getParticlesSRV(),
+        numParticles(),
         buildCollisionGridCompute.getCollisionCellParticleCountsUAV(),
         buildCollisionGridCompute.getParticleCollisionCB(),
         faceConstraintsCompute.getIsSurfaceSRV()
@@ -236,14 +245,13 @@ void PBD::createComputeShaders(
 
     solveCollisionsCompute = SolveCollisionsCompute(
         buildCollisionGridCompute.getHashGridSize(),
-        vgsCompute.getParticlesUAV(),
         buildCollisionParticleCompute.getParticlesByCollisionCellSRV(),
         buildCollisionGridCompute.getCollisionCellParticleCountsSRV(),
         buildCollisionGridCompute.getParticleCollisionCB()
     );
 
     dragParticlesCompute = DragParticlesCompute(
-        vgsCompute.getParticlesUAV(),
+        voxels.size(),
         substeps
     );
 
@@ -253,7 +261,6 @@ void PBD::createComputeShaders(
         particles.oldPositions.data(),
 		preVGSConstants,
         vgsCompute.getWeightsSRV(),
-        vgsCompute.getParticlesUAV(),
         dragParticlesCompute.getIsDraggingUAV()
     );
 }
@@ -324,7 +331,6 @@ void PBD::createParticles(const Voxels& voxels) {
             particles.numParticles++;
         }
     }
-    numParticles = particles.numParticles;
 
     // Set the particle data attribute
     MStatus status;

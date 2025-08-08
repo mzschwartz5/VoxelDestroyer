@@ -32,13 +32,18 @@ public:
     DragParticlesCompute() = default;
 
     DragParticlesCompute(
-        const ComPtr<ID3D11UnorderedAccessView>& particlesUAV,
+        int numVoxels,
         int numSubsteps
-    ) : ComputeShader(IDR_SHADER7), particlesUAV(particlesUAV), numSubsteps(numSubsteps)
+    ) : ComputeShader(IDR_SHADER7), numSubsteps(numSubsteps)
     {
-        initializeBuffers();
+        initializeBuffers(numVoxels);
         initSubscriptions();
     };
+
+    void setParticlesUAV(const ComPtr<ID3D11UnorderedAccessView>& particlesUAV)
+    {
+        this->particlesUAV = particlesUAV;
+    }
 
     void initSubscriptions() {
         unsubscribeFromDragStateChange = VoxelDragContext::subscribeToDragStateChange([this](const DragState& dragState) {
@@ -69,7 +74,6 @@ public:
             ComputeShader::operator=(std::move(other));
 
             // Move all members
-            particlesUAV = std::move(other.particlesUAV);
             depthSRV = std::move(other.depthSRV);
             isDraggingUAV = std::move(other.isDraggingUAV);
             constantBuffer = std::move(other.constantBuffer);
@@ -78,7 +82,6 @@ public:
             dragValues = std::move(other.dragValues);
             numWorkgroups = other.numWorkgroups;
             numSubsteps = other.numSubsteps;
-            uavQueryDesc = other.uavQueryDesc;
             
             // Unsubscribe from events in the moved-from object
             other.unsubscribeFromDragStateChange();
@@ -173,7 +176,6 @@ private:
     DragValues dragValues;
     int numWorkgroups;
     float numSubsteps;
-    D3D11_UNORDERED_ACCESS_VIEW_DESC uavQueryDesc;
     EventBase::Unsubscribe unsubscribeFromDragStateChange;
     EventBase::Unsubscribe unsubscribeFromMousePositionChange;
     EventBase::Unsubscribe unsubscribeFromDepthTargetChange;
@@ -235,13 +237,11 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
-    void initializeBuffers()
+    void initializeBuffers(int numVoxels)
     {
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-        particlesUAV->GetDesc(&uavQueryDesc);
-        int numVoxels = uavQueryDesc.Buffer.NumElements / 8;
         numWorkgroups = Utils::divideRoundUp(numVoxels, VGS_THREADS);
 
         // Create CBV for the drag values (mouse position, drag distance, grab radius)

@@ -447,6 +447,7 @@ EXPORT MStatus uninitializePlugin(MObject obj)
         MGlobal::displayError("deregisterNode failed on VoxelDeformerCPUNode: " + status.errorString());
 
 	// Global Solver Node
+	GlobalSolver::tearDown();
 	status = plugin.deregisterNode(GlobalSolver::id);
 	if (!status)
 		MGlobal::displayError("deregisterNode failed on GlobalSolver: " + status.errorString());

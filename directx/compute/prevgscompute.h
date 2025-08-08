@@ -18,9 +18,8 @@ public:
         const glm::vec4* initialOldPositions,
         const PreVGSConstantBuffer& simConstants,
         const ComPtr<ID3D11ShaderResourceView>& weightsSRV,
-		const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
         const ComPtr<ID3D11UnorderedAccessView>& isDraggingUAV
-	) : ComputeShader(IDR_SHADER5), positionsUAV(positionsUAV), weightsSRV(weightsSRV), isDraggingUAV(isDraggingUAV)
+	) : ComputeShader(IDR_SHADER5), weightsSRV(weightsSRV), isDraggingUAV(isDraggingUAV)
     {
         initializeBuffers(numParticles, initialOldPositions, simConstants);
     };
@@ -33,6 +32,10 @@ public:
 
     void dispatch() override {
         ComputeShader::dispatch(numWorkgroups);
+    }
+
+    void setPositionsUAV(const ComPtr<ID3D11UnorderedAccessView>& positionsUAV) {
+        this->positionsUAV = positionsUAV;
     }
 
 private:

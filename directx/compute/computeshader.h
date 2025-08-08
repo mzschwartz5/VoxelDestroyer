@@ -7,7 +7,7 @@
 #include "../directx.h"
 #include <unordered_map>
 #include "../../utils.h"
-using namespace Microsoft::WRL;
+using Microsoft::WRL::ComPtr;
 
 class ComputeShader
 {
