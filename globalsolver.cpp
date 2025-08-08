@@ -5,13 +5,16 @@
 #include <maya/MDGModifier.h>
 #include <maya/MFnPluginData.h>
 #include "glm/glm.hpp"
-#include "directx/compute/computeshader.h"
+#include "custommayaconstructs/voxeldeformerGPUNode.h"
 
 const MTypeId GlobalSolver::id(0x0013A7B1);
 const MString GlobalSolver::globalSolverNodeName("globalSolverNode");
 MObject GlobalSolver::globalSolverNodeObject = MObject::kNullObj;
 MObject GlobalSolver::aParticleData = MObject::kNullObj;
 MObject GlobalSolver::aParticleBufferOffset = MObject::kNullObj;
+ComPtr<ID3D11Buffer> GlobalSolver::particleBuffer = nullptr;
+MInt64 GlobalSolver::heldMemory = 0;
+
 
 const MObject& GlobalSolver::createGlobalSolver() {
     if (!globalSolverNodeObject.isNull()) {
@@ -43,6 +46,12 @@ GlobalSolver::~GlobalSolver() {
     globalSolverNodeObject = MObject::kNullObj;
 }
 
+void GlobalSolver::tearDown() {
+    MRenderer::theRenderer()->releaseGPUMemory(heldMemory);
+    heldMemory = 0;
+    particleBuffer.Reset();
+}
+
 /**
  * Logical indices are sparse, mapped to contiguous physical indices.
  * This method finds the next available logical index for creating a new particle data plug in the array.
@@ -63,12 +72,12 @@ uint GlobalSolver::getNextParticleDataPlugIndex() {
     return nextIndex;
 }
 
+// TODO: on file load, we don't want to recreate the buffer for each connection, just once. Is total numConnections known at load?
 void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
     if (plug != aParticleData || !(msg & MNodeMessage::kConnectionMade || msg & MNodeMessage::kConnectionBroken)) {
         return;
     }
-    GlobalSolver* solver = static_cast<GlobalSolver*>(clientData);
-    MFnDependencyNode globalSolverNode(solver->thisMObject());
+    MFnDependencyNode globalSolverNode(getMObject());
     MPlug particleDataArrayPlug = globalSolverNode.findPlug(aParticleData, false);
     MPlug particleBufferOffsetArrayPlug = globalSolverNode.findPlug(aParticleBufferOffset, false);
 
@@ -95,8 +104,51 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
         totalParticles += numParticles;
     }
 
-    // TODO: upload all particle data to GPU
-    // Create a method to get a UAV into the buffer at a given offset
+    createParticleBuffer(allParticlePositions);
+}
+
+void GlobalSolver::createParticleBuffer(const std::vector<glm::vec4>& particlePositions) {
+    D3D11_BUFFER_DESC bufferDesc = {};
+    D3D11_SUBRESOURCE_DATA initData = {};
+
+    bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    bufferDesc.ByteWidth = particlePositions.size() * sizeof(glm::vec4); // glm::vec4 for alignment
+    bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
+    bufferDesc.CPUAccessFlags = 0;
+    bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+    bufferDesc.StructureByteStride = sizeof(glm::vec4); // Size of each element in the buffer
+
+    initData.pSysMem = particlePositions.data();
+    DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, particleBuffer.GetAddressOf());
+
+    MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
+    heldMemory += bufferDesc.ByteWidth;
+
+    VoxelDeformerGPUNode::initGlobalParticlesBuffer(particleBuffer);
+}
+
+ComPtr<ID3D11UnorderedAccessView> GlobalSolver::createParticleUAV(uint offset, uint numElements) {
+    D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+    uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+    uavDesc.Buffer.FirstElement = offset;
+    uavDesc.Buffer.NumElements = numElements;
+
+    ComPtr<ID3D11UnorderedAccessView> particleUAV;
+    DirectX::getDevice()->CreateUnorderedAccessView(particleBuffer.Get(), &uavDesc, particleUAV.GetAddressOf());
+    return particleUAV;
+}
+
+ComPtr<ID3D11ShaderResourceView> GlobalSolver::createParticleSRV(uint offset, uint numElements) {
+    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    srvDesc.Buffer.FirstElement = offset;
+    srvDesc.Buffer.NumElements = numElements;
+
+    ComPtr<ID3D11ShaderResourceView> particleSRV;
+    DirectX::getDevice()->CreateShaderResourceView(particleBuffer.Get(), &srvDesc, particleSRV.GetAddressOf());
+    return particleSRV;
 }
 
 MStatus GlobalSolver::initialize() {

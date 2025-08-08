@@ -13,12 +13,10 @@ public:
 
     SolveCollisionsCompute(
         int hashGridSize,
-        const ComPtr<ID3D11UnorderedAccessView>& particlePositionsUAV,
         const ComPtr<ID3D11ShaderResourceView>& particlesByCollisionCellSRV,
         const ComPtr<ID3D11ShaderResourceView>& collisionCellParticleCountsSRV,
         const ComPtr<ID3D11Buffer>& particleCollisionCB
     ) : ComputeShader(IDR_SHADER12),
-        particlePositionsUAV(particlePositionsUAV),
         particlesByCollisionCellSRV(particlesByCollisionCellSRV),
         collisionCellParticleCountsSRV(collisionCellParticleCountsSRV),
         particleCollisionCB(particleCollisionCB)
@@ -30,6 +28,9 @@ public:
         ComputeShader::dispatch(numWorkgroups);
     }
 
+    void setParticlePositionsUAV(const ComPtr<ID3D11UnorderedAccessView>& particlesUAV) {
+        particlePositionsUAV = particlesUAV;
+    }
 
 private:
     int numWorkgroups = 0;

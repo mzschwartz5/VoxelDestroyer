@@ -97,13 +97,16 @@ public:
     void setInitialized(bool initialized) {
         this->initialized = initialized;
     }
+
+    int numParticles() const {
+        return particles.numParticles;
+    }
     
 private:
     Particles particles;
 
     int substeps = 10;
     float timeStep;
-    int numParticles;
 
     bool initialized = false;
     bool isDragging = false;

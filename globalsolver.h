@@ -4,6 +4,10 @@
 #include <maya/MCallbackIdArray.h>
 #include "custommayaconstructs/particledata.h"
 #include <maya/MNodeMessage.h>
+#include <d3d11.h>
+#include <wrl/client.h>
+#include "directx/directx.h"
+using Microsoft::WRL::ComPtr;
 
 /**
  * Global solver node - responsible for inter-voxel collisions, and interactive dragging.
@@ -17,13 +21,19 @@ public:
     static MObject aParticleData;
     static MObject aParticleBufferOffset;
     static MObject globalSolverNodeObject;
+    static ComPtr<ID3D11Buffer> particleBuffer;
+    static MInt64 heldMemory;
 
     static void* creator() { return new GlobalSolver(); }
     static MStatus initialize();
-    static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
+    static void tearDown();
     static const MObject& createGlobalSolver();
     static const MObject& getMObject();
     static uint getNextParticleDataPlugIndex();
+    static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
+    static void createParticleBuffer(const std::vector<glm::vec4>& particlePositions);
+    static ComPtr<ID3D11UnorderedAccessView> createParticleUAV(uint offset, uint numElements);
+    static ComPtr<ID3D11ShaderResourceView> createParticleSRV(uint offset, uint numElements);
 
     // No compute implementation. All input data will be constant after initialization.
     // Added and removed connections will be handled by attribute callbacks.

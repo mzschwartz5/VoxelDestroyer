@@ -8,17 +8,16 @@ public:
     BuildCollisionParticlesCompute() = default;
 
     BuildCollisionParticlesCompute(
-        const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV,
+        int numParticles,
         const ComPtr<ID3D11UnorderedAccessView>& collisionCellParticleCountsUAV,
         const ComPtr<ID3D11Buffer>& particleCollisionCB,
         const ComPtr<ID3D11ShaderResourceView>& isSurfaceSRV
     ) : ComputeShader(IDR_SHADER9), 
-        particlePositionsSRV(particlePositionsSRV),
         particleCollisionCB(particleCollisionCB),
         collisionCellParticleCountsUAV(collisionCellParticleCountsUAV), 
         isSurfaceSRV(isSurfaceSRV) 
     {
-        initializeBuffers();
+        initializeBuffers(numParticles);
     }
 
     void dispatch() override {
@@ -28,9 +27,12 @@ public:
 
     const ComPtr<ID3D11ShaderResourceView>& getParticlesByCollisionCellSRV() const { return particlesByCollisionCellSRV; }
 
+    void setParticlePositionsSRV(const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV) {
+        this->particlePositionsSRV = particlePositionsSRV;
+    }
+
 private:
     int numWorkgroups = 0;
-    D3D11_SHADER_RESOURCE_VIEW_DESC srvQueryDesc;
     // Passed in
     ComPtr<ID3D11ShaderResourceView> particlePositionsSRV;
     ComPtr<ID3D11Buffer> particleCollisionCB;
@@ -68,14 +70,12 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     }
 
-    void initializeBuffers() {
+    void initializeBuffers(int numParticles) {
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 
         // Each particle can overlap up to 8 cells, so we need to allocate memory accordingly.
-        particlePositionsSRV->GetDesc(&srvQueryDesc);
-        int numParticles = srvQueryDesc.Buffer.NumElements;
         int numBufferElements = 8 * numParticles;
         numWorkgroups = Utils::divideRoundUp(numBufferElements, BUILD_COLLISION_PARTICLE_THREADS);
 

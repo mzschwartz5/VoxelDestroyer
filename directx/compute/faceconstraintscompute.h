@@ -27,10 +27,9 @@ public:
     FaceConstraintsCompute(
         const std::array<std::vector<FaceConstraint>, 3>& constraints,
         const std::vector<uint>& isSurface,
-        const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
 		const ComPtr<ID3D11ShaderResourceView>& weightsSRV,
         const ComPtr<ID3D11Buffer>& voxelSimInfoBuffer
-    ) : ComputeShader(IDR_SHADER4), positionsUAV(positionsUAV), weightsSRV(weightsSRV), voxelSimInfoBuffer(voxelSimInfoBuffer)
+    ) : ComputeShader(IDR_SHADER4), weightsSRV(weightsSRV), voxelSimInfoBuffer(voxelSimInfoBuffer)
     {
         initializeBuffers(constraints, isSurface);
     };
@@ -45,6 +44,10 @@ public:
 	}
 
     const ComPtr<ID3D11ShaderResourceView>& getIsSurfaceSRV() const { return isSurfaceSRV; }
+
+    void setPositionsUAV(const ComPtr<ID3D11UnorderedAccessView>& positionsUAV) {
+        this->positionsUAV = positionsUAV;
+    }
 
 private:
     int activeConstraintAxis = 0; // x = 0, y = 1, z = 2
