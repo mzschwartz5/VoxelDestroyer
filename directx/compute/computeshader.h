@@ -6,6 +6,7 @@
 #include "../d3dincludehandler.h"
 #include "../directx.h"
 #include <unordered_map>
+#include "../../utils.h"
 using namespace Microsoft::WRL;
 
 class ComputeShader

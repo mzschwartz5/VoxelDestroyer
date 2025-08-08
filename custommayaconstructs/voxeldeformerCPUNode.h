@@ -9,8 +9,10 @@
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnPluginData.h>
+#include <maya/MFnAttribute.h>
 #include "particledata.h"
 #include "deformerdata.h"
+#include "../pbd.h"
 
 /**
  * In order to register a GPU deformer node, Maya first requires a CPU deformer node that
@@ -57,6 +59,15 @@ public:
         CHECK_MSTATUS_AND_RETURN_IT(status);
         attributeAffects(aTrigger, outputGeom);
 
+        // The offset into the global particle buffer where this deformer node's particles start
+        aParticleBufferOffset = nAttr.create("particlebufferoffset", "pbo", MFnNumericData::kInt, -1, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        nAttr.setStorable(false);
+        nAttr.setWritable(true);
+        nAttr.setReadable(false);
+        status = addAttribute(aParticleBufferOffset);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
         // Set the minimum verts needed to run on the GPU to 0, so we never fall back to CPU evaluation.
         MGlobal::executeCommand("deformerEvaluator -limitMinimumVerts false;", false, false);
         return MS::kSuccess; 
@@ -88,7 +99,7 @@ public:
     static MObject createDeformerNode(const MDagPath& meshDagPath, const MObject& pbdNodeObj, std::vector<uint>& vertStartIdx) {
         MStatus status;
         MStringArray deformerNodeNameResult;
-        MGlobal::executeCommand("deformer -type " + typeName() + " " + meshDagPath.fullPathName(), deformerNodeNameResult, true, false);
+        MGlobal::executeCommand("deformer -type " + typeName() + " " + meshDagPath.fullPathName(), deformerNodeNameResult, false, false);
         MString deformerNodeName = deformerNodeNameResult[0];
         MSelectionList selList;
         selList.add(deformerNodeName);
@@ -101,17 +112,24 @@ public:
         MObject deformerDataObj = pluginDataFn.create(DeformerData::id, &status);
         DeformerData* deformerData = static_cast<DeformerData*>(pluginDataFn.data(&status));
         deformerData->setVertexStartIdx(std::move(vertStartIdx));
-        MPlug deformerDataPlug = deformerNode.findPlug("deformerData", false, &status);
+        MPlug deformerDataPlug = deformerNode.findPlug(aDeformerData, false, &status);
         deformerDataPlug.setValue(deformerDataObj);
 
         // Connect the PBD node's trigger output to the deformer node's trigger input.
         MFnDependencyNode pbdNode(pbdNodeObj);
-        MPlug pbdTriggerPlug = pbdNode.findPlug("trigger", false);
-        MGlobal::executeCommandOnIdle("connectAttr " + pbdTriggerPlug.name() + " " + deformerNodeName + ".trigger", false);
+        MPlug pbdTriggerPlug = pbdNode.findPlug(PBD::aTrigger, false);
+        MGlobal::executeCommandOnIdle("connectAttr " + pbdTriggerPlug.name() + " " 
+                                                     + deformerNodeName + "." + MFnAttribute(aTrigger).name(), false);
 
         // Connect the PBD node's particle data output to the deformer node's particle data input.
-        MPlug pbdParticleDataPlug = pbdNode.findPlug("particledata", false);
-        MGlobal::executeCommandOnIdle("connectAttr " + pbdParticleDataPlug.name() + " " + deformerNodeName + ".particledata", false);
+        MPlug pbdParticleDataPlug = pbdNode.findPlug(PBD::aParticleData, false);
+        MGlobal::executeCommandOnIdle("connectAttr " + pbdParticleDataPlug.name() + " " 
+                                                     + deformerNodeName + "." + MFnAttribute(aParticleData).name(), false);
+
+        // Connect the PBD node's particle buffer offset output to the deformer node's particle buffer offset input.
+        MPlug pbdParticleBufferOffsetOutPlug = pbdNode.findPlug(PBD::aParticleBufferOffsetOut, false);
+        MGlobal::executeCommandOnIdle("connectAttr " + pbdParticleBufferOffsetOutPlug.name() + " " 
+                                                     + deformerNodeName + "." + MFnAttribute(aParticleBufferOffset).name(), false);
 
         return deformerNodeObj;
     }
@@ -120,4 +138,5 @@ public:
     inline static MObject aTrigger;
     inline static MObject aParticleData;
     inline static MObject aDeformerData;
+    inline static MObject aParticleBufferOffset;
 };
