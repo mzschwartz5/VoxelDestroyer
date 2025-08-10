@@ -16,6 +16,7 @@ MObject GlobalSolver::aParticleData = MObject::kNullObj;
 MObject GlobalSolver::aParticleBufferOffset = MObject::kNullObj;
 MObject GlobalSolver::aTime = MObject::kNullObj;
 MObject GlobalSolver::aTrigger = MObject::kNullObj;
+MObject GlobalSolver::aSimulateFunction = MObject::kNullObj;
 ComPtr<ID3D11Buffer> GlobalSolver::particleBuffer = nullptr;
 MInt64 GlobalSolver::heldMemory = 0;
 std::unordered_map<uint, std::function<void()>> GlobalSolver::pbdSimulateFuncs;
@@ -47,6 +48,7 @@ void GlobalSolver::postConstructor() {
     MStatus status;
 
     MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onParticleDataConnectionChange, this, &status);
+    callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onSimulateFunctionConnectionChange, this, &status);
     callbackIds.append(callbackId);
 }
 
@@ -123,15 +125,21 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
         MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(i);
         particleBufferOffsetPlug.setValue(offsets[i]);
     }
+}
 
-    // TODO: this should really be its own plug / own callback.
-    // Finally, add or remove the PBD node's simulate function to/from the map.
-    plug.getValue(particleDataObj);
-    pluginDataFn.setObject(particleDataObj);
-    ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
+void GlobalSolver::onSimulateFunctionConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+    if (plug != GlobalSolver::aSimulateFunction || !(msg & (MNodeMessage::kConnectionMade | MNodeMessage::kConnectionBroken))) {
+        return;
+    }
+
+    MStatus status;
+    MObject functionalDataObj;
+    plug.getValue(functionalDataObj);
+    MFnPluginData pluginDataFn(functionalDataObj); 
+    FunctionalData* functionalData = static_cast<FunctionalData*>(pluginDataFn.data(&status));
 
     if (msg & MNodeMessage::kConnectionMade) {
-        pbdSimulateFuncs[plug.logicalIndex()] = particleData->getData().simulateStepFunc;
+        pbdSimulateFuncs[plug.logicalIndex()] = functionalData->getFunction();
         return;
     }
     if (!(msg & MNodeMessage::kConnectionBroken)) {
@@ -207,6 +215,16 @@ MStatus GlobalSolver::initialize() {
     tAttr.setReadable(false);
     tAttr.setArray(true);
     status = addAttribute(aParticleData);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    // Simulation function attribute
+    aSimulateFunction = tAttr.create("simulatefunction", "ssf", FunctionalData::id, MObject::kNullObj, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    tAttr.setStorable(false);
+    tAttr.setWritable(true);
+    tAttr.setReadable(false);
+    tAttr.setArray(true);
+    status = addAttribute(aSimulateFunction);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     // Output attribute
