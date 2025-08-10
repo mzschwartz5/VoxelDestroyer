@@ -30,11 +30,11 @@ MStatus PBD::initialize() {
     MFnUnitAttribute uTimeAttr;
     aTime = uTimeAttr.create("time", "tm", MFnUnitAttribute::kTime, 0.0, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-    status = addAttribute(aTime);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-    uTimeAttr.setCached(false);
     uTimeAttr.setStorable(false);
     uTimeAttr.setWritable(true);
+    uTimeAttr.setReadable(false);
+    status = addAttribute(aTime);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
     
     // Voxel data attribute
     MFnTypedAttribute tVoxelDataAttr;
@@ -96,7 +96,7 @@ void PBD::postConstructor() {
     MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onVoxelDataSet, this, &status);
     callbackIds.append(callbackId);
 
-    callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onParticleBufferOffsetChanged, this, &status);
+    callbackId = MNodeMessage::addNodeDirtyPlugCallback(thisMObject(), onParticleBufferOffsetChanged, this, &status);
     callbackIds.append(callbackId);
 
     unsubscribeFromDragStateChange = VoxelDragContext::subscribeToDragStateChange([this](const DragState& dragState) {
@@ -179,9 +179,11 @@ void PBD::onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug&
     pbdNode->createComputeShaders(voxels, faceConstraints);
 }
 
-void PBD::onParticleBufferOffsetChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+void PBD::onParticleBufferOffsetChanged(MObject& node, MPlug& plug, void* clientData) {
     // Only respond to changes to the particle buffer offset attribute
-    if (plug != aParticleBufferOffsetIn || !(msg & (MNodeMessage::kAttributeSet | MNodeMessage::kConnectionMade))) {
+    if (plug != aParticleBufferOffsetIn) return;
+
+    if (node.isNull() || !node.hasFn(MFn::kPluginDependNode)) {
         return;
     }
 
@@ -255,9 +257,9 @@ void PBD::createComputeShaders(
         substeps
     );
 
-    PreVGSConstantBuffer preVGSConstants{GRAVITY_STRENGTH, GROUND_COLLISION_Y, TIMESTEP, particles.numParticles};
+    PreVGSConstantBuffer preVGSConstants{GRAVITY_STRENGTH, GROUND_COLLISION_Y, TIMESTEP, numParticles()};
     preVGSCompute = PreVGSCompute(
-        particles.numParticles,
+        numParticles(),
         particles.oldPositions.data(),
 		preVGSConstants,
         vgsCompute.getWeightsSRV(),
@@ -359,14 +361,13 @@ MStatus PBD::compute(const MPlug& plug, MDataBlock& dataBlock)
         return MS::kSuccess;
     }
 
+    if (plug != aTrigger) return MS::kSuccess;
+
     for (int i = 0; i < substeps; i++)
     {
         simulateSubstep();
     }
     
-    MDataHandle triggerHandle = dataBlock.outputValue(aTrigger);
-    triggerHandle.setBool(true);
-    triggerHandle.setClean();
     return MS::kSuccess;
 }
 

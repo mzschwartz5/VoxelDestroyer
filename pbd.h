@@ -70,10 +70,12 @@ public:
     void postConstructor() override;
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override;
     MPxNode::SchedulingType schedulingType() const override {
-        return MPxNode::kUntrusted; // TODO: Compute dispatches must be serial (at least for now - might be able to create deferred DX11 contexts)
+        // Evaluated serially amongst nodes of the same type
+        // Necessary because Maya provides a single threaded D3D11 device
+        return MPxNode::kGloballySerial; 
     }
     static void onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
-    static void onParticleBufferOffsetChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
+    static void onParticleBufferOffsetChanged(MObject& node, MPlug& plug, void* clientData);
 
     std::array<std::vector<FaceConstraint>, 3> constructFaceToFaceConstraints(
         const Voxels& voxels, 
@@ -106,8 +108,6 @@ private:
     Particles particles;
 
     int substeps = 10;
-    float timeStep;
-
     bool initialized = false;
     bool isDragging = false;
 

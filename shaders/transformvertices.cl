@@ -5,7 +5,7 @@
 __kernel void transformVertices(
     const uint numVoxels,
     const uint totalVerts,
-    const uint particleBufferOffset,
+    const int particleBufferOffset,
     __global const float4* particles,
     __global const uint* vertStartIds,
     __global const float4* originalParticles,

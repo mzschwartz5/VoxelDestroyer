@@ -30,8 +30,6 @@ public:
     static const MObject& createGlobalSolver();
     static const MObject& getMObject();
     static uint getNextParticleDataPlugIndex();
-    static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
-    static void createParticleBuffer(const std::vector<glm::vec4>& particlePositions);
     static ComPtr<ID3D11UnorderedAccessView> createParticleUAV(uint offset, uint numElements);
     static ComPtr<ID3D11ShaderResourceView> createParticleSRV(uint offset, uint numElements);
 
@@ -43,5 +41,7 @@ private:
     GlobalSolver() = default;
     ~GlobalSolver() override;
     void postConstructor() override;
+    static void createParticleBuffer(const std::vector<glm::vec4>& particlePositions);
+    static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     MCallbackIdArray callbackIds;
 };
