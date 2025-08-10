@@ -52,6 +52,7 @@ private:
     static void createParticleBuffer(const std::vector<glm::vec4>& particlePositions);
     static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static void onSimulateFunctionConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
+    static MPlug getGlobalTimePlug();
     MCallbackIdArray callbackIds;
 
     static constexpr int SUBSTEPS = 10;

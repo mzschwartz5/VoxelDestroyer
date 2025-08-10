@@ -21,7 +21,6 @@ typedef cl_int (CL_API_CALL *clEnqueueReleaseD3D11Objects_fn)(
     cl_command_queue, cl_uint, const cl_mem*, cl_uint, const cl_event*, cl_event*);
 extern clEnqueueReleaseD3D11Objects_fn clEnqueueReleaseD3D11Objects;
 
-// Forward declare ComputeShader to avoid circular dependency
 class DirectX
 {
 public:
