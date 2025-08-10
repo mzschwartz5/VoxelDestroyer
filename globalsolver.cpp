@@ -6,6 +6,7 @@
 #include <maya/MDGModifier.h>
 #include <maya/MFnPluginData.h>
 #include <maya/MFnDependencyNode.h>
+#include <maya/MItDependencyNodes.h>
 #include "glm/glm.hpp"
 #include "custommayaconstructs/voxeldeformerGPUNode.h"
 
@@ -33,10 +34,21 @@ const MObject& GlobalSolver::createGlobalSolver() {
     globalSolverNodeObject = dgMod.createNode(GlobalSolver::globalSolverNodeName, &status);
 	dgMod.doIt();
 
-    // TODO: consider making this more robust (not using a hardcoded name). Util func to get first time node in scene (using MItDependencyNodes).
-    MGlobal::executeCommandOnIdle("connectAttr time1.outTime " + MFnDependencyNode(globalSolverNodeObject).name() + "." + MFnAttribute(aTime).name(), false);
+    MPlug timePlug = getGlobalTimePlug();
+    MGlobal::executeCommandOnIdle("connectAttr " + timePlug.name() + " " + MFnDependencyNode(globalSolverNodeObject).name() + "." + MFnAttribute(aTime).name(), false);
 
     return globalSolverNodeObject;
+}
+
+MPlug GlobalSolver::getGlobalTimePlug() {
+    MItDependencyNodes it(MFn::kTime);
+    // Assumes there's only one time node in the scene, which is a pretty safe assumption.
+    if (!it.isDone()) {
+        MFnDependencyNode timeNode(it.thisNode());
+        return timeNode.findPlug("outTime", false);
+    }
+
+    return MPlug();
 }
 
 const MObject& GlobalSolver::getMObject() {
