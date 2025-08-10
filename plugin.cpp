@@ -10,6 +10,7 @@
 #include "custommayaconstructs/voxeldata.h"
 #include "custommayaconstructs/particledata.h"
 #include "custommayaconstructs/deformerdata.h"
+#include "custommayaconstructs/functionaldata.h"
 #include <maya/MFnPluginData.h>
 #include "directx/compute/computeshader.h"
 #include "globalsolver.h"
@@ -335,6 +336,13 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	// Functional data (for passing function pointers to GlobalSolver)
+	status = plugin.registerData(FunctionalData::fullName, FunctionalData::id, FunctionalData::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register FunctionalData: " + status.errorString());
+		return status;
+	}
+
 	// PBD Node
 	status = plugin.registerNode(PBD::pbdNodeName, PBD::id, PBD::creator, PBD::initialize, MPxNode::kDependNode);
 	if (!status) {
@@ -424,6 +432,10 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	status = plugin.deregisterData(DeformerData::id);
 	if (!status)
 		MGlobal::displayError("deregisterData failed on DeformerData: " + status.errorString());
+
+	status = plugin.deregisterData(FunctionalData::id);
+	if (!status)
+		MGlobal::displayError("deregisterData failed on FunctionalData: " + status.errorString());
 
 	// PBD Node
 	status = plugin.deregisterNode(PBD::id);

@@ -60,6 +60,7 @@ public:
     static MObject aTriggerOut;
     static MObject aParticleData;
     static MObject aParticleBufferOffsetOut;
+    static MObject aSimulateSubstepFunction;
     
     PBD() = default;
     ~PBD() override;

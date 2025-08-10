@@ -7,6 +7,7 @@
 #include "custommayaconstructs/voxeldragcontext.h"
 #include "custommayaconstructs/voxeldata.h"
 #include "custommayaconstructs/particledata.h"
+#include "custommayaconstructs/functionaldata.h"
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnPluginData.h>
@@ -19,6 +20,7 @@ MObject PBD::aVoxelData;
 MObject PBD::aParticleData;
 MObject PBD::aParticleBufferOffsetIn;
 MObject PBD::aParticleBufferOffsetOut;
+MObject PBD::aSimulateSubstepFunction;
 MTypeId PBD::id(0x0013A7B0);
 MString PBD::pbdNodeName("PBD");
 
@@ -62,6 +64,16 @@ MStatus PBD::initialize() {
     tParticleDataAttr.setWritable(false);
     tParticleDataAttr.setReadable(true); 
     status = addAttribute(aParticleData);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    // Output simulateSubstep function for GlobalSolver to use
+    MFnTypedAttribute tSimulateSubstepAttr;
+    aSimulateSubstepFunction = tSimulateSubstepAttr.create("simulatesubstepfunc", "ssf", FunctionalData::id, MObject::kNullObj, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    tSimulateSubstepAttr.setStorable(false);
+    tSimulateSubstepAttr.setWritable(false);
+    tSimulateSubstepAttr.setReadable(true);
+    status = addAttribute(aSimulateSubstepFunction);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     // Input/Output attribute: particle buffer offset tells PBD node and deformer node where in the global particle buffer its particles start
@@ -119,14 +131,19 @@ MObject PBD::createPBDNode(Voxels& voxels) {
     MPlug globalSolverTriggerPlug = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aTrigger, false, &status);
     MPlug globalSolverParticleDataPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aParticleData, false, &status);
     MPlug globalSolverParticleBufferOffsetPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aParticleBufferOffset, false, &status);
+    MPlug globalSolverSimulateFunctionPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aSimulateFunction, false, &status);
     
     uint plugIndex = GlobalSolver::getNextParticleDataPlugIndex();
     MPlug globalSolverParticleDataPlug = globalSolverParticleDataPlugArray.elementByLogicalIndex(plugIndex, &status);
     MPlug globalSolverParticleBufferOffsetPlug = globalSolverParticleBufferOffsetPlugArray.elementByLogicalIndex(plugIndex, &status);
-
+    MPlug globalSolverSimulateFunctionPlug = globalSolverSimulateFunctionPlugArray.elementByLogicalIndex(plugIndex, &status);
+    
     MGlobal::executeCommandOnIdle("connectAttr " + globalSolverTriggerPlug.name() + " " 
                                                  + pbdNode.name() + "." + MFnAttribute(aTriggerIn).name(), false);
 
+    MGlobal::executeCommandOnIdle("connectAttr " + pbdNode.name() + "." + MFnAttribute(aSimulateSubstepFunction).name() + " "
+                                                    + globalSolverSimulateFunctionPlug.name(), false);
+    
     MGlobal::executeCommandOnIdle("connectAttr " + pbdNode.name() + "." +  MFnAttribute(aParticleData).name() + " " 
                                                  + globalSolverParticleDataPlug.name(), false);
 
@@ -178,6 +195,15 @@ void PBD::onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug&
         = pbdNode->constructFaceToFaceConstraints(voxels, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX);
     
     pbdNode->createComputeShaders(voxels, faceConstraints);
+
+    // Set the simulateSubstep function attribute (used by GlobalSolver to invoke simulation on each node)
+    MObject simulateSubstepObj = fnData.create(FunctionalData::id, &status);
+    FunctionalData* simulateSubstepData = static_cast<FunctionalData*>(fnData.data(&status));
+    simulateSubstepData->setFunction([pbdNode]() { pbdNode->simulateSubstep(); });
+    MFnDependencyNode pbdDepNode(pbdNode->thisMObject());
+    MPlug simulateSubstepPlug = pbdDepNode.findPlug(aSimulateSubstepFunction, false);
+    simulateSubstepPlug.setValue(simulateSubstepObj);
+
 }
 
 void PBD::onParticleBufferOffsetChanged(MObject& node, MPlug& plug, void* clientData) {
@@ -343,7 +369,6 @@ void PBD::createParticles(const Voxels& voxels) {
     particleData->setData({
         particles.numParticles,
         particles.positions.data(),
-        [this]() { this->simulateSubstep(); } // TODO: put this in own plug
     });
 
     // This will trigger the global solver to (re-)create the global particle buffer,
