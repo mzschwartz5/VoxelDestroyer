@@ -82,19 +82,18 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
     MPlug particleBufferOffsetArrayPlug = globalSolverNode.findPlug(aParticleBufferOffset, false);
 
     // Collect all particles from all PBD nodes into one vector to copy to the GPU.
+    uint numElements = particleDataArrayPlug.numElements();
     int totalParticles = 0;
     std::vector<glm::vec4> allParticlePositions;
+    std::vector<int> offsets(numElements);
 
-    uint numElements = particleDataArrayPlug.numElements();
     MObject particleDataObj;
     for (uint i = 0; i < numElements; ++i) {
-        // Set the offset for this PBD node in the global particle buffer
-        MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(i);
-        particleBufferOffsetPlug.setValue(totalParticles);
+        offsets[i] = totalParticles;
 
         // Collect the particle data from the PBD node
         MPlug particleDataPlug = particleDataArrayPlug.elementByPhysicalIndex(i);
-        MStatus status = plug.getValue(particleDataObj);
+        MStatus status = particleDataPlug.getValue(particleDataObj);
         MFnPluginData pluginDataFn(particleDataObj, &status);
         ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
         const glm::vec4* positions = particleData->getData().particlePositionsCPU;
@@ -105,6 +104,13 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
     }
 
     createParticleBuffer(allParticlePositions);
+
+    // Set these after creating the particle buffer, because doing so triggers each PBD node to go make a UAV/SRV.
+    for (uint i = 0; i < numElements; ++i) {
+        // Set the offset for this PBD node in the global particle buffer
+        MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(i);
+        particleBufferOffsetPlug.setValue(offsets[i]);
+    }
 }
 
 void GlobalSolver::createParticleBuffer(const std::vector<glm::vec4>& particlePositions) {

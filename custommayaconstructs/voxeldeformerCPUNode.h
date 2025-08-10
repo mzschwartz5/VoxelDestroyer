@@ -83,6 +83,12 @@ public:
         disablingInfo.setReason("The VoxelDestroyer plugin does not currently support Cached Playback.");   
     }
 
+    MPxNode::SchedulingType schedulingType() const override {
+        // Not actually sure if this is necessary, but each deformer is writing
+        // to different regions of the same buffer, so serial scheduling might be necessary.
+        return MPxNode::kGloballySerial;
+    }
+
     static MString typeName() { return "VoxelDeformerCPUNode"; }
 
     MStatus deform(MDataBlock&, MItGeometry&, const MMatrix&, unsigned int) override {

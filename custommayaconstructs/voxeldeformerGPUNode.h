@@ -74,7 +74,7 @@ public:
         MOpenCLInfo::checkCLErrorStatus(err);
         err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_uint), (void*)&inputElementCount);
         MOpenCLInfo::checkCLErrorStatus(err);
-        err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_uint), (void*)&m_particleBufferOffset);
+        err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_int), (void*)&m_particleBufferOffset);
         MOpenCLInfo::checkCLErrorStatus(err);
         err = clSetKernelArg(mKernel.get(), parameterId++, sizeof(cl_mem), (void*)m_particlePositionsBuffer.getReadOnlyRef());
         MOpenCLInfo::checkCLErrorStatus(err);
@@ -152,6 +152,8 @@ public:
      * (And, subsequently, if new models are added or deleted - this will be called again to update the handle). 
      */
     static void initGlobalParticlesBuffer(const ComPtr<ID3D11Buffer>& particlesBuffer) {
+        m_particlePositionsBuffer.reset();
+
         cl_int err = CL_SUCCESS;
         cl_mem particlePositionsMem = clCreateFromD3D11Buffer(
             MOpenCLInfo::getOpenCLContext(),
