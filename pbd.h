@@ -53,11 +53,11 @@ public:
     static MString pbdNodeName;
     // Attributes
     // Inputs
-    static MObject aTime;
+    static MObject aTriggerIn;
     static MObject aVoxelData;
     static MObject aParticleBufferOffsetIn;
     // Output
-    static MObject aTrigger;
+    static MObject aTriggerOut;
     static MObject aParticleData;
     static MObject aParticleBufferOffsetOut;
     
@@ -68,7 +68,6 @@ public:
     static MStatus initialize();
     static MObject createPBDNode(Voxels& voxels);
     void postConstructor() override;
-    MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override;
     MPxNode::SchedulingType schedulingType() const override {
         // Evaluated serially amongst nodes of the same type
         // Necessary because Maya provides a single threaded D3D11 device
@@ -107,7 +106,6 @@ public:
 private:
     Particles particles;
 
-    int substeps = 10;
     bool initialized = false;
     bool isDragging = false;
 

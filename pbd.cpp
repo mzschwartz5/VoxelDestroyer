@@ -7,16 +7,15 @@
 #include "custommayaconstructs/voxeldragcontext.h"
 #include "custommayaconstructs/voxeldata.h"
 #include "custommayaconstructs/particledata.h"
-#include <maya/MFnUnitAttribute.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnPluginData.h>
 #include "globalsolver.h"
 #include <maya/MFnAttribute.h>
 
-MObject PBD::aTime;
+MObject PBD::aTriggerIn;
+MObject PBD::aTriggerOut;
 MObject PBD::aVoxelData;
-MObject PBD::aTrigger;
 MObject PBD::aParticleData;
 MObject PBD::aParticleBufferOffsetIn;
 MObject PBD::aParticleBufferOffsetOut;
@@ -26,14 +25,23 @@ MString PBD::pbdNodeName("PBD");
 MStatus PBD::initialize() {
     MStatus status;
 
-    // Time attribute
-    MFnUnitAttribute uTimeAttr;
-    aTime = uTimeAttr.create("time", "tm", MFnUnitAttribute::kTime, 0.0, &status);
+    // Input attribute for GlobalSolver to trigger updates
+    MFnNumericAttribute nAttr;
+    aTriggerIn = nAttr.create("triggerin", "tgi", MFnNumericData::kBoolean, false, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-    uTimeAttr.setStorable(false);
-    uTimeAttr.setWritable(true);
-    uTimeAttr.setReadable(false);
-    status = addAttribute(aTime);
+    nAttr.setStorable(false);
+    nAttr.setWritable(true);
+    nAttr.setReadable(false);
+    status = addAttribute(aTriggerIn);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    // Output attribute to trigger downstream updates
+    aTriggerOut = nAttr.create("triggerout", "tgo", MFnNumericData::kBoolean, false, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    nAttr.setStorable(false);
+    nAttr.setWritable(false);
+    nAttr.setReadable(true);
+    status = addAttribute(aTriggerOut);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     
     // Voxel data attribute
@@ -44,15 +52,6 @@ MStatus PBD::initialize() {
     tVoxelDataAttr.setStorable(true);
     tVoxelDataAttr.setWritable(true);
     status = addAttribute(aVoxelData);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-    
-    // Output attribute to trigger downstream updates
-    MFnNumericAttribute nAttr;
-    aTrigger = nAttr.create("trigger", "trg", MFnNumericData::kBoolean, false, &status);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-    nAttr.setStorable(false);
-    nAttr.setWritable(false);
-    status = addAttribute(aTrigger);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     
     // Output particle data to facilitate GPU buffer resource initialization in the GPU deformer override
@@ -83,7 +82,7 @@ MStatus PBD::initialize() {
     status = addAttribute(aParticleBufferOffsetOut);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = attributeAffects(aTime, aTrigger);
+    status = attributeAffects(aTriggerIn, aTriggerOut);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     return MS::kSuccess;
@@ -117,6 +116,7 @@ MObject PBD::createPBDNode(Voxels& voxels) {
     // Connect the particle data attribute output to the global solver node's particle data (array) input.
     // And connect the particle buffer offset attribute to the global solver node's particle buffer offset (array) output.
     MObject globalSolverNodeObj = GlobalSolver::getMObject();
+    MPlug globalSolverTriggerPlug = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aTrigger, false, &status);
     MPlug globalSolverParticleDataPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aParticleData, false, &status);
     MPlug globalSolverParticleBufferOffsetPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aParticleBufferOffset, false, &status);
     
@@ -124,13 +124,14 @@ MObject PBD::createPBDNode(Voxels& voxels) {
     MPlug globalSolverParticleDataPlug = globalSolverParticleDataPlugArray.elementByLogicalIndex(plugIndex, &status);
     MPlug globalSolverParticleBufferOffsetPlug = globalSolverParticleBufferOffsetPlugArray.elementByLogicalIndex(plugIndex, &status);
 
+    MGlobal::executeCommandOnIdle("connectAttr " + globalSolverTriggerPlug.name() + " " 
+                                                 + pbdNode.name() + "." + MFnAttribute(aTriggerIn).name(), false);
+
     MGlobal::executeCommandOnIdle("connectAttr " + pbdNode.name() + "." +  MFnAttribute(aParticleData).name() + " " 
                                                  + globalSolverParticleDataPlug.name(), false);
+
     MGlobal::executeCommandOnIdle("connectAttr " + globalSolverParticleBufferOffsetPlug.name() + " " 
                                                  + pbdNode.name() + "." + MFnAttribute(aParticleBufferOffsetIn).name(), false);
-
-    // Connect global time to node's input time attribute
-    MGlobal::executeCommandOnIdle("connectAttr time1.outTime " + pbdNode.name() + "." + MFnAttribute(aTime).name(), false);
 
     // Set voxel data to node attribute
     // This will trigger the onVoxelDataSet callback, which will create particles (in turn triggering GlobalSolver... see createParticles)
@@ -254,7 +255,7 @@ void PBD::createComputeShaders(
 
     dragParticlesCompute = DragParticlesCompute(
         voxels.size(),
-        substeps
+        10 // hardcoded - will be addressed when moved to global solver
     );
 
     PreVGSConstantBuffer preVGSConstants{GRAVITY_STRENGTH, GROUND_COLLISION_Y, TIMESTEP, numParticles()};
@@ -341,7 +342,8 @@ void PBD::createParticles(const Voxels& voxels) {
     ParticleData* particleData = static_cast<ParticleData*>(particleDataFn.data(&status));
     particleData->setData({
         particles.numParticles,
-        particles.positions.data()
+        particles.positions.data(),
+        [this]() { this->simulateSubstep(); } // TODO: put this in own plug
     });
 
     // This will trigger the global solver to (re-)create the global particle buffer,
@@ -351,27 +353,9 @@ void PBD::createParticles(const Voxels& voxels) {
     particleDataPlug.setValue(particleDataObj);
 }
 
-/**
- * Run a simulation step. Since the only attribute-affects relationship on this node is between
- * input time and output trigger, this function only runs when time changes and only ever computes the output trigger.
- */
-MStatus PBD::compute(const MPlug& plug, MDataBlock& dataBlock) 
-{   
-    if (!initialized) {
-        return MS::kSuccess;
-    }
-
-    if (plug != aTrigger) return MS::kSuccess;
-
-    for (int i = 0; i < substeps; i++)
-    {
-        simulateSubstep();
-    }
-    
-    return MS::kSuccess;
-}
-
 void PBD::simulateSubstep() {
+    if (!initialized) return;
+
     preVGSCompute.dispatch();
 
     if (isDragging) {

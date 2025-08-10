@@ -123,7 +123,7 @@ public:
 
         // Connect the PBD node's trigger output to the deformer node's trigger input.
         MFnDependencyNode pbdNode(pbdNodeObj);
-        MPlug pbdTriggerPlug = pbdNode.findPlug(PBD::aTrigger, false);
+        MPlug pbdTriggerPlug = pbdNode.findPlug(PBD::aTriggerOut, false);
         MGlobal::executeCommandOnIdle("connectAttr " + pbdTriggerPlug.name() + " " 
                                                      + deformerNodeName + "." + MFnAttribute(aTrigger).name(), false);
 
