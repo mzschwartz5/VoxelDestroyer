@@ -4,10 +4,13 @@
 #include <maya/MTypeId.h>
 #include <maya/MString.h>
 #include "glm/glm.hpp"
+#include <functional>
 
 struct ParticleDataContainer {
     int numParticles = 0;
     const glm::vec4* particlePositionsCPU = nullptr;
+    // For now, stick this here. It should really be in its own data class though.
+    std::function<void()> simulateStepFunc;
 };
 
 /**

@@ -7,6 +7,8 @@
 #include <d3d11.h>
 #include <wrl/client.h>
 #include "directx/directx.h"
+#include <unordered_map>
+#include <functional>
 using Microsoft::WRL::ComPtr;
 
 /**
@@ -20,6 +22,8 @@ public:
     static const MString globalSolverNodeName;
     static MObject aParticleData;
     static MObject aParticleBufferOffset;
+    static MObject aTrigger;
+    static MObject aTime;
     static MObject globalSolverNodeObject;
     static ComPtr<ID3D11Buffer> particleBuffer;
     static MInt64 heldMemory;
@@ -33,8 +37,7 @@ public:
     static ComPtr<ID3D11UnorderedAccessView> createParticleUAV(uint offset, uint numElements);
     static ComPtr<ID3D11ShaderResourceView> createParticleSRV(uint offset, uint numElements);
 
-    // No compute implementation. All input data will be constant after initialization.
-    // Added and removed connections will be handled by attribute callbacks.
+    // Time input triggers compute which runs simulation step for all connected PBD nodes.
     MStatus compute(const MPlug& plug, MDataBlock& block) override;
 
 private:
@@ -44,4 +47,11 @@ private:
     static void createParticleBuffer(const std::vector<glm::vec4>& particlePositions);
     static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     MCallbackIdArray callbackIds;
+
+    static constexpr int SUBSTEPS = 10;
+
+    // Maps PBD node plug index to its simulate function.
+    // Essentially a cache so we don't have to retrieve the function from plugs every frame.
+    static std::unordered_map<uint, std::function<void()>> pbdSimulateFuncs;
+    static int numPBDNodes;
 };
