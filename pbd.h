@@ -12,11 +12,6 @@
 #include "directx/compute/vgscompute.h"
 #include "directx/compute/prevgscompute.h"
 #include "directx/compute/faceconstraintscompute.h"
-#include "directx/compute/dragparticlescompute.h"
-#include "directx/compute/buildcollisiongridcompute.h"
-#include "directx/compute/prefixscancompute.h"
-#include "directx/compute/buildcollisionparticlescompute.h"
-#include "directx/compute/solvecollisionscompute.h"
 
 #include <maya/MGlobal.h>
 #include <maya/MPxNode.h>
@@ -108,22 +103,12 @@ private:
     Particles particles;
 
     bool initialized = false;
-    bool isDragging = false;
-
     MCallbackIdArray callbackIds;
-
-    // Event subscriptions
-    std::function<void()> unsubscribeFromDragStateChange;
 
     // Shaders
     VGSCompute vgsCompute;
     FaceConstraintsCompute faceConstraintsCompute;
     PreVGSCompute preVGSCompute;
-    DragParticlesCompute dragParticlesCompute;
-    BuildCollisionGridCompute buildCollisionGridCompute;
-    PrefixScanCompute prefixScanCompute;
-    BuildCollisionParticlesCompute buildCollisionParticleCompute;
-    SolveCollisionsCompute solveCollisionsCompute;
     
     void simulateSubstep();
 

@@ -40,6 +40,10 @@ public:
         initSubscriptions();
     };
 
+    ~DragParticlesCompute() override {
+        tearDown();
+    }
+
     void setParticlesUAV(const ComPtr<ID3D11UnorderedAccessView>& particlesUAV)
     {
         this->particlesUAV = particlesUAV;
@@ -83,13 +87,7 @@ public:
             numWorkgroups = other.numWorkgroups;
             numSubsteps = other.numSubsteps;
             
-            // Unsubscribe from events in the moved-from object
-            other.unsubscribeFromDragStateChange();
-            other.unsubscribeFromMousePositionChange();
-            other.unsubscribeFromDepthTargetChange();
-            other.unsubscribeFromCameraMatricesChange();
-
-            // And subscribe in this object
+            removeSubscriptions();
             initSubscriptions();
         }
         return *this;
@@ -144,9 +142,9 @@ public:
         this->cameraMatrices = cameraMatrices;
     }
 
-    const ComPtr<ID3D11UnorderedAccessView>& getIsDraggingUAV() const
+    const ComPtr<ID3D11Buffer>& getIsDraggingBuffer() const
     {
-        return isDraggingUAV;
+        return isDraggingBuffer;
     }
 
     void dispatch() override
@@ -175,7 +173,7 @@ private:
     CameraMatrices cameraMatrices;
     DragValues dragValues;
     int numWorkgroups;
-    float numSubsteps;
+    int numSubsteps;
     EventBase::Unsubscribe unsubscribeFromDragStateChange;
     EventBase::Unsubscribe unsubscribeFromMousePositionChange;
     EventBase::Unsubscribe unsubscribeFromDepthTargetChange;
@@ -208,7 +206,7 @@ private:
                                           (dragValues.currentMousePosition.y / cameraMatrices.viewportHeight) * 2.0f - 1.0f);
         glm::vec4 mouseEndWorld = glm::vec4(mouseEndNDC, 1.0f, 1.0f) * cameraMatrices.invViewProjMatrix;
 
-        return (mouseEndWorld - mouseStartWorld) / numSubsteps;
+        return (mouseEndWorld - mouseStartWorld) / static_cast<float>(numSubsteps);
     }
 
     void bind() override
@@ -278,10 +276,22 @@ private:
     void tearDown() override
     {
         ComputeShader::tearDown();
-        unsubscribeFromDragStateChange();
-        unsubscribeFromMousePositionChange();
-        unsubscribeFromDepthTargetChange();
-        unsubscribeFromCameraMatricesChange();
+        removeSubscriptions();
     };
+
+    void removeSubscriptions() {
+        if (unsubscribeFromDragStateChange) {
+            unsubscribeFromDragStateChange();
+        }
+        if (unsubscribeFromMousePositionChange) {
+            unsubscribeFromMousePositionChange();
+        }
+        if (unsubscribeFromDepthTargetChange) {
+            unsubscribeFromDepthTargetChange();
+        }
+        if (unsubscribeFromCameraMatricesChange) {
+            unsubscribeFromCameraMatricesChange();
+        }
+    }
     
 };

@@ -8,6 +8,7 @@
 struct ParticleDataContainer {
     int numParticles = 0;
     const glm::vec4* particlePositionsCPU = nullptr;
+    float particleRadius = 0.0f;
     const uint* isSurface = nullptr;
 };
 
