@@ -17,8 +17,13 @@ using Microsoft::WRL::ComPtr;
  * Basically, anything that affects any and all particles without regard to which model they belong to.
  */
 class GlobalSolver : public MPxNode {
-
+    
 public:
+    enum BufferType {
+        PARTICLE,
+        SURFACE
+    };
+
     static const MTypeId id;
     static const MString globalSolverNodeName;
     // Input attributes
@@ -31,6 +36,7 @@ public:
 
     static MObject globalSolverNodeObject;
     static ComPtr<ID3D11Buffer> particleBuffer;
+    static ComPtr<ID3D11Buffer> surfaceBuffer;
     static MInt64 heldMemory;
 
     static void* creator() { return new GlobalSolver(); }
@@ -39,8 +45,8 @@ public:
     static const MObject& createGlobalSolver();
     static const MObject& getMObject();
     static uint getNextParticleDataPlugIndex();
-    static ComPtr<ID3D11UnorderedAccessView> createParticleUAV(uint offset, uint numElements);
-    static ComPtr<ID3D11ShaderResourceView> createParticleSRV(uint offset, uint numElements);
+    static ComPtr<ID3D11UnorderedAccessView> createUAV(uint offset, uint numElements, BufferType bufferType);
+    static ComPtr<ID3D11ShaderResourceView> createSRV(uint offset, uint numElements, BufferType bufferType);
 
     // Time input triggers compute which runs simulation step for all connected PBD nodes.
     MStatus compute(const MPlug& plug, MDataBlock& block) override;
@@ -49,7 +55,6 @@ private:
     GlobalSolver() = default;
     ~GlobalSolver() override;
     void postConstructor() override;
-    static void createParticleBuffer(const std::vector<glm::vec4>& particlePositions);
     static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static void onSimulateFunctionConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static MPlug getGlobalTimePlug();
@@ -61,4 +66,23 @@ private:
     // Essentially a cache so we don't have to retrieve the function from plugs every frame.
     static std::unordered_map<uint, std::function<void()>> pbdSimulateFuncs;
     static int numPBDNodes;
+
+    template<typename T>
+    static void createBuffer(const std::vector<T>& data, ComPtr<ID3D11Buffer>& buffer) {
+        D3D11_BUFFER_DESC bufferDesc = {};
+        D3D11_SUBRESOURCE_DATA initData = {};
+
+        bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+        bufferDesc.ByteWidth = data.size() * sizeof(T);
+        bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
+        bufferDesc.CPUAccessFlags = 0;
+        bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+        bufferDesc.StructureByteStride = sizeof(T);
+
+        initData.pSysMem = data.data();
+        DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, buffer.GetAddressOf());
+
+        MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
+        heldMemory += bufferDesc.ByteWidth;
+    }
 };

@@ -10,12 +10,10 @@ public:
     BuildCollisionParticlesCompute(
         int numParticles,
         const ComPtr<ID3D11UnorderedAccessView>& collisionCellParticleCountsUAV,
-        const ComPtr<ID3D11Buffer>& particleCollisionCB,
-        const ComPtr<ID3D11ShaderResourceView>& isSurfaceSRV
+        const ComPtr<ID3D11Buffer>& particleCollisionCB
     ) : ComputeShader(IDR_SHADER9), 
         particleCollisionCB(particleCollisionCB),
-        collisionCellParticleCountsUAV(collisionCellParticleCountsUAV), 
-        isSurfaceSRV(isSurfaceSRV) 
+        collisionCellParticleCountsUAV(collisionCellParticleCountsUAV)
     {
         initializeBuffers(numParticles);
     }
@@ -29,6 +27,10 @@ public:
 
     void setParticlePositionsSRV(const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV) {
         this->particlePositionsSRV = particlePositionsSRV;
+    }
+
+    void setIsSurfaceSRV(const ComPtr<ID3D11ShaderResourceView>& isSurfaceSRV) {
+        this->isSurfaceSRV = isSurfaceSRV;
     }
 
 private:

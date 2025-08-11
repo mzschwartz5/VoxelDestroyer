@@ -18,9 +18,8 @@ public:
 
     BuildCollisionGridCompute(
         int numParticles,
-        float particleSize,
-        const ComPtr<ID3D11ShaderResourceView>& isSurfaceSRV
-    ) : ComputeShader(IDR_SHADER8), isSurfaceSRV(isSurfaceSRV) {
+        float particleSize
+    ) : ComputeShader(IDR_SHADER8) {
         initializeBuffers(numParticles, particleSize);
     };
 
@@ -49,6 +48,10 @@ public:
 
     void setParticlePositionsSRV(const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV) {
         this->particlePositionsSRV = particlePositionsSRV;
+    }
+
+    void setIsSurfaceSRV(const ComPtr<ID3D11ShaderResourceView>& isSurfaceSRV) {
+        this->isSurfaceSRV = isSurfaceSRV;
     }
 
 private:
@@ -105,7 +108,7 @@ private:
         bufferDesc.CPUAccessFlags = 0;
         bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
         bufferDesc.StructureByteStride = sizeof(uint);
-        DirectX::getDevice()->CreateBuffer(&bufferDesc, nullptr, &collisionCellParticleCountsBuffer);
+        CreateBuffer(&bufferDesc, nullptr, &collisionCellParticleCountsBuffer);
 
         // Create the SRV for the collision cell particle counts buffer
         srvDesc.Format = DXGI_FORMAT_UNKNOWN;
