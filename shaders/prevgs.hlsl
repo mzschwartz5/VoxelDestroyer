@@ -1,8 +1,8 @@
 
 StructuredBuffer<float> weights : register(t0);
+StructuredBuffer<bool> isDragging : register(t1);
 RWStructuredBuffer<float4> positions : register(u0);
 RWStructuredBuffer<float4> oldPositions : register(u1);
-RWStructuredBuffer<bool> isDragging : register(u2);
 
 cbuffer VoxelSimBuffer : register(b0)
 {

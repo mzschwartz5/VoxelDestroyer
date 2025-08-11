@@ -4,6 +4,11 @@
 #include <maya/MCallbackIdArray.h>
 #include "custommayaconstructs/particledata.h"
 #include "custommayaconstructs/functionaldata.h"
+#include "directx/compute/dragparticlescompute.h"
+#include "directx/compute/buildcollisiongridcompute.h"
+#include "directx/compute/prefixscancompute.h"
+#include "directx/compute/buildcollisionparticlescompute.h"
+#include "directx/compute/solvecollisionscompute.h"
 #include <maya/MNodeMessage.h>
 #include <d3d11.h>
 #include <wrl/client.h>
@@ -21,8 +26,10 @@ class GlobalSolver : public MPxNode {
 public:
     enum BufferType {
         PARTICLE,
-        SURFACE
+        SURFACE,
+        DRAGGING
     };
+    static std::unordered_map<BufferType, ComPtr<ID3D11Buffer>> buffers;
 
     static const MTypeId id;
     static const MString globalSolverNodeName;
@@ -37,6 +44,7 @@ public:
     static MObject globalSolverNodeObject;
     static ComPtr<ID3D11Buffer> particleBuffer;
     static ComPtr<ID3D11Buffer> surfaceBuffer;
+    static ComPtr<ID3D11Buffer> draggingBuffer;
     static MInt64 heldMemory;
 
     static void* creator() { return new GlobalSolver(); }
@@ -66,6 +74,17 @@ private:
     // Essentially a cache so we don't have to retrieve the function from plugs every frame.
     static std::unordered_map<uint, std::function<void()>> pbdSimulateFuncs;
     static int numPBDNodes;
+
+    // Global compute shaders
+    void createGlobalComputeShaders(int totalParticles, float maxParticleRadius);
+    DragParticlesCompute dragParticlesCompute;
+    BuildCollisionGridCompute buildCollisionGridCompute;
+    PrefixScanCompute prefixScanCompute;
+    BuildCollisionParticlesCompute buildCollisionParticleCompute;
+    SolveCollisionsCompute solveCollisionsCompute;
+    
+    bool isDragging = false;
+    EventBase::Unsubscribe unsubscribeFromDragStateChange;
 
     template<typename T>
     static void createBuffer(const std::vector<T>& data, ComPtr<ID3D11Buffer>& buffer) {

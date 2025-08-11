@@ -17,9 +17,8 @@ public:
         int numParticles,
         const glm::vec4* initialOldPositions,
         const PreVGSConstantBuffer& simConstants,
-        const ComPtr<ID3D11ShaderResourceView>& weightsSRV,
-        const ComPtr<ID3D11UnorderedAccessView>& isDraggingUAV
-	) : ComputeShader(IDR_SHADER5), weightsSRV(weightsSRV), isDraggingUAV(isDraggingUAV)
+        const ComPtr<ID3D11ShaderResourceView>& weightsSRV
+	) : ComputeShader(IDR_SHADER5), weightsSRV(weightsSRV)
     {
         initializeBuffers(numParticles, initialOldPositions, simConstants);
     };
@@ -38,6 +37,10 @@ public:
         this->positionsUAV = positionsUAV;
     }
 
+    void setIsDraggingSRV(const ComPtr<ID3D11ShaderResourceView>& isDraggingSRV) {
+        this->isDraggingSRV = isDraggingSRV;
+    }
+
 private:
     int numWorkgroups;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
@@ -45,17 +48,17 @@ private:
     ComPtr<ID3D11ShaderResourceView> weightsSRV;
     ComPtr<ID3D11ShaderResourceView> oldPositionsSRV;
     ComPtr<ID3D11UnorderedAccessView> oldPositionsUAV;
-    ComPtr<ID3D11UnorderedAccessView> isDraggingUAV;
+    ComPtr<ID3D11ShaderResourceView> isDraggingSRV;
     ComPtr<ID3D11Buffer> simConstantsBuffer; //gravity on, ground on, ground collision y, padding
 
     void bind() override
     {
         DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
-        ID3D11ShaderResourceView* srvs[] = { weightsSRV.Get() };
+        ID3D11ShaderResourceView* srvs[] = { weightsSRV.Get(), isDraggingSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
-		ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), oldPositionsUAV.Get(), isDraggingUAV.Get() };
+		ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), oldPositionsUAV.Get() };
 		DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
 		ID3D11Buffer* cbvs[] = { simConstantsBuffer.Get() };
@@ -66,10 +69,10 @@ private:
     {
         DirectX::getContext()->CSSetShader(nullptr, NULL, 0);
 
-        ID3D11ShaderResourceView* srvs[] = { nullptr };
+        ID3D11ShaderResourceView* srvs[] = { nullptr, nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
-        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr };
+        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
 		ID3D11Buffer* cbvs[] = { nullptr };

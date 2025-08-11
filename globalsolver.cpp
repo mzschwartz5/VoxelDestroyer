@@ -9,6 +9,7 @@
 #include <maya/MItDependencyNodes.h>
 #include "glm/glm.hpp"
 #include "custommayaconstructs/voxeldeformerGPUNode.h"
+#include "custommayaconstructs/voxeldragcontext.h"
 
 const MTypeId GlobalSolver::id(0x0013A7B1);
 const MString GlobalSolver::globalSolverNodeName("globalSolverNode");
@@ -20,8 +21,10 @@ MObject GlobalSolver::aTrigger = MObject::kNullObj;
 MObject GlobalSolver::aSimulateFunction = MObject::kNullObj;
 ComPtr<ID3D11Buffer> GlobalSolver::particleBuffer = nullptr;
 ComPtr<ID3D11Buffer> GlobalSolver::surfaceBuffer = nullptr;
-MInt64 GlobalSolver::heldMemory = 0;
+ComPtr<ID3D11Buffer> GlobalSolver::draggingBuffer = nullptr;
+std::unordered_map<GlobalSolver::BufferType, ComPtr<ID3D11Buffer>> GlobalSolver::buffers;
 std::unordered_map<uint, std::function<void()>> GlobalSolver::pbdSimulateFuncs;
+MInt64 GlobalSolver::heldMemory = 0;
 int GlobalSolver::numPBDNodes = 0;
 
 
@@ -63,11 +66,16 @@ void GlobalSolver::postConstructor() {
     MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onParticleDataConnectionChange, this, &status);
     callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onSimulateFunctionConnectionChange, this, &status);
     callbackIds.append(callbackId);
+
+    unsubscribeFromDragStateChange = VoxelDragContext::subscribeToDragStateChange([this](const DragState& dragState) {
+        isDragging = dragState.isDragging;
+    });
 }
 
 GlobalSolver::~GlobalSolver() {
     MMessage::removeCallbacks(callbackIds);
     globalSolverNodeObject = MObject::kNullObj;
+    unsubscribeFromDragStateChange();
 }
 
 void GlobalSolver::tearDown() {
@@ -109,6 +117,7 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
     // Same for the isSurface buffer values
     numPBDNodes = particleDataArrayPlug.numElements();
     int totalParticles = 0;
+    float maximumParticleRadius = 0.0f;
     std::vector<glm::vec4> allParticlePositions;
     std::vector<uint> isSurface;
     std::vector<int> offsets(numPBDNodes);
@@ -128,23 +137,71 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
         const uint* surfaceVal = particleData->getData().isSurface;
         uint numParticles = particleData->getData().numParticles;
         uint numVoxels = numParticles / 8;
+        float particleRadius = particleData->getData().particleRadius;
 
         allParticlePositions.insert(allParticlePositions.end(), positions, positions + numParticles);
         isSurface.insert(isSurface.end(), surfaceVal, surfaceVal + numVoxels);
         totalParticles += numParticles;
+        maximumParticleRadius = std::max(maximumParticleRadius, particleRadius);
     }
 
     createBuffer<glm::vec4>(allParticlePositions, particleBuffer);
+    buffers[BufferType::PARTICLE] = particleBuffer;
     createBuffer<uint>(isSurface, surfaceBuffer);
+    buffers[BufferType::SURFACE] = surfaceBuffer;
     VoxelDeformerGPUNode::initGlobalParticlesBuffer(particleBuffer);
 
-    // Set these *after* creating the particle / surface buffer, because doing so triggers each PBD node to go make a UAV/SRV.
+    GlobalSolver* globalSolver = static_cast<GlobalSolver*>(clientData);
+    globalSolver->createGlobalComputeShaders(totalParticles, maximumParticleRadius);
+
+    // Set these *after* creating buffers, because doing so triggers each PBD node to go make UAVs / SRVs.
     MPlug particleBufferOffsetArrayPlug = globalSolverNode.findPlug(aParticleBufferOffset, false);
     for (int i = 0; i < numPBDNodes; ++i) {
         // Set the offset for this PBD node in the global particle buffer
         MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(i);
         particleBufferOffsetPlug.setValue(offsets[i]);
     }
+}
+
+void GlobalSolver::createGlobalComputeShaders(int totalParticles, float maximumParticleRadius) {
+    int totalVoxels = totalParticles / 8;
+    ComPtr<ID3D11ShaderResourceView> particleSRV = createSRV(0, totalParticles, BufferType::PARTICLE);
+    ComPtr<ID3D11UnorderedAccessView> particleUAV = createUAV(0, totalParticles, BufferType::PARTICLE);
+    ComPtr<ID3D11ShaderResourceView> isSurfaceSRV = createSRV(0, totalVoxels, BufferType::SURFACE);
+
+    buildCollisionGridCompute = BuildCollisionGridCompute(
+        totalParticles,
+        maximumParticleRadius // For collision assumptions to work, grid cell must be at least as big as the biggest particle
+    );
+    buildCollisionGridCompute.setParticlePositionsSRV(particleSRV);
+    buildCollisionGridCompute.setIsSurfaceSRV(isSurfaceSRV);
+
+    prefixScanCompute = PrefixScanCompute(
+        buildCollisionGridCompute.getCollisionCellParticleCountsUAV()
+    );
+
+    buildCollisionParticleCompute = BuildCollisionParticlesCompute(
+        totalParticles,
+        buildCollisionGridCompute.getCollisionCellParticleCountsUAV(),
+        buildCollisionGridCompute.getParticleCollisionCB()
+    );
+    buildCollisionParticleCompute.setParticlePositionsSRV(particleSRV);
+    buildCollisionParticleCompute.setIsSurfaceSRV(isSurfaceSRV);
+
+    solveCollisionsCompute = SolveCollisionsCompute(
+        buildCollisionGridCompute.getHashGridSize(),
+        buildCollisionParticleCompute.getParticlesByCollisionCellSRV(),
+        buildCollisionGridCompute.getCollisionCellParticleCountsSRV(),
+        buildCollisionGridCompute.getParticleCollisionCB()
+    );
+    solveCollisionsCompute.setParticlePositionsUAV(particleUAV);
+
+    dragParticlesCompute = DragParticlesCompute(
+        totalVoxels,
+        SUBSTEPS
+    );
+    dragParticlesCompute.setParticlesUAV(particleUAV);
+    buffers[BufferType::DRAGGING] = dragParticlesCompute.getIsDraggingBuffer();
 }
 
 void GlobalSolver::onSimulateFunctionConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
@@ -176,7 +233,7 @@ ComPtr<ID3D11UnorderedAccessView> GlobalSolver::createUAV(uint offset, uint numE
     uavDesc.Buffer.NumElements = numElements;
 
     ComPtr<ID3D11UnorderedAccessView> particleUAV;
-    ComPtr<ID3D11Buffer> buffer = (bufferType == BufferType::PARTICLE) ? particleBuffer : surfaceBuffer;
+    ComPtr<ID3D11Buffer> buffer = buffers[bufferType];
     DirectX::getDevice()->CreateUnorderedAccessView(buffer.Get(), &uavDesc, particleUAV.GetAddressOf());
     return particleUAV;
 }
@@ -189,7 +246,7 @@ ComPtr<ID3D11ShaderResourceView> GlobalSolver::createSRV(uint offset, uint numEl
     srvDesc.Buffer.NumElements = numElements;
 
     ComPtr<ID3D11ShaderResourceView> particleSRV;
-    ComPtr<ID3D11Buffer> buffer = (bufferType == BufferType::PARTICLE) ? particleBuffer : surfaceBuffer;
+    ComPtr<ID3D11Buffer> buffer = buffers[bufferType];
     DirectX::getDevice()->CreateShaderResourceView(buffer.Get(), &srvDesc, particleSRV.GetAddressOf());
     return particleSRV;
 }
@@ -274,9 +331,15 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
             pbdSimFuncIt->second(); 
         }
 
-        // TODO: do collision solve and drag compute steps after each substep.
+        if (isDragging) {
+            dragParticlesCompute.dispatch();
+        }   
+
+        buildCollisionGridCompute.dispatch();
+        prefixScanCompute.dispatch(); 
+        buildCollisionParticleCompute.dispatch();
+        solveCollisionsCompute.dispatch();
     }
 
     return MS::kSuccess;
 }
-
