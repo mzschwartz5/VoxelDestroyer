@@ -19,6 +19,7 @@ MObject GlobalSolver::aTime = MObject::kNullObj;
 MObject GlobalSolver::aTrigger = MObject::kNullObj;
 MObject GlobalSolver::aSimulateFunction = MObject::kNullObj;
 ComPtr<ID3D11Buffer> GlobalSolver::particleBuffer = nullptr;
+ComPtr<ID3D11Buffer> GlobalSolver::surfaceBuffer = nullptr;
 MInt64 GlobalSolver::heldMemory = 0;
 std::unordered_map<uint, std::function<void()>> GlobalSolver::pbdSimulateFuncs;
 int GlobalSolver::numPBDNodes = 0;
@@ -103,12 +104,13 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
 
     MFnDependencyNode globalSolverNode(getMObject());
     MPlug particleDataArrayPlug = globalSolverNode.findPlug(aParticleData, false);
-    MPlug particleBufferOffsetArrayPlug = globalSolverNode.findPlug(aParticleBufferOffset, false);
 
     // Collect all particles from all PBD nodes into one vector to copy to the GPU.
+    // Same for the isSurface buffer values
     numPBDNodes = particleDataArrayPlug.numElements();
     int totalParticles = 0;
     std::vector<glm::vec4> allParticlePositions;
+    std::vector<uint> isSurface;
     std::vector<int> offsets(numPBDNodes);
 
     MObject particleDataObj;
@@ -117,21 +119,27 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
     for (int i = 0; i < numPBDNodes; ++i) {
         offsets[i] = totalParticles;
 
-        // Collect the particle data from the PBD node
         MPlug particleDataPlug = particleDataArrayPlug.elementByPhysicalIndex(i);
         status = particleDataPlug.getValue(particleDataObj);
         pluginDataFn.setObject(particleDataObj);
         ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
+        
         const glm::vec4* positions = particleData->getData().particlePositionsCPU;
+        const uint* surfaceVal = particleData->getData().isSurface;
         uint numParticles = particleData->getData().numParticles;
+        uint numVoxels = numParticles / 8;
 
         allParticlePositions.insert(allParticlePositions.end(), positions, positions + numParticles);
+        isSurface.insert(isSurface.end(), surfaceVal, surfaceVal + numVoxels);
         totalParticles += numParticles;
     }
 
-    createParticleBuffer(allParticlePositions);
+    createBuffer<glm::vec4>(allParticlePositions, particleBuffer);
+    createBuffer<uint>(isSurface, surfaceBuffer);
+    VoxelDeformerGPUNode::initGlobalParticlesBuffer(particleBuffer);
 
-    // Set these after creating the particle buffer, because doing so triggers each PBD node to go make a UAV/SRV.
+    // Set these *after* creating the particle / surface buffer, because doing so triggers each PBD node to go make a UAV/SRV.
+    MPlug particleBufferOffsetArrayPlug = globalSolverNode.findPlug(aParticleBufferOffset, false);
     for (int i = 0; i < numPBDNodes; ++i) {
         // Set the offset for this PBD node in the global particle buffer
         MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(i);
@@ -160,27 +168,7 @@ void GlobalSolver::onSimulateFunctionConnectionChange(MNodeMessage::AttributeMes
     }
 }
 
-void GlobalSolver::createParticleBuffer(const std::vector<glm::vec4>& particlePositions) {
-    D3D11_BUFFER_DESC bufferDesc = {};
-    D3D11_SUBRESOURCE_DATA initData = {};
-
-    bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-    bufferDesc.ByteWidth = particlePositions.size() * sizeof(glm::vec4); // glm::vec4 for alignment
-    bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
-    bufferDesc.CPUAccessFlags = 0;
-    bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-    bufferDesc.StructureByteStride = sizeof(glm::vec4); // Size of each element in the buffer
-
-    initData.pSysMem = particlePositions.data();
-    DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, particleBuffer.GetAddressOf());
-
-    MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
-    heldMemory += bufferDesc.ByteWidth;
-
-    VoxelDeformerGPUNode::initGlobalParticlesBuffer(particleBuffer);
-}
-
-ComPtr<ID3D11UnorderedAccessView> GlobalSolver::createParticleUAV(uint offset, uint numElements) {
+ComPtr<ID3D11UnorderedAccessView> GlobalSolver::createUAV(uint offset, uint numElements, BufferType bufferType) {
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
     uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
     uavDesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -188,11 +176,12 @@ ComPtr<ID3D11UnorderedAccessView> GlobalSolver::createParticleUAV(uint offset, u
     uavDesc.Buffer.NumElements = numElements;
 
     ComPtr<ID3D11UnorderedAccessView> particleUAV;
-    DirectX::getDevice()->CreateUnorderedAccessView(particleBuffer.Get(), &uavDesc, particleUAV.GetAddressOf());
+    ComPtr<ID3D11Buffer> buffer = (bufferType == BufferType::PARTICLE) ? particleBuffer : surfaceBuffer;
+    DirectX::getDevice()->CreateUnorderedAccessView(buffer.Get(), &uavDesc, particleUAV.GetAddressOf());
     return particleUAV;
 }
 
-ComPtr<ID3D11ShaderResourceView> GlobalSolver::createParticleSRV(uint offset, uint numElements) {
+ComPtr<ID3D11ShaderResourceView> GlobalSolver::createSRV(uint offset, uint numElements, BufferType bufferType) {
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
     srvDesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -200,7 +189,8 @@ ComPtr<ID3D11ShaderResourceView> GlobalSolver::createParticleSRV(uint offset, ui
     srvDesc.Buffer.NumElements = numElements;
 
     ComPtr<ID3D11ShaderResourceView> particleSRV;
-    DirectX::getDevice()->CreateShaderResourceView(particleBuffer.Get(), &srvDesc, particleSRV.GetAddressOf());
+    ComPtr<ID3D11Buffer> buffer = (bufferType == BufferType::PARTICLE) ? particleBuffer : surfaceBuffer;
+    DirectX::getDevice()->CreateShaderResourceView(buffer.Get(), &srvDesc, particleSRV.GetAddressOf());
     return particleSRV;
 }
 
