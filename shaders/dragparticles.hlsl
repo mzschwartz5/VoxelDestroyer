@@ -28,7 +28,7 @@ void main( uint3 gId : SV_DispatchThreadID )
 
     // Calculate the voxel's center from the average position of the 8 voxel particles
     uint start_idx = gId.x << 3;
-    float4 p0 = particles[start_idx];
+    float4 p0 = particles[start_idx + 0];
     float4 p1 = particles[start_idx + 1];
     float4 p2 = particles[start_idx + 2];
     float4 p3 = particles[start_idx + 3];
@@ -38,7 +38,7 @@ void main( uint3 gId : SV_DispatchThreadID )
     float4 p7 = particles[start_idx + 7];
 
     float voxelSize = length(p0 - p7);
-    float4 voxelCenter = p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7;
+    float4 voxelCenter = float4(p0.xyz + p1.xyz + p2.xyz + p3.xyz + p4.xyz + p5.xyz + p6.xyz + p7.xyz, 1.0f);
     voxelCenter *= 0.125f;
     voxelCenter.w = 1.0f;
 
@@ -85,12 +85,12 @@ void main( uint3 gId : SV_DispatchThreadID )
     // It looks weird unintuitive but it's just the mathematical result of some commutativity. Intuitively, it works because similar triangles.
     float4 scaledDragWorldDiff = float4(voxelCameraDepth * pixelSpaceVoxelCenter.z * dragWorldDiff, 0.0f);
 
-    particles[start_idx] = p0 + scaledDragWorldDiff;
-    particles[start_idx + 1] = p1 + scaledDragWorldDiff;
-    particles[start_idx + 2] = p2 + scaledDragWorldDiff;
-    particles[start_idx + 3] = p3 + scaledDragWorldDiff;
-    particles[start_idx + 4] = p4 + scaledDragWorldDiff;
-    particles[start_idx + 5] = p5 + scaledDragWorldDiff;
-    particles[start_idx + 6] = p6 + scaledDragWorldDiff;
-    particles[start_idx + 7] = p7 + scaledDragWorldDiff;
+    particles[start_idx + 0] = float4(p0.xyz + scaledDragWorldDiff, p0.w);
+    particles[start_idx + 1] = float4(p1.xyz + scaledDragWorldDiff, p1.w);
+    particles[start_idx + 2] = float4(p2.xyz + scaledDragWorldDiff, p2.w);
+    particles[start_idx + 3] = float4(p3.xyz + scaledDragWorldDiff, p3.w);
+    particles[start_idx + 4] = float4(p4.xyz + scaledDragWorldDiff, p4.w);
+    particles[start_idx + 5] = float4(p5.xyz + scaledDragWorldDiff, p5.w);
+    particles[start_idx + 6] = float4(p6.xyz + scaledDragWorldDiff, p6.w);
+    particles[start_idx + 7] = float4(p7.xyz + scaledDragWorldDiff, p7.w);
 }

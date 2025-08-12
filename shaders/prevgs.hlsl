@@ -1,6 +1,6 @@
+#include "common.hlsl"
 
-StructuredBuffer<float> weights : register(t0);
-StructuredBuffer<bool> isDragging : register(t1);
+StructuredBuffer<bool> isDragging : register(t0);
 RWStructuredBuffer<float4> positions : register(u0);
 RWStructuredBuffer<float4> oldPositions : register(u1);
 
@@ -17,8 +17,9 @@ void main(uint3 gId : SV_DispatchThreadID)
 {
     if (gId.x >= numParticles) return; 
     
-    if (weights[gId.x] == 0.0f) return;
     float4 pos = positions[gId.x];
+    if (massIsInfinite(pos)) return;
+
     float4 oldPos = oldPositions[gId.x];
     oldPositions[gId.x] = pos;
 

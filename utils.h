@@ -19,4 +19,8 @@ inline int ilogbaseceil(int x, int base) {
     return static_cast<int>(std::ceil(std::log(x) / std::log(base)));
 }
 
+uint16_t floatToHalf(float value);
+
+float packTwoFloatsAsHalfs(float a, float b);
+
 } // namespace Utils

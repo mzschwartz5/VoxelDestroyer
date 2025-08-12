@@ -24,7 +24,7 @@ __kernel void transformVertices(
 
     // Note: originalParticles contains only one reference particle per voxel, thus the index into it
     // does not need to be multiplied by 8 to account for the 8 particles per voxel.
-    float4 v0_orig = originalParticles[groupId]; 
+    float3 v0_orig = originalParticles[groupId].xyz; 
 
     float3 e0 = normalize(v1 - v0).xyz;
     float3 e1 = normalize(v2 - v0).xyz;
@@ -42,7 +42,7 @@ __kernel void transformVertices(
 
         vertexIdx *= 3; // Vertex positions are stored as flat arrays of floats, 3 floats per vertex.
         float3 restPosition = (float3)(originalVertPositions[vertexIdx + 0], originalVertPositions[vertexIdx + 1], originalVertPositions[vertexIdx + 2]) 
-                            - v0_orig.xyz;
+                            - v0_orig;
         float3 transformedPos = v0.xyz + (restPosition.x * e0) + (restPosition.y * e1) + (restPosition.z * e2);
 
         transformedPositions[vertexIdx + 0] = transformedPos.x;

@@ -242,13 +242,11 @@ void PBD::createComputeShaders(
 ) {
     vgsCompute = VGSCompute(
         numParticles(),
-        particles.w.data(),
         VGSConstantBuffer{ RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, voxels.size() }
     );
 
 	faceConstraintsCompute = FaceConstraintsCompute(
 		faceConstraints,
-		vgsCompute.getWeightsSRV(),
         vgsCompute.getVoxelSimInfoBuffer()
 	);
 
@@ -256,8 +254,7 @@ void PBD::createComputeShaders(
     preVGSCompute = PreVGSCompute(
         numParticles(),
         particles.oldPositions.data(),
-		preVGSConstants,
-        vgsCompute.getWeightsSRV()
+		preVGSConstants
     );
 }
 
@@ -321,9 +318,9 @@ void PBD::createParticles(const Voxels& voxels) {
         for (const auto& corner : voxels.corners[i].corners) {
             // Offset the corner towards the center by the radius of the particle
             const glm::vec3& position = corner - (PARTICLE_RADIUS * glm::sign(corner - voxelCenter));
-            particles.positions.push_back(vec4(position, 1.0f));
-            particles.oldPositions.push_back(vec4(position, 1.0f));
-            particles.w.push_back(1.0f);
+            float packedRadiusAndW = Utils::packTwoFloatsAsHalfs(PARTICLE_RADIUS, 1.0f); // for now, w is hardcoded to 1.0f
+            particles.positions.push_back(vec4(position, packedRadiusAndW));
+            particles.oldPositions.push_back(vec4(position, packedRadiusAndW));
             particles.numParticles++;
         }
     }

@@ -1,3 +1,5 @@
+#include "common.hlsl"
+
 static const float eps = 1e-8f;
 static const float oneThird = 1.0f / 3.0f;
 
@@ -27,8 +29,7 @@ float safeLength(float3 v) {
 }
 
 void doVGSIterations(
-    inout float3 pos[8],
-    float w[8],
+    inout float4 pos[8],
     float particleRadius,
     float voxelRestVolume,
     float iterCount,
@@ -38,12 +39,12 @@ void doVGSIterations(
 ) {
     for (int iter = 0; iter < iterCount; iter++)
     {
-        float3 center = 0.125 * (pos[0] + pos[1] + pos[2] + pos[3] + pos[4] + pos[5] + pos[6] + pos[7]);
+        float3 center = 0.125 * (pos[0].xyz + pos[1].xyz + pos[2].xyz + pos[3].xyz + pos[4].xyz + pos[5].xyz + pos[6].xyz + pos[7].xyz);
 
         // Calculate basis vectors (average of edges for each axis)
-        float3 v0 = 0.25 * ((pos[1] - pos[0]) + (pos[3] - pos[2]) + (pos[5] - pos[4]) + (pos[7] - pos[6]));
-        float3 v1 = 0.25 * ((pos[2] - pos[0]) + (pos[3] - pos[1]) + (pos[6] - pos[4]) + (pos[7] - pos[5]));
-        float3 v2 = 0.25 * ((pos[4] - pos[0]) + (pos[5] - pos[1]) + (pos[6] - pos[2]) + (pos[7] - pos[3]));
+        float3 v0 = 0.25 * ((pos[1].xyz - pos[0].xyz) + (pos[3].xyz - pos[2].xyz) + (pos[5].xyz - pos[4].xyz) + (pos[7].xyz - pos[6].xyz));
+        float3 v1 = 0.25 * ((pos[2].xyz - pos[0].xyz) + (pos[3].xyz - pos[1].xyz) + (pos[6].xyz - pos[4].xyz) + (pos[7].xyz - pos[5].xyz));
+        float3 v2 = 0.25 * ((pos[4].xyz - pos[0].xyz) + (pos[5].xyz - pos[1].xyz) + (pos[6].xyz - pos[2].xyz) + (pos[7].xyz - pos[3].xyz));
         if (dot(cross(v0, v1), v2) == 0.0f) {
             v2 = normalize(cross(v0, v1)) * particleRadius;
         }
@@ -86,29 +87,29 @@ void doVGSIterations(
         u1 *= mult;
         u2 *= mult;
 
-        if (w[0] != 0.0f) {
-            pos[0] = center - u0 - u1 - u2;
+        if (!massIsInfinite(pos[0])) {
+            pos[0].xyz = center - u0 - u1 - u2;
         }
-        if (w[1] != 0.0f) {
-            pos[1] = center + u0 - u1 - u2;
+        if (!massIsInfinite(pos[1])) {
+            pos[1].xyz = center + u0 - u1 - u2;
         }
-        if (w[2] != 0.0f) {
-            pos[2] = center - u0 + u1 - u2;
+        if (!massIsInfinite(pos[2])) {
+            pos[2].xyz = center - u0 + u1 - u2;
         }
-        if (w[3] != 0.0f) {
-            pos[3] = center + u0 + u1 - u2;
+        if (!massIsInfinite(pos[3])) {
+            pos[3].xyz = center + u0 + u1 - u2;
         }
-        if (w[4] != 0.0f) {
-            pos[4] = center - u0 - u1 + u2;
+        if (!massIsInfinite(pos[4])) {
+            pos[4].xyz = center - u0 - u1 + u2;
         }
-        if (w[5] != 0.0f) {
-            pos[5] = center + u0 - u1 + u2;
+        if (!massIsInfinite(pos[5])) {
+            pos[5].xyz = center + u0 - u1 + u2;
         }
-        if (w[6] != 0.0f) {
-            pos[6] = center - u0 + u1 + u2;
+        if (!massIsInfinite(pos[6])) {
+            pos[6].xyz = center - u0 + u1 + u2;
         }
-        if (w[7] != 0.0f) {
-            pos[7] = center + u0 + u1 + u2;
+        if (!massIsInfinite(pos[7])) {
+            pos[7].xyz = center + u0 + u1 + u2;
         }
     }
 }
