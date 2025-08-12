@@ -19,10 +19,11 @@ MObject GlobalSolver::aParticleBufferOffset = MObject::kNullObj;
 MObject GlobalSolver::aTime = MObject::kNullObj;
 MObject GlobalSolver::aTrigger = MObject::kNullObj;
 MObject GlobalSolver::aSimulateFunction = MObject::kNullObj;
-ComPtr<ID3D11Buffer> GlobalSolver::particleBuffer = nullptr;
-ComPtr<ID3D11Buffer> GlobalSolver::surfaceBuffer = nullptr;
-ComPtr<ID3D11Buffer> GlobalSolver::draggingBuffer = nullptr;
-std::unordered_map<GlobalSolver::BufferType, ComPtr<ID3D11Buffer>> GlobalSolver::buffers;
+std::unordered_map<GlobalSolver::BufferType, ComPtr<ID3D11Buffer>> GlobalSolver::buffers = {
+    { GlobalSolver::BufferType::PARTICLE, nullptr },
+    { GlobalSolver::BufferType::SURFACE, nullptr },
+    { GlobalSolver::BufferType::DRAGGING, nullptr }
+};
 std::unordered_map<uint, std::function<void()>> GlobalSolver::pbdSimulateFuncs;
 MInt64 GlobalSolver::heldMemory = 0;
 int GlobalSolver::numPBDNodes = 0;
@@ -82,10 +83,11 @@ void GlobalSolver::tearDown() {
     heldMemory = 0;
     pbdSimulateFuncs.clear();
     numPBDNodes = 0;
-    particleBuffer.Reset();
-    surfaceBuffer.Reset();
-    draggingBuffer.Reset();
-    buffers.clear();
+    for (auto& buffer : buffers) {
+        if (buffer.second) {
+            buffer.second.Reset();
+        }
+    }
     globalSolverNodeObject = MObject::kNullObj;
 }
 
@@ -155,11 +157,9 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
         maximumParticleRadius = std::max(maximumParticleRadius, particleRadius);
     }
 
-    createBuffer<glm::vec4>(allParticlePositions, particleBuffer);
-    buffers[BufferType::PARTICLE] = particleBuffer;
-    createBuffer<uint>(isSurface, surfaceBuffer);
-    buffers[BufferType::SURFACE] = surfaceBuffer;
-    VoxelDeformerGPUNode::initGlobalParticlesBuffer(particleBuffer);
+    createBuffer<glm::vec4>(allParticlePositions, buffers[BufferType::PARTICLE]);
+    createBuffer<uint>(isSurface, buffers[BufferType::SURFACE]);
+    VoxelDeformerGPUNode::initGlobalParticlesBuffer(buffers[BufferType::PARTICLE]);
 
     GlobalSolver* globalSolver = static_cast<GlobalSolver*>(clientData);
     globalSolver->createGlobalComputeShaders(totalParticles, maximumParticleRadius);

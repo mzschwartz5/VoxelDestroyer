@@ -42,9 +42,6 @@ public:
     static MObject aSimulateFunction;
 
     static MObject globalSolverNodeObject;
-    static ComPtr<ID3D11Buffer> particleBuffer;
-    static ComPtr<ID3D11Buffer> surfaceBuffer;
-    static ComPtr<ID3D11Buffer> draggingBuffer;
     static MInt64 heldMemory;
 
     static void* creator() { return new GlobalSolver(); }
