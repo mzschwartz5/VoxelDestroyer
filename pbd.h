@@ -47,6 +47,7 @@ public:
     static MTypeId id;
     static MString pbdNodeName;
     // Attributes
+    static MObject aMeshOwner;
     // Inputs
     static MObject aTriggerIn;
     static MObject aVoxelData;
@@ -58,11 +59,11 @@ public:
     static MObject aSimulateSubstepFunction;
     
     PBD() = default;
-    ~PBD() override;
+    ~PBD() override = default;
     // Functions for Maya to create and initialize the node
     static void* creator() { return new PBD(); }
     static MStatus initialize();
-    static MObject createPBDNode(Voxels& voxels);
+    static MObject createPBDNode(Voxels& voxels, const MDagPath& meshDagPath);
     void postConstructor() override;
     MPxNode::SchedulingType schedulingType() const override {
         // Evaluated serially amongst nodes of the same type
@@ -71,6 +72,7 @@ public:
     }
     static void onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static void onParticleBufferOffsetChanged(MObject& node, MPlug& plug, void* clientData);
+    static void onMeshConnectionDeleted(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
 
     std::array<std::vector<FaceConstraint>, 3> constructFaceToFaceConstraints(
         const Voxels& voxels, 

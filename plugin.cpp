@@ -82,8 +82,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	MDagPath voxelizedMeshDagPath = voxels.voxelizedMeshDagPath;
 	
 	MProgressWindow::setProgressStatus("Creating PBD particles and face constraints..."); MProgressWindow::setProgressRange(0, 100); MProgressWindow::setProgress(0);
-	GlobalSolver::createGlobalSolver(); // this is a singleton node, so it will only be actually created once
-	MObject pbdNodeObj = PBD::createPBDNode(voxels); // TODO: add callback to delete this on removal of voxelized mesh node
+	MObject pbdNodeObj = PBD::createPBDNode(voxels, voxelizedMeshDagPath);
 	MObject deformerNodeObj = VoxelDeformerCPUNode::createDeformerNode(voxelizedMeshDagPath, pbdNodeObj, voxels.vertStartIdx);
 	MProgressWindow::setProgress(100);
 

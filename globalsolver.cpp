@@ -28,7 +28,7 @@ MInt64 GlobalSolver::heldMemory = 0;
 int GlobalSolver::numPBDNodes = 0;
 
 
-const MObject& GlobalSolver::createGlobalSolver() {
+const MObject& GlobalSolver::getOrCreateGlobalSolver() {
     if (!globalSolverNodeObject.isNull()) {
         return globalSolverNodeObject;
     }
@@ -55,33 +55,38 @@ MPlug GlobalSolver::getGlobalTimePlug() {
     return MPlug();
 }
 
-const MObject& GlobalSolver::getMObject() {
-    return globalSolverNodeObject;
-}
-
 void GlobalSolver::postConstructor() {
     MPxNode::postConstructor();
     MStatus status;
+    
+    unsubscribeFromDragStateChange = VoxelDragContext::subscribeToDragStateChange([this](const DragState& dragState) {
+        isDragging = dragState.isDragging;
+    });
 
     MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onParticleDataConnectionChange, this, &status);
     callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onSimulateFunctionConnectionChange, this, &status);
     callbackIds.append(callbackId);
 
-    unsubscribeFromDragStateChange = VoxelDragContext::subscribeToDragStateChange([this](const DragState& dragState) {
-        isDragging = dragState.isDragging;
-    });
-}
-
-GlobalSolver::~GlobalSolver() {
-    MMessage::removeCallbacks(callbackIds);
-    globalSolverNodeObject = MObject::kNullObj;
-    unsubscribeFromDragStateChange();
+    // Effectively a destructor callback to clean up when the node is deleted
+    // This is more reliable than a destructor, because Maya won't necessarily call destructors on node deletion (unless undo queue is flushed)
+    callbackId = MNodeMessage::addNodePreRemovalCallback(thisMObject(), [](MObject& node, void* clientData) {
+        GlobalSolver* globalSolver = static_cast<GlobalSolver*>(clientData);
+        MMessage::removeCallbacks(globalSolver->callbackIds);
+        globalSolver->unsubscribeFromDragStateChange();
+        tearDown();
+    }, this, &status);
 }
 
 void GlobalSolver::tearDown() {
     MRenderer::theRenderer()->releaseGPUMemory(heldMemory);
     heldMemory = 0;
+    pbdSimulateFuncs.clear();
+    numPBDNodes = 0;
     particleBuffer.Reset();
+    surfaceBuffer.Reset();
+    draggingBuffer.Reset();
+    buffers.clear();
+    globalSolverNodeObject = MObject::kNullObj;
 }
 
 /**
@@ -110,12 +115,17 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
         return;
     }
 
-    MFnDependencyNode globalSolverNode(getMObject());
+    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
     MPlug particleDataArrayPlug = globalSolverNode.findPlug(aParticleData, false);
+    numPBDNodes = particleDataArrayPlug.numElements();
+
+    if ((msg & MNodeMessage::kConnectionBroken) && numPBDNodes == 0) {
+        MGlobal::executeCommandOnIdle("delete " + globalSolverNode.name(), false);
+        return;
+    }
 
     // Collect all particles from all PBD nodes into one vector to copy to the GPU.
     // Same for the isSurface buffer values
-    numPBDNodes = particleDataArrayPlug.numElements();
     int totalParticles = 0;
     float maximumParticleRadius = 0.0f;
     std::vector<glm::vec4> allParticlePositions;

@@ -9,10 +9,12 @@
 #include "custommayaconstructs/functionaldata.h"
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
+#include <maya/MFnMessageAttribute.h>
 #include <maya/MFnPluginData.h>
 #include "globalsolver.h"
 #include <maya/MFnAttribute.h>
 
+MObject PBD::aMeshOwner;
 MObject PBD::aTriggerIn;
 MObject PBD::aTriggerOut;
 MObject PBD::aVoxelData;
@@ -25,6 +27,16 @@ MString PBD::pbdNodeName("PBD");
 
 MStatus PBD::initialize() {
     MStatus status;
+
+    // Special message attribute for associating a PBD node with a mesh (for lifetime management)
+    MFnMessageAttribute mAttr;
+    aMeshOwner = mAttr.create("mesh", "msh", &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    mAttr.setStorable(true);
+    mAttr.setWritable(true);
+    mAttr.setReadable(false);
+    addAttribute(aMeshOwner);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
 
     // Input attribute for GlobalSolver to trigger updates
     MFnNumericAttribute nAttr;
@@ -52,6 +64,7 @@ MStatus PBD::initialize() {
     tVoxelDataAttr.setCached(false);
     tVoxelDataAttr.setStorable(true);
     tVoxelDataAttr.setWritable(true);
+    tVoxelDataAttr.setConnectable(false); // Only used for setting input data
     status = addAttribute(aVoxelData);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     
@@ -108,21 +121,38 @@ void PBD::postConstructor() {
 
     callbackId = MNodeMessage::addNodeDirtyPlugCallback(thisMObject(), onParticleBufferOffsetChanged, this, &status);
     callbackIds.append(callbackId);
+
+    callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onMeshConnectionDeleted, this, &status);
+    callbackIds.append(callbackId);
+
+    // Effectively a destructor callback to clean up when the node is deleted
+    // This is more reliable than a destructor, because Maya won't necessarily call destructors on node deletion (unless undo queue is flushed)
+    callbackId = MNodeMessage::addNodePreRemovalCallback(thisMObject(), [](MObject& node, void* clientData) {
+        PBD* pbdNode = static_cast<PBD*>(clientData);
+        MMessage::removeCallbacks(pbdNode->callbackIds);
+    }, this, &status);
+    callbackIds.append(callbackId);
 }
 
 /**
  * Static factory method to create a PBD node, setting up its connections and attributes.
  */
-MObject PBD::createPBDNode(Voxels& voxels) {
+MObject PBD::createPBDNode(Voxels& voxels, const MDagPath& meshDagPath) {
     MStatus status;
     MDGModifier dgMod;
     MObject pbdNodeObj = dgMod.createNode(PBD::pbdNodeName, &status);
 	dgMod.doIt();
 	MFnDependencyNode pbdNode(pbdNodeObj);
 
+    // Connect the mesh owner attribute to the mesh's dag path
+    MPlug meshOwnerPlug = pbdNode.findPlug(aMeshOwner, false, &status);
+    MFnDependencyNode meshFn(meshDagPath.node());
+    MPlug meshMessagePlug = meshFn.findPlug("message", false, &status); // built in to every MObject
+    MGlobal::executeCommandOnIdle("connectAttr " + meshMessagePlug.name() + " " + meshOwnerPlug.name(), false);
+
     // Connect the particle data attribute output to the global solver node's particle data (array) input.
     // And connect the particle buffer offset attribute to the global solver node's particle buffer offset (array) output.
-    MObject globalSolverNodeObj = GlobalSolver::getMObject();
+    MObject globalSolverNodeObj = GlobalSolver::getOrCreateGlobalSolver();
     MPlug globalSolverTriggerPlug = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aTrigger, false, &status);
     MPlug globalSolverParticleDataPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aParticleData, false, &status);
     MPlug globalSolverParticleBufferOffsetPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aParticleBufferOffset, false, &status);
@@ -156,10 +186,6 @@ MObject PBD::createPBDNode(Voxels& voxels) {
 	voxelDataPlug.setValue(pluginDataObj);
 
     return pbdNodeObj;
-}
-
-PBD::~PBD() {
-    MMessage::removeCallbacks(callbackIds);
 }
 
 /**
@@ -234,6 +260,22 @@ void PBD::onParticleBufferOffsetChanged(MObject& node, MPlug& plug, void* client
     pbdNode->preVGSCompute.setIsDraggingSRV(isDraggingSRV);
 
     pbdNode->setInitialized(true);
+}
+
+// Used to tie the lifetime of the PBD node to the lifetime of the mesh it simulates.
+// Note that, technically, this will trigger on a connection being broken - not just the mesh being deleted. It's a proxy for deletion.
+// There IS a node message for deletion, but it's difficult to have it capture the PBD node's pointer in a static context.
+void PBD::onMeshConnectionDeleted(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+    if (plug != aMeshOwner || !(msg & MNodeMessage::kConnectionBroken)) {
+        return;
+    }
+
+    PBD* pbdNode = static_cast<PBD*>(clientData);
+    MObject pbdNodeObj = pbdNode->thisMObject();
+    if (pbdNodeObj.isNull()) return;
+
+    // On idle - don't want to delete the node while it's processing graph connection changes.
+    MGlobal::executeCommandOnIdle("delete " + pbdNode->name(), false);
 }
 
 void PBD::createComputeShaders(
