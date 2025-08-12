@@ -1,34 +1,36 @@
 #include "particle_collisions_shared.hlsl"
+#include "common.hlsl"
 
 StructuredBuffer<uint> particleIndices : register(t0);
 StructuredBuffer<uint> collisionCellParticleCounts : register(t1);
 RWStructuredBuffer<float4> particles : register(u0);
 
-bool doParticlesOverlap(float3 particleA, float3 particleB, out float distanceSquared, out float3 particleAToB)
+bool doParticlesOverlap(
+    float3 particleA,
+    float3 particleB,
+    float particleARadius,
+    float particleBRadius,
+    out float distanceSquared, 
+    out float3 particleAToB
+)
 {
     particleAToB = particleB - particleA;
     distanceSquared = dot(particleAToB, particleAToB);
     if (distanceSquared < 1e-6f) return false; // Avoid division by zero or NaN
-    return (distanceSquared < 4.0f * particleRadius * particleRadius);
-}
 
-bool doVoxelCentersOverlap(float3 voxelACenter, float3 voxelBCenter, out float3 voxelAToB)
-{
-    voxelAToB = voxelBCenter - voxelACenter;
-    float distanceSquared = dot(voxelAToB, voxelAToB);
-    if (distanceSquared < 1e-6f) return false; // Avoid division by zero or NaN
-    return (distanceSquared < 9.0f * particleRadius * particleRadius);
+    return (distanceSquared < (particleARadius + particleBRadius) * (particleARadius + particleBRadius));
 }
 
 // Approximates the center of a voxel that owns a particle by the average of the particle and its diagonal particle in the voxel.
 // The diagonal particle is retrieved using index relationships between different particles in the voxel (by construction).
-float3 getVoxelCenterOfParticle(float3 particle, uint localParticleIdx) {
+float4 getVoxelCenterOfParticle(float4 particle, uint localParticleIdx) {
     int particleGlobalIdx = particleIndices[localParticleIdx];
     int voxelIdx = particleGlobalIdx >> 3;
     int particleIdxInVoxel = (particleGlobalIdx - (voxelIdx << 3));
     int particleDiagIdx = (voxelIdx << 3) + 7 - particleIdxInVoxel;
-    float3 particleDiag = particles[particleDiagIdx].xyz;
-    return (particle + particleDiag) * 0.5f;
+    float4 particleDiag = particles[particleDiagIdx];
+    // It's okay to use the .w component from just one particle, because the particle radius will be the same for all particles in a voxel.
+    return float4((particle.xyz + particleDiag.xyz) * 0.5f, particle.w); 
 }
 
 // Max out shared memory. See note below about how many particles each thread can store, based
@@ -67,19 +69,23 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
 
             float distanceSquared;
             float3 particleAToB;
-            if (!doParticlesOverlap(particleA.xyz, particleB.xyz, distanceSquared, particleAToB)) continue;
+            float particleARadius = unpackHalf2x16(particleA.w).x;
+            float particleBRadius = unpackHalf2x16(particleB.w).x;
+            if (!doParticlesOverlap(particleA.xyz, particleB.xyz, particleARadius, particleBRadius, distanceSquared, particleAToB)) continue;
             particleAToB = normalize(particleAToB);
+            float delta = (particleARadius + particleBRadius) - sqrt(distanceSquared);
 
             // Get the particles diagonal to A and B within their respective voxels.
             // Then approximate the voxel centers to augment collision normals, to avoid voxel interlock.
-            float3 voxelACenter = getVoxelCenterOfParticle(particleA.xyz, particleStartIdx + i);
-            float3 voxelBCenter = getVoxelCenterOfParticle(particleB.xyz, particleStartIdx + j);
+            float4 voxelACenter = getVoxelCenterOfParticle(particleA, particleStartIdx + i);
+            float4 voxelBCenter = getVoxelCenterOfParticle(particleB, particleStartIdx + j);
+            float voxelARadius = 1.5f * unpackHalf2x16(voxelACenter.w).x;
+            float voxelBRadius = 1.5f * unpackHalf2x16(voxelBCenter.w).x;
 
-            float delta = (2.0f * particleRadius - sqrt(distanceSquared));
-    
+            // Test for voxel-center collision, treating each center as an imaginary "particle" with radius 1.5x that of the voxel's real particles. 
             float3 augmentedNormal = particleAToB;
             float3 voxelAToB;
-            if (doVoxelCentersOverlap(voxelACenter, voxelBCenter, voxelAToB)) {
+            if (doParticlesOverlap(voxelACenter, voxelBCenter, voxelARadius, voxelBRadius, distanceSquared, voxelAToB)) {
                 augmentedNormal = normalize(normalize(voxelAToB) + particleAToB);
             }
             

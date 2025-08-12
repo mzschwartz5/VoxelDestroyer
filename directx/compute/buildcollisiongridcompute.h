@@ -6,7 +6,7 @@ struct ParticleCollisionCB {
     float inverseCellSize;
     unsigned int hashGridSize;
     unsigned int numParticles;
-    float particleRadius;
+    uint padding = 0;
 };
 
 static constexpr int HASH_TABLE_SIZE_TO_PARTICLES = 2;
@@ -42,7 +42,6 @@ public:
         particleCollisionCBData.inverseCellSize = 1.0f / (2.0f * particleSize);
         particleCollisionCBData.hashGridSize = HASH_TABLE_SIZE_TO_PARTICLES * numParticles;
         particleCollisionCBData.numParticles = numParticles;
-        particleCollisionCBData.particleRadius = particleSize;
         ComputeShader::updateConstantBuffer(particleCollisionCB, particleCollisionCBData);
     }
 

@@ -16,9 +16,8 @@ public:
     PreVGSCompute(
         int numParticles,
         const glm::vec4* initialOldPositions,
-        const PreVGSConstantBuffer& simConstants,
-        const ComPtr<ID3D11ShaderResourceView>& weightsSRV
-	) : ComputeShader(IDR_SHADER5), weightsSRV(weightsSRV)
+        const PreVGSConstantBuffer& simConstants
+	) : ComputeShader(IDR_SHADER5)
     {
         initializeBuffers(numParticles, initialOldPositions, simConstants);
     };
@@ -45,7 +44,6 @@ private:
     int numWorkgroups;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
     ComPtr<ID3D11Buffer> oldPositionsBuffer;
-    ComPtr<ID3D11ShaderResourceView> weightsSRV;
     ComPtr<ID3D11ShaderResourceView> oldPositionsSRV;
     ComPtr<ID3D11UnorderedAccessView> oldPositionsUAV;
     ComPtr<ID3D11ShaderResourceView> isDraggingSRV;
@@ -55,7 +53,7 @@ private:
     {
         DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
-        ID3D11ShaderResourceView* srvs[] = { weightsSRV.Get(), isDraggingSRV.Get() };
+        ID3D11ShaderResourceView* srvs[] = { isDraggingSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
 		ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), oldPositionsUAV.Get() };
@@ -69,7 +67,7 @@ private:
     {
         DirectX::getContext()->CSSetShader(nullptr, NULL, 0);
 
-        ID3D11ShaderResourceView* srvs[] = { nullptr, nullptr };
+        ID3D11ShaderResourceView* srvs[] = { nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
         ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr };

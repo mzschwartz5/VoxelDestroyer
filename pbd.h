@@ -35,9 +35,9 @@ using glm::vec4;
 
 struct Particles
 {
+    // Inverse mass (w) and particle radius stored, packed at half-precision, as 4th component.
     std::vector<vec4> positions;
     std::vector<vec4> oldPositions;
-    std::vector<float> w; // inverse mass
     int numParticles{ 0 };
 };
 

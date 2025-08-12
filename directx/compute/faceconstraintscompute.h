@@ -6,7 +6,7 @@
 struct FaceContraintsCB {
 	glm::uvec4 faceOneIndices;
 	glm::uvec4 faceTwoIndices;
-    int numContraints;
+    uint numContraints;
     int padding0;
     int padding1;
     int padding2;
@@ -26,9 +26,8 @@ public:
 
     FaceConstraintsCompute(
         const std::array<std::vector<FaceConstraint>, 3>& constraints,
-		const ComPtr<ID3D11ShaderResourceView>& weightsSRV,
         const ComPtr<ID3D11Buffer>& voxelSimInfoBuffer
-    ) : ComputeShader(IDR_SHADER4), weightsSRV(weightsSRV), voxelSimInfoBuffer(voxelSimInfoBuffer)
+    ) : ComputeShader(IDR_SHADER4), voxelSimInfoBuffer(voxelSimInfoBuffer)
     {
         initializeBuffers(constraints);
     };
@@ -57,16 +56,12 @@ private:
     std::array<ComPtr<ID3D11Buffer>, 3> faceContraintsCBs;
     std::array<ComPtr<ID3D11Buffer>, 3> constraintBuffers;
     ComPtr<ID3D11Buffer> voxelSimInfoBuffer;
-    ComPtr<ID3D11ShaderResourceView> weightsSRV;
     ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
 
     void bind() override
     {
         DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
-
-        ID3D11ShaderResourceView* srvs[] = { weightsSRV.Get() };
-        DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
         ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), faceConstraintUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
@@ -78,9 +73,6 @@ private:
     void unbind() override
     {
         DirectX::getContext()->CSSetShader(nullptr, NULL, 0);
-
-        ID3D11ShaderResourceView* srvs[] = { nullptr };
-        DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
         ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
@@ -141,17 +133,17 @@ private:
         bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; // Bind as a constant buffer
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // Allow CPU writes
         bufferDesc.MiscFlags = 0;
-        FaceContraintsCB xFaceIndices = {{1, 3, 5, 7}, {0, 2, 4, 6}, static_cast<int>(constraints[0].size()), 0, 0, 0};
+        FaceContraintsCB xFaceIndices = {{1, 3, 5, 7}, {0, 2, 4, 6}, static_cast<uint>(constraints[0].size()), 0, 0, 0};
         initData.pSysMem = &xFaceIndices;
         CreateBuffer(&bufferDesc, &initData, &faceContraintsCBs[0]);
 
         // Initialize constant buffer for Y-direction face indices
-        FaceContraintsCB yFaceIndices = {{2, 3, 6, 7}, {0, 1, 4, 5}, static_cast<int>(constraints[1].size()), 0, 0, 0};
+        FaceContraintsCB yFaceIndices = {{2, 3, 6, 7}, {0, 1, 4, 5}, static_cast<uint>(constraints[1].size()), 0, 0, 0};
         initData.pSysMem = &yFaceIndices;
         CreateBuffer(&bufferDesc, &initData, &faceContraintsCBs[1]);
 
         // Initialize constant buffer for Z-direction face indices
-        FaceContraintsCB zFaceIndices = {{4, 5, 6, 7}, {0, 1, 2, 3}, static_cast<int>(constraints[2].size()), 0, 0, 0};
+        FaceContraintsCB zFaceIndices = {{4, 5, 6, 7}, {0, 1, 2, 3}, static_cast<uint>(constraints[2].size()), 0, 0, 0};
         initData.pSysMem = &zFaceIndices;
         CreateBuffer(&bufferDesc, &initData, &faceContraintsCBs[2]);
     }

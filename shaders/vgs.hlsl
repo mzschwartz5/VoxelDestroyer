@@ -1,7 +1,6 @@
 #include "vgs_core.hlsl"
 
 RWStructuredBuffer<float4> positions : register(u0);
-StructuredBuffer<float> weights : register(t0);
 
 cbuffer VoxelSimBuffer : register(b0)
 {
@@ -27,18 +26,14 @@ void main(
 
     uint start_idx = voxel_idx << 3;
     
-    float3 pos[8];
-    float w[8];
-    // Load positions and weights from global memory
+    float4 pos[8];
     for (int i = 0; i < 8; ++i) {
-        pos[i] = positions[start_idx + i].xyz;
-        w[i] = weights[start_idx + i];
+        pos[i] = positions[start_idx + i];
     }
 
     // Perform VGS iterations
     doVGSIterations(
         pos,
-        w,
         PARTICLE_RADIUS,
         VOXEL_REST_VOLUME,
         ITER_COUNT,
@@ -49,7 +44,8 @@ void main(
 
     // Write back the updated positions
     for (int i = 0; i < 8; ++i) {
-        positions[start_idx + i] = float4(pos[i], 1.0f);
+        if (massIsInfinite(pos[i])) continue;
+        positions[start_idx + i] = pos[i];
     }
 
 }

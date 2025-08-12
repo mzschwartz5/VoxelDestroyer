@@ -2,6 +2,7 @@
 #include <maya/MGlobal.h>
 #include <windows.h>
 #include <sstream>
+#include <cstring>
 
 // Anonymous namespace to keep this constant's linkage internal to this file.
 namespace {
@@ -107,6 +108,33 @@ std::string HResultToString(const HRESULT& hr) {
     ss << ")";
     result += ss.str();
 
+    return result;
+}
+
+uint16_t floatToHalf(float value) {
+    uint32_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));
+    uint32_t sign = (bits >> 16) & 0x8000;
+    uint32_t exponent = ((bits >> 23) & 0xFF) - 112;
+    uint32_t mantissa = bits & 0x007FFFFF;
+
+    if (exponent <= 0) {
+        // Subnormal or zero
+        return sign;
+    } else if (exponent >= 31) {
+        // Inf or NaN
+        return sign | 0x7C00;
+    } else {
+        return sign | (exponent << 10) | (mantissa >> 13);
+    }
+}
+
+float packTwoFloatsAsHalfs(float a, float b) {
+    uint16_t ha = floatToHalf(a);
+    uint16_t hb = floatToHalf(b);
+    uint32_t packed = (hb << 16) | ha;
+    float result;
+    std::memcpy(&result, &packed, sizeof(result));
     return result;
 }
 

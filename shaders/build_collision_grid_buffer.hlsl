@@ -1,4 +1,5 @@
 #include "particle_collisions_shared.hlsl"
+#include "common.hlsl"
 
 StructuredBuffer<float4> particlePositions : register(t0);
 StructuredBuffer<uint> isSurfaceVoxel : register(t1);
@@ -20,6 +21,7 @@ void main(uint3 gId : SV_DispatchThreadID)
     }
 
     float4 position = particlePositions[gId.x];
+    float particleRadius = unpackHalf2x16(position.w).x;
     int3 gridMinOverlap = int3(floor((position.xyz - particleRadius) * inverseCellSize));
     int3 gridMaxOverlap = int3(floor((position.xyz + particleRadius) * inverseCellSize));
 
