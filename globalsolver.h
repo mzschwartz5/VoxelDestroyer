@@ -50,8 +50,7 @@ public:
     static void* creator() { return new GlobalSolver(); }
     static MStatus initialize();
     static void tearDown();
-    static const MObject& createGlobalSolver();
-    static const MObject& getMObject();
+    static const MObject& getOrCreateGlobalSolver();
     static uint getNextParticleDataPlugIndex();
     static ComPtr<ID3D11UnorderedAccessView> createUAV(uint offset, uint numElements, BufferType bufferType);
     static ComPtr<ID3D11ShaderResourceView> createSRV(uint offset, uint numElements, BufferType bufferType);
@@ -61,7 +60,7 @@ public:
 
 private:
     GlobalSolver() = default;
-    ~GlobalSolver() override;
+    ~GlobalSolver() override = default;
     void postConstructor() override;
     static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static void onSimulateFunctionConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
