@@ -102,7 +102,7 @@ uint GlobalSolver::getNextParticleDataPlugIndex() {
     MPlug particleDataArrayPlug = globalSolverNode.findPlug(aParticleData, false, &status);
 
     uint nextIndex = 0;
-    const uint numElements = particleDataArrayPlug.numElements(&status);
+    const uint numElements = particleDataArrayPlug.evaluateNumElements(&status);
     for (uint i = 0; i < numElements; ++i) {
         uint idx = particleDataArrayPlug.elementByPhysicalIndex(i, &status).logicalIndex();
         if (idx >= nextIndex) {
@@ -118,12 +118,10 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
         return;
     }
     
-    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
-    MPlug particleDataArrayPlug = globalSolverNode.findPlug(aParticleData, false);
-    numPBDNodes = particleDataArrayPlug.evaluateNumElements();
-
+    numPBDNodes += (msg & MNodeMessage::kConnectionMade) ? 1 : -1;
     if (numPBDNodes == 0) {
-        MGlobal::executeCommandOnIdle("delete " + globalSolverNode.name(), false);
+        // All PBD nodes have been deleted
+        // GlobalSolver node will delete itself upon seeing it has no connections
         return;
     }
 
@@ -136,18 +134,31 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
         deleteParticleData(plug);
     }
 
+    // The deformer needs to update its OpenCL handle to the D3D global particle buffer
     VoxelDeformerGPUNode::initGlobalParticlesBuffer(buffers[BufferType::PARTICLE]);
     GlobalSolver* globalSolver = static_cast<GlobalSolver*>(clientData);
     globalSolver->createGlobalComputeShaders(maximumParticleRadius);
 
     // Set these *after* creating buffers, because doing so triggers each PBD node to go make UAVs / SRVs.
+    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
     MPlug particleBufferOffsetArrayPlug = globalSolverNode.findPlug(aParticleBufferOffset, false);
     for (const auto& [logicalIndex, offset] : offsetForLogicalPlug) {
-        // This line will create the plug if it doesn't already exist
         MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(logicalIndex);
         particleBufferOffsetPlug.setInt(offset);
     }
-    // TODO: possibly delete the particleBufferOffsetPlug connection on removal?
+
+    // Now, disconnect parallel-array plug entries associated with this PBD node, which effectively deletes them (bc of kDelete setting).
+    if (msg & MNodeMessage::kConnectionBroken) {
+        uint logicalIndex = plug.logicalIndex();
+        MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(logicalIndex);
+        MGlobal::executeCommandOnIdle(MString("removeMultiInstance ") + particleBufferOffsetPlug.name());
+
+        MPlug simulateFunctionArrayPlug = globalSolverNode.findPlug(aSimulateFunction, false);
+        MPlug simulateFunctionPlug = simulateFunctionArrayPlug.elementByLogicalIndex(logicalIndex);
+        MGlobal::executeCommandOnIdle(MString("removeMultiInstance ") + simulateFunctionPlug.name());
+
+        MGlobal::executeCommandOnIdle(MString("removeMultiInstance ") + plug.name());
+    }
 }
 
 // Updates the offsets into the global buffers for each connected PBD node
@@ -200,9 +211,9 @@ void GlobalSolver::calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNode
             continue;
         }
 
-        // If the node was deleted, and this node comes after the deleted one, subtract 
-        // the removed particles from its offset.
-        if (particleBufferOffsetPlug.logicalIndex() < plugLogicalIndex) {
+        // If the node was deleted and was created after this ith node (i.e. prepended in front of the ith node),
+        // subtract the number of removed particles from the ith node's offset.
+        if (changedPlug.logicalIndex() > plugLogicalIndex) {
             offsetForLogicalPlug[plugLogicalIndex] = (offset_i - numChangedParticles);
             continue;
         }
@@ -212,6 +223,7 @@ void GlobalSolver::calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNode
     }
 }
 
+// Prepends new particle data (corresponding to a new model) to the particle (and related) buffer(s)
 void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
     MStatus status;
     MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
@@ -268,6 +280,7 @@ void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
     return;
 }
 
+// Deletes a region of particle data (corresponding to a deleted model) from the particle (and related) buffer(s)
 void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
     MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
 
@@ -278,7 +291,7 @@ void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
     ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
 
     // Create new particle buffer sized for the data minus the deleted particles
-    int totalParticles = getTotalParticles();
+    uint totalParticles = getTotalParticles();
     uint numRemovedParticles = particleData->getData().numParticles;
     std::vector<glm::vec4> positions(totalParticles - numRemovedParticles);
     ComPtr<ID3D11Buffer> newParticleBuffer;
@@ -291,23 +304,27 @@ void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
     MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(plugLogicalIndex);
     particleBufferOffsetPlug.getValue(offset);
 
-    // Combine the old particle data into the new buffer in two copies: 
+    // Combine the old particle data into the new buffer in (up to) two copies: 
     // the particles before those being removed, and those after.
-    copyBufferSubregion<glm::vec4>(
-        buffers[BufferType::PARTICLE],
-        newParticleBuffer,
-        0,             // src copy offset
-        0,             // dst copy offset
-        offset         // num elements to copy
-    );
+    if (offset > 0) {
+        copyBufferSubregion<glm::vec4>(
+            buffers[BufferType::PARTICLE],
+            newParticleBuffer,
+            0,             // src copy offset
+            0,             // dst copy offset
+            offset         // num elements to copy
+        );
+    }
 
-    copyBufferSubregion<glm::vec4>(
-        buffers[BufferType::PARTICLE],
-        newParticleBuffer,
-        offset + numRemovedParticles,                   // src copy offset
-        offset,                                         // dst copy offset
-        totalParticles - (offset + numRemovedParticles) // num elements to copy
-    );
+    if (static_cast<uint>(offset) + numRemovedParticles < totalParticles) {
+        copyBufferSubregion<glm::vec4>(
+            buffers[BufferType::PARTICLE],
+            newParticleBuffer,
+            offset + numRemovedParticles,                   // src copy offset
+            offset,                                         // dst copy offset
+            totalParticles - (offset + numRemovedParticles) // num elements to copy
+        );
+    }
     buffers[BufferType::PARTICLE] = newParticleBuffer;
 
     // Create new surface buffer sized for the data minus the deleted voxels
@@ -317,24 +334,28 @@ void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
     ComPtr<ID3D11Buffer> newSurfaceBuffer;
     createBuffer<uint>(surfaceValues, newSurfaceBuffer);
 
-    // Combine the old surface data into the new buffer in two copies:
+    // Combine the old surface data into the new buffer in (up to) two copies:
     // the voxels before those being removed, and those after.
     offset /= 8;
-    copyBufferSubregion<uint>(
-        buffers[BufferType::SURFACE],
-        newSurfaceBuffer,
-        0,             // src copy offset
-        0,             // dst copy offset
-        offset         // num elements to copy
-    );
+    if (offset > 0) {
+        copyBufferSubregion<uint>(
+            buffers[BufferType::SURFACE],
+            newSurfaceBuffer,
+            0,             // src copy offset
+            0,             // dst copy offset
+            offset         // num elements to copy
+        );
+    }
 
-    copyBufferSubregion<uint>(
-        buffers[BufferType::SURFACE],
-        newSurfaceBuffer,
-        offset + numRemovedVoxels,                // src copy offset
-        offset,                                   // dst copy offset
-        totalVoxels - (offset + numRemovedVoxels) // num elements to copy
-    );
+    if (static_cast<uint>(offset) + numRemovedVoxels < totalVoxels) {
+        copyBufferSubregion<uint>(
+            buffers[BufferType::SURFACE],
+            newSurfaceBuffer,
+            offset + numRemovedVoxels,                // src copy offset
+            offset,                                   // dst copy offset
+            totalVoxels - (offset + numRemovedVoxels) // num elements to copy
+        );
+    }
     buffers[BufferType::SURFACE] = newSurfaceBuffer;
 
     return;
@@ -397,7 +418,7 @@ void GlobalSolver::onSimulateFunctionConnectionChange(MNodeMessage::AttributeMes
         pbdSimulateFuncs[plug.logicalIndex()] = functionalData->getFunction();
         return;
     }
-    if (!(msg & MNodeMessage::kConnectionBroken)) {
+    if (msg & MNodeMessage::kConnectionBroken) {
         pbdSimulateFuncs.erase(plug.logicalIndex());
         return;
     }
@@ -443,7 +464,7 @@ MStatus GlobalSolver::initialize() {
     status = addAttribute(aTime);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    // Contains pointer to particle data and number of particles
+    // Contains pointer to particle data
     MFnTypedAttribute tAttr;
     aParticleData = tAttr.create("particledata", "ptd", ParticleData::id, MObject::kNullObj, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
@@ -451,7 +472,6 @@ MStatus GlobalSolver::initialize() {
     tAttr.setWritable(true);
     tAttr.setReadable(false);
     tAttr.setArray(true);
-    tAttr.setDisconnectBehavior(MFnAttribute::kDelete);
     status = addAttribute(aParticleData);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
@@ -462,7 +482,6 @@ MStatus GlobalSolver::initialize() {
     tAttr.setWritable(true);
     tAttr.setReadable(false);
     tAttr.setArray(true);
-    tAttr.setDisconnectBehavior(MFnAttribute::kDelete);
     status = addAttribute(aSimulateFunction);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
@@ -484,7 +503,6 @@ MStatus GlobalSolver::initialize() {
     nAttr.setWritable(false);
     nAttr.setReadable(true);
     nAttr.setArray(true);
-    nAttr.setDisconnectBehavior(MFnAttribute::kDelete);
     status = addAttribute(aParticleBufferOffset);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
@@ -512,12 +530,8 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
     lastComputeTime = time;
 
     for (int i = 0; i < SUBSTEPS; ++i) {
-        for (int j = 0; j < numPBDNodes; ++j) {
-            auto pbdSimFuncIt = pbdSimulateFuncs.find(j);
-            if (pbdSimFuncIt == pbdSimulateFuncs.end()) continue;
-    
-            // Call the simulate function for this PBD node
-            pbdSimFuncIt->second(); 
+        for (const auto& [j, pbdSimulateFunc] : pbdSimulateFuncs) {
+            pbdSimulateFunc();
         }
 
         if (isDragging) {
