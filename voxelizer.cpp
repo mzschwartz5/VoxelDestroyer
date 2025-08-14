@@ -193,15 +193,15 @@ void Voxelizer::getSurfaceVoxels(
     int triIdx = 0;
     for (const Triangle& tri : triangles) {
         MPoint voxelMin = MPoint(
-            std::clamp(static_cast<int>(std::floor((tri.boundingBox.min().x - gridMin.x) / voxelSize)), 0, voxelsPerEdge - 1),
-            std::clamp(static_cast<int>(std::floor((tri.boundingBox.min().y - gridMin.y) / voxelSize)), 0, voxelsPerEdge - 1),
-            std::clamp(static_cast<int>(std::floor((tri.boundingBox.min().z - gridMin.z) / voxelSize)), 0, voxelsPerEdge - 1)
+            std::max(0, static_cast<int>(std::floor((tri.boundingBox.min().x - gridMin.x) / voxelSize))),
+            std::max(0, static_cast<int>(std::floor((tri.boundingBox.min().y - gridMin.y) / voxelSize))),
+            std::max(0, static_cast<int>(std::floor((tri.boundingBox.min().z - gridMin.z) / voxelSize)))
         );
-        
+
         MPoint voxelMax = MPoint(
-            std::clamp(static_cast<int>(std::floor((tri.boundingBox.max().x - gridMin.x) / voxelSize)), 0, voxelsPerEdge - 1),
-            std::clamp(static_cast<int>(std::floor((tri.boundingBox.max().y - gridMin.y) / voxelSize)), 0, voxelsPerEdge - 1),
-            std::clamp(static_cast<int>(std::floor((tri.boundingBox.max().z - gridMin.z) / voxelSize)), 0, voxelsPerEdge - 1)
+            std::min(voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().x - gridMin.x) / voxelSize))),
+            std::min(voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().y - gridMin.y) / voxelSize))),
+            std::min(voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().z - gridMin.z) / voxelSize)))
         );
 
         for (int x = static_cast<int>(voxelMin.x); x <= voxelMax.x; ++x) {
