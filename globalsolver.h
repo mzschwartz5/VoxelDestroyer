@@ -59,8 +59,11 @@ private:
     GlobalSolver() = default;
     ~GlobalSolver() override = default;
     void postConstructor() override;
-    static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static void onSimulateFunctionConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
+    static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
+    static void addParticleData(MPlug& particleDataToAddPlug);
+    static void deleteParticleData(MPlug& particleDataToRemovePlug);
+    static void calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNodeMessage::AttributeMessage changeType, std::unordered_map<int, int>& offsetForLogicalPlug, float& maximumParticleRadius);
     static MPlug getGlobalTimePlug();
     MCallbackIdArray callbackIds;
 
@@ -70,9 +73,10 @@ private:
     // Essentially a cache so we don't have to retrieve the function from plugs every frame.
     static std::unordered_map<uint, std::function<void()>> pbdSimulateFuncs;
     static int numPBDNodes;
+    static MTime lastComputeTime;
 
     // Global compute shaders
-    void createGlobalComputeShaders(int totalParticles, float maxParticleRadius);
+    void createGlobalComputeShaders(float maxParticleRadius);
     DragParticlesCompute dragParticlesCompute;
     BuildCollisionGridCompute buildCollisionGridCompute;
     PrefixScanCompute prefixScanCompute;
@@ -99,5 +103,34 @@ private:
 
         MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
         heldMemory += bufferDesc.ByteWidth;
+    }
+
+    template<typename T>
+    static void copyBufferSubregion(ComPtr<ID3D11Buffer>& srcBuffer, ComPtr<ID3D11Buffer>& dstBuffer, uint srcOffset, uint dstOffset, uint numElements) {
+        D3D11_BOX srcBox = {};
+        srcBox.left = srcOffset * sizeof(T);
+        srcBox.right = (srcOffset + numElements) * sizeof(T);
+        srcBox.top = 0;
+        srcBox.bottom = 1;
+        srcBox.front = 0;
+        srcBox.back = 1;
+
+        DirectX::getContext()->CopySubresourceRegion(
+            dstBuffer.Get(),
+            0, 
+            sizeof(T) * dstOffset, 
+            0, 0, 
+            srcBuffer.Get(),
+            0, 
+            &srcBox
+        );
+    }
+
+    static int getTotalParticles() {
+        if (!buffers[BufferType::PARTICLE]) return 0;
+
+        D3D11_BUFFER_DESC desc;
+        buffers[BufferType::PARTICLE]->GetDesc(&desc);
+        return desc.ByteWidth / sizeof(glm::vec4);
     }
 };

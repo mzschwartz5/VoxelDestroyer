@@ -71,7 +71,6 @@ public:
         return MPxNode::kGloballySerial; 
     }
     static void onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
-    static void onParticleBufferOffsetChanged(MObject& node, MPlug& plug, void* clientData);
     static void onMeshConnectionDeleted(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
 
     std::array<std::vector<FaceConstraint>, 3> constructFaceToFaceConstraints(
@@ -111,8 +110,10 @@ private:
     VGSCompute vgsCompute;
     FaceConstraintsCompute faceConstraintsCompute;
     PreVGSCompute preVGSCompute;
-    
+
+    MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override;
     void simulateSubstep();
+    void onParticleBufferOffsetChanged(int newOffset);
 
     float BETA{ 0.0f };
     float PARTICLE_RADIUS{ 0.25f };
