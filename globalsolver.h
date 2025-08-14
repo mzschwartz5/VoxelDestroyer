@@ -42,7 +42,6 @@ public:
     static MObject aSimulateFunction;
 
     static MObject globalSolverNodeObject;
-    static MInt64 heldMemory;
 
     static void* creator() { return new GlobalSolver(); }
     static MStatus initialize();
@@ -100,9 +99,7 @@ private:
 
         initData.pSysMem = data.data();
         DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, buffer.GetAddressOf());
-
         MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
-        heldMemory += bufferDesc.ByteWidth;
     }
 
     template<typename T>
@@ -132,5 +129,14 @@ private:
         D3D11_BUFFER_DESC desc;
         buffers[BufferType::PARTICLE]->GetDesc(&desc);
         return desc.ByteWidth / sizeof(glm::vec4);
+    }
+
+    static void resetBuffer(ComPtr<ID3D11Buffer>& buffer) {
+        if (!buffer) return;
+        
+        D3D11_BUFFER_DESC desc;
+        buffer->GetDesc(&desc);
+        MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
+        buffer.Reset();
     }
 };

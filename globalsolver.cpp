@@ -25,7 +25,6 @@ std::unordered_map<GlobalSolver::BufferType, ComPtr<ID3D11Buffer>> GlobalSolver:
     { GlobalSolver::BufferType::DRAGGING, nullptr }
 };
 std::unordered_map<uint, std::function<void()>> GlobalSolver::pbdSimulateFuncs;
-MInt64 GlobalSolver::heldMemory = 0;
 int GlobalSolver::numPBDNodes = 0;
 MTime GlobalSolver::lastComputeTime = MTime();
 
@@ -79,14 +78,12 @@ void GlobalSolver::postConstructor() {
 }
 
 void GlobalSolver::tearDown() {
-    MRenderer::theRenderer()->releaseGPUMemory(heldMemory);
-    heldMemory = 0;
     pbdSimulateFuncs.clear();
     numPBDNodes = 0;
     lastComputeTime = MTime();
     for (auto& buffer : buffers) {
         if (buffer.second) {
-            buffer.second.Reset();
+            resetBuffer(buffer.second);
         }
     }
     globalSolverNodeObject = MObject::kNullObj;
