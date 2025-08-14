@@ -27,7 +27,7 @@ std::unordered_map<GlobalSolver::BufferType, ComPtr<ID3D11Buffer>> GlobalSolver:
 std::unordered_map<uint, std::function<void()>> GlobalSolver::pbdSimulateFuncs;
 MInt64 GlobalSolver::heldMemory = 0;
 int GlobalSolver::numPBDNodes = 0;
-
+MTime GlobalSolver::lastComputeTime = MTime();
 
 const MObject& GlobalSolver::getOrCreateGlobalSolver() {
     if (!globalSolverNodeObject.isNull()) {
@@ -83,6 +83,7 @@ void GlobalSolver::tearDown() {
     heldMemory = 0;
     pbdSimulateFuncs.clear();
     numPBDNodes = 0;
+    lastComputeTime = MTime();
     for (auto& buffer : buffers) {
         if (buffer.second) {
             buffer.second.Reset();
@@ -116,64 +117,231 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
     if (plug != aParticleData || !(msg & (MNodeMessage::kConnectionMade | MNodeMessage::kConnectionBroken))) {
         return;
     }
-
+    
     MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
     MPlug particleDataArrayPlug = globalSolverNode.findPlug(aParticleData, false);
-    numPBDNodes = particleDataArrayPlug.numElements();
+    numPBDNodes = particleDataArrayPlug.evaluateNumElements();
 
-    if ((msg & MNodeMessage::kConnectionBroken) && numPBDNodes == 0) {
+    if (numPBDNodes == 0) {
         MGlobal::executeCommandOnIdle("delete " + globalSolverNode.name(), false);
         return;
     }
 
-    // Collect all particles from all PBD nodes into one vector to copy to the GPU.
-    // Same for the isSurface buffer values
-    int totalParticles = 0;
-    float maximumParticleRadius = 0.0f;
-    std::vector<glm::vec4> allParticlePositions;
-    std::vector<uint> isSurface;
-    std::vector<int> offsets(numPBDNodes);
-
-    MObject particleDataObj;
-    MFnPluginData pluginDataFn; 
-    MStatus status;
-    for (int i = 0; i < numPBDNodes; ++i) {
-        offsets[i] = totalParticles;
-
-        MPlug particleDataPlug = particleDataArrayPlug.elementByPhysicalIndex(i);
-        status = particleDataPlug.getValue(particleDataObj);
-        pluginDataFn.setObject(particleDataObj);
-        ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
-        
-        const glm::vec4* positions = particleData->getData().particlePositionsCPU;
-        const uint* surfaceVal = particleData->getData().isSurface;
-        uint numParticles = particleData->getData().numParticles;
-        uint numVoxels = numParticles / 8;
-        float particleRadius = particleData->getData().particleRadius;
-
-        allParticlePositions.insert(allParticlePositions.end(), positions, positions + numParticles);
-        isSurface.insert(isSurface.end(), surfaceVal, surfaceVal + numVoxels);
-        totalParticles += numParticles;
-        maximumParticleRadius = std::max(maximumParticleRadius, particleRadius);
+    std::unordered_map<int, int> offsetForLogicalPlug;
+    float maximumParticleRadius = 0;
+    calculateNewOffsetsAndParticleRadius(plug, msg, offsetForLogicalPlug, maximumParticleRadius);
+    if (msg & MNodeMessage::kConnectionMade) {
+        addParticleData(plug);
+    } else {
+        deleteParticleData(plug);
     }
 
-    createBuffer<glm::vec4>(allParticlePositions, buffers[BufferType::PARTICLE]);
-    createBuffer<uint>(isSurface, buffers[BufferType::SURFACE]);
     VoxelDeformerGPUNode::initGlobalParticlesBuffer(buffers[BufferType::PARTICLE]);
-
     GlobalSolver* globalSolver = static_cast<GlobalSolver*>(clientData);
-    globalSolver->createGlobalComputeShaders(totalParticles, maximumParticleRadius);
+    globalSolver->createGlobalComputeShaders(maximumParticleRadius);
 
     // Set these *after* creating buffers, because doing so triggers each PBD node to go make UAVs / SRVs.
     MPlug particleBufferOffsetArrayPlug = globalSolverNode.findPlug(aParticleBufferOffset, false);
-    for (int i = 0; i < numPBDNodes; ++i) {
-        // Set the offset for this PBD node in the global particle buffer
-        MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(i);
-        particleBufferOffsetPlug.setValue(offsets[i]);
+    for (const auto& [logicalIndex, offset] : offsetForLogicalPlug) {
+        // This line will create the plug if it doesn't already exist
+        MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(logicalIndex);
+        particleBufferOffsetPlug.setInt(offset);
+    }
+    // TODO: possibly delete the particleBufferOffsetPlug connection on removal?
+}
+
+// Updates the offsets into the global buffers for each connected PBD node
+// Also finds the maximum particle radius of all connected PBD nodes
+// These two operations are done together because they both need to iterate through all connected PBD nodes
+void GlobalSolver::calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNodeMessage::AttributeMessage changeType, std::unordered_map<int, int>& offsetForLogicalPlug, float& maximumParticleRadius)
+{
+    MStatus status;
+
+    // Retrieve data from the changed plug
+    MObject particleDataObj;
+    MFnPluginData pluginDataFn;
+    changedPlug.getValue(particleDataObj);
+    pluginDataFn.setObject(particleDataObj);
+    ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
+    uint numChangedParticles = particleData->getData().numParticles;
+    float particleRadius = particleData->getData().particleRadius;
+
+    // If plug was added, take care of it specially, because it won't be iterated over below.
+    if (changeType & MNodeMessage::kConnectionMade) {
+        maximumParticleRadius = particleRadius;
+        offsetForLogicalPlug[changedPlug.logicalIndex()] = 0; // Newly added plug data is prepended to buffers, so offset is 0.
+    }
+
+    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
+    MPlug particleDataArrayPlug = globalSolverNode.findPlug(aParticleData, false);
+    MPlug particleBufferOffsetArrayPlug = globalSolverNode.findPlug(aParticleBufferOffset, false);
+    int numBufferOffsetPlugs = particleBufferOffsetArrayPlug.evaluateNumElements();
+
+    int offset_i;
+    for (int i = 0; i < numBufferOffsetPlugs; ++i) {
+        MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByPhysicalIndex(i);        
+        uint plugLogicalIndex = particleBufferOffsetPlug.logicalIndex();
+        if (plugLogicalIndex == changedPlug.logicalIndex()) continue;
+
+        MPlug particleDataPlug = particleDataArrayPlug.elementByLogicalIndex(plugLogicalIndex); // parallel array, shares logical indices with offset plug array
+
+        // Update maximum particle radius
+        particleDataPlug.getValue(particleDataObj);
+        pluginDataFn.setObject(particleDataObj);
+        ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
+        float particleRadius = particleData->getData().particleRadius;
+        maximumParticleRadius = (particleRadius > maximumParticleRadius) ? particleRadius : maximumParticleRadius;
+
+        // Now update offset
+        particleBufferOffsetPlug.getValue(offset_i);
+        // If a new node was added (prepended), just add its added particles to each offset
+        if (changeType & MNodeMessage::kConnectionMade) {
+            offsetForLogicalPlug[plugLogicalIndex] = (offset_i + numChangedParticles);
+            continue;
+        }
+
+        // If the node was deleted, and this node comes after the deleted one, subtract 
+        // the removed particles from its offset.
+        if (particleBufferOffsetPlug.logicalIndex() < plugLogicalIndex) {
+            offsetForLogicalPlug[plugLogicalIndex] = (offset_i - numChangedParticles);
+            continue;
+        }
+
+        // Otherwise, the offset stays the same
+        offsetForLogicalPlug[plugLogicalIndex] = offset_i;
     }
 }
 
-void GlobalSolver::createGlobalComputeShaders(int totalParticles, float maximumParticleRadius) {
+void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
+    MStatus status;
+    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
+    
+    MObject particleDataObj;
+    particleDataToAddPlug.getValue(particleDataObj);
+    MFnPluginData pluginDataFn(particleDataObj);
+    ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
+
+    const glm::vec4* positions = particleData->getData().particlePositionsCPU;
+    uint numNewParticles = particleData->getData().numParticles;
+
+    // Create new particle buffer big enough for all particles
+    int totalParticles = getTotalParticles();
+    std::vector<glm::vec4> paddedParticlePositions(totalParticles + numNewParticles);
+    std::copy(positions, positions + numNewParticles, paddedParticlePositions.begin());
+    ComPtr<ID3D11Buffer> newParticleBuffer;
+    createBuffer<glm::vec4>(paddedParticlePositions, newParticleBuffer);
+
+    // If any particle data has already been added, combine old buffer into new buffer, offset by numNewParticles
+    if (buffers[BufferType::PARTICLE]) {
+        copyBufferSubregion<glm::vec4>(
+            buffers[BufferType::PARTICLE], 
+            newParticleBuffer, 
+            0,
+            numNewParticles,
+            totalParticles
+        );
+    }
+    buffers[BufferType::PARTICLE] = newParticleBuffer;
+
+    // Create new surface buffer big enough for all voxels
+    const uint* surfaceVal = particleData->getData().isSurface;
+    uint numNewVoxels = numNewParticles / 8;
+    uint totalVoxels = totalParticles / 8;
+
+    std::vector<uint> paddedSurfaceValues(totalVoxels + numNewVoxels);
+    std::copy(surfaceVal, surfaceVal + numNewVoxels, paddedSurfaceValues.begin());
+    ComPtr<ID3D11Buffer> newSurfaceBuffer;
+    createBuffer<uint>(paddedSurfaceValues, newSurfaceBuffer);
+
+    // If any surface data has already been added, combine old buffer into new buffer, offset by numNewVoxels
+    if (buffers[BufferType::SURFACE]) {
+        copyBufferSubregion<uint>(
+            buffers[BufferType::SURFACE],
+            newSurfaceBuffer,
+            0,
+            numNewVoxels,  
+            totalVoxels
+        );
+    }
+    buffers[BufferType::SURFACE] = newSurfaceBuffer;
+
+    return;
+}
+
+void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
+    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
+
+    MStatus status;
+    MObject particleDataObj;
+    particleDataToRemovePlug.getValue(particleDataObj);
+    MFnPluginData pluginDataFn(particleDataObj);
+    ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
+
+    // Create new particle buffer sized for the data minus the deleted particles
+    int totalParticles = getTotalParticles();
+    uint numRemovedParticles = particleData->getData().numParticles;
+    std::vector<glm::vec4> positions(totalParticles - numRemovedParticles);
+    ComPtr<ID3D11Buffer> newParticleBuffer;
+    createBuffer<glm::vec4>(positions, newParticleBuffer);
+    
+    // Get the removed node's offset into the old particle buffer
+    int offset;
+    uint plugLogicalIndex = particleDataToRemovePlug.logicalIndex();
+    MPlug particleBufferOffsetArrayPlug = globalSolverNode.findPlug(aParticleBufferOffset, false);
+    MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(plugLogicalIndex);
+    particleBufferOffsetPlug.getValue(offset);
+
+    // Combine the old particle data into the new buffer in two copies: 
+    // the particles before those being removed, and those after.
+    copyBufferSubregion<glm::vec4>(
+        buffers[BufferType::PARTICLE],
+        newParticleBuffer,
+        0,             // src copy offset
+        0,             // dst copy offset
+        offset         // num elements to copy
+    );
+
+    copyBufferSubregion<glm::vec4>(
+        buffers[BufferType::PARTICLE],
+        newParticleBuffer,
+        offset + numRemovedParticles,                   // src copy offset
+        offset,                                         // dst copy offset
+        totalParticles - (offset + numRemovedParticles) // num elements to copy
+    );
+    buffers[BufferType::PARTICLE] = newParticleBuffer;
+
+    // Create new surface buffer sized for the data minus the deleted voxels
+    uint numRemovedVoxels = numRemovedParticles / 8;
+    uint totalVoxels = totalParticles / 8;
+    std::vector<uint> surfaceValues(totalVoxels - numRemovedVoxels);
+    ComPtr<ID3D11Buffer> newSurfaceBuffer;
+    createBuffer<uint>(surfaceValues, newSurfaceBuffer);
+
+    // Combine the old surface data into the new buffer in two copies:
+    // the voxels before those being removed, and those after.
+    offset /= 8;
+    copyBufferSubregion<uint>(
+        buffers[BufferType::SURFACE],
+        newSurfaceBuffer,
+        0,             // src copy offset
+        0,             // dst copy offset
+        offset         // num elements to copy
+    );
+
+    copyBufferSubregion<uint>(
+        buffers[BufferType::SURFACE],
+        newSurfaceBuffer,
+        offset + numRemovedVoxels,                // src copy offset
+        offset,                                   // dst copy offset
+        totalVoxels - (offset + numRemovedVoxels) // num elements to copy
+    );
+    buffers[BufferType::SURFACE] = newSurfaceBuffer;
+
+    return;
+}
+
+void GlobalSolver::createGlobalComputeShaders(float maximumParticleRadius) {
+    int totalParticles = getTotalParticles();
     int totalVoxels = totalParticles / 8;
     ComPtr<ID3D11ShaderResourceView> particleSRV = createSRV(0, totalParticles, BufferType::PARTICLE);
     ComPtr<ID3D11UnorderedAccessView> particleUAV = createUAV(0, totalParticles, BufferType::PARTICLE);
@@ -283,6 +451,7 @@ MStatus GlobalSolver::initialize() {
     tAttr.setWritable(true);
     tAttr.setReadable(false);
     tAttr.setArray(true);
+    tAttr.setDisconnectBehavior(MFnAttribute::kDelete);
     status = addAttribute(aParticleData);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
@@ -293,6 +462,7 @@ MStatus GlobalSolver::initialize() {
     tAttr.setWritable(true);
     tAttr.setReadable(false);
     tAttr.setArray(true);
+    tAttr.setDisconnectBehavior(MFnAttribute::kDelete);
     status = addAttribute(aSimulateFunction);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
@@ -314,6 +484,7 @@ MStatus GlobalSolver::initialize() {
     nAttr.setWritable(false);
     nAttr.setReadable(true);
     nAttr.setArray(true);
+    nAttr.setDisconnectBehavior(MFnAttribute::kDelete);
     status = addAttribute(aParticleBufferOffset);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
@@ -331,7 +502,15 @@ MStatus GlobalSolver::initialize() {
 MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block) 
 {
     if (plug != aTrigger) return MS::kSuccess;
-    
+
+    // Sometimes aTrigger gets triggered even when time has not explicitly changed.
+    // To guard against that, cache off time on each compute and compare to last.
+    MTime time = block.inputValue(aTime).asTime();
+    if (time == lastComputeTime) {
+        return MS::kSuccess;
+    }
+    lastComputeTime = time;
+
     for (int i = 0; i < SUBSTEPS; ++i) {
         for (int j = 0; j < numPBDNodes; ++j) {
             auto pbdSimFuncIt = pbdSimulateFuncs.find(j);

@@ -109,6 +109,9 @@ MStatus PBD::initialize() {
     status = attributeAffects(aTriggerIn, aTriggerOut);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
+    status = attributeAffects(aParticleBufferOffsetIn, aParticleBufferOffsetOut);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
     return MS::kSuccess;
 }
 
@@ -117,9 +120,6 @@ void PBD::postConstructor() {
     MPxNode::postConstructor();
     
     MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onVoxelDataSet, this, &status);
-    callbackIds.append(callbackId);
-
-    callbackId = MNodeMessage::addNodeDirtyPlugCallback(thisMObject(), onParticleBufferOffsetChanged, this, &status);
     callbackIds.append(callbackId);
 
     callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onMeshConnectionDeleted, this, &status);
@@ -150,17 +150,26 @@ MObject PBD::createPBDNode(Voxels& voxels, const MDagPath& meshDagPath) {
     MPlug meshMessagePlug = meshFn.findPlug("message", false, &status); // built in to every MObject
     MGlobal::executeCommandOnIdle("connectAttr " + meshMessagePlug.name() + " " + meshOwnerPlug.name(), false);
 
+    // Set voxel data to node attribute
+	MFnPluginData pluginDataFn;
+	MObject pluginDataObj = pluginDataFn.create( VoxelData::id, &status );
+	VoxelData* voxelData = static_cast<VoxelData*>(pluginDataFn.data(&status));
+	voxelData->setVoxels(voxels);
+
+	MPlug voxelDataPlug = pbdNode.findPlug(aVoxelData, false, &status);
+	voxelDataPlug.setValue(pluginDataObj);
+
     // Connect the particle data attribute output to the global solver node's particle data (array) input.
     // And connect the particle buffer offset attribute to the global solver node's particle buffer offset (array) output.
     MObject globalSolverNodeObj = GlobalSolver::getOrCreateGlobalSolver();
     MPlug globalSolverTriggerPlug = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aTrigger, false, &status);
-    MPlug globalSolverParticleDataPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aParticleData, false, &status);
     MPlug globalSolverParticleBufferOffsetPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aParticleBufferOffset, false, &status);
+    MPlug globalSolverParticleDataPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aParticleData, false, &status);
     MPlug globalSolverSimulateFunctionPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aSimulateFunction, false, &status);
     
     uint plugIndex = GlobalSolver::getNextParticleDataPlugIndex();
-    MPlug globalSolverParticleDataPlug = globalSolverParticleDataPlugArray.elementByLogicalIndex(plugIndex, &status);
     MPlug globalSolverParticleBufferOffsetPlug = globalSolverParticleBufferOffsetPlugArray.elementByLogicalIndex(plugIndex, &status);
+    MPlug globalSolverParticleDataPlug = globalSolverParticleDataPlugArray.elementByLogicalIndex(plugIndex, &status);
     MPlug globalSolverSimulateFunctionPlug = globalSolverSimulateFunctionPlugArray.elementByLogicalIndex(plugIndex, &status);
     
     MGlobal::executeCommandOnIdle("connectAttr " + globalSolverTriggerPlug.name() + " " 
@@ -169,21 +178,12 @@ MObject PBD::createPBDNode(Voxels& voxels, const MDagPath& meshDagPath) {
     MGlobal::executeCommandOnIdle("connectAttr " + pbdNode.name() + "." + MFnAttribute(aSimulateSubstepFunction).name() + " "
                                                     + globalSolverSimulateFunctionPlug.name(), false);
     
+    // Note: the GlobalSolver operates on the assumption that the buffer offset plug is connected before the particle data plug
+    MGlobal::executeCommandOnIdle("connectAttr " + globalSolverParticleBufferOffsetPlug.name() + " " 
+                                                    + pbdNode.name() + "." + MFnAttribute(aParticleBufferOffsetIn).name(), false);
+    
     MGlobal::executeCommandOnIdle("connectAttr " + pbdNode.name() + "." +  MFnAttribute(aParticleData).name() + " " 
                                                  + globalSolverParticleDataPlug.name(), false);
-
-    MGlobal::executeCommandOnIdle("connectAttr " + globalSolverParticleBufferOffsetPlug.name() + " " 
-                                                 + pbdNode.name() + "." + MFnAttribute(aParticleBufferOffsetIn).name(), false);
-
-    // Set voxel data to node attribute
-    // This will trigger the onVoxelDataSet callback, which will create particles (in turn triggering GlobalSolver... see createParticles)
-	MFnPluginData pluginDataFn;
-	MObject pluginDataObj = pluginDataFn.create( VoxelData::id, &status );
-	VoxelData* voxelData = static_cast<VoxelData*>(pluginDataFn.data(&status));
-	voxelData->setVoxels(voxels);
-
-	MPlug voxelDataPlug = pbdNode.findPlug(aVoxelData, false, &status);
-	voxelDataPlug.setValue(pluginDataObj);
 
     return pbdNodeObj;
 }
@@ -223,43 +223,25 @@ void PBD::onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug&
     MFnDependencyNode pbdDepNode(pbdNode->thisMObject());
     MPlug simulateSubstepPlug = pbdDepNode.findPlug(aSimulateSubstepFunction, false);
     simulateSubstepPlug.setValue(simulateSubstepObj);
-
 }
 
-void PBD::onParticleBufferOffsetChanged(MObject& node, MPlug& plug, void* clientData) {
-    // Only respond to changes to the particle buffer offset attribute
-    if (plug != aParticleBufferOffsetIn) return;
-
-    if (node.isNull() || !node.hasFn(MFn::kPluginDependNode)) {
-        return;
-    }
-
-    int particleOffset;
-    plug.getValue(particleOffset);
-
-    PBD* pbdNode = static_cast<PBD*>(clientData);
-
-    // Passthrough the offset to the output particle buffer offset attribute
-    MFnDependencyNode pbdNodeFn(pbdNode->thisMObject());
-    MPlug particleBufferOffsetOutPlug = pbdNodeFn.findPlug(aParticleBufferOffsetOut, false);
-    particleBufferOffsetOutPlug.setValue(particleOffset);
-
-    int numParticles = pbdNode->numParticles();
-    int voxelOffset = particleOffset / 8;
-    int numVoxels = numParticles / 8;
-    ComPtr<ID3D11UnorderedAccessView> particleUAV = GlobalSolver::createUAV(particleOffset, numParticles, GlobalSolver::BufferType::PARTICLE);
-    ComPtr<ID3D11ShaderResourceView> particleSRV = GlobalSolver::createSRV(particleOffset, numParticles, GlobalSolver::BufferType::PARTICLE);
+void PBD::onParticleBufferOffsetChanged(int particleBufferOffset) {
+    int numberParticles = numParticles();
+    int voxelOffset = particleBufferOffset / 8;
+    int numVoxels = numberParticles / 8;
+    ComPtr<ID3D11UnorderedAccessView> particleUAV = GlobalSolver::createUAV(particleBufferOffset, numberParticles, GlobalSolver::BufferType::PARTICLE);
+    ComPtr<ID3D11ShaderResourceView> particleSRV = GlobalSolver::createSRV(particleBufferOffset, numberParticles, GlobalSolver::BufferType::PARTICLE);
     ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV = GlobalSolver::createUAV(voxelOffset, numVoxels, GlobalSolver::BufferType::SURFACE);
     ComPtr<ID3D11ShaderResourceView> isSurfaceSRV = GlobalSolver::createSRV(voxelOffset, numVoxels, GlobalSolver::BufferType::SURFACE);
     ComPtr<ID3D11ShaderResourceView> isDraggingSRV = GlobalSolver::createSRV(voxelOffset, numVoxels, GlobalSolver::BufferType::DRAGGING);
 
-    pbdNode->vgsCompute.setParticlesUAV(particleUAV);
-    pbdNode->faceConstraintsCompute.setPositionsUAV(particleUAV);
-    pbdNode->faceConstraintsCompute.setIsSurfaceUAV(isSurfaceUAV);
-    pbdNode->preVGSCompute.setPositionsUAV(particleUAV);
-    pbdNode->preVGSCompute.setIsDraggingSRV(isDraggingSRV);
+    vgsCompute.setParticlesUAV(particleUAV);
+    faceConstraintsCompute.setPositionsUAV(particleUAV);
+    faceConstraintsCompute.setIsSurfaceUAV(isSurfaceUAV);
+    preVGSCompute.setPositionsUAV(particleUAV);
+    preVGSCompute.setIsDraggingSRV(isDraggingSRV);
 
-    pbdNode->setInitialized(true);
+    setInitialized(true);
 }
 
 // Used to tie the lifetime of the PBD node to the lifetime of the mesh it simulates.
@@ -379,11 +361,22 @@ void PBD::createParticles(const Voxels& voxels) {
         voxels.isSurface.data()
     });
 
-    // This will trigger the global solver to (re-)create the global particle buffer,
-    // and send back an offset to this node (see onParticleBufferOffsetChanged).
     MFnDependencyNode pbdNode(thisMObject());
     MPlug particleDataPlug = pbdNode.findPlug(aParticleData, false);
     particleDataPlug.setValue(particleDataObj);
+}
+
+MStatus PBD::compute(const MPlug& plug, MDataBlock& dataBlock) {
+    // This is the only attribute that explicitly needs to be recomputed.
+    // It's not simply set once, and its input affects its output (as more than just a trigger).
+    if (plug != aParticleBufferOffsetOut) return MS::kSuccess;
+
+    int particleBufferOffsetIn = dataBlock.inputValue(aParticleBufferOffsetIn).asInt();
+    MDataHandle particleBufferOffsetOut = dataBlock.outputValue(aParticleBufferOffsetOut);
+    particleBufferOffsetOut.setInt(particleBufferOffsetIn);
+    onParticleBufferOffsetChanged(particleBufferOffsetIn);
+
+    return MS::kSuccess;
 }
 
 void PBD::simulateSubstep() {
