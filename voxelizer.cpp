@@ -10,8 +10,8 @@
 #include <maya/MProgressWindow.h>
 
 Voxels Voxelizer::voxelizeSelectedMesh(
-    float gridEdgeLength,
-    float voxelSize,
+    double gridEdgeLength,
+    int voxelsPerEdge,
     MPoint gridCenter,
     const MDagPath& selectedMeshPath,
     bool voxelizeSurface,
@@ -28,9 +28,8 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     MString originalMeshName = transformPath.partialPathName();
     MString newMeshName = originalMeshName + "_voxelized";
 
-    int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
     Voxels voxels;
-    voxels.voxelSize = voxelSize;
+    voxels.voxelSize = gridEdgeLength / voxelsPerEdge;
     voxels.resize(voxelsPerEdge * voxelsPerEdge * voxelsPerEdge);
     status = MThreadPool::init();
     
@@ -38,14 +37,14 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     MGlobal::executeCommand(MString("makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 -pn 1"), false, true);
 
     MProgressWindow::setProgressStatus("Processing mesh triangles...");
-    std::vector<Triangle> meshTris = getTrianglesOfMesh(selectedMesh, voxelSize, status);
+    std::vector<Triangle> meshTris = getTrianglesOfMesh(selectedMesh, voxels.voxelSize, status);
 
     if (voxelizeInterior) {
         MProgressWindow::setProgressStatus("Performing interior voxelization...");
         getInteriorVoxels(
             meshTris,
             gridEdgeLength,
-            voxelSize,
+            voxelsPerEdge,
             gridCenter,
             voxels,
             selectedMesh
@@ -57,7 +56,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
         getSurfaceVoxels(
             meshTris,
             gridEdgeLength,
-            voxelSize,
+            voxelsPerEdge,
             gridCenter,
             voxels,
             selectedMesh
@@ -68,7 +67,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     createVoxels(
         voxels,
         gridEdgeLength,
-        voxelSize,
+        voxelsPerEdge,
         gridCenter
     );
 
@@ -85,14 +84,14 @@ Voxels Voxelizer::voxelizeSelectedMesh(
         clipTriangles
     );
 
-    sortedVoxels.voxelizedMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, voxelSize, faceSelectionStrings); // TODO: if no boolean, should get rid of non-manifold geometry
+    sortedVoxels.voxelizedMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, faceSelectionStrings); // TODO: if no boolean, should get rid of non-manifold geometry
     MGlobal::executeCommand("delete " + originalMeshName, false, true); // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh (or just allow for undo)
 
     MThreadPool::release(); // reduce reference count incurred by init()
     return sortedVoxels;
 }
 
-std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxelSize, MStatus& status) {
+std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, double voxelSize, MStatus& status) {
     MIntArray triangleCounts;
     MIntArray vertexIndices;
     status = meshFn.getTriangles(triangleCounts, vertexIndices);
@@ -119,7 +118,7 @@ std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, float voxel
     return triangles;
 }
 
-Triangle Voxelizer::processMayaTriangle(const MFnMesh& meshFn, const std::array<int, 3>& vertIndices, float voxelSize) {
+Triangle Voxelizer::processMayaTriangle(const MFnMesh& meshFn, const std::array<int, 3>& vertIndices, double voxelSize) {
     std::array<MPoint, 3> vertices;
     meshFn.getPoint(vertIndices[0], vertices[0], MSpace::kWorld);
     meshFn.getPoint(vertIndices[1], vertices[1], MSpace::kWorld);
@@ -179,30 +178,30 @@ Triangle Voxelizer::processMayaTriangle(const MFnMesh& meshFn, const std::array<
 
 void Voxelizer::getSurfaceVoxels(
     const std::vector<Triangle>& triangles,
-    float gridEdgeLength,
-    float voxelSize,
+    double gridEdgeLength,
+    int voxelsPerEdge,
     MPoint gridCenter,
     Voxels& voxels,
     const MFnMesh& selectedMesh
 ) {
     MProgressWindow::setProgressRange(0, static_cast<int>(triangles.size()));
     MProgressWindow::setProgress(0);
-    
-    int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
+
+    double voxelSize = gridEdgeLength / voxelsPerEdge;
     MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
 
     int triIdx = 0;
     for (const Triangle& tri : triangles) {
         MPoint voxelMin = MPoint(
-            std::max(0, static_cast<int>(std::floor((tri.boundingBox.min().x - gridMin.x) / voxelSize))),
-            std::max(0, static_cast<int>(std::floor((tri.boundingBox.min().y - gridMin.y) / voxelSize))),
-            std::max(0, static_cast<int>(std::floor((tri.boundingBox.min().z - gridMin.z) / voxelSize)))
+            std::clamp(static_cast<int>(std::floor((tri.boundingBox.min().x - gridMin.x) / voxelSize)), 0, voxelsPerEdge - 1),
+            std::clamp(static_cast<int>(std::floor((tri.boundingBox.min().y - gridMin.y) / voxelSize)), 0, voxelsPerEdge - 1),
+            std::clamp(static_cast<int>(std::floor((tri.boundingBox.min().z - gridMin.z) / voxelSize)), 0, voxelsPerEdge - 1)
         );
         
         MPoint voxelMax = MPoint(
-            std::min(voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().x - gridMin.x) / voxelSize))),
-            std::min(voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().y - gridMin.y) / voxelSize))),
-            std::min(voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().z - gridMin.z) / voxelSize)))
+            std::clamp(static_cast<int>(std::floor((tri.boundingBox.max().x - gridMin.x) / voxelSize)), 0, voxelsPerEdge - 1),
+            std::clamp(static_cast<int>(std::floor((tri.boundingBox.max().y - gridMin.y) / voxelSize)), 0, voxelsPerEdge - 1),
+            std::clamp(static_cast<int>(std::floor((tri.boundingBox.max().z - gridMin.z) / voxelSize)), 0, voxelsPerEdge - 1)
         );
 
         for (int x = static_cast<int>(voxelMin.x); x <= voxelMax.x; ++x) {
@@ -265,16 +264,16 @@ bool Voxelizer::isTriangleCentroidInVoxel(
 
 void Voxelizer::getInteriorVoxels(
     const std::vector<Triangle>& triangles,
-    float gridEdgeLength,
-    float voxelSize,
+    double gridEdgeLength,
+    int voxelsPerEdge,
     MPoint gridCenter,
     Voxels& voxels,
     const MFnMesh& selectedMesh
 ) {
     MProgressWindow::setProgressRange(0, static_cast<int>(triangles.size()));
     MProgressWindow::setProgress(0);
-    
-    int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
+
+    double voxelSize = gridEdgeLength / voxelsPerEdge;
     MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
 
     int progressCounter = 0;
@@ -362,11 +361,11 @@ double Voxelizer::getTriangleVoxelCenterIntercept(
 
 void Voxelizer::createVoxels(
     Voxels& overlappedVoxels,
-    float gridEdgeLength, 
-    float voxelSize,       
+    double gridEdgeLength, 
+    int voxelsPerEdge,
     MPoint gridCenter
 ) {    
-    int voxelsPerEdge = static_cast<int>(floor(gridEdgeLength / voxelSize));
+    double voxelSize = gridEdgeLength / voxelsPerEdge;
     MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
 
     MProgressWindow::setProgressRange(0, voxelsPerEdge * voxelsPerEdge * voxelsPerEdge);
@@ -442,7 +441,6 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     const MString& newMeshName,
     const MString& originalMeshName,
     const MPoint& originalPivot,
-    float voxelSize,
     const FaceSelectionStrings& faceSelectionStrings
 ) {
     MProgressWindow::setProgressRange(0, 100);
@@ -490,7 +488,7 @@ MDagPath Voxelizer::finalizeVoxelMesh(
 
 void Voxelizer::addVoxelToMesh(
     const MPoint& voxelMin,
-    float voxelSize,
+    double voxelSize,
     Voxels& voxels,
     int index
 ) {

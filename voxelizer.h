@@ -67,7 +67,7 @@ struct Voxels {
     
     int totalVerts = 0; // total number of vertices in the voxelized mesh
     int numOccupied = 0;
-    float voxelSize;
+    double voxelSize;
     
     Voxels() = default;
 
@@ -150,8 +150,8 @@ public:
     ~Voxelizer() = default;
 
     Voxels voxelizeSelectedMesh(
-        float gridEdgeLength,
-        float voxelSize,
+        double gridEdgeLength,
+        int voxelsPerEdge,
         MPoint gridCenter,
         const MDagPath& selectedMeshDagPath,
         bool voxelizeSurface,
@@ -164,19 +164,19 @@ public:
 private:
 
     // Iterates over Maya triangles and processes each one, calculating quantities needed for voxelization
-    std::vector<Triangle> getTrianglesOfMesh(MFnMesh& mesh, float voxelSize, MStatus& status);
+    std::vector<Triangle> getTrianglesOfMesh(MFnMesh& mesh, double voxelSize, MStatus& status);
 
     Triangle processMayaTriangle(
         const MFnMesh& meshFn,                   // the overall mesh
         const std::array<int, 3>& vertIndices,   // indices of the triangle vertices in the mesh
-        float voxelSize                          // edge length of a single voxel
+        double voxelSize                         // edge length of a single voxel
     );
     
     // Does a conservative surface voxelization
     void getSurfaceVoxels(
         const std::vector<Triangle>& triangles, // triangles to check against
-        float gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
-        float voxelSize,                        // edge length of a single voxel
+        double gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
+        int voxelsPerEdge,                      // number of voxels along each edge
         MPoint gridCenter,                      // center of the grid in world space
         Voxels& voxels,
         const MFnMesh& selectedMesh
@@ -185,15 +185,15 @@ private:
     // Does an interior voxelization
     void getInteriorVoxels(
         const std::vector<Triangle>& triangles, // triangles to check against
-        float gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
-        float voxelSize,                        // edge length of a single voxel
+        double gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
+        int voxelsPerEdge,                      // number of voxels along each edge
         MPoint gridCenter,                      // center of the grid in world space
         Voxels& voxels,                         // output array of voxels (true = occupied, false = empty)
         const MFnMesh& selectedMesh             // the original mesh to use for boolean operations
     );
 
     bool doesTriangleOverlapVoxel(
-        const Triangle& triangle, // triangle to check against
+        const Triangle& triangle,  // triangle to check against
         const MVector& voxelMin    // min corner of the voxel
     );
 
@@ -220,14 +220,14 @@ private:
     // creates a cube mesh for it.
     void createVoxels(
         Voxels& occupiedVoxels,
-        float gridEdgeLength, 
-        float voxelSize,       
+        double gridEdgeLength, 
+        int voxelsPerEdge,
         MPoint gridCenter
     );
 
     void addVoxelToMesh(
-        const MPoint& voxelMin, // min corner of the voxel
-        float voxelSize,        // edge length of a single voxel
+        const MPoint& voxelMin,  // min corner of the voxel
+        double voxelSize,        // edge length of a single voxel
         Voxels& voxels,
         int index
     );
@@ -295,7 +295,6 @@ private:
         const MString& newMeshName,
         const MString& originalMesh,
         const MPoint& originalPivot,
-        float voxelSize,
         const FaceSelectionStrings& faceSelectionStrings
     );
 };

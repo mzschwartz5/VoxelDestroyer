@@ -41,7 +41,6 @@ MSyntax plugin::syntax()
 	return syntax;
 }
 
-// Plugin doIt function
 MStatus plugin::doIt(const MArgList& argList)
 {
 	MGlobal::executeCommand("undoInfo -openChunk", false, false); // make everything from here to the end of the function undoable in one command
@@ -67,10 +66,9 @@ MStatus plugin::doIt(const MArgList& argList)
 	}
 
 	// Progress window message updates done within the voxelizer (for finer-grained control)
-	float voxelSize = static_cast<float>(pluginArgs.scale / pluginArgs.voxelsPerEdge);
 	Voxels voxels = voxelizer.voxelizeSelectedMesh(
-		static_cast<float>(pluginArgs.scale),
-		voxelSize,
+		pluginArgs.scale * 1.02, // To avoid precision / cut off issues, scale up the voxelization grid very slightly.
+		pluginArgs.voxelsPerEdge,
 		pluginArgs.position,
 		selectedMeshDagPath,
 		pluginArgs.voxelizeSurface,
