@@ -32,9 +32,8 @@ public:
     DragParticlesCompute() = default;
 
     DragParticlesCompute(
-        int numVoxels,
-        int numSubsteps
-    ) : ComputeShader(IDR_SHADER7), numSubsteps(numSubsteps)
+        int numVoxels
+    ) : ComputeShader(IDR_SHADER7)
     {
         initializeBuffers(numVoxels);
         initSubscriptions();
@@ -85,7 +84,6 @@ public:
             cameraMatrices = std::move(other.cameraMatrices);
             dragValues = std::move(other.dragValues);
             numWorkgroups = other.numWorkgroups;
-            numSubsteps = other.numSubsteps;
             
             removeSubscriptions();
             initSubscriptions();
@@ -173,7 +171,6 @@ private:
     CameraMatrices cameraMatrices;
     DragValues dragValues;
     int numWorkgroups;
-    int numSubsteps;
     EventBase::Unsubscribe unsubscribeFromDragStateChange;
     EventBase::Unsubscribe unsubscribeFromMousePositionChange;
     EventBase::Unsubscribe unsubscribeFromDepthTargetChange;
@@ -195,8 +192,7 @@ private:
         updateConstantBuffer(constantBuffer, cb);
     }
 
-    // Reverse-project the mouse start and end points to world space at a unit depth.
-    // Get the difference and amortize it across the number of substeps in one simulation step.
+    // Reverse-project the mouse start and end points to world space at a unit depth, and return the difference.
     glm::vec3 calculateDragWorldDiff() {
         glm::vec2 mouseStartNDC = glm::vec2((dragValues.lastMousePosition.x / cameraMatrices.viewportWidth) * 2.0f - 1.0f,
                                             (dragValues.lastMousePosition.y / cameraMatrices.viewportHeight) * 2.0f - 1.0f);
@@ -206,7 +202,7 @@ private:
                                           (dragValues.currentMousePosition.y / cameraMatrices.viewportHeight) * 2.0f - 1.0f);
         glm::vec4 mouseEndWorld = glm::vec4(mouseEndNDC, 1.0f, 1.0f) * cameraMatrices.invViewProjMatrix;
 
-        return (mouseEndWorld - mouseStartWorld) / static_cast<float>(numSubsteps);
+        return (mouseEndWorld - mouseStartWorld);
     }
 
     void bind() override

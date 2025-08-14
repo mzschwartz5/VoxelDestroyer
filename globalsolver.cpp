@@ -392,10 +392,7 @@ void GlobalSolver::createGlobalComputeShaders(float maximumParticleRadius) {
     );
     solveCollisionsCompute.setParticlePositionsUAV(particleUAV);
 
-    dragParticlesCompute = DragParticlesCompute(
-        totalVoxels,
-        SUBSTEPS
-    );
+    dragParticlesCompute = DragParticlesCompute(totalVoxels);
     dragParticlesCompute.setParticlesUAV(particleUAV);
     buffers[BufferType::DRAGGING] = dragParticlesCompute.getIsDraggingBuffer();
 }
