@@ -11,6 +11,8 @@
 #include "custommayaconstructs/particledata.h"
 #include "custommayaconstructs/deformerdata.h"
 #include "custommayaconstructs/functionaldata.h"
+#include "custommayaconstructs/geometryoverride/voxelshape.h"
+#include "custommayaconstructs/geometryoverride/voxelshapegeometrydata.h"
 #include <maya/MFnPluginData.h>
 #include "directx/compute/computeshader.h"
 #include "globalsolver.h"
@@ -384,6 +386,19 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	// All things related to the voxel geometry override
+	status = plugin.registerData(VoxelShapeGeometryData::typeName, VoxelShapeGeometryData::id, VoxelShapeGeometryData::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelShapeGeometryData: " + status.errorString());
+		return status;
+	}
+
+	status = plugin.registerShape(VoxelShape::typeName, VoxelShape::id, VoxelShape::creator, VoxelShape::initialize, &VoxelShape::drawDbClassification);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelShape: " + status.errorString());
+		return status;
+	}
+
 	// TODO: potentially make this more robust / only allow in perspective panel?
 	MString activeModelPanel = plugin::getActiveModelPanel();
 	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
@@ -460,6 +475,16 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	status = plugin.deregisterNode(GlobalSolver::id);
 	if (!status)
 		MGlobal::displayError("deregisterNode failed on GlobalSolver: " + status.errorString());
+
+	// All things related to the voxel geometry override
+	status = plugin.deregisterData(VoxelShapeGeometryData::id);
+	if (!status)
+		MGlobal::displayError("deregisterData failed on VoxelShapeGeometryData: " + status.errorString());
+
+	// Voxel Shape Node
+	status = plugin.deregisterNode(VoxelShape::id);
+	if (!status)
+		MGlobal::displayError("deregisterNode failed on VoxelShape: " + status.errorString());
 
 	// Any loaded shaders should be cleared to free resources
 	ComputeShader::clearShaderCache();

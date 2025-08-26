@@ -8,6 +8,9 @@
 #include <numeric>
 #include "cgalhelper.h"
 #include <maya/MProgressWindow.h>
+#include <maya/MDagModifier.h>
+#include "custommayaconstructs/geometryoverride/voxelshape.h"
+#include "custommayaconstructs/geometryoverride/voxelshapegeometrydata.h"
 
 Voxels Voxelizer::voxelizeSelectedMesh(
     double gridEdgeLength,
@@ -483,7 +486,45 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MGlobal::executeCommand("delete -ch " + newMeshName); // Delete the history of the combined mesh to decouple it from the original mesh
     MGlobal::executeCommand("select -cl;", false, false); // Clear selection
 
-    return resultMeshDagPath;
+    return createVoxelShapeNode(resultMeshDagPath);
+
+    // return resultMeshDagPath;
+}
+
+MDagPath Voxelizer::createVoxelShapeNode(const MDagPath& voxelTransformDagPath) {
+    MStatus status;
+    MObject voxelTransform = voxelTransformDagPath.node();
+    MDagPath voxelMeshDagPath = voxelTransformDagPath;
+    voxelMeshDagPath.extendToShape();
+
+	// Create the new shape under the existing transform
+	MDagModifier dagMod;
+    MObject newShapeObj = dagMod.createNode(VoxelShape::typeName, voxelTransform);
+    dagMod.doIt();
+
+    VoxelShapeGeometry geomPayload;
+    MFnMesh fnMesh(voxelMeshDagPath, &status);
+    fnMesh.getPoints(geomPayload.vertices);
+    fnMesh.getUVs(geomPayload.ucoord, geomPayload.vcoord);
+    fnMesh.getVertices(geomPayload.face_counts, geomPayload.face_connects);
+    fnMesh.getNormals(geomPayload.normals);
+
+    dagMod.deleteNode(voxelMeshDagPath.node());
+    dagMod.doIt();
+
+    // Create a plugin data object with the voxel shape geometry data
+    MFnPluginData pluginDataFn;
+    MObject pluginDataObj = pluginDataFn.create(VoxelShapeGeometryData::id);
+    VoxelShapeGeometryData* voxelShapeData = static_cast<VoxelShapeGeometryData*>(pluginDataFn.data());
+    voxelShapeData->setGeometry(std::move(geomPayload));
+
+    // Finally, set the input geometry plug on the new shape
+    MPlug inputGeometryPlug = MFnDependencyNode(newShapeObj).findPlug(VoxelShape::aInputGeom, false, &status);
+    inputGeometryPlug.setValue(pluginDataObj);
+
+    MDagPath newShapeDagPath;
+    MDagPath::getAPathTo(newShapeObj, newShapeDagPath);
+    return newShapeDagPath;
 }
 
 void Voxelizer::addVoxelToMesh(
@@ -620,7 +661,7 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
         allMeshPoints,
         allPolyCounts,
         allPolyConnects,
-        MObject::kNullObj, // No parent transform (could enhance later to allow a parent to be passed in)
+        MObject::kNullObj, // No parent transform (TODO: could enhance to allow a parent to be passed in)
         &status
     );
 
