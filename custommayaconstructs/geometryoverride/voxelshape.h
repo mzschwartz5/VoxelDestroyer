@@ -1,6 +1,6 @@
 #pragma once
 #include <maya/MPxSurfaceShape.h>
-#include "voxelshapegeometrydata.h"
+#include <maya/MFnMeshData.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnSingleIndexedComponent.h>
 #include <maya/MFnPluginData.h>
@@ -23,14 +23,14 @@ public:
     static MStatus initialize() {
         MStatus status;
         MFnTypedAttribute tAttr;
-        aInputGeom = tAttr.create("inMesh", "in", VoxelShapeGeometryData::id, MObject::kNullObj, &status);
+        aInputGeom = tAttr.create("inMesh", "in", MFnData::kMesh, MObject::kNullObj, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         tAttr.setStorable(false);
         tAttr.setReadable(true);
         status = addAttribute(aInputGeom);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
-        aOutputGeom = tAttr.create("outMesh", "out", VoxelShapeGeometryData::id, MObject::kNullObj, &status);
+        aOutputGeom = tAttr.create("outMesh", "out", MFnData::kMesh, MObject::kNullObj, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         tAttr.setStorable(false);
         tAttr.setWritable(false);
@@ -38,7 +38,7 @@ public:
         status = addAttribute(aOutputGeom);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
-        aWorldGeom = tAttr.create("worldMesh", "wmesh", VoxelShapeGeometryData::id, MObject::kNullObj, &status);
+        aWorldGeom = tAttr.create("worldMesh", "wmesh", MFnData::kMesh, MObject::kNullObj, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         tAttr.setWritable(false);
         tAttr.setCached(false);
@@ -50,7 +50,7 @@ public:
         status = addAttribute(aWorldGeom);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
-        aCachedGeom = tAttr.create("cachedMesh", "cm", VoxelShapeGeometryData::id, MObject::kNullObj, &status);
+        aCachedGeom = tAttr.create("cachedMesh", "cm", MFnData::kMesh, MObject::kNullObj, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         tAttr.setStorable(true);
         tAttr.setWritable(true);
@@ -92,19 +92,17 @@ public:
     }
 
     bool acceptsGeometryIterator(bool writeable = true) override {
-        return true;
+        return false;
     }
 
     bool acceptsGeometryIterator(MObject& object, bool writeable = true, bool forReadOnly = false) override {
-        return true;
+        return false;
     }
 
+    // Need to override this method for the shape to be usable with deformers, but since our attributes of are type kMesh 
+    // (rather than a custom MpxGeometryData type), we don't actually need to supply an iterator.
     MPxGeometryIterator* geometryIteratorSetup(MObjectArray& componentList, MObject& component, bool forReadOnly = false ) {
-        VoxelShapeGeometryData* geometry = getGeometry();
-        if (!geometry) return nullptr;
-
-        bool useComponents = (componentList.length() > 0);
-        return geometry->iterator(componentList, component, useComponents);
+        return nullptr; 
     }
 
     bool excludeAsPluginShape() const {
@@ -112,22 +110,13 @@ public:
         return false;
     }
 
-    VoxelShapeGeometryData* getGeometry() const {
-        MStatus status;
-        MObject geomData = geometryData();
-        if (geomData.isNull()) return nullptr;
-
-        MFnPluginData fnData(geomData, &status);
-        return static_cast<VoxelShapeGeometryData*>(fnData.data(&status));
-    }
-
     MObject createFullVertexGroup() const override {
         MFnSingleIndexedComponent fnComponent;
         MObject fullComponent = fnComponent.create( MFn::kMeshVertComponent );
-        VoxelShapeGeometryData* geometry = getGeometry();
-        if (!geometry) return MObject::kNullObj;
+        MObject geomData = geometryData();
+        if (geomData.isNull()) return MObject::kNullObj;
 
-        int numVertices = geometry->getNumVertices();
+        int numVertices = MFnMesh(geomData).numVertices();
         fnComponent.setCompleteData(numVertices);
         return fullComponent;
     }
@@ -165,30 +154,29 @@ public:
     }
 
     MStatus computeCachedGeom(const MPlug& plug, MDataBlock& dataBlock) {
-        VoxelShapeGeometryData* inputGeom = static_cast<VoxelShapeGeometryData*>(dataBlock.inputValue(aInputGeom).asPluginData());
-        if (!inputGeom) return MS::kFailure;
+        MObject inputGeomObj = dataBlock.inputValue(aInputGeom).data();
+        if (inputGeomObj.isNull()) return MS::kFailure;
+        MFnMesh fnMesh(inputGeomObj);
 
-        // Create an object for cached geom and copy the input surface into it.
-        MFnPluginData cachedDataFn;
-        MObject cachedDataObj = cachedDataFn.create(VoxelShapeGeometryData::id);
-        VoxelShapeGeometryData* voxelShapeData = static_cast<VoxelShapeGeometryData*>(cachedDataFn.data());
-        voxelShapeData->smartCopy(inputGeom);
-        dataBlock.outputValue(aCachedGeom).set(voxelShapeData);
+        MFnMeshData dataFn;
+        MObject cachedGeomObj = dataFn.create();
+        fnMesh.copy(inputGeomObj, cachedGeomObj);
+        dataBlock.outputValue(aCachedGeom).set(cachedGeomObj);
 
         return MS::kSuccess;
     }
 
     MStatus computeOutputGeom(const MPlug& plug, MDataBlock& dataBlock) {
-        if (!computeCachedGeom(plug, dataBlock)) return MS::kFailure;
+        if (computeCachedGeom(plug, dataBlock) != MS::kSuccess) return MS::kFailure;
 
-        VoxelShapeGeometryData* cachedData = static_cast<VoxelShapeGeometryData*>(dataBlock.outputValue(aCachedGeom).asPluginData());
-        if (!cachedData) return MS::kFailure;
+        MObject cachedData = dataBlock.outputValue(aCachedGeom).data();
+        if (cachedData.isNull()) return MS::kFailure;
 
-        MFnPluginData outputDataFn;
-        outputDataFn.create(VoxelShapeGeometryData::id);
-        VoxelShapeGeometryData* outputVoxelShapeData = static_cast<VoxelShapeGeometryData*>(outputDataFn.data());
-        outputVoxelShapeData->smartCopy(cachedData);
-        dataBlock.outputValue(aOutputGeom).set(outputVoxelShapeData);
+        MFnMesh fnMesh(cachedData);
+        MFnMeshData dataFn;
+        MObject outputGeomObj = dataFn.create();
+        fnMesh.copy(cachedData, outputGeomObj);
+        dataBlock.outputValue(aOutputGeom).set(outputGeomObj);
 
         return MS::kSuccess;
     }
@@ -197,20 +185,19 @@ public:
         MStatus status;
         computeOutputGeom(plug, dataBlock);
 
-        VoxelShapeGeometryData* outputData = static_cast<VoxelShapeGeometryData*>(dataBlock.outputValue(aOutputGeom).asPluginData());
-        if (!outputData) return MS::kFailure;
+        MObject outputData = dataBlock.outputValue(aOutputGeom).data();
+        if (outputData.isNull()) return MS::kFailure;
 
-        MFnPluginData worldDataFn;
-        worldDataFn.create(VoxelShapeGeometryData::id);
-        VoxelShapeGeometryData* worldVoxelShapeData = static_cast<VoxelShapeGeometryData*>(worldDataFn.data());
-        worldVoxelShapeData->smartCopy(outputData);
-        worldVoxelShapeData->setMatrix(getWorldMatrix(dataBlock, 0));
+        MFnMesh fnMesh(outputData);
+        MFnMeshData dataFn;
+        MObject worldGeomObj = dataFn.create();
+        fnMesh.copy(outputData, worldGeomObj);
 
         int arrayIndex = plug.logicalIndex(&status);
         MArrayDataHandle worldHandle = dataBlock.outputArrayValue(aWorldGeom, &status);
         MArrayDataBuilder builder = worldHandle.builder(&status);
         MDataHandle outHandle = builder.addElement(arrayIndex, &status);
-        outHandle.set(worldVoxelShapeData);
+        outHandle.set(worldGeomObj);
         worldHandle.set(builder);
         dataBlock.setClean(plug);
 
