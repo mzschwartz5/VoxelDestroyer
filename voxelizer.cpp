@@ -10,7 +10,6 @@
 #include <maya/MProgressWindow.h>
 #include <maya/MDagModifier.h>
 #include "custommayaconstructs/geometryoverride/voxelshape.h"
-#include "custommayaconstructs/geometryoverride/voxelshapegeometrydata.h"
 
 Voxels Voxelizer::voxelizeSelectedMesh(
     double gridEdgeLength,
@@ -502,25 +501,18 @@ MDagPath Voxelizer::createVoxelShapeNode(const MDagPath& voxelTransformDagPath) 
     MObject newShapeObj = dagMod.createNode(VoxelShape::typeName, voxelTransform);
     dagMod.doIt();
 
-    VoxelShapeGeometry geomPayload;
-    MFnMesh fnMesh(voxelMeshDagPath, &status);
-    fnMesh.getPoints(geomPayload.vertices);
-    fnMesh.getUVs(geomPayload.ucoord, geomPayload.vcoord);
-    fnMesh.getVertices(geomPayload.face_counts, geomPayload.face_connects);
-    fnMesh.getNormals(geomPayload.normals);
+    // Copy the old shape's geometry to the new shape
+    MFnMesh oldMeshFn(voxelMeshDagPath, &status);
+    MFnMeshData newShapeDataFn;
+    MObject newShapeDataObj = newShapeDataFn.create();
+    oldMeshFn.copy(oldMeshFn.object(), newShapeDataObj, &status);
 
     dagMod.deleteNode(voxelMeshDagPath.node());
     dagMod.doIt();
 
-    // Create a plugin data object with the voxel shape geometry data
-    MFnPluginData pluginDataFn;
-    MObject pluginDataObj = pluginDataFn.create(VoxelShapeGeometryData::id);
-    VoxelShapeGeometryData* voxelShapeData = static_cast<VoxelShapeGeometryData*>(pluginDataFn.data());
-    voxelShapeData->setGeometry(std::move(geomPayload));
-
     // Finally, set the input geometry plug on the new shape
     MPlug inputGeometryPlug = MFnDependencyNode(newShapeObj).findPlug(VoxelShape::aInputGeom, false, &status);
-    inputGeometryPlug.setValue(pluginDataObj);
+    inputGeometryPlug.setValue(newShapeDataObj);
 
     MDagPath newShapeDagPath;
     MDagPath::getAPathTo(newShapeObj, newShapeDagPath);
