@@ -194,6 +194,10 @@
     <ClInclude Include="custommayaconstructs\voxeldata.h" />
     <ClInclude Include="custommayaconstructs\particledata.h" />
     <ClInclude Include="custommayaconstructs\deformerdata.h" />
+    <ClInclude Include="custommayaconstructs\geometryoverride\voxelgeometryoverride.h" />
+    <ClInclude Include="custommayaconstructs\geometryoverride\voxelshape.h" />
+    <ClInclude Include="custommayaconstructs\geometryoverride\voxelshapegeometrydata.h" />
+    <ClInclude Include="custommayaconstructs\geometryoverride\voxelgeometryiterator.h" />
     <ClInclude Include="directx\directx.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\vgscompute.h" />
