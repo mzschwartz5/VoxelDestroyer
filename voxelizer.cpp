@@ -485,12 +485,14 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MGlobal::executeCommand("delete -ch " + newMeshName); // Delete the history of the combined mesh to decouple it from the original mesh
     MGlobal::executeCommand("select -cl;", false, false); // Clear selection
 
-    return createVoxelShapeNode(resultMeshDagPath);
+    createVoxelShapeNode(resultMeshDagPath);
 
-    // return resultMeshDagPath;
+    return resultMeshDagPath;
 }
 
-MDagPath Voxelizer::createVoxelShapeNode(const MDagPath& voxelTransformDagPath) {
+// TODO: it might be possible to create this directly without first copying from the original mesh shape.
+// depends whether our shape node works with the transferAttributes and transferShadingSets methods
+void Voxelizer::createVoxelShapeNode(const MDagPath& voxelTransformDagPath) {
     MStatus status;
     MObject voxelTransform = voxelTransformDagPath.node();
     MDagPath voxelMeshDagPath = voxelTransformDagPath;
@@ -513,10 +515,6 @@ MDagPath Voxelizer::createVoxelShapeNode(const MDagPath& voxelTransformDagPath) 
     // Finally, set the input geometry plug on the new shape
     MPlug inputGeometryPlug = MFnDependencyNode(newShapeObj).findPlug(VoxelShape::aInputGeom, false, &status);
     inputGeometryPlug.setValue(newShapeDataObj);
-
-    MDagPath newShapeDagPath;
-    MDagPath::getAPathTo(newShapeObj, newShapeDagPath);
-    return newShapeDagPath;
 }
 
 void Voxelizer::addVoxelToMesh(

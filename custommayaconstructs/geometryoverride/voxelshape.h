@@ -26,7 +26,8 @@ public:
         aInputGeom = tAttr.create("inMesh", "in", MFnData::kMesh, MObject::kNullObj, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         tAttr.setStorable(false);
-        tAttr.setReadable(true);
+        tAttr.setReadable(false);
+        tAttr.setWritable(true);
         status = addAttribute(aInputGeom);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
@@ -85,7 +86,7 @@ public:
         // Following pattern set out in API examples
         VoxelShape* nonConstThis = const_cast<VoxelShape*>(this);
         MDataBlock dataBlock = nonConstThis->forceCache();
-        MDataHandle geomHandle = dataBlock.inputValue(aInputGeom);
+        MDataHandle geomHandle = dataBlock.outputValue(aOutputGeom);
         if (geomHandle.data().isNull()) return MObject::kNullObj;
 
         return geomHandle.data();
