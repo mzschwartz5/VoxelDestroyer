@@ -299,5 +299,5 @@ private:
     );
 
 	// Replace the default shape node with a plugin voxel shape node
-	MDagPath createVoxelShapeNode(const MDagPath& voxelizedMeshDagPath);
+	void createVoxelShapeNode(const MDagPath& voxelizedMeshDagPath);
 };
