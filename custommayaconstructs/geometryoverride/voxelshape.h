@@ -11,7 +11,7 @@ class VoxelShape : public MPxSurfaceShape {
 public:
     inline static MTypeId id = { 0x0012A3B4 };
     inline static MString typeName = "VoxelShape";
-    inline static MString drawDbClassification = "drawdb/geometry/voxelshape";
+    inline static MString drawDbClassification = "drawdb/subscene/voxelSubsceneOverride/voxelshape";
     // Attributes (required to work with deformers)
     inline static MObject aInputGeom; 
     inline static MObject aOutputGeom;
@@ -75,21 +75,44 @@ public:
     VoxelShape() = default;
     ~VoxelShape() override = default;
    
-    bool isBounded() const override { return false; }
-    
+    bool isBounded() const override { return true; }
+
+    MBoundingBox boundingBox() const override {
+        MDagPath srcDagPath = pathToOriginalGeometry();
+        if (!srcDagPath.isValid()) return MBoundingBox();
+
+        return MFnDagNode(srcDagPath).boundingBox();
+    }
+
+    MDagPath pathToOriginalGeometry() const {
+        MPlug inPlug(thisMObject(), aInputGeom);
+        if (inPlug.isNull()) return MDagPath();
+
+        MPlugArray sources;
+        if (!inPlug.connectedTo(sources, true, false) || sources.length() <= 0) return MDagPath();
+
+        const MPlug& srcPlug = sources[0];
+        MObject srcNode = srcPlug.node();
+        if (srcNode.isNull() || !srcNode.hasFn(MFn::kMesh)) return MDagPath();
+
+        MDagPath srcDagPath;
+        MStatus status = MDagPath::getAPathTo(srcNode, srcDagPath);
+        if (status != MS::kSuccess) return MDagPath();
+
+        return srcDagPath;
+    }
+
     MObject localShapeInAttr() const override { return aInputGeom; }
     MObject localShapeOutAttr() const override { return aOutputGeom; }
     MObject worldShapeOutAttr() const override { return aWorldGeom; }
     MObject cachedShapeAttr() const override { return aCachedGeom; }
     
     MObject geometryData() const override { 
-        // Following pattern set out in API examples
-        VoxelShape* nonConstThis = const_cast<VoxelShape*>(this);
-        MDataBlock dataBlock = nonConstThis->forceCache();
-        MDataHandle geomHandle = dataBlock.outputValue(aOutputGeom);
-        if (geomHandle.data().isNull()) return MObject::kNullObj;
+        const MDagPath srcDagPath = pathToOriginalGeometry();
+        if (!srcDagPath.isValid()) return MObject::kNullObj;
 
-        return geomHandle.data();
+        MFnMesh fnMesh(srcDagPath);
+        return fnMesh.object();
     }
 
     bool acceptsGeometryIterator(bool writeable = true) override {

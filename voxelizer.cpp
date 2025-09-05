@@ -490,31 +490,29 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     return resultMeshDagPath;
 }
 
-// TODO: it might be possible to create this directly without first copying from the original mesh shape.
-// depends whether our shape node works with the transferAttributes and transferShadingSets methods
 void Voxelizer::createVoxelShapeNode(const MDagPath& voxelTransformDagPath) {
     MStatus status;
     MObject voxelTransform = voxelTransformDagPath.node();
     MDagPath voxelMeshDagPath = voxelTransformDagPath;
-    voxelMeshDagPath.extendToShape();
+    status = voxelMeshDagPath.extendToShape();
 
 	// Create the new shape under the existing transform
 	MDagModifier dagMod;
     MObject newShapeObj = dagMod.createNode(VoxelShape::typeName, voxelTransform);
+
+    // Relegate the old shape to an intermediate object
+    MFnDagNode oldShapeDagNode(voxelMeshDagPath);
+    oldShapeDagNode.setIntermediateObject(true);
+
+    // Connect the old shape's geometry to the new shape as its input
+    MFnDependencyNode srcDep(voxelMeshDagPath.node(), &status);
+    MPlug srcOutMesh = srcDep.findPlug("outMesh", true, &status);
+
+    MFnDependencyNode dstDep(newShapeObj, &status);
+    MPlug dstInMesh = dstDep.findPlug(VoxelShape::aInputGeom, false, &status);
+
+    dagMod.connect(srcOutMesh, dstInMesh);
     dagMod.doIt();
-
-    // Copy the old shape's geometry to the new shape
-    MFnMesh oldMeshFn(voxelMeshDagPath, &status);
-    MFnMeshData newShapeDataFn;
-    MObject newShapeDataObj = newShapeDataFn.create();
-    oldMeshFn.copy(oldMeshFn.object(), newShapeDataObj, &status);
-
-    dagMod.deleteNode(voxelMeshDagPath.node());
-    dagMod.doIt();
-
-    // Finally, set the input geometry plug on the new shape
-    MPlug inputGeometryPlug = MFnDependencyNode(newShapeObj).findPlug(VoxelShape::aInputGeom, false, &status);
-    inputGeometryPlug.setValue(newShapeDataObj);
 }
 
 void Voxelizer::addVoxelToMesh(

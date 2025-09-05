@@ -12,7 +12,9 @@
 #include "custommayaconstructs/deformerdata.h"
 #include "custommayaconstructs/functionaldata.h"
 #include "custommayaconstructs/geometryoverride/voxelshape.h"
+#include "custommayaconstructs/geometryoverride/voxelsubsceneoverride.h"
 #include <maya/MFnPluginData.h>
+#include <maya/MDrawRegistry.h>
 #include "directx/compute/computeshader.h"
 #include "globalsolver.h"
 
@@ -82,7 +84,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	
 	MProgressWindow::setProgressStatus("Creating PBD particles and face constraints..."); MProgressWindow::setProgressRange(0, 100); MProgressWindow::setProgress(0);
 	MObject pbdNodeObj = PBD::createPBDNode(voxels, voxelizedMeshDagPath);
-	MObject deformerNodeObj = VoxelDeformerCPUNode::createDeformerNode(voxelizedMeshDagPath, pbdNodeObj, voxels.vertStartIdx);
+	// MObject deformerNodeObj = VoxelDeformerCPUNode::createDeformerNode(voxelizedMeshDagPath, pbdNodeObj, voxels.vertStartIdx);
 	MProgressWindow::setProgress(100);
 
 	MProgressWindow::endProgress();
@@ -391,6 +393,12 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	status = MHWRender::MDrawRegistry::registerSubSceneOverrideCreator(VoxelSubSceneOverride::drawDbClassification, VoxelSubSceneOverride::drawRegistrantId, VoxelSubSceneOverride::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelSubSceneOverride: " + status.errorString());
+		return status;
+	}
+
 	// TODO: potentially make this more robust / only allow in perspective panel?
 	MString activeModelPanel = plugin::getActiveModelPanel();
 	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
@@ -472,6 +480,11 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	status = plugin.deregisterNode(VoxelShape::id);
 	if (!status)
 		MGlobal::displayError("deregisterNode failed on VoxelShape: " + status.errorString());
+
+	// Voxel SubScene Override
+	status = MHWRender::MDrawRegistry::deregisterSubSceneOverrideCreator(VoxelSubSceneOverride::drawDbClassification, VoxelSubSceneOverride::drawRegistrantId);
+	if (!status)
+		MGlobal::displayError("deregisterSubSceneOverrideCreator failed on VoxelSubSceneOverride: " + status.errorString());
 
 	// Any loaded shaders should be cleared to free resources
 	ComputeShader::clearShaderCache();
