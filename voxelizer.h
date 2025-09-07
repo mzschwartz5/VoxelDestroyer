@@ -297,7 +297,4 @@ private:
         const MPoint& originalPivot,
         const FaceSelectionStrings& faceSelectionStrings
     );
-
-	// Replace the default shape node with a plugin voxel shape node
-	void createVoxelShapeNode(const MDagPath& voxelizedMeshDagPath);
 };

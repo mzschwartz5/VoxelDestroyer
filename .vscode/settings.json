@@ -100,5 +100,6 @@
         "future": "cpp",
         "*.rh": "cpp"
     },
-    "cmake.ignoreCMakeListsMissing": true
+    "cmake.ignoreCMakeListsMissing": true,
+    "terminal.integrated.fontLigatures.enabled": true
 }

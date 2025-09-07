@@ -9,7 +9,6 @@
 #include "constants.h"
 #include "../resource.h"
 #include <thread>
-#include "voxeldeformerCPUNode.h"
 #include <maya/MFnPluginData.h>
 #include <maya/MFnNumericData.h>
 

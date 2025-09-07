@@ -8,9 +8,9 @@
 #include <numeric>
 #include "cgalhelper.h"
 #include <maya/MProgressWindow.h>
-#include <maya/MDagModifier.h>
-#include "custommayaconstructs/geometryoverride/voxelshape.h"
 
+// TODO: voxelizer should be an MPxNode that gets connected up to the shape node and the PBD node by the plugin command
+// (Or, better yet, VoxelizerNode should *have* a Voxelizer instance - to separate the Maya-specific stuff from the actual voxelization logic)
 Voxels Voxelizer::voxelizeSelectedMesh(
     double gridEdgeLength,
     int voxelsPerEdge,
@@ -485,34 +485,7 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MGlobal::executeCommand("delete -ch " + newMeshName); // Delete the history of the combined mesh to decouple it from the original mesh
     MGlobal::executeCommand("select -cl;", false, false); // Clear selection
 
-    createVoxelShapeNode(resultMeshDagPath);
-
     return resultMeshDagPath;
-}
-
-void Voxelizer::createVoxelShapeNode(const MDagPath& voxelTransformDagPath) {
-    MStatus status;
-    MObject voxelTransform = voxelTransformDagPath.node();
-    MDagPath voxelMeshDagPath = voxelTransformDagPath;
-    status = voxelMeshDagPath.extendToShape();
-
-	// Create the new shape under the existing transform
-	MDagModifier dagMod;
-    MObject newShapeObj = dagMod.createNode(VoxelShape::typeName, voxelTransform);
-
-    // Relegate the old shape to an intermediate object
-    MFnDagNode oldShapeDagNode(voxelMeshDagPath);
-    oldShapeDagNode.setIntermediateObject(true);
-
-    // Connect the old shape's geometry to the new shape as its input
-    MFnDependencyNode srcDep(voxelMeshDagPath.node(), &status);
-    MPlug srcOutMesh = srcDep.findPlug("outMesh", true, &status);
-
-    MFnDependencyNode dstDep(newShapeObj, &status);
-    MPlug dstInMesh = dstDep.findPlug(VoxelShape::aInputGeom, false, &status);
-
-    dagMod.connect(srcOutMesh, dstInMesh);
-    dagMod.doIt();
 }
 
 void Voxelizer::addVoxelToMesh(
