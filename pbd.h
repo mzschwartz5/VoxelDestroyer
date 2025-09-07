@@ -51,11 +51,11 @@ public:
     // Inputs
     static MObject aTriggerIn;
     static MObject aVoxelData;
-    static MObject aParticleBufferOffsetIn;
+    static MObject aParticleBufferOffset;
     // Output
     static MObject aTriggerOut;
     static MObject aParticleData;
-    static MObject aParticleBufferOffsetOut;
+    static MObject aParticleSRV;
     static MObject aSimulateSubstepFunction;
     
     PBD() = default;
@@ -113,7 +113,7 @@ private:
 
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override;
     void simulateSubstep();
-    void onParticleBufferOffsetChanged(int newOffset);
+    void onParticleBufferOffsetChanged(int newOffset, MDataHandle& particleUAVHandle);
 
     float BETA{ 0.0f };
     float PARTICLE_RADIUS{ 0.25f };

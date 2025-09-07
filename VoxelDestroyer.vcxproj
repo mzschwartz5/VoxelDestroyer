@@ -189,13 +189,11 @@
     <ClInclude Include="custommayaconstructs\voxeldragcontextcommand.h" />
     <ClInclude Include="custommayaconstructs\voxelrendereroverride.h" />
     <ClInclude Include="custommayaconstructs\voxelsimulationnode.h" />
-    <ClInclude Include="custommayaconstructs\voxeldeformerCPUNode.h" />
-    <ClInclude Include="custommayaconstructs\voxeldeformerGPUNode.h" />
     <ClInclude Include="custommayaconstructs\voxeldata.h" />
     <ClInclude Include="custommayaconstructs\particledata.h" />
     <ClInclude Include="custommayaconstructs\deformerdata.h" />
-    <ClInclude Include="custommayaconstructs\geometryoverride\voxelgeometryoverride.h" />
     <ClInclude Include="custommayaconstructs\geometryoverride\voxelshape.h" />
+    <ClInclude Include="custommayaconstructs\geometryoverride\voxelsubsceneoverride.h" />
     <ClInclude Include="directx\directx.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\vgscompute.h" />
@@ -207,6 +205,7 @@
     <ClInclude Include="directx\compute\prefixscancompute.h" />
     <ClInclude Include="directx\compute\prefixscancollectcompute.h" />
     <ClInclude Include="directx\compute\solvecollisioncompute.h" />
+    <ClInclude Include="directx\compute\deformverticescompute.h" />
     <ClInclude Include="directx\d3dincludehandler.h" />
   </ItemGroup>
   <ItemGroup>

@@ -28,7 +28,33 @@ public:
         return new VoxelSubSceneOverride(obj);
     }
 
-    ~VoxelSubSceneOverride() override = default;
+    ~VoxelSubSceneOverride() override {
+        // Tell MRenderer that we don't need the GPU memory anymore.
+        D3D11_BUFFER_DESC desc;
+        if (positionsBuffer) {
+            positionsBuffer->GetDesc(&desc);
+            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
+            positionsBuffer.Reset();
+        }
+
+        if (normalsBuffer) {
+            normalsBuffer->GetDesc(&desc);
+            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
+            normalsBuffer.Reset();
+        }
+
+        if (originalPositionsBuffer) {
+            originalPositionsBuffer->GetDesc(&desc);
+            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
+            originalPositionsBuffer.Reset();
+        }
+
+        if (originalNormalsBuffer) {
+            originalNormalsBuffer->GetDesc(&desc);
+            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
+            originalNormalsBuffer.Reset();
+        }
+    }
     
     DrawAPI supportedDrawAPIs() const override {
         return kDirectX11;
@@ -139,17 +165,70 @@ public:
 
     void createVertexBuffer(const MVertexBufferDescriptor& vbDesc, const MGeometryExtractor& extractor, uint vertexCount, MVertexBufferArray& vertexBufferArray) {
         auto vertexBuffer = make_unique<MVertexBuffer>(vbDesc);
-        void* data = vertexBuffer->acquire(vertexCount, true);
-        extractor.populateVertexBuffer(data, vertexCount, vbDesc);
-        vertexBuffer->commit(data);
+        const MGeometry::Semantic semantic = vbDesc.semantic();
+        
+        // Position and normal buffers need to be created with flags for binding (write-ably) to a DX11 compute shader (for the deform vertex compute step).
+        // So create them as DX11 buffers with the unordered access flag, then pass the underlying resource handle to the Maya MVertexBuffer.
+        if (semantic == MGeometry::kPosition || semantic == MGeometry::kNormal) {
+            ComPtr<ID3D11Buffer>& buffer = (semantic == MGeometry::kPosition) ? positionsBuffer : normalsBuffer;
+            D3D11_BUFFER_DESC bufferDesc = {};
+            D3D11_SUBRESOURCE_DATA initData = {};
+            
+            // Create the buffer
+            std::vector<float> data(vertexCount * vbDesc.dimension(), 0.0f);
+            extractor.populateVertexBuffer(data.data(), vertexCount, vbDesc);
+
+            bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+            bufferDesc.ByteWidth = data.size() * sizeof(float);
+            bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER | D3D11_BIND_UNORDERED_ACCESS;
+            bufferDesc.CPUAccessFlags = 0;
+            bufferDesc.MiscFlags = 0;
+
+            initData.pSysMem = data.data();
+            DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, buffer.GetAddressOf());
+            MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
+
+            vertexBuffer->resourceHandle(buffer.Get(), bufferDesc.ByteWidth);
+
+            // Create the UAV
+            ComPtr<ID3D11UnorderedAccessView>& uav = (semantic == MGeometry::kPosition) ? positionsUAV : normalsUAV;
+            D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+            uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+            uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+            uavDesc.Buffer.FirstElement = 0;
+            uavDesc.Buffer.NumElements = vertexCount * vbDesc.dimension();
+
+            DirectX::getDevice()->CreateUnorderedAccessView(buffer.Get(), &uavDesc, uav.GetAddressOf());
+
+            // Also need to create a buffer with the original positions/normals for the deform shader to read from
+            ComPtr<ID3D11Buffer>& originalBuffer = (semantic == MGeometry::kPosition) ? originalPositionsBuffer : originalNormalsBuffer;
+            bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, originalBuffer.GetAddressOf());
+            MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
+            
+            ComPtr<ID3D11ShaderResourceView>& originalSRV = (semantic == MGeometry::kPosition) ? originalPositionsSRV : originalNormalsSRV;
+            D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+            srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+            srvDesc.Buffer.FirstElement = 0;
+            srvDesc.Buffer.NumElements = vertexCount * vbDesc.dimension();
+
+            DirectX::getDevice()->CreateShaderResourceView(originalBuffer.Get(), &srvDesc, originalSRV.GetAddressOf());
+        }
+        else {
+            void* data = vertexBuffer->acquire(vertexCount, true);
+            extractor.populateVertexBuffer(data, vertexCount, vbDesc);
+            vertexBuffer->commit(data);
+        }
+        
         vertexBufferArray.addBuffer(vbDesc.name(), vertexBuffer.get());
-        vertexBuffers.push_back(std::move(vertexBuffer));
+        mayaVertexBuffers.insert({semantic, std::move(vertexBuffer)});
     }
 
     MIndexBuffer* createIndexBuffer(const RenderItemInfo& itemInfo, const MGeometryExtractor& extractor) {
         unsigned int numTriangles = extractor.primitiveCount(itemInfo.indexDesc);
         if (numTriangles == 0) return nullptr;
-
+    
         auto indexBuffer = make_unique<MIndexBuffer>(MGeometry::kUnsignedInt32);
         void* indexData = indexBuffer->acquire(3 * numTriangles, true);
 
@@ -172,8 +251,19 @@ public:
         renderItem->setWantConsolidation(true);
         renderItem->setShader(itemInfo.shaderInstance);
         container.add(renderItem);
-
+        
+        releaseShaderInstance(itemInfo.shaderInstance);
         return renderItem;
+    }
+
+    void releaseShaderInstance(MShaderInstance* shaderInstance) {
+        MRenderer* renderer = MRenderer::theRenderer();
+        if (!renderer) return;
+
+        const MShaderManager* shaderManager = renderer->getShaderManager();
+        if (!shaderManager) return;
+
+        shaderManager->releaseShader(shaderInstance);
     }
 
     /**
@@ -185,6 +275,8 @@ public:
     {
         if (!voxelShape) return;
         MStatus status;
+        mayaVertexBuffers.clear();
+        indexBuffers.clear();
 
         const MDagPath originalGeomPath = voxelShape->pathToOriginalGeometry();
         MFnMesh originalMeshFn(originalGeomPath.node());
@@ -224,13 +316,35 @@ public:
             if (!rawIndexBuffer) continue;
 
             MRenderItem* renderItem = createRenderItem(container, itemInfo);
-            status = setGeometryForRenderItem(*renderItem, vertexBufferArray, *rawIndexBuffer, &bounds);
+            setGeometryForRenderItem(*renderItem, vertexBufferArray, *rawIndexBuffer, &bounds);
         }
+
+        voxelShape->initializeDeformVerticesCompute(
+            vertexCount, 
+            positionsUAV, 
+            normalsUAV,
+            originalPositionsSRV, 
+            originalNormalsSRV
+        );
     }
 
 private:
     VoxelShape* voxelShape;
-    std::vector<unique_ptr<MVertexBuffer>> vertexBuffers;
+    
+    ComPtr<ID3D11Buffer> positionsBuffer;
+    ComPtr<ID3D11UnorderedAccessView> positionsUAV;
+
+    ComPtr<ID3D11Buffer> normalsBuffer;
+    ComPtr<ID3D11UnorderedAccessView> normalsUAV;
+
+    // The deform shader also needs the original vertex positions and normals to do its transformations
+    ComPtr<ID3D11Buffer> originalPositionsBuffer;
+    ComPtr<ID3D11ShaderResourceView> originalPositionsSRV;
+
+    ComPtr<ID3D11Buffer> originalNormalsBuffer;
+    ComPtr<ID3D11ShaderResourceView> originalNormalsSRV;
+
+    std::unordered_map<MGeometry::Semantic, unique_ptr<MVertexBuffer>> mayaVertexBuffers;
     std::vector<unique_ptr<MIndexBuffer>> indexBuffers;
 
     VoxelSubSceneOverride(const MObject& obj)

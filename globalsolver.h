@@ -91,7 +91,7 @@ private:
         D3D11_SUBRESOURCE_DATA initData = {};
 
         bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        bufferDesc.ByteWidth = data.size() * sizeof(T);
+        bufferDesc.ByteWidth = static_cast<UINT>(data.size() * sizeof(T));
         bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
         bufferDesc.CPUAccessFlags = 0;
         bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;

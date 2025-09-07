@@ -8,7 +8,6 @@
 #include <maya/MFnDependencyNode.h>
 #include <maya/MItDependencyNodes.h>
 #include "glm/glm.hpp"
-#include "custommayaconstructs/voxeldeformerGPUNode.h"
 #include "custommayaconstructs/voxeldragcontext.h"
 
 const MTypeId GlobalSolver::id(0x0013A7B1);
@@ -131,8 +130,6 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
         deleteParticleData(plug);
     }
 
-    // The deformer needs to update its OpenCL handle to the D3D global particle buffer
-    VoxelDeformerGPUNode::initGlobalParticlesBuffer(buffers[BufferType::PARTICLE]);
     GlobalSolver* globalSolver = static_cast<GlobalSolver*>(clientData);
     globalSolver->createGlobalComputeShaders(maximumParticleRadius);
 
@@ -144,7 +141,7 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
         particleBufferOffsetPlug.setInt(offset);
     }
 
-    // Now, disconnect parallel-array plug entries associated with this PBD node, which effectively deletes them (bc of kDelete setting).
+    // Now, disconnect parallel-array plug entries associated with this PBD node.
     if (msg & MNodeMessage::kConnectionBroken) {
         uint logicalIndex = plug.logicalIndex();
         MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(logicalIndex);

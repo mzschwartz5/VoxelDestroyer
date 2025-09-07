@@ -11,6 +11,7 @@
 #include "custommayaconstructs/particledata.h"
 #include "custommayaconstructs/deformerdata.h"
 #include "custommayaconstructs/functionaldata.h"
+#include "custommayaconstructs/d3d11data.h"
 #include "custommayaconstructs/geometryoverride/voxelshape.h"
 #include "custommayaconstructs/geometryoverride/voxelsubsceneoverride.h"
 #include <maya/MFnPluginData.h>
@@ -84,7 +85,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	
 	MProgressWindow::setProgressStatus("Creating PBD particles and face constraints..."); MProgressWindow::setProgressRange(0, 100); MProgressWindow::setProgress(0);
 	MObject pbdNodeObj = PBD::createPBDNode(voxels, voxelizedMeshDagPath);
-	// MObject deformerNodeObj = VoxelDeformerCPUNode::createDeformerNode(voxelizedMeshDagPath, pbdNodeObj, voxels.vertStartIdx);
+	MObject voxelShapeObj = VoxelShape::createVoxelShapeNode(voxels, voxelizedMeshDagPath, pbdNodeObj);
 	MProgressWindow::setProgress(100);
 
 	MProgressWindow::endProgress();
@@ -343,6 +344,12 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	status = plugin.registerData(D3D11Data::fullName, D3D11Data::id, D3D11Data::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register D3D11Data: " + status.errorString());
+		return status;
+	}
+
 	// PBD Node
 	status = plugin.registerNode(PBD::pbdNodeName, PBD::id, PBD::creator, PBD::initialize, MPxNode::kDependNode);
 	if (!status) {
@@ -364,21 +371,6 @@ EXPORT MStatus initializePlugin(MObject obj)
 		MGlobal::displayError("Failed to register VoxelRendererOverride: " + status.errorString());
 		return status;
 	}
-
-	// CPU Deformer Node
-	status = plugin.registerNode(VoxelDeformerCPUNode::typeName(), VoxelDeformerCPUNode::id, VoxelDeformerCPUNode::creator, VoxelDeformerCPUNode::initialize, MPxNode::kDeformerNode);
-	if (!status) {
-		MGlobal::displayError("Failed to register VoxelDeformerCPUNode");
-		return status;
-	}
-
-	// GPU Deformer override
-	status = MGPUDeformerRegistry::registerGPUDeformerCreator(VoxelDeformerCPUNode::typeName(), "VoxelDestroyer", VoxelDeformerGPUNode::getGPUDeformerInfo());
-	if (!status) {
-		MGlobal::displayError("Failed to register VoxelDeformerGPUNode: " + status.errorString());
-		return status;
-	}
-	VoxelDeformerGPUNode::compileKernel();
 
 	// Global solver node
 	status = plugin.registerNode(GlobalSolver::globalSolverNodeName, GlobalSolver::id, GlobalSolver::creator, GlobalSolver::initialize, MPxNode::kDependNode);
@@ -449,6 +441,10 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	if (!status)
 		MGlobal::displayError("deregisterData failed on FunctionalData: " + status.errorString());
 
+	status = plugin.deregisterData(D3D11Data::id);
+	if (!status)
+		MGlobal::displayError("deregisterData failed on D3D11Data: " + status.errorString());
+
 	// PBD Node
 	status = plugin.deregisterNode(PBD::id);
 	if (!status)
@@ -458,17 +454,6 @@ EXPORT MStatus uninitializePlugin(MObject obj)
     MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);
     delete plugin::voxelRendererOverride;
     plugin::voxelRendererOverride = nullptr;
-	
-    // Voxel Deformer GPU override
-	VoxelDeformerGPUNode::tearDown();
-    status = MGPUDeformerRegistry::deregisterGPUDeformerCreator(VoxelDeformerCPUNode::typeName(), "VoxelDestroyer");
-    if (!status)
-		MGlobal::displayError("deregisterGPUDeformerCreator failed on VoxelDeformerCPUNode: " + status.errorString());
-
-	// Voxel Deformer CPU Node
-    status = plugin.deregisterNode(VoxelDeformerCPUNode::id);
-    if (!status)
-        MGlobal::displayError("deregisterNode failed on VoxelDeformerCPUNode: " + status.errorString());
 
 	// Global Solver Node
 	GlobalSolver::tearDown();
