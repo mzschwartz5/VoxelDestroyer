@@ -9,8 +9,8 @@ public:
     DeformVerticesCompute(
         int numParticles,
         int vertexCount,
-        const std::vector<uint>& vertexOffsets,       // Will be uploaded to GPU
         const glm::vec4* originalParticlePositions,   // Will be uploaded to GPU
+        const std::vector<uint>& vertexVoxelIds,      // Will be uploaded to GPU
         const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
         const ComPtr<ID3D11UnorderedAccessView>& normalsUAV,
         const ComPtr<ID3D11ShaderResourceView>& originalPositionsSRV,
@@ -18,7 +18,7 @@ public:
         const ComPtr<ID3D11ShaderResourceView>& particleSRV
     ) : ComputeShader(IDR_SHADER1), positionsUAV(positionsUAV), normalsUAV(normalsUAV), originalPositionsSRV(originalPositionsSRV), originalNormalsSRV(originalNormalsSRV), particleSRV(particleSRV)
     {
-        initializeBuffers(numParticles, vertexCount, vertexOffsets, originalParticlePositions);
+        initializeBuffers(numParticles, vertexCount, originalParticlePositions);
     }
 
     void dispatch() override
@@ -49,7 +49,7 @@ private:
         DirectX::getContext()->CSSetShader(nullptr, NULL, 0);
     };
 
-    void initializeBuffers(int numParticles, int vertexCount, const std::vector<uint>& vertexOffsets, const glm::vec4* originalParticlePositions)
+    void initializeBuffers(int numParticles, int vertexCount, const glm::vec4* originalParticlePositions)
     {
         
     }

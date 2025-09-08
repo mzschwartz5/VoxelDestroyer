@@ -12,13 +12,14 @@
 #include <maya/MNodeMessage.h>
 #include "../../voxelizer.h"
 #include "../../pbd.h"
-#include "../deformerdata.h"
 #include "../particledata.h"
 #include "../d3d11data.h"
+#include "../voxeldata.h"
 #include "../../directx/compute/deformverticescompute.h"
 #include <d3d11.h>
 #include <wrl/client.h>
 #include "directx/directx.h"
+#include "../../utils.h"
 using Microsoft::WRL::ComPtr;
 
 class VoxelShape : public MPxSurfaceShape {
@@ -29,9 +30,9 @@ public:
     inline static MString drawDbClassification = "drawdb/subscene/voxelSubsceneOverride/voxelshape";
     
     inline static MObject aInputGeom;
-    inline static MObject aDeformerData;
     inline static MObject aParticleSRV;
     inline static MObject aParticleData;
+    inline static MObject aVoxelData;
     inline static MObject aTrigger;
 
     static void* creator() { return new VoxelShape(); }
@@ -45,15 +46,6 @@ public:
         tAttr.setReadable(false);
         tAttr.setWritable(true);
         status = addAttribute(aInputGeom);
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-
-        // Vertex buffer offsets (TODO: better name for data / attribute)
-        aDeformerData = tAttr.create("deformerData", "ddt", DeformerData::id, MObject::kNullObj, &status);
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-        tAttr.setStorable(true); // YES storable - we want this data to persist with save/load
-        tAttr.setWritable(false); // set by voxelizer directly, not written by connection. (TODO: for now...)
-        tAttr.setReadable(false);
-        status = addAttribute(aDeformerData);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         // Contains the particle positions (on the CPU) and a few other things not used by this node.
@@ -73,6 +65,14 @@ public:
         status = addAttribute(aParticleSRV);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
+        aVoxelData = tAttr.create("voxelData", "vxd", VoxelData::id, MObject::kNullObj, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        tAttr.setStorable(false);
+        tAttr.setWritable(true);
+        tAttr.setReadable(false);
+        status = addAttribute(aVoxelData);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
         // This is the output of the PBD sim node, which is just used to trigger evaluation of the deformer.
         MFnNumericAttribute nAttr;
         aTrigger = nAttr.create("trigger", "trg", MFnNumericData::kBoolean, false, &status);
@@ -86,7 +86,7 @@ public:
         return MS::kSuccess;
     }
    
-    static MObject createVoxelShapeNode(Voxels& voxels, const MDagPath& voxelTransformDagPath, const MObject& pbdNodeObj) {
+    static MObject createVoxelShapeNode(const MDagPath& voxelTransformDagPath, const MObject& pbdNodeObj) {
         MStatus status;
         MObject voxelTransform = voxelTransformDagPath.node();
         MDagPath voxelMeshDagPath = voxelTransformDagPath;
@@ -110,15 +110,6 @@ public:
         dagMod.connect(srcOutMesh, dstInMesh);
         dagMod.doIt();
 
-        // Directly set voxel data on the shape for vertex deformation (TODO: this will be set by connection in the future...)
-        MFnPluginData pluginDataFn;
-        MObject deformerDataObj = pluginDataFn.create(DeformerData::id, &status);
-        DeformerData* deformerData = static_cast<DeformerData*>(pluginDataFn.data(&status));
-        deformerData->setVertexStartIdx(std::move(voxels.vertStartIdx));
-
-        MPlug deformerDataPlug = dstDep.findPlug(aDeformerData, false, &status);
-        deformerDataPlug.setValue(deformerDataObj);
-
         // Connect the PBD node outputs to the shape's inputs
         MDGModifier dgMod;
         MFnDependencyNode pbdNode(pbdNodeObj);
@@ -134,6 +125,10 @@ public:
         MPlug pbdParticleSRVPlug = pbdNode.findPlug(PBD::aParticleSRV, false);
         MPlug particleSRVPlug = dstDep.findPlug(aParticleSRV, false);
         dgMod.connect(pbdParticleSRVPlug, particleSRVPlug);
+
+        MPlug pbdVoxelDataPlug = pbdNode.findPlug(PBD::aVoxelDataOut, false);
+        MPlug voxelDataPlug = dstDep.findPlug(aVoxelData, false);
+        dgMod.connect(pbdVoxelDataPlug, voxelDataPlug); 
 
         dgMod.doIt();
 
@@ -167,43 +162,55 @@ public:
         return srcDagPath;
     }
     
-    MObject geometryData() const override { 
-        const MDagPath srcDagPath = pathToOriginalGeometry();
-        if (!srcDagPath.isValid()) return MObject::kNullObj;
-
-        MFnMesh fnMesh(srcDagPath);
-        return fnMesh.object();
-    }
-
     bool excludeAsPluginShape() const {
         // Always display this shape in the outliner, even when plugin shapes are excluded.
         return false;
     }
 
-    MObject createFullVertexGroup() const override {
-        MFnSingleIndexedComponent fnComponent;
-        MObject fullComponent = fnComponent.create( MFn::kMeshVertComponent );
-        MObject geomData = geometryData();
-        if (geomData.isNull()) return MObject::kNullObj;
+    /**
+     * Associate each vertex in the buffer created by the subscene override with a voxel ID it belongs to.
+     * This is done by computing the centroid of each triangle and seeing which voxel it falls into. All vertices of that triangle get tagged with that voxel ID.
+     * 
+     * We do this now, instead of in the voxelizer, because the subscene override is the ultimate source of truth on the order of vertices in the GPU buffers.
+     * Aside from possible internal Maya reasons, supporting split normals, UV seams, etc. requires duplicating vertices. So we have to do this step after the subscene override has created the final vertex buffers.
+     */
+    std::vector<uint> getVoxelIdsForVertices(
+        const std::vector<uint>& vertexIndices,
+        const std::vector<float>& vertexPositions,
+        const VoxelizationGrid& voxelizationGrid,
+        const Voxels& voxels
+    ) const {
 
-        int numVertices = MFnMesh(geomData).numVertices();
-        fnComponent.setCompleteData(numVertices);
-        return fullComponent;
-    }
+        std::vector<uint> voxelIds(vertexPositions.size() / 3, 0);
+        double voxelSize = voxelizationGrid.gridEdgeLength / voxelizationGrid.voxelsPerEdge;
+        MPoint gridMin = voxelizationGrid.gridCenter - MVector(voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2);
+        const std::unordered_map<uint32_t, uint32_t>& voxelMortonCodeToIndex = voxels.mortonCodesToSortedIdx;
 
-    bool match( const MSelectionMask & mask, const MObjectArray& componentList ) const override {
-        if( componentList.length() == 0 ) {
-            return mask.intersects( MSelectionMask::kSelectMeshes );
+        for (size_t i = 0; i < vertexIndices.size(); i += 3) {
+            uint idx0 = vertexIndices[i] * 3;
+            uint idx1 = vertexIndices[i + 1] * 3;
+            uint idx2 = vertexIndices[i + 2] * 3;
+
+            MPoint v0(vertexPositions[idx0], vertexPositions[idx0 + 1], vertexPositions[idx0 + 2]);
+            MPoint v1(vertexPositions[idx1], vertexPositions[idx1 + 1], vertexPositions[idx1 + 2]);
+            MPoint v2(vertexPositions[idx2], vertexPositions[idx2 + 1], vertexPositions[idx2 + 2]);
+
+            MPoint centroid = (v0 + v1 + v2) / 3.0;
+
+            int voxelX = static_cast<int>(floor((centroid.x - gridMin.x) / voxelSize));
+            int voxelY = static_cast<int>(floor((centroid.y - gridMin.y) / voxelSize));
+            int voxelZ = static_cast<int>(floor((centroid.z - gridMin.z) / voxelSize));
+
+            uint voxelMortonCode = Utils::toMortonCode(voxelX, voxelY, voxelZ);
+            uint voxelId = voxelMortonCodeToIndex.at(voxelMortonCode);
+
+            // Tag all three vertices of this triangle with the same voxel ID
+            voxelIds[i] = voxelId;
+            voxelIds[i + 1] = voxelId;
+            voxelIds[i + 2] = voxelId;
         }
 
-        for ( uint i=0; i < componentList.length(); ++i ) {
-            if ((componentList[i].apiType() == MFn::kMeshVertComponent) 
-                && (mask.intersects(MSelectionMask::kSelectMeshVerts))) 
-            {
-                return true;
-            }
-        }
-        return false;
+        return voxelIds;
     }
 
     /**
@@ -212,7 +219,8 @@ public:
      * upload them to the GPU (done in the constructor of DeformVerticesCompute).
      */
     void initializeDeformVerticesCompute(
-        int vertexCount,
+        const std::vector<uint>& vertexIndices,
+        const std::vector<float>& vertexPositions,
         const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
         const ComPtr<ID3D11UnorderedAccessView>& normalsUAV,
         const ComPtr<ID3D11ShaderResourceView>& originalPositionsSRV,
@@ -225,28 +233,35 @@ public:
         ParticleData* particleData = static_cast<ParticleData*>(particleDataFn.data());
         const ParticleDataContainer& particleDataContainer = particleData->getData();
 
-        MObject deformerDataObj;
-        MPlug deformerDataPlug(thisMObject(), aDeformerData);
-        deformerDataPlug.getValue(deformerDataObj);
-        MFnPluginData deformerDataFn(deformerDataObj);
-        DeformerData* deformerData = static_cast<DeformerData*>(deformerDataFn.data());
-
         MObject particleSRVObj;
         MPlug particleSRVPlug(thisMObject(), aParticleSRV);
         particleSRVPlug.getValue(particleSRVObj);
         MFnPluginData d3d11DataFn(particleSRVObj);
-        D3D11Data* d3d11Data = static_cast<D3D11Data*>(d3d11DataFn.data());
+        D3D11Data* particleSRVData = static_cast<D3D11Data*>(d3d11DataFn.data());
+
+        MObject voxelDataObj;
+        MPlug voxelDataPlug(thisMObject(), aVoxelData);
+        voxelDataPlug.getValue(voxelDataObj);
+        MFnPluginData voxelDataFn(voxelDataObj);
+        VoxelData* voxelData = static_cast<VoxelData*>(voxelDataFn.data());
+
+        std::vector<uint> vertexVoxelIds = getVoxelIdsForVertices(
+            vertexIndices, 
+            vertexPositions,
+            voxelData->getVoxelizationGrid(),
+            voxelData->getVoxels()
+        );
 
         deformVerticesCompute = DeformVerticesCompute(
             particleDataContainer.numParticles,
-            vertexCount,
-            deformerData->getVertexStartIdx(),
+            vertexPositions.size() / 3,
             particleDataContainer.particlePositionsCPU,
+            vertexVoxelIds,
             positionsUAV,
             normalsUAV,
             originalPositionsSRV,
             originalNormalsSRV,
-            d3d11Data->getSRV()
+            particleSRVData->getSRV()
         );
 
         isInitialized = true;
@@ -296,6 +311,5 @@ private:
 
         callbackIds.append(callbackId);
     }
-
 
 };

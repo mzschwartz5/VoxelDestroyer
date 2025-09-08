@@ -17,7 +17,8 @@
 MObject PBD::aMeshOwner;
 MObject PBD::aTriggerIn;
 MObject PBD::aTriggerOut;
-MObject PBD::aVoxelData;
+MObject PBD::aVoxelDataIn;
+MObject PBD::aVoxelDataOut;
 MObject PBD::aParticleData;
 MObject PBD::aParticleBufferOffset;
 MObject PBD::aParticleSRV;
@@ -57,15 +58,21 @@ MStatus PBD::initialize() {
     status = addAttribute(aTriggerOut);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     
-    // Voxel data attribute
+    // Voxel data input attribute
     MFnTypedAttribute tVoxelDataAttr;
-    aVoxelData = tVoxelDataAttr.create("voxeldata", "vxd", VoxelData::id, MObject::kNullObj, &status);
+    aVoxelDataIn = tVoxelDataAttr.create("voxeldatain", "vxdi", VoxelData::id, MObject::kNullObj, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     tVoxelDataAttr.setCached(false);
     tVoxelDataAttr.setStorable(true);
     tVoxelDataAttr.setWritable(true);
-    tVoxelDataAttr.setConnectable(false); // Only used for setting input data
-    status = addAttribute(aVoxelData);
+    status = addAttribute(aVoxelDataIn);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    aVoxelDataOut = tVoxelDataAttr.create("voxeldataout", "vxdo", VoxelData::id, MObject::kNullObj, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    tVoxelDataAttr.setWritable(false);
+    tVoxelDataAttr.setReadable(true);
+    status = addAttribute(aVoxelDataOut);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     
     // Output particle data to facilitate GPU buffer resource initialization in the GPU deformer override
@@ -88,7 +95,7 @@ MStatus PBD::initialize() {
     status = addAttribute(aSimulateSubstepFunction);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    // Input/Output attribute: particle buffer offset tells PBD node and deformer node where in the global particle buffer its particles start
+    // Particle buffer offset tells PBD node and deformer node where in the global particle buffer its particles start
     MFnNumericAttribute nParticleBufferOffsetAttr;
     aParticleBufferOffset = nParticleBufferOffsetAttr.create("particlebufferoffset", "pbo", MFnNumericData::kInt, -1, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
@@ -111,6 +118,9 @@ MStatus PBD::initialize() {
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     status = attributeAffects(aParticleBufferOffset, aParticleSRV);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    status = attributeAffects(aVoxelDataIn, aVoxelDataOut);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     return MS::kSuccess;
@@ -138,7 +148,7 @@ void PBD::postConstructor() {
 /**
  * Static factory method to create a PBD node, setting up its connections and attributes.
  */
-MObject PBD::createPBDNode(Voxels& voxels, const MDagPath& meshDagPath) {
+MObject PBD::createPBDNode(Voxels& voxels, const VoxelizationGrid& voxelizationGrid, const MDagPath& meshDagPath) {
     MStatus status;
     MDGModifier dgMod;
     MObject pbdNodeObj = dgMod.createNode(PBD::pbdNodeName, &status);
@@ -156,9 +166,10 @@ MObject PBD::createPBDNode(Voxels& voxels, const MDagPath& meshDagPath) {
 	MObject pluginDataObj = pluginDataFn.create( VoxelData::id, &status );
 	VoxelData* voxelData = static_cast<VoxelData*>(pluginDataFn.data(&status));
 	voxelData->setVoxels(voxels);
+    voxelData->setVoxelizationGrid(voxelizationGrid);
 
-	MPlug voxelDataPlug = pbdNode.findPlug(aVoxelData, false, &status);
-	voxelDataPlug.setValue(pluginDataObj);
+	MPlug voxelDataInPlug = pbdNode.findPlug(aVoxelDataIn, false, &status);
+	voxelDataInPlug.setValue(pluginDataObj);
 
     // Connect the particle data attribute output to the global solver node's particle data (array) input.
     // And connect the particle buffer offset attribute to the global solver node's particle buffer offset (array) output.
@@ -198,7 +209,7 @@ MObject PBD::createPBDNode(Voxels& voxels, const MDagPath& meshDagPath) {
 void PBD::onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
     // Only respond to changes to the voxel data attribute
     // Only respond to attribute value changes
-    if (plug != aVoxelData || !(msg & MNodeMessage::kAttributeSet)) {
+    if (plug != aVoxelDataIn || !(msg & MNodeMessage::kAttributeSet)) {
         return;
     }
 
@@ -373,15 +384,24 @@ void PBD::createParticles(const Voxels& voxels) {
 }
 
 MStatus PBD::compute(const MPlug& plug, MDataBlock& dataBlock) {
-    // This is the only attribute that explicitly needs to be recomputed.
-    // It's not simply set once, and its input affects its output (as more than just a trigger).
-    if (plug != aParticleSRV) return MS::kSuccess;
+    if (plug == aVoxelDataOut) {
+        MDataHandle inHandle = dataBlock.inputValue(aVoxelDataIn);
+        MObject voxelDataObj = inHandle.data();
 
-    int particleBufferOffset = dataBlock.inputValue(aParticleBufferOffset).asInt();
-    MDataHandle particleUAVHandle = dataBlock.outputValue(aParticleSRV);
-    onParticleBufferOffsetChanged(particleBufferOffset, particleUAVHandle);
+        MDataHandle outHandle = dataBlock.outputValue(aVoxelDataOut);
+        outHandle.set(voxelDataObj);
+        outHandle.setClean();
+        return MS::kSuccess;
+    }
 
-    return MS::kSuccess;
+    if (plug == aParticleSRV) {
+        int particleBufferOffset = dataBlock.inputValue(aParticleBufferOffset).asInt();
+        MDataHandle particleUAVHandle = dataBlock.outputValue(aParticleSRV);
+        onParticleBufferOffsetChanged(particleBufferOffset, particleUAVHandle);
+        return MS::kSuccess;
+    }
+
+    return MS::kUnknownParameter;
 }
 
 void PBD::simulateSubstep() {

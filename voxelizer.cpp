@@ -12,9 +12,7 @@
 // TODO: voxelizer should be an MPxNode that gets connected up to the shape node and the PBD node by the plugin command
 // (Or, better yet, VoxelizerNode should *have* a Voxelizer instance - to separate the Maya-specific stuff from the actual voxelization logic)
 Voxels Voxelizer::voxelizeSelectedMesh(
-    double gridEdgeLength,
-    int voxelsPerEdge,
-    MPoint gridCenter,
+    const VoxelizationGrid& grid,
     const MDagPath& selectedMeshPath,
     bool voxelizeSurface,
     bool voxelizeInterior,
@@ -31,8 +29,8 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     MString newMeshName = originalMeshName + "_voxelized";
 
     Voxels voxels;
-    voxels.voxelSize = gridEdgeLength / voxelsPerEdge;
-    voxels.resize(voxelsPerEdge * voxelsPerEdge * voxelsPerEdge);
+    voxels.voxelSize = grid.gridEdgeLength / grid.voxelsPerEdge;
+    voxels.resize(grid.voxelsPerEdge * grid.voxelsPerEdge * grid.voxelsPerEdge);
     status = MThreadPool::init();
     
     // Freeze transformations on the original mesh before any processing
@@ -45,9 +43,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
         MProgressWindow::setProgressStatus("Performing interior voxelization...");
         getInteriorVoxels(
             meshTris,
-            gridEdgeLength,
-            voxelsPerEdge,
-            gridCenter,
+            grid,
             voxels,
             selectedMesh
         );
@@ -57,9 +53,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
         MProgressWindow::setProgressStatus("Performing surface voxelization...");
         getSurfaceVoxels(
             meshTris,
-            gridEdgeLength,
-            voxelsPerEdge,
-            gridCenter,
+            grid,
             voxels,
             selectedMesh
         );
@@ -68,9 +62,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     MProgressWindow::setProgressStatus("Creating voxels...");
     createVoxels(
         voxels,
-        gridEdgeLength,
-        voxelsPerEdge,
-        gridCenter
+        grid
     );
 
     MProgressWindow::setProgressStatus("Sorting voxels by Morton code...");
@@ -180,17 +172,15 @@ Triangle Voxelizer::processMayaTriangle(const MFnMesh& meshFn, const std::array<
 
 void Voxelizer::getSurfaceVoxels(
     const std::vector<Triangle>& triangles,
-    double gridEdgeLength,
-    int voxelsPerEdge,
-    MPoint gridCenter,
+    const VoxelizationGrid& grid,
     Voxels& voxels,
     const MFnMesh& selectedMesh
 ) {
     MProgressWindow::setProgressRange(0, static_cast<int>(triangles.size()));
     MProgressWindow::setProgress(0);
 
-    double voxelSize = gridEdgeLength / voxelsPerEdge;
-    MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
+    double voxelSize = grid.gridEdgeLength / grid.voxelsPerEdge;
+    MPoint gridMin = grid.gridCenter - MVector(grid.gridEdgeLength / 2, grid.gridEdgeLength / 2, grid.gridEdgeLength / 2);
 
     int triIdx = 0;
     for (const Triangle& tri : triangles) {
@@ -201,16 +191,16 @@ void Voxelizer::getSurfaceVoxels(
         );
 
         MPoint voxelMax = MPoint(
-            std::min(voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().x - gridMin.x) / voxelSize))),
-            std::min(voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().y - gridMin.y) / voxelSize))),
-            std::min(voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().z - gridMin.z) / voxelSize)))
+            std::min(grid.voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().x - gridMin.x) / voxelSize))),
+            std::min(grid.voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().y - gridMin.y) / voxelSize))),
+            std::min(grid.voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().z - gridMin.z) / voxelSize)))
         );
 
         for (int x = static_cast<int>(voxelMin.x); x <= voxelMax.x; ++x) {
             for (int y = static_cast<int>(voxelMin.y); y <= voxelMax.y; ++y) {
                 for (int z = static_cast<int>(voxelMin.z); z <= voxelMax.z; ++z) {
-                    int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
-                    
+                    int index = x * grid.voxelsPerEdge * grid.voxelsPerEdge + y * grid.voxelsPerEdge + z;
+
                     MVector voxelMinCorner(MVector(x, y, z) * voxelSize + gridMin);
                     if (!doesTriangleOverlapVoxel(tri, voxelMinCorner)) continue;
                     
@@ -266,17 +256,15 @@ bool Voxelizer::isTriangleCentroidInVoxel(
 
 void Voxelizer::getInteriorVoxels(
     const std::vector<Triangle>& triangles,
-    double gridEdgeLength,
-    int voxelsPerEdge,
-    MPoint gridCenter,
+    const VoxelizationGrid& grid,
     Voxels& voxels,
     const MFnMesh& selectedMesh
 ) {
     MProgressWindow::setProgressRange(0, static_cast<int>(triangles.size()));
     MProgressWindow::setProgress(0);
 
-    double voxelSize = gridEdgeLength / voxelsPerEdge;
-    MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
+    double voxelSize = grid.gridEdgeLength / grid.voxelsPerEdge;
+    MPoint gridMin = grid.gridCenter - MVector(grid.gridEdgeLength / 2, grid.gridEdgeLength / 2, grid.gridEdgeLength / 2);
 
     int progressCounter = 0;
     for (const Triangle& tri : triangles) {
@@ -290,8 +278,8 @@ void Voxelizer::getInteriorVoxels(
 
         MPoint voxelMax = MPoint(
             0,
-            std::min(voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().y - (voxelSize / 2.0) - gridMin.y) / voxelSize))),
-            std::min(voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().z - (voxelSize / 2.0) - gridMin.z) / voxelSize)))
+            std::min(grid.voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().y - (voxelSize / 2.0) - gridMin.y) / voxelSize))),
+            std::min(grid.voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().z - (voxelSize / 2.0) - gridMin.z) / voxelSize)))
         );
 
         for (int y = static_cast<int>(voxelMin.y); y <= voxelMax.y; ++y) {
@@ -307,8 +295,8 @@ void Voxelizer::getInteriorVoxels(
                 int xVoxelMin = std::max(0, static_cast<int>(std::ceil((xIntercept - (voxelSize / 2.0) - gridMin.x) / voxelSize)));
 
                 // Now iterate over all voxels in the column (in +x) and flip their occupancy state
-                for (int x = xVoxelMin; x < voxelsPerEdge; ++x) {
-                    int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
+                for (int x = xVoxelMin; x < grid.voxelsPerEdge; ++x) {
+                    int index = x * grid.voxelsPerEdge * grid.voxelsPerEdge + y * grid.voxelsPerEdge + z;
                     voxels.occupied[index] = !voxels.occupied[index];
                 }
             }
@@ -363,20 +351,18 @@ double Voxelizer::getTriangleVoxelCenterIntercept(
 
 void Voxelizer::createVoxels(
     Voxels& overlappedVoxels,
-    double gridEdgeLength, 
-    int voxelsPerEdge,
-    MPoint gridCenter
-) {    
-    double voxelSize = gridEdgeLength / voxelsPerEdge;
-    MPoint gridMin = gridCenter - MVector(gridEdgeLength / 2, gridEdgeLength / 2, gridEdgeLength / 2);
+    const VoxelizationGrid& grid
+) {
+    double voxelSize = grid.gridEdgeLength / grid.voxelsPerEdge;
+    MPoint gridMin = grid.gridCenter - MVector(grid.gridEdgeLength / 2, grid.gridEdgeLength / 2, grid.gridEdgeLength / 2);
 
-    MProgressWindow::setProgressRange(0, voxelsPerEdge * voxelsPerEdge * voxelsPerEdge);
+    MProgressWindow::setProgressRange(0, grid.voxelsPerEdge * grid.voxelsPerEdge * grid.voxelsPerEdge);
     MProgressWindow::setProgress(0);
 
-    for (int x = 0; x < voxelsPerEdge; ++x) {
-        for (int y = 0; y < voxelsPerEdge; ++y) {
-            for (int z = 0; z < voxelsPerEdge; ++z) {
-                int index = x * voxelsPerEdge * voxelsPerEdge + y * voxelsPerEdge + z;
+    for (int x = 0; x < grid.voxelsPerEdge; ++x) {
+        for (int y = 0; y < grid.voxelsPerEdge; ++y) {
+            for (int z = 0; z < grid.voxelsPerEdge; ++z) {
+                int index = x * grid.voxelsPerEdge * grid.voxelsPerEdge + y * grid.voxelsPerEdge + z;
                 if (index % 100 == 0) MProgressWindow::advanceProgress(100);
                 if (!overlappedVoxels.occupied[index]) continue;
                 
@@ -579,7 +565,7 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
     MIntArray allPolyConnects;
     int startFaceIdx = 0;
     for (int i = 0; i < voxels->numOccupied; ++i) {
-        voxels->vertStartIdx[i] = voxels->totalVerts;
+        int startVertIdx = voxels->totalVerts;
         voxels->totalVerts += meshPointsAfterIntersection[i].length();
 
         int totalFaceCount = polyCountsAfterIntersection[i].length();
@@ -602,7 +588,7 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
         }
         
         for (unsigned int j = 0; j < polyConnectsAfterIntersection[i].length(); ++j) {
-            allPolyConnects.append(polyConnectsAfterIntersection[i][j] + voxels->vertStartIdx[i]); // Offset the vertex indices by the start index of this voxel
+            allPolyConnects.append(polyConnectsAfterIntersection[i][j] + startVertIdx); // Offset the vertex indices by the start index of this voxel
         }
 
         // To reduce memory usage at any given time:
@@ -661,7 +647,7 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
     }
 
     // Each voxel tracks triangles that are contained within it and triangles that just overlap it. 
-    // For the boolean intersection, we want the union of these two sets. Then onvert this subset of the original mesh to a CGAL SurfaceMesh.
+    // For the boolean intersection, we want the union of these two sets. Then convert this subset of the original mesh to a CGAL SurfaceMesh.
     std::vector<int> originalMeshTriIndices;
     originalMeshTriIndices.reserve(voxels->containedTris[voxelIndex].size() + voxels->overlappingTris[voxelIndex].size());
     originalMeshTriIndices.insert(originalMeshTriIndices.end(), voxels->containedTris[voxelIndex].begin(), voxels->containedTris[voxelIndex].end());

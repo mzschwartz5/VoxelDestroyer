@@ -50,10 +50,11 @@ public:
     static MObject aMeshOwner;
     // Inputs
     static MObject aTriggerIn;
-    static MObject aVoxelData;
+    static MObject aVoxelDataIn;
     static MObject aParticleBufferOffset;
     // Output
     static MObject aTriggerOut;
+    static MObject aVoxelDataOut;
     static MObject aParticleData;
     static MObject aParticleSRV;
     static MObject aSimulateSubstepFunction;
@@ -63,7 +64,7 @@ public:
     // Functions for Maya to create and initialize the node
     static void* creator() { return new PBD(); }
     static MStatus initialize();
-    static MObject createPBDNode(Voxels& voxels, const MDagPath& meshDagPath);
+    static MObject createPBDNode(Voxels& voxels, const VoxelizationGrid& voxelizationGrid, const MDagPath& meshDagPath);
     void postConstructor() override;
     MPxNode::SchedulingType schedulingType() const override {
         // Evaluated serially amongst nodes of the same type
