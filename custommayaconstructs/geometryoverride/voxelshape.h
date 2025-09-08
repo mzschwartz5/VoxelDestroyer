@@ -181,7 +181,7 @@ public:
         const Voxels& voxels
     ) const {
 
-        std::vector<uint> voxelIds(vertexPositions.size() / 3, 0);
+        std::vector<uint> vertexVoxelIds(vertexPositions.size(), 0);
         double voxelSize = voxelizationGrid.gridEdgeLength / voxelizationGrid.voxelsPerEdge;
         MPoint gridMin = voxelizationGrid.gridCenter - MVector(voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2);
         const std::unordered_map<uint32_t, uint32_t>& voxelMortonCodeToIndex = voxels.mortonCodesToSortedIdx;
@@ -205,12 +205,14 @@ public:
             uint voxelId = voxelMortonCodeToIndex.at(voxelMortonCode);
 
             // Tag all three vertices of this triangle with the same voxel ID
-            voxelIds[i] = voxelId;
-            voxelIds[i + 1] = voxelId;
-            voxelIds[i + 2] = voxelId;
+            // Note that this will overwrite previous assignments if a vertex is shared between triangles, but that's fine - we just need some voxel ID for each vertex.
+            // A triangle can't be shared between voxels, by construction, so this is well-defined.
+            vertexVoxelIds[idx0] = voxelId;
+            vertexVoxelIds[idx1] = voxelId;
+            vertexVoxelIds[idx2] = voxelId;
         }
 
-        return voxelIds;
+        return vertexVoxelIds;
     }
 
     /**
@@ -290,10 +292,10 @@ private:
         if (plug != aParticleSRV) return;
 
         MObject particleSRVObj = plug.asMObject();
-        D3D11Data* d3d11Data = static_cast<D3D11Data*>(MFnPluginData(particleSRVObj).data());
+        D3D11Data* particleSRVData = static_cast<D3D11Data*>(MFnPluginData(particleSRVObj).data());
 
         VoxelShape* shapeNode = static_cast<VoxelShape*>(clientData);
-        shapeNode->deformVerticesCompute.setParticleSRV(d3d11Data->getSRV());
+        shapeNode->deformVerticesCompute.setParticlePositionsSRV(particleSRVData->getSRV());
     }
 
     void postConstructor() override {
