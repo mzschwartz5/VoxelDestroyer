@@ -52,12 +52,17 @@ struct VoxelPositions {
     std::array<glm::vec3, 8> corners;
 };
 
+struct VoxelizationGrid {
+    double gridEdgeLength;
+    int voxelsPerEdge;
+    MPoint gridCenter;
+};
+
 struct Voxels {
     std::vector<bool> occupied;             // Contains some part (surface or interior) of the underlying mesh
     std::vector<uint> isSurface;            // Use uints instead of bools because vector<bool> packs bools into bits, which will not work for GPU access.
     std::vector<SurfaceMesh> cgalMeshes;    // The actual cube meshes
     std::vector<VoxelPositions> corners;    // Ordered according to the VGS expectations
-    std::vector<uint> vertStartIdx;         // Each voxel owns a number of vertices contained within (including the corners)
     std::vector<uint32_t> mortonCodes;
     // Answers the question: for a given voxel morton code, what is the index of the corresponding voxel in the sorted array of voxels?
     std::unordered_map<uint32_t, uint32_t> mortonCodesToSortedIdx;
@@ -77,7 +82,6 @@ struct Voxels {
           isSurface(other.isSurface),
           cgalMeshes(other.cgalMeshes),
           corners(other.corners),
-          vertStartIdx(other.vertStartIdx),
           mortonCodes(other.mortonCodes),
           mortonCodesToSortedIdx(other.mortonCodesToSortedIdx),
           containedTris(other.containedTris),
@@ -96,7 +100,6 @@ struct Voxels {
             isSurface = other.isSurface;
             // cgalMeshes is not copy-assignable, but shouldn't need to copy it anyway
             corners = other.corners;
-            vertStartIdx = other.vertStartIdx;
             mortonCodes = other.mortonCodes;
             mortonCodesToSortedIdx = other.mortonCodesToSortedIdx;
             containedTris = other.containedTris;
@@ -116,7 +119,6 @@ struct Voxels {
           isSurface(std::move(other.isSurface)),
           cgalMeshes(std::move(other.cgalMeshes)),
           corners(std::move(other.corners)),
-          vertStartIdx(std::move(other.vertStartIdx)),
           mortonCodes(std::move(other.mortonCodes)),
           mortonCodesToSortedIdx(std::move(other.mortonCodesToSortedIdx)),
           containedTris(std::move(other.containedTris)),
@@ -136,7 +138,6 @@ struct Voxels {
         isSurface.resize(size, false);
         cgalMeshes.resize(size);
         corners.resize(size, VoxelPositions());
-		vertStartIdx.resize(size, -1);
         mortonCodes.resize(size, UINT_MAX);
         containedTris.resize(size);
         overlappingTris.resize(size);
@@ -150,9 +151,7 @@ public:
     ~Voxelizer() = default;
 
     Voxels voxelizeSelectedMesh(
-        double gridEdgeLength,
-        int voxelsPerEdge,
-        MPoint gridCenter,
+        const VoxelizationGrid& grid,
         const MDagPath& selectedMeshDagPath,
         bool voxelizeSurface,
         bool voxelizeInterior,
@@ -175,9 +174,7 @@ private:
     // Does a conservative surface voxelization
     void getSurfaceVoxels(
         const std::vector<Triangle>& triangles, // triangles to check against
-        double gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
-        int voxelsPerEdge,                      // number of voxels along each edge
-        MPoint gridCenter,                      // center of the grid in world space
+        const VoxelizationGrid& grid,           // grid parameters
         Voxels& voxels,
         const MFnMesh& selectedMesh
     );
@@ -185,9 +182,7 @@ private:
     // Does an interior voxelization
     void getInteriorVoxels(
         const std::vector<Triangle>& triangles, // triangles to check against
-        double gridEdgeLength,                   // voxel grid must be a cube. User specifies the edge length of the cube
-        int voxelsPerEdge,                      // number of voxels along each edge
-        MPoint gridCenter,                      // center of the grid in world space
+        const VoxelizationGrid& grid,           // grid parameters
         Voxels& voxels,                         // output array of voxels (true = occupied, false = empty)
         const MFnMesh& selectedMesh             // the original mesh to use for boolean operations
     );
@@ -220,9 +215,7 @@ private:
     // creates a cube mesh for it.
     void createVoxels(
         Voxels& occupiedVoxels,
-        double gridEdgeLength, 
-        int voxelsPerEdge,
-        MPoint gridCenter
+        const VoxelizationGrid& grid
     );
 
     void addVoxelToMesh(

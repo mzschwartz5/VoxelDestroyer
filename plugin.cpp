@@ -9,7 +9,6 @@
 #include <maya/MProgressWindow.h>
 #include "custommayaconstructs/voxeldata.h"
 #include "custommayaconstructs/particledata.h"
-#include "custommayaconstructs/deformerdata.h"
 #include "custommayaconstructs/functionaldata.h"
 #include "custommayaconstructs/d3d11data.h"
 #include "custommayaconstructs/geometryoverride/voxelshape.h"
@@ -70,10 +69,14 @@ MStatus plugin::doIt(const MArgList& argList)
 	}
 
 	// Progress window message updates done within the voxelizer (for finer-grained control)
-	Voxels voxels = voxelizer.voxelizeSelectedMesh(
+	const VoxelizationGrid voxelizationGrid {
 		pluginArgs.scale * 1.02, // To avoid precision / cut off issues, scale up the voxelization grid very slightly.
 		pluginArgs.voxelsPerEdge,
-		pluginArgs.position,
+		pluginArgs.position
+	};
+
+	Voxels voxels = voxelizer.voxelizeSelectedMesh(
+		voxelizationGrid,
 		selectedMeshDagPath,
 		pluginArgs.voxelizeSurface,
 		pluginArgs.voxelizeInterior,
@@ -84,8 +87,8 @@ MStatus plugin::doIt(const MArgList& argList)
 	MDagPath voxelizedMeshDagPath = voxels.voxelizedMeshDagPath;
 	
 	MProgressWindow::setProgressStatus("Creating PBD particles and face constraints..."); MProgressWindow::setProgressRange(0, 100); MProgressWindow::setProgress(0);
-	MObject pbdNodeObj = PBD::createPBDNode(voxels, voxelizedMeshDagPath);
-	MObject voxelShapeObj = VoxelShape::createVoxelShapeNode(voxels, voxelizedMeshDagPath, pbdNodeObj);
+	MObject pbdNodeObj = PBD::createPBDNode(voxels, voxelizationGrid, voxelizedMeshDagPath);
+	MObject voxelShapeObj = VoxelShape::createVoxelShapeNode(voxelizedMeshDagPath, pbdNodeObj);
 	MProgressWindow::setProgress(100);
 
 	MProgressWindow::endProgress();
@@ -330,13 +333,6 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
-	// Deformer node state (not passed around, just for initialization)
-	status = plugin.registerData(DeformerData::fullName, DeformerData::id, DeformerData::creator);
-	if (!status) {
-		MGlobal::displayError("Failed to register DeformerData: " + status.errorString());
-		return status;
-	}
-
 	// Functional data (for passing function pointers to GlobalSolver)
 	status = plugin.registerData(FunctionalData::fullName, FunctionalData::id, FunctionalData::creator);
 	if (!status) {
@@ -432,10 +428,6 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	status = plugin.deregisterData(ParticleData::id);
 	if (!status)
 		MGlobal::displayError("deregisterData failed on ParticleData: " + status.errorString());
-
-	status = plugin.deregisterData(DeformerData::id);
-	if (!status)
-		MGlobal::displayError("deregisterData failed on DeformerData: " + status.errorString());
 
 	status = plugin.deregisterData(FunctionalData::id);
 	if (!status)

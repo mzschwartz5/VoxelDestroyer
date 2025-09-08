@@ -120,6 +120,7 @@ public:
         MFnSingleIndexedComponent fnFaceComponent;
         MFnMesh originalMeshFn(originalGeomPath.node());
 
+        // TODO: may need to support multiple UV sets in future.
         MString uvSet;
         originalMeshFn.getCurrentUVSetName(uvSet);
         const bool haveUVs = (uvSet.length() > 0) && (originalMeshFn.numUVs(uvSet) > 0);
@@ -266,6 +267,23 @@ public:
         shaderManager->releaseShader(shaderInstance);
     }
 
+    void getAllMeshVertices(
+        const MGeometryExtractor& extractor,
+        std::vector<uint>& vertexIndices,
+        std::vector<float>& vertexPositions
+    ) {
+        MVertexBufferDescriptor posDesc("position", MGeometry::kPosition, MGeometry::kFloat, 3);
+        const unsigned int vertexCount = extractor.vertexCount(); 
+        vertexPositions.resize(vertexCount * 3);
+        extractor.populateVertexBuffer(vertexPositions.data(), vertexCount, posDesc);
+
+        // No face component arg --> whole mesh
+        MIndexBufferDescriptor indexDesc(MIndexBufferDescriptor::kTriangle, MString(), MGeometry::kTriangles, 0);
+        const unsigned int primitiveCount = extractor.primitiveCount(indexDesc);
+        vertexIndices.resize(primitiveCount * 3);
+        extractor.populateIndexBuffer(vertexIndices.data(), primitiveCount * 3, indexDesc);
+    }
+
     /**
      * This method is responsible for populating the MSubSceneContainer with render items. In our case, we want the our custom VoxelShape
      * to have the same geometry, topology, and shading as the original mesh it deforms. To do so, we use the shading sets of the original mesh
@@ -290,7 +308,7 @@ public:
         if (status != MStatus::kSuccess) return;
         MObjectArray shadingSetFaceComponents = getShadingSetFaceComponents(shadingSets, faceIdxToShader);
 
-        // Extract the geometry requirements (vertex and index buffer descriptorss) from the shaders.
+        // Extract the geometry requirements (vertex and index buffer descriptors) from the shaders.
         // Then use MGeometryExtractor to extract the vertex and index buffers from the original mesh.
         MGeometryRequirements geomReqs;
         std::vector<RenderItemInfo> renderItemInfos;
@@ -319,8 +337,15 @@ public:
             setGeometryForRenderItem(*renderItem, vertexBufferArray, *rawIndexBuffer, &bounds);
         }
 
+        // The voxel shape needs the whole mesh's vertex positions and indices to tag each vertex with the voxel it belongs to.
+        // It's important to do this in the order that MGeometryExtractor provides the buffers to us.
+        std::vector<uint> vertexIndices;
+        std::vector<float> vertexPositions;
+        getAllMeshVertices(extractor, vertexIndices, vertexPositions);
+
         voxelShape->initializeDeformVerticesCompute(
-            vertexCount, 
+            vertexIndices,
+            vertexPositions,
             positionsUAV, 
             normalsUAV,
             originalPositionsSRV, 

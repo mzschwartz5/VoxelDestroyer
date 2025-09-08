@@ -39,6 +39,11 @@ public:
             out.write(reinterpret_cast<const char*>(&pair.second), sizeof(uint32_t));
         }
 
+        // Voxelization Grid
+        out.write(reinterpret_cast<const char*>(&voxelizationGrid.gridEdgeLength), sizeof(voxelizationGrid.gridEdgeLength));
+        out.write(reinterpret_cast<const char*>(&voxelizationGrid.voxelsPerEdge), sizeof(voxelizationGrid.voxelsPerEdge));
+        out.write(reinterpret_cast<const char*>(&voxelizationGrid.gridCenter), sizeof(voxelizationGrid.gridCenter));
+
         return MS::kSuccess;
     }
 
@@ -51,7 +56,6 @@ public:
 
         in.read(reinterpret_cast<char*>(voxels.isSurface.data()), size * sizeof(uint));
         in.read(reinterpret_cast<char*>(voxels.corners.data()), size * sizeof(VoxelPositions));
-        in.read(reinterpret_cast<char*>(voxels.vertStartIdx.data()), size * sizeof(uint));
         in.read(reinterpret_cast<char*>(voxels.mortonCodes.data()), size * sizeof(uint32_t));
 
         size_t mapSize;
@@ -62,6 +66,11 @@ public:
             in.read(reinterpret_cast<char*>(&value), sizeof(uint32_t));
             voxels.mortonCodesToSortedIdx[key] = value;
         }
+
+        // Voxelization Grid
+        in.read(reinterpret_cast<char*>(&voxelizationGrid.gridEdgeLength), sizeof(voxelizationGrid.gridEdgeLength));
+        in.read(reinterpret_cast<char*>(&voxelizationGrid.voxelsPerEdge), sizeof(voxelizationGrid.voxelsPerEdge));
+        in.read(reinterpret_cast<char*>(&voxelizationGrid.gridCenter), sizeof(voxelizationGrid.gridCenter));
 
         return MS::kSuccess;
     }
@@ -78,11 +87,13 @@ public:
     void copy(const MPxData& src) override {
         const VoxelData& voxelData = static_cast<const VoxelData&>(src);
         voxels = voxelData.voxels;
+        voxelizationGrid = voxelData.voxelizationGrid;
     }
 
     MTypeId typeId() const override { return id; }
     MString name() const override { return fullName; }
     const Voxels& getVoxels() const { return voxels; }
+    const VoxelizationGrid& getVoxelizationGrid() const { return voxelizationGrid; }
 
     // We want to take ownership of the voxel data because it's large and thus expensive to copy.
     // But we don't need all of it. Some of it can be freed after the PBD node is created, some of it
@@ -97,6 +108,11 @@ public:
         voxels.mortonCodesToSortedIdx = std::move(v.mortonCodesToSortedIdx);
     }
 
+    void setVoxelizationGrid(const VoxelizationGrid& grid) {
+        voxelizationGrid = grid;
+    }
+
 private:
     Voxels voxels;
+    VoxelizationGrid voxelizationGrid;
 };
