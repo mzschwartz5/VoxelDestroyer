@@ -175,7 +175,8 @@ public:
             D3D11_BUFFER_DESC bufferDesc = {};
             D3D11_SUBRESOURCE_DATA initData = {};
             
-            // Create the buffer
+            // Create the buffer - must be a raw buffer because Maya doesn't seem to accept structured buffers 
+            // for binding as vertex buffers.
             std::vector<float> data(vertexCount * vbDesc.dimension(), 0.0f);
             extractor.populateVertexBuffer(data.data(), vertexCount, vbDesc);
 
@@ -183,7 +184,7 @@ public:
             bufferDesc.ByteWidth = data.size() * sizeof(float);
             bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER | D3D11_BIND_UNORDERED_ACCESS;
             bufferDesc.CPUAccessFlags = 0;
-            bufferDesc.MiscFlags = 0;
+            bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
 
             initData.pSysMem = data.data();
             DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, buffer.GetAddressOf());
@@ -195,15 +196,18 @@ public:
             ComPtr<ID3D11UnorderedAccessView>& uav = (semantic == MGeometry::kPosition) ? positionsUAV : normalsUAV;
             D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
             uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-            uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+            uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
             uavDesc.Buffer.FirstElement = 0;
-            uavDesc.Buffer.NumElements = vertexCount * vbDesc.dimension();
+            uavDesc.Buffer.Flags = D3D11_BUFFER_UAV_FLAG_RAW;
+            uavDesc.Buffer.NumElements = bufferDesc.ByteWidth / 4; // RAW = count of 32-bit units
 
             DirectX::getDevice()->CreateUnorderedAccessView(buffer.Get(), &uavDesc, uav.GetAddressOf());
 
             // Also need to create a buffer with the original positions/normals for the deform shader to read from
             ComPtr<ID3D11Buffer>& originalBuffer = (semantic == MGeometry::kPosition) ? originalPositionsBuffer : originalNormalsBuffer;
             bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+            bufferDesc.StructureByteStride = sizeof(float) * vbDesc.dimension();
             DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, originalBuffer.GetAddressOf());
             MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
             
@@ -346,7 +350,7 @@ public:
         voxelShape->initializeDeformVerticesCompute(
             vertexIndices,
             vertexPositions,
-            positionsUAV, 
+            positionsUAV,
             normalsUAV,
             originalPositionsSRV, 
             originalNormalsSRV
