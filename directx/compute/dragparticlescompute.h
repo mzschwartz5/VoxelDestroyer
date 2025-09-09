@@ -1,8 +1,8 @@
 #pragma once
 #include "computeshader.h"
 #include "glm/glm.hpp"
-#include "../custommayaconstructs/voxeldragcontext.h"
-#include "../custommayaconstructs/voxelrendereroverride.h"
+#include "../custommayaconstructs/tools/voxeldragcontext.h"
+#include "../custommayaconstructs/draw/voxelrendereroverride.h"
 
 // NOTE: currently, the ConstantBuffer is perfectly 16-byte aligned. Adding any values to these structs
 // or even changing their order can break this shader. Any extra data must fit into the next 16-byte chunk.

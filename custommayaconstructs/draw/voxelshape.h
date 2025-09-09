@@ -12,9 +12,9 @@
 #include <maya/MNodeMessage.h>
 #include "../../voxelizer.h"
 #include "../../pbd.h"
-#include "../particledata.h"
-#include "../d3d11data.h"
-#include "../voxeldata.h"
+#include "../data/particledata.h"
+#include "../data/d3d11data.h"
+#include "../data/voxeldata.h"
 #include "../../directx/compute/deformverticescompute.h"
 #include <d3d11.h>
 #include <wrl/client.h>

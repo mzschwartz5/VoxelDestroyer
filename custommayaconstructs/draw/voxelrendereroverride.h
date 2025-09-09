@@ -16,6 +16,9 @@ struct CameraMatrices
 };
 
 /**
+ * Pass-through implementation of a render override, simply to get consistent access to the render target's depth buffer and camera matrices.
+ * Does not add any render operations; should just replicate default viewport rendering.
+ * 
  * Note: to actually activate a render override, you need to register it and THEN select it from the renderer drop down menu in Maya.
  * There *is* a way to programmatically switch to the override via MEL (see plugin.cpp).
  */

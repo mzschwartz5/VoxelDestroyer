@@ -3,10 +3,10 @@
 #include <float.h>
 #include "utils.h"
 #include "constants.h"
-#include "custommayaconstructs/voxeldata.h"
-#include "custommayaconstructs/particledata.h"
-#include "custommayaconstructs/functionaldata.h"
-#include "custommayaconstructs/d3d11data.h"
+#include "custommayaconstructs/data/voxeldata.h"
+#include "custommayaconstructs/data/particledata.h"
+#include "custommayaconstructs/data/functionaldata.h"
+#include "custommayaconstructs/data/d3d11data.h"
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnMessageAttribute.h>
