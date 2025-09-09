@@ -25,8 +25,8 @@
 #include <string>
 #include "custommayaconstructs/voxelrendereroverride.h"
 #include <maya/MViewport2Renderer.h>
-#include <thread>
 using namespace MHWRender;
+
 struct PluginArgs {
 	MPoint position{ 0.0f, 0.0f, 0.0f };
 	double scale{ 1.0f };
@@ -57,8 +57,6 @@ public:
 	MDagPath getSelectedObject(const MPoint& voxelGridCenter, double voxelGridSize);
 	bool isBoundingBoxOverlappingVoxelGrid(const MBoundingBox& bbox, const MPoint& voxelGridCenter, double voxelGridSize);
 
-	static void createVoxelSimulationNode();
-	static void loadVoxelSimulationNodeEditorTemplate();
 	static void loadVoxelizerMenu();
 	static MString getActiveModelPanel();
 	

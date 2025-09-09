@@ -65,8 +65,6 @@
     <ClInclude Include="directx\compute\faceconstraintscompute.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="voxelsimulationnode.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

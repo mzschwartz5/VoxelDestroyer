@@ -188,7 +188,6 @@
     <ClInclude Include="custommayaconstructs\voxeldragcontext.h" />
     <ClInclude Include="custommayaconstructs\voxeldragcontextcommand.h" />
     <ClInclude Include="custommayaconstructs\voxelrendereroverride.h" />
-    <ClInclude Include="custommayaconstructs\voxelsimulationnode.h" />
     <ClInclude Include="custommayaconstructs\voxeldata.h" />
     <ClInclude Include="custommayaconstructs\particledata.h" />
     <ClInclude Include="custommayaconstructs\geometryoverride\voxelshape.h" />
