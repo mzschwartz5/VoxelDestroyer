@@ -138,8 +138,16 @@ public:
     /**
      * Since this shape can shatter, and grow unbounded, it doesn't really make sense to return a bounding box.
      * We could update one dynamically, but that would be both expensive, and not very useful for culling or other optizations.
+     * However, with no bounding box at all, Maya for some reason culls the object when the camera is close to it. 
+     * Instead, we return an effectively infinite bounding box.
      */
-    bool isBounded() const override { return false; }
+    bool isBounded() const override { return true; }
+
+    MBoundingBox boundingBox() const override {
+        MPoint min(-1e10, -1e10, -1e10);
+        MPoint max(1e10, 1e10, 1e10);
+        return MBoundingBox(min, max);
+    }
 
     MDagPath pathToOriginalGeometry() const {
         MPlug inPlug(thisMObject(), aInputGeom);
