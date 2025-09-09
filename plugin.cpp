@@ -1,7 +1,6 @@
 #include "plugin.h"
 #include "glm/glm.hpp"
 #include <maya/MCommandResult.h>
-#include "custommayaconstructs/voxelsimulationnode.h"
 #include <maya/MFnMessageAttribute.h>
 #include <windows.h>
 #include "custommayaconstructs/voxeldragcontextcommand.h"
@@ -20,7 +19,6 @@
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
-extern std::thread::id g_mainThreadId = std::this_thread::get_id();
 
 Voxelizer plugin::voxelizer = Voxelizer();
 VoxelRendererOverride* plugin::voxelRendererOverride = nullptr;
@@ -252,23 +250,6 @@ bool plugin::isBoundingBoxOverlappingVoxelGrid(const MBoundingBox& objectBoundin
 	);
 }
 
-void plugin::loadVoxelSimulationNodeEditorTemplate() {
-	void* data = nullptr;
-	DWORD size = Utils::loadResourceFile(MhInstPlugin, IDR_MEL1, L"MEL", &data);
-	if (size == 0) {
-		MGlobal::displayError("Failed to load Voxelization editor template resource.");
-		return;
-	}
-
-    MString melScript(static_cast<char*>(data), size);
-
-    // Execute the MEL script to load the UI for the VoxelSimulationNode
-    MStatus status = MGlobal::executeCommand(melScript);
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("Failed to execute AETEMPLATE MEL script: " + status.errorString());
-    }
-}
-
 void plugin::loadVoxelizerMenu() {
 	void* data = nullptr;
 	DWORD size = Utils::loadResourceFile(MhInstPlugin, IDR_MEL2, L"MEL", &data);
@@ -299,8 +280,6 @@ MString plugin::getActiveModelPanel() {
 // Initialize Maya Plugin upon loading
 EXPORT MStatus initializePlugin(MObject obj)
 {
-	g_mainThreadId = std::this_thread::get_id();
-
 	// Initialize DirectX
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
 	DirectX::initialize(MhInstPlugin);
@@ -310,14 +289,6 @@ EXPORT MStatus initializePlugin(MObject obj)
 	status = plugin.registerCommand("VoxelDestroyer", plugin::creator);
 	if (!status)
 		status.perror("registerCommand failed");
-
-	// Register custom maya constructs (nodes, contexts, render overrides, etc.)
-	// Voxel Simulation Node
-	status = plugin.registerNode("VoxelSimulationNode", VoxelSimulationNode::id, VoxelSimulationNode::creator, VoxelSimulationNode::initialize);
-	if (!status) {
-		MGlobal::displayError("Failed to register VoxelSimulationNode");
-		return status;
-	}
 
 	// Voxel Data (custom node attribute data type that holds voxel info)
 	status = plugin.registerData(VoxelData::fullName, VoxelData::id, VoxelData::creator);
@@ -391,7 +362,6 @@ EXPORT MStatus initializePlugin(MObject obj)
 	MString activeModelPanel = plugin::getActiveModelPanel();
 	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
 
-	plugin::loadVoxelSimulationNodeEditorTemplate();
 	plugin::loadVoxelizerMenu();
 
 	MGlobal::executeCommand("VoxelizerMenu_addToShelf");
@@ -415,11 +385,6 @@ EXPORT MStatus uninitializePlugin(MObject obj)
     status = plugin.deregisterContextCommand("voxelDragContextCommand");
     if (!status)
         MGlobal::displayError("deregisterContextCommand failed on VoxelDragContextCommand: " + status.errorString());
-
-    // Voxel Simulation Node
-    status = plugin.deregisterNode(VoxelSimulationNode::id);
-    if (!status)
-        MGlobal::displayError("deregisterNode failed on VoxelSimulationNode: " + status.errorString());
 
 	status = plugin.deregisterData(VoxelData::id);
 	if (!status)
