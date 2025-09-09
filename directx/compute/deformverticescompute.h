@@ -2,6 +2,12 @@
 
 #include "directx/compute/computeshader.h"
 
+struct DeformVerticesConstantBuffer {
+    float inverseWorldMatrix[4][4];
+    int vertexCount;
+    int padding[3]; // Padding to align to 16 bytes
+};
+
 class DeformVerticesCompute : public ComputeShader
 {
 public:
@@ -9,6 +15,7 @@ public:
     DeformVerticesCompute(
         int numParticles,
         int vertexCount,
+        const MMatrix& inverseWorldMatrix,
         const glm::vec4* originalParticlePositions,   // Will be uploaded to GPU
         const std::vector<uint>& vertexVoxelIds,      // Will be uploaded to GPU
         const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
@@ -18,7 +25,7 @@ public:
         const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV
     ) : ComputeShader(IDR_SHADER1), positionsUAV(positionsUAV), normalsUAV(normalsUAV), originalVertPositionsSRV(originalVertPositionsSRV), originalNormalsSRV(originalNormalsSRV), particlePositionsSRV(particlePositionsSRV)
     {
-        initializeBuffers(numParticles, vertexCount, originalParticlePositions, vertexVoxelIds);
+        initializeBuffers(numParticles, vertexCount, inverseWorldMatrix, originalParticlePositions, vertexVoxelIds);
     }
 
     void dispatch() override
@@ -84,7 +91,7 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(nullConstBuffers), nullConstBuffers);
     };
 
-    void initializeBuffers(int numParticles, int vertexCount, const glm::vec4* originalParticlePositions, const std::vector<uint>& vertexVoxelIds)
+    void initializeBuffers(int numParticles, int vertexCount, const MMatrix& inverseWorldMatrix, const glm::vec4* originalParticlePositions, const std::vector<uint>& vertexVoxelIds)
     {
         numWorkgroups = Utils::divideRoundUp(vertexCount, DEFORM_VERTICES_THREADS);
         D3D11_BUFFER_DESC bufferDesc = {};
@@ -136,12 +143,16 @@ private:
 
         // Make a constants buffer for vertexCount
         bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
-        bufferDesc.ByteWidth = 4 * sizeof(int); // Needs to be multiple of 16 bytes
+        bufferDesc.ByteWidth = static_cast<UINT>(sizeof(DeformVerticesConstantBuffer)); // Must be multiple of 16 bytes
         bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         bufferDesc.CPUAccessFlags = 0;
         bufferDesc.MiscFlags = 0;
-        uint constants[4] = { static_cast<uint>(vertexCount), 0, 0, 0 };
-        initData.pSysMem = constants;
+        
+        DeformVerticesConstantBuffer constants = {};
+        inverseWorldMatrix.get(constants.inverseWorldMatrix);
+        constants.vertexCount = vertexCount;
+        initData.pSysMem = &constants;
+
         CreateBuffer(&bufferDesc, &initData, &constantsBuffer);
     }
 
