@@ -52,6 +52,12 @@ private:
     
     void bind() override
     {
+        // In case Maya left either the position or normal vertex buffer bound to the IA stage, unbind them here.
+        ID3D11Buffer* nullVBs[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT] = {};
+        UINT zeroStrides[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT] = {};
+        UINT zeroOffsets[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT] = {};
+        DirectX::getContext()->IASetVertexBuffers(0, D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT, nullVBs, zeroStrides, zeroOffsets);
+
         DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
 
         ID3D11ShaderResourceView* srvs[] = { originalVertPositionsSRV.Get(), originalNormalsSRV.Get(), originalParticlePositionsSRV.Get(), particlePositionsSRV.Get(), vertexVoxelIdsSRV.Get() };
@@ -87,7 +93,7 @@ private:
 
         // We only need one reference particle per voxel, not the whole shebang
         std::vector<glm::vec4> reducedOriginalParticles;
-        reducedOriginalParticles.reserve((numParticles + 7) / 8);
+        reducedOriginalParticles.reserve(numParticles / 8);
         for (int i = 0; i < numParticles; i += 8) {
             reducedOriginalParticles.push_back(originalParticlePositions[i]);
         }

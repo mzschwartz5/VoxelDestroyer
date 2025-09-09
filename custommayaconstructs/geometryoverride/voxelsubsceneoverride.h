@@ -205,6 +205,7 @@ public:
 
             // Also need to create a buffer with the original positions/normals for the deform shader to read from
             ComPtr<ID3D11Buffer>& originalBuffer = (semantic == MGeometry::kPosition) ? originalPositionsBuffer : originalNormalsBuffer;
+            bufferDesc.Usage = D3D11_USAGE_DEFAULT;
             bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
             bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
             bufferDesc.StructureByteStride = sizeof(float) * vbDesc.dimension();
@@ -213,10 +214,10 @@ public:
             
             ComPtr<ID3D11ShaderResourceView>& originalSRV = (semantic == MGeometry::kPosition) ? originalPositionsSRV : originalNormalsSRV;
             D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
             srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
             srvDesc.Buffer.FirstElement = 0;
-            srvDesc.Buffer.NumElements = vertexCount * vbDesc.dimension();
+            srvDesc.Buffer.NumElements = vertexCount;
 
             DirectX::getDevice()->CreateShaderResourceView(originalBuffer.Get(), &srvDesc, originalSRV.GetAddressOf());
         }

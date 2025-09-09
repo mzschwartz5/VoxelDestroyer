@@ -181,19 +181,22 @@ public:
         const Voxels& voxels
     ) const {
 
+        // TODO: THIS APPROACH ONLY WORKS IF WE'RE CLIPPING TRIANGLES
+        // (The idea of assuming each triangle is fully contained within a single voxel breaks down if we don't clip triangles to voxel boundaries.)
+
         std::vector<uint> vertexVoxelIds(vertexPositions.size(), 0);
         double voxelSize = voxelizationGrid.gridEdgeLength / voxelizationGrid.voxelsPerEdge;
         MPoint gridMin = voxelizationGrid.gridCenter - MVector(voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2);
         const std::unordered_map<uint32_t, uint32_t>& voxelMortonCodeToIndex = voxels.mortonCodesToSortedIdx;
 
         for (size_t i = 0; i < vertexIndices.size(); i += 3) {
-            uint idx0 = vertexIndices[i] * 3;
-            uint idx1 = vertexIndices[i + 1] * 3;
-            uint idx2 = vertexIndices[i + 2] * 3;
+            uint idx0 = vertexIndices[i];
+            uint idx1 = vertexIndices[i + 1];
+            uint idx2 = vertexIndices[i + 2];
 
-            MPoint v0(vertexPositions[idx0], vertexPositions[idx0 + 1], vertexPositions[idx0 + 2]);
-            MPoint v1(vertexPositions[idx1], vertexPositions[idx1 + 1], vertexPositions[idx1 + 2]);
-            MPoint v2(vertexPositions[idx2], vertexPositions[idx2 + 1], vertexPositions[idx2 + 2]);
+            MPoint v0(vertexPositions[idx0 * 3], vertexPositions[idx0 * 3 + 1], vertexPositions[idx0 * 3 + 2]);
+            MPoint v1(vertexPositions[idx1 * 3], vertexPositions[idx1 * 3 + 1], vertexPositions[idx1 * 3 + 2]);
+            MPoint v2(vertexPositions[idx2 * 3], vertexPositions[idx2 * 3 + 1], vertexPositions[idx2 * 3 + 2]);
 
             MPoint centroid = (v0 + v1 + v2) / 3.0;
 
@@ -277,7 +280,7 @@ private:
     VoxelShape() = default;
     ~VoxelShape() override = default;
 
-    MStatus VoxelShape::compute(const MPlug& plug, MDataBlock& dataBlock) {
+    MStatus VoxelShape::compute(const MPlug& plug, MDataBlock& dataBlock) override {
         if (!isInitialized) return MS::kSuccess;
         if (plug != aTrigger) return MS::kUnknownParameter;
         
