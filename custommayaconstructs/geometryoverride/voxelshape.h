@@ -135,14 +135,11 @@ public:
         return newShapeObj;
     }
 
-    bool isBounded() const override { return true; }
-
-    MBoundingBox boundingBox() const override {
-        MDagPath srcDagPath = pathToOriginalGeometry();
-        if (!srcDagPath.isValid()) return MBoundingBox();
-
-        return MFnDagNode(srcDagPath).boundingBox();
-    }
+    /**
+     * Since this shape can shatter, and grow unbounded, it doesn't really make sense to return a bounding box.
+     * We could update one dynamically, but that would be both expensive, and not very useful for culling or other optizations.
+     */
+    bool isBounded() const override { return false; }
 
     MDagPath pathToOriginalGeometry() const {
         MPlug inPlug(thisMObject(), aInputGeom);
@@ -180,10 +177,6 @@ public:
         const VoxelizationGrid& voxelizationGrid,
         const Voxels& voxels
     ) const {
-
-        // TODO: THIS APPROACH ONLY WORKS IF WE'RE CLIPPING TRIANGLES
-        // (The idea of assuming each triangle is fully contained within a single voxel breaks down if we don't clip triangles to voxel boundaries.)
-
         std::vector<uint> vertexVoxelIds(vertexPositions.size(), 0);
         double voxelSize = voxelizationGrid.gridEdgeLength / voxelizationGrid.voxelsPerEdge;
         MPoint gridMin = voxelizationGrid.gridCenter - MVector(voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2);
@@ -257,9 +250,12 @@ public:
             voxelData->getVoxels()
         );
 
+        const MDagPath originalGeomPath = pathToOriginalGeometry();
+
         deformVerticesCompute = DeformVerticesCompute(
             particleDataContainer.numParticles,
             vertexPositions.size() / 3,
+            originalGeomPath.inclusiveMatrix().inverse(),
             particleDataContainer.particlePositionsCPU,
             vertexVoxelIds,
             positionsUAV,
