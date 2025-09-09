@@ -8,7 +8,7 @@
 #include <maya/MFnDependencyNode.h>
 #include <maya/MItDependencyNodes.h>
 #include "glm/glm.hpp"
-#include "custommayaconstructs/voxeldragcontext.h"
+#include "custommayaconstructs/tools/voxeldragcontext.h"
 
 const MTypeId GlobalSolver::id(0x0013A7B1);
 const MString GlobalSolver::globalSolverNodeName("globalSolverNode");
