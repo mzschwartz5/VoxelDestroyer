@@ -105,12 +105,12 @@ MStatus PBD::initialize() {
     status = addAttribute(aParticleBufferOffset);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    MFnTypedAttribute tParticleUAVAttr;
-    aParticleSRV = tParticleUAVAttr.create("particleUAV", "puav", D3D11Data::id, MObject::kNullObj, &status);
+    MFnTypedAttribute tParticleSRVAttr;
+    aParticleSRV = tParticleSRVAttr.create("particleSRV", "psrv", D3D11Data::id, MObject::kNullObj, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-    tParticleUAVAttr.setStorable(false);
-    tParticleUAVAttr.setWritable(false);
-    tParticleUAVAttr.setReadable(true);
+    tParticleSRVAttr.setStorable(false);
+    tParticleSRVAttr.setWritable(false);
+    tParticleSRVAttr.setReadable(true);
     status = addAttribute(aParticleSRV);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
@@ -236,7 +236,7 @@ void PBD::onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug&
     simulateSubstepPlug.setValue(simulateSubstepObj);
 }
 
-void PBD::onParticleBufferOffsetChanged(int particleBufferOffset, MDataHandle& particleUAVHandle) {
+void PBD::onParticleBufferOffsetChanged(int particleBufferOffset, MDataHandle& particleSRVHandle) {
     int numberParticles = numParticles();
     int voxelOffset = particleBufferOffset / 8;
     int numVoxels = numberParticles / 8;
@@ -256,7 +256,8 @@ void PBD::onParticleBufferOffsetChanged(int particleBufferOffset, MDataHandle& p
 	MObject pluginDataObj = pluginDataFn.create(D3D11Data::id);
 	D3D11Data* d3d11Data = static_cast<D3D11Data*>(pluginDataFn.data());
 	d3d11Data->setSRV(particleSRV);
-    particleUAVHandle.set(pluginDataObj);
+    particleSRVHandle.set(pluginDataObj);
+    particleSRVHandle.setClean();
 
     setInitialized(true);
 }
@@ -396,8 +397,8 @@ MStatus PBD::compute(const MPlug& plug, MDataBlock& dataBlock) {
 
     if (plug == aParticleSRV) {
         int particleBufferOffset = dataBlock.inputValue(aParticleBufferOffset).asInt();
-        MDataHandle particleUAVHandle = dataBlock.outputValue(aParticleSRV);
-        onParticleBufferOffsetChanged(particleBufferOffset, particleUAVHandle);
+        MDataHandle particleSRVHandle = dataBlock.outputValue(aParticleSRV);
+        onParticleBufferOffsetChanged(particleBufferOffset, particleSRVHandle);
         return MS::kSuccess;
     }
 

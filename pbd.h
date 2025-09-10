@@ -114,7 +114,7 @@ private:
 
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override;
     void simulateSubstep();
-    void onParticleBufferOffsetChanged(int newOffset, MDataHandle& particleUAVHandle);
+    void onParticleBufferOffsetChanged(int newOffset, MDataHandle& particleSRVHandle);
 
     float BETA{ 0.0f };
     float PARTICLE_RADIUS{ 0.25f };
