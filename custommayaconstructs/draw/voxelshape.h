@@ -278,46 +278,60 @@ public:
 
 private:
     bool isInitialized = false;
-    DeformVerticesCompute deformVerticesCompute;
+    bool isParticleSRVPlugDirty = false;
     MCallbackIdArray callbackIds;
+    DeformVerticesCompute deformVerticesCompute;
     
     VoxelShape() = default;
     ~VoxelShape() override = default;
 
-    MStatus VoxelShape::compute(const MPlug& plug, MDataBlock& dataBlock) override {
+    MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override {
         if (!isInitialized) return MS::kSuccess;
         if (plug != aTrigger) return MS::kUnknownParameter;
-        
+
+        if (isParticleSRVPlugDirty) {
+            // The particle SRV has changed, so we need to update the compute shader with the new one.
+            MDataHandle d3d11DataHandle = dataBlock.inputValue(aParticleSRV);
+            D3D11Data* particleSRVData = static_cast<D3D11Data*>(d3d11DataHandle.asPluginData());
+            deformVerticesCompute.setParticlePositionsSRV(particleSRVData->getSRV());
+            isParticleSRVPlugDirty = false;
+        }
+
         deformVerticesCompute.dispatch();
 
         return MS::kSuccess;
     }
 
-    // TODO: I'm not actually sure if this will run when the other plug value changes... need to test which message is emitted.
-    static void onParticleSRVChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
-        if (!(msg & MNodeMessage::kOtherPlugSet)) return;
+    MPxNode::SchedulingType schedulingType() const override {
+        // Evaluated serially amongst nodes of the same type
+        // Necessary because Maya provides a single threaded D3D11 device
+        return MPxNode::kGloballySerial;
+    }
+
+    /**
+     * Since this node has no outputs, nothing pulls new values of this plug if it gets dirty, so the plug will always have stale data.
+     * Use a dirty plug callback to detect when it gets dirtied, and then pull the new value in compute().
+     */
+    static void onParticleSRVPlugDirty(MObject& node, MPlug& plug, void* clientData) {
         if (plug != aParticleSRV) return;
-
-        MObject particleSRVObj = plug.asMObject();
-        D3D11Data* particleSRVData = static_cast<D3D11Data*>(MFnPluginData(particleSRVObj).data());
-
-        VoxelShape* shapeNode = static_cast<VoxelShape*>(clientData);
-        shapeNode->deformVerticesCompute.setParticlePositionsSRV(particleSRVData->getSRV());
+        
+        VoxelShape* voxelShape = static_cast<VoxelShape*>(clientData);
+        voxelShape->isParticleSRVPlugDirty = true;
     }
 
     void postConstructor() override {
         MPxSurfaceShape::postConstructor();
-        setRenderable(true); 
+        setRenderable(true);
 
-        MStatus status;
-        MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onParticleSRVChange, this, &status); 
+        MCallbackId callbackId = MNodeMessage::addNodeDirtyPlugCallback(thisMObject(), onParticleSRVPlugDirty, this);
         callbackIds.append(callbackId);
 
+        // Effectively a destructor callback to clean up when the node is deleted
+        // This is more reliable than a destructor, because Maya won't necessarily call destructors on node deletion (unless undo queue is flushed)
         callbackId = MNodeMessage::addNodePreRemovalCallback(thisMObject(), [](MObject& node, void* clientData) {
-            VoxelShape* shapeNode = static_cast<VoxelShape*>(clientData);
-            MMessage::removeCallbacks(shapeNode->callbackIds);
-        }, this, &status);
-
+            VoxelShape* voxelShape = static_cast<VoxelShape*>(clientData);
+            MMessage::removeCallbacks(voxelShape->callbackIds);
+        }, this);
         callbackIds.append(callbackId);
     }
 
