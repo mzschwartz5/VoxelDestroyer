@@ -97,7 +97,6 @@
       <WarningLevel>Level3</WarningLevel>
       <AdditionalIncludeDirectories>
         C:\Program Files\Autodesk\Maya2025\include;
-        $(ProjectDir)glm;
         %(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
       <AdditionalOptions>/std:c++17 /bigobj %(AdditionalOptions)</AdditionalOptions>
@@ -144,7 +143,6 @@
       <WarningLevel>Level3</WarningLevel>
       <AdditionalIncludeDirectories>
         C:\Program Files\Autodesk\Maya2025\include;
-        $(ProjectDir)glm;
         %(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
