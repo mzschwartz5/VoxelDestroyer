@@ -16,7 +16,7 @@ public:
         int numParticles,
         int vertexCount,
         const MMatrix& inverseWorldMatrix,
-        const glm::vec4* originalParticlePositions,   // Will be uploaded to GPU
+        const MFloatPoint* originalParticlePositions,   // Will be uploaded to GPU
         const std::vector<uint>& vertexVoxelIds,      // Will be uploaded to GPU
         const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
         const ComPtr<ID3D11UnorderedAccessView>& normalsUAV,
@@ -91,7 +91,7 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(nullConstBuffers), nullConstBuffers);
     };
 
-    void initializeBuffers(int numParticles, int vertexCount, const MMatrix& inverseWorldMatrix, const glm::vec4* originalParticlePositions, const std::vector<uint>& vertexVoxelIds)
+    void initializeBuffers(int numParticles, int vertexCount, const MMatrix& inverseWorldMatrix, const MFloatPoint* originalParticlePositions, const std::vector<uint>& vertexVoxelIds)
     {
         numWorkgroups = Utils::divideRoundUp(vertexCount, DEFORM_VERTICES_THREADS);
         D3D11_BUFFER_DESC bufferDesc = {};
@@ -99,7 +99,7 @@ private:
         D3D11_SUBRESOURCE_DATA initData = {};
 
         // We only need one reference particle per voxel, not the whole shebang
-        std::vector<glm::vec4> reducedOriginalParticles;
+        std::vector<MFloatPoint> reducedOriginalParticles;
         reducedOriginalParticles.reserve(numParticles / 8);
         for (int i = 0; i < numParticles; i += 8) {
             reducedOriginalParticles.push_back(originalParticlePositions[i]);
@@ -109,11 +109,11 @@ private:
 
         // Create originalParticlePositions buffer and SRV
         bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        bufferDesc.ByteWidth = reducedNumParticles * sizeof(glm::vec4);
+        bufferDesc.ByteWidth = reducedNumParticles * sizeof(MFloatPoint);
         bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
         bufferDesc.CPUAccessFlags = 0;
         bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-        bufferDesc.StructureByteStride = sizeof(glm::vec4);
+        bufferDesc.StructureByteStride = sizeof(MFloatPoint);
 
         initData.pSysMem = reducedOriginalParticles.data();
         CreateBuffer(&bufferDesc, &initData, originalParticlePositionsBuffer.GetAddressOf());

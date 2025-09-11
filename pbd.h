@@ -1,6 +1,5 @@
 #pragma once
 
-#include "glm/glm.hpp"
 #include "voxelizer.h"
 
 #include <algorithm>
@@ -30,14 +29,11 @@
 #include <maya/MCallbackIdArray.h>
 
 
-using glm::vec3;
-using glm::vec4;
-
 struct Particles
 {
     // Inverse mass (w) and particle radius stored, packed at half-precision, as 4th component.
-    std::vector<vec4> positions;
-    std::vector<vec4> oldPositions;
+    std::vector<MFloatPoint> positions;
+    std::vector<MFloatPoint> oldPositions;
     int numParticles{ 0 };
 };
 

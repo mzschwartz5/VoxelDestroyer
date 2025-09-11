@@ -28,7 +28,7 @@ public:
         out.write(reinterpret_cast<const char*>(&size), sizeof(size));
         
         out.write(reinterpret_cast<const char*>(voxels.isSurface.data()), size * sizeof(uint));
-        out.write(reinterpret_cast<const char*>(voxels.corners.data()), size * sizeof(VoxelPositions));
+        out.write(reinterpret_cast<const char*>(voxels.dimensions.data()), size * sizeof(VoxelDimensions));
         out.write(reinterpret_cast<const char*>(voxels.mortonCodes.data()), size * sizeof(uint32_t));
 
         // If it proves to be too slow to serialize the map entry-by-entry, try copying it first into a vector of pairs for one contiguous write.
@@ -55,7 +55,7 @@ public:
         voxels.resize(static_cast<int>(size));
 
         in.read(reinterpret_cast<char*>(voxels.isSurface.data()), size * sizeof(uint));
-        in.read(reinterpret_cast<char*>(voxels.corners.data()), size * sizeof(VoxelPositions));
+        in.read(reinterpret_cast<char*>(voxels.dimensions.data()), size * sizeof(VoxelDimensions));
         in.read(reinterpret_cast<char*>(voxels.mortonCodes.data()), size * sizeof(uint32_t));
 
         size_t mapSize;
@@ -103,7 +103,7 @@ public:
         voxels.voxelSize = v.voxelSize;
         voxels.numOccupied = v.numOccupied;
         voxels.isSurface = std::move(v.isSurface);
-        voxels.corners = std::move(v.corners);
+        voxels.dimensions = std::move(v.dimensions);
         voxels.mortonCodes = std::move(v.mortonCodes);
         voxels.mortonCodesToSortedIdx = std::move(v.mortonCodesToSortedIdx);
     }

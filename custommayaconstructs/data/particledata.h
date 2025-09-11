@@ -3,11 +3,11 @@
 #include <maya/MPxData.h>
 #include <maya/MTypeId.h>
 #include <maya/MString.h>
-#include "glm/glm.hpp"
+#include <maya/MPoint.h>
 
 struct ParticleDataContainer {
     int numParticles = 0;
-    const glm::vec4* particlePositionsCPU = nullptr;
+    const MFloatPoint* particlePositionsCPU = nullptr;
     float particleRadius = 0.0f;
     const uint* isSurface = nullptr;
 };

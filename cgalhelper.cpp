@@ -20,7 +20,6 @@ SurfaceMesh cube(
     const float halfEdge = edgeLength * 0.5f;
     const MPoint center(minCorner.x + halfEdge, minCorner.y + halfEdge, minCorner.z + halfEdge);
 
-    // Arranged in morton order as needed by the VGS algorithm
     std::array<Point_3, 8> vertices = {
         Point_3(center.x - halfEdge, center.y - halfEdge, center.z - halfEdge),
         Point_3(center.x + halfEdge, center.y - halfEdge, center.z - halfEdge),

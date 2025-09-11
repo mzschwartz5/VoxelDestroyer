@@ -7,7 +7,6 @@
 #include <maya/MFnPluginData.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MItDependencyNodes.h>
-#include "glm/glm.hpp"
 #include "custommayaconstructs/tools/voxeldragcontext.h"
 
 const MTypeId GlobalSolver::id(0x0013A7B1);
@@ -227,19 +226,19 @@ void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
     MFnPluginData pluginDataFn(particleDataObj);
     ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
 
-    const glm::vec4* positions = particleData->getData().particlePositionsCPU;
+    const MFloatPoint* positions = particleData->getData().particlePositionsCPU;
     uint numNewParticles = particleData->getData().numParticles;
 
     // Create new particle buffer big enough for all particles
     int totalParticles = getTotalParticles();
-    std::vector<glm::vec4> paddedParticlePositions(totalParticles + numNewParticles);
+    std::vector<MFloatPoint> paddedParticlePositions(totalParticles + numNewParticles);
     std::copy(positions, positions + numNewParticles, paddedParticlePositions.begin());
     ComPtr<ID3D11Buffer> newParticleBuffer;
-    createBuffer<glm::vec4>(paddedParticlePositions, newParticleBuffer);
+    createBuffer<MFloatPoint>(paddedParticlePositions, newParticleBuffer);
 
     // If any particle data has already been added, combine old buffer into new buffer, offset by numNewParticles
     if (buffers[BufferType::PARTICLE]) {
-        copyBufferSubregion<glm::vec4>(
+        copyBufferSubregion<MFloatPoint>(
             buffers[BufferType::PARTICLE], 
             newParticleBuffer, 
             0,
@@ -287,10 +286,10 @@ void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
     // Create new particle buffer sized for the data minus the deleted particles
     uint totalParticles = getTotalParticles();
     uint numRemovedParticles = particleData->getData().numParticles;
-    std::vector<glm::vec4> positions(totalParticles - numRemovedParticles);
+    std::vector<MFloatPoint> positions(totalParticles - numRemovedParticles);
     ComPtr<ID3D11Buffer> newParticleBuffer;
-    createBuffer<glm::vec4>(positions, newParticleBuffer);
-    
+    createBuffer<MFloatPoint>(positions, newParticleBuffer);
+
     // Get the removed node's offset into the old particle buffer
     int offset;
     uint plugLogicalIndex = particleDataToRemovePlug.logicalIndex();
@@ -301,7 +300,7 @@ void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
     // Combine the old particle data into the new buffer in (up to) two copies: 
     // the particles before those being removed, and those after.
     if (offset > 0) {
-        copyBufferSubregion<glm::vec4>(
+        copyBufferSubregion<MFloatPoint>(
             buffers[BufferType::PARTICLE],
             newParticleBuffer,
             0,             // src copy offset
@@ -311,7 +310,7 @@ void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
     }
 
     if (static_cast<uint>(offset) + numRemovedParticles < totalParticles) {
-        copyBufferSubregion<glm::vec4>(
+        copyBufferSubregion<MFloatPoint>(
             buffers[BufferType::PARTICLE],
             newParticleBuffer,
             offset + numRemovedParticles,                   // src copy offset

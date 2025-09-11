@@ -1,8 +1,6 @@
 #pragma once
 
 #include "directx/compute/computeshader.h"
-#include "glm.hpp"
-
 struct VGSConstantBuffer {
     float relaxation;
     float edgeUniformity;

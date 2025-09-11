@@ -1,5 +1,6 @@
 #pragma once
 #include <maya/MGlobal.h>
+#include <maya/MFloatVector.h>
 #include <windows.h>
 #include <cstdint>
 
@@ -22,5 +23,7 @@ inline int ilogbaseceil(int x, int base) {
 uint16_t floatToHalf(float value);
 
 float packTwoFloatsAsHalfs(float a, float b);
+
+MFloatVector sign(const MFloatVector& v);
 
 } // namespace Utils

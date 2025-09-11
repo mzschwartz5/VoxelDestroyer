@@ -138,4 +138,12 @@ float packTwoFloatsAsHalfs(float a, float b) {
     return result;
 }
 
+MFloatVector sign(const MFloatVector& v) {
+    return MFloatVector(
+        (v.x > 0) ? 1.0f : (v.x < 0) ? -1.0f : 0.0f,
+        (v.y > 0) ? 1.0f : (v.y < 0) ? -1.0f : 0.0f,
+        (v.z > 0) ? 1.0f : (v.z < 0) ? -1.0f : 0.0f
+    );
+}
+
 } // namespace Utils
