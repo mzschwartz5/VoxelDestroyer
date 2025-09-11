@@ -79,12 +79,12 @@ void main(uint3 gId : SV_DispatchThreadID)
 
     // Deform position
     float3 restPosition = originalVertPositions[gId.x] - mul(inverseWorldMatrix3x3, v0_orig.xyz);
-    float3 deformedPos = mul(inverseWorldMatrix3x3, v0) + restPosition.x * e0
-                                                        + restPosition.y * e1
-                                                        + restPosition.z * e2;
+    restPosition = mul(inverseWorldMatrix3x3, v0) + restPosition.x * e0
+                                                  + restPosition.y * e1
+                                                  + restPosition.z * e2;
 
     uint outOffset = gId.x * 12; // 3 floats * 4 bytes each
-    outVertPositions.Store3(outOffset, asuint(deformedPos));
+    outVertPositions.Store3(outOffset, asuint(restPosition));
 
     // Deform normal
     float3x3 deformMatrix = transpose(inverseFromRows(e0, e1, e2));
