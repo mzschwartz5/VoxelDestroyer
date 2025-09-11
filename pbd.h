@@ -23,7 +23,6 @@
 #include <maya/MPlugArray.h>
 #include <maya/MItDag.h>
 #include <maya/MFnMesh.h>
-#include <maya/MMatrix.h>
 #include <maya/MNodeMessage.h>
 #include <maya/MDataBlock.h>
 #include <maya/MCallbackIdArray.h>
