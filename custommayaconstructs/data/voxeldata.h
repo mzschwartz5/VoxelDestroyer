@@ -2,7 +2,7 @@
 #include <maya/MPxData.h>
 #include <maya/MTypeId.h>
 #include <maya/MString.h>
-#include "../voxelizer.h"
+#include "../../voxelizer.h"
 
 /**
  * This is a custom attribute data type used for storing Voxel data on the PBD node type.

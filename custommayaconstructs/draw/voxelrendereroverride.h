@@ -3,7 +3,7 @@
 #include <maya/MRenderTargetManager.h>
 #include <maya/MGlobal.h>
 #include <maya/MMatrix.h>
-#include "../event.h"
+#include "../../event.h"
 using namespace MHWRender;
 
 struct CameraMatrices

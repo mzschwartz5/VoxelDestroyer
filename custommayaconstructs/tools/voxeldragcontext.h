@@ -8,7 +8,7 @@
 #include <maya/MTimerMessage.h>
 #include <maya/MEventMessage.h>
 #include <maya/MConditionMessage.h>
-#include "../event.h"
+#include "../../event.h"
 
 // Maya API does not expose a playback direction enum, nor a way to get the current playback direction,
 // so we define and track it ourselves.
