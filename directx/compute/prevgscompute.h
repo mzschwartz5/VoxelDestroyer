@@ -15,7 +15,7 @@ public:
 
     PreVGSCompute(
         int numParticles,
-        const glm::vec4* initialOldPositions,
+        const MFloatPoint* initialOldPositions,
         const PreVGSConstantBuffer& simConstants
 	) : ComputeShader(IDR_SHADER5)
     {
@@ -77,7 +77,7 @@ private:
 		DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
-    void initializeBuffers(int numParticles, const glm::vec4* initialOldPositions, const PreVGSConstantBuffer& simConstants) {
+    void initializeBuffers(int numParticles, const MFloatPoint* initialOldPositions, const PreVGSConstantBuffer& simConstants) {
         numWorkgroups = Utils::divideRoundUp(numParticles, VGS_THREADS);
         D3D11_BUFFER_DESC bufferDesc = {};
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -86,11 +86,11 @@ private:
 
         // Create oldPositions buffer and its SRV and UAV
         bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        bufferDesc.ByteWidth = numParticles * sizeof(glm::vec4);
+        bufferDesc.ByteWidth = numParticles * sizeof(MFloatPoint);
         bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
         bufferDesc.CPUAccessFlags = 0;
         bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-        bufferDesc.StructureByteStride = sizeof(glm::vec4); // Size of each element in the buffer
+        bufferDesc.StructureByteStride = sizeof(MFloatPoint); // Size of each element in the buffer
 
         initData.pSysMem = initialOldPositions; 
         CreateBuffer(&bufferDesc, &initData, &oldPositionsBuffer);
@@ -110,7 +110,7 @@ private:
 
 		// Create simConstants buffer
 		bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-		bufferDesc.ByteWidth = sizeof(glm::vec4);
+		bufferDesc.ByteWidth = sizeof(PreVGSConstantBuffer);
 		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
         bufferDesc.MiscFlags = 0;

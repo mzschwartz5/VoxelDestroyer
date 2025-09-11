@@ -1,5 +1,4 @@
 #include "plugin.h"
-#include "glm/glm.hpp"
 #include <maya/MCommandResult.h>
 #include <maya/MFnMessageAttribute.h>
 #include <windows.h>

@@ -374,7 +374,7 @@ void Voxelizer::createVoxels(
                     z * voxelSize + gridMin.z
                 );
 
-                addVoxelToMesh(voxelMin, voxelSize, overlappedVoxels, index);
+                overlappedVoxels.dimensions[index] = { voxelMin, voxelSize };
                 overlappedVoxels.numOccupied++;
             }
         }
@@ -474,29 +474,6 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     return resultMeshDagPath;
 }
 
-void Voxelizer::addVoxelToMesh(
-    const MPoint& voxelMin,
-    double voxelSize,
-    Voxels& voxels,
-    int index
-) {
-    CGALHelper::SurfaceMesh cubeMesh = CGALHelper::cube(
-        voxelMin,
-        voxelSize
-    );
-
-    VoxelPositions positions;
-    positions.corners = std::array<glm::vec3, 8>();
-    int i = 0;
-    for (const auto& vertex : cubeMesh.vertices()) {
-        const auto& point = cubeMesh.point(vertex);
-        positions.corners[i++] = glm::vec3( point.x(), point.y(), point.z());
-    }
-
-    voxels.corners[index] = positions;
-    voxels.cgalMeshes[index] = cubeMesh;
-}
-
 Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
     // Note that the size of the sortedVoxels is equal to the number of occupied voxels. Thus, we're also filtering in this step.
     Voxels sortedVoxels;
@@ -512,8 +489,7 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
 
     for (size_t i = 0; i < voxels.numOccupied; ++i) {
         sortedVoxels.isSurface[i] = voxels.isSurface[voxelIndices[i]];
-        sortedVoxels.cgalMeshes[i] = voxels.cgalMeshes[voxelIndices[i]];
-        sortedVoxels.corners[i] = voxels.corners[voxelIndices[i]];
+        sortedVoxels.dimensions[i] = voxels.dimensions[voxelIndices[i]];
         sortedVoxels.mortonCodes[i] = voxels.mortonCodes[voxelIndices[i]];
         sortedVoxels.mortonCodesToSortedIdx[voxels.mortonCodes[voxelIndices[i]]] = static_cast<uint32_t>(i);
         sortedVoxels.containedTris[i] = voxels.containedTris[voxelIndices[i]];
@@ -629,12 +605,14 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
     std::unordered_map<Point_3, int, CGALHelper::Point3Hash> cgalVertexToMayaIdx;
 
     const Voxels* voxels = taskData->voxels;
+    const VoxelDimensions& voxelDim = voxels->dimensions[voxelIndex];
+    SurfaceMesh cube = CGALHelper::cube(voxelDim.min, voxelDim.edgeLength);
 
     // In this case, we just return the points of the cube without intersection.
     if (!voxels->isSurface[voxelIndex] || !doBoolean) {
         cgalVertexToMayaIdx.reserve(8); // 8 vertices for a cube
         CGALHelper::toMayaMesh(
-            voxels->cgalMeshes[voxelIndex],
+            cube,
             cgalVertexToMayaIdx,
             meshPointsAfterIntersection,
             polyCountsAfterIntersection,
@@ -658,7 +636,6 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
         originalMeshTriIndices,
         taskData->triangles
     );
-    SurfaceMesh cube = voxels->cgalMeshes[voxelIndex];
     originalMeshTriIndices.clear();
 
     CGALHelper::openMeshBooleanIntersection(

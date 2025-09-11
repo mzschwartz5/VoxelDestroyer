@@ -128,7 +128,7 @@ private:
 
         D3D11_BUFFER_DESC desc;
         buffers[BufferType::PARTICLE]->GetDesc(&desc);
-        return desc.ByteWidth / sizeof(glm::vec4);
+        return desc.ByteWidth / sizeof(MFloatPoint);
     }
 
     static void resetBuffer(ComPtr<ID3D11Buffer>& buffer) {

@@ -353,16 +353,41 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(c
     return faceConstraints;
 }
 
+// Importantly: in Morton order (the order the VGS algorithm expects)
+std::array<std::array<int, 3>, 8> cornerOffsets = {{
+    {{0, 0, 0}},
+    {{1, 0, 0}},
+    {{0, 1, 0}},
+    {{1, 1, 0}},
+    {{0, 0, 1}},
+    {{1, 0, 1}},
+    {{0, 1, 1}},
+    {{1, 1, 1}}
+}};
+
 void PBD::createParticles(const Voxels& voxels) {
     for (int i = 0; i < voxels.numOccupied; i++) {
-        glm::vec3 voxelCenter = 0.5f * (voxels.corners[i].corners[0] + voxels.corners[i].corners[7]);
+        const VoxelDimensions& voxelDims = voxels.dimensions[i];
+        const MFloatPoint& voxelMin = voxelDims.min;
+        double edgeLength = voxelDims.edgeLength;
+        const MFloatPoint voxelCenter = MFloatPoint(
+            voxelMin.x + (edgeLength * 0.5),
+            voxelMin.y + (edgeLength * 0.5),
+            voxelMin.z + (edgeLength * 0.5)
+        );
 
-        for (const auto& corner : voxels.corners[i].corners) {
+        for (int j = 0; j < 8; j++) {
+            MFloatPoint corner = MFloatPoint(
+                voxelMin.x + (cornerOffsets[j][0] * edgeLength),
+                voxelMin.y + (cornerOffsets[j][1] * edgeLength),
+                voxelMin.z + (cornerOffsets[j][2] * edgeLength)
+            );
+
             // Offset the corner towards the center by the radius of the particle
-            const glm::vec3& position = corner - (PARTICLE_RADIUS * glm::sign(corner - voxelCenter));
+            const MFloatPoint& position = corner - (PARTICLE_RADIUS * Utils::sign(corner - voxelCenter));
             float packedRadiusAndW = Utils::packTwoFloatsAsHalfs(PARTICLE_RADIUS, 1.0f); // for now, w is hardcoded to 1.0f
-            particles.positions.push_back(vec4(position, packedRadiusAndW));
-            particles.oldPositions.push_back(vec4(position, packedRadiusAndW));
+            particles.positions.push_back(MFloatPoint(position.x, position.y, position.z, packedRadiusAndW));
+            particles.oldPositions.push_back(MFloatPoint(position.x, position.y, position.z, packedRadiusAndW));
             particles.numParticles++;
         }
     }

@@ -11,7 +11,6 @@
 #include <unordered_map>
 
 #include "utils.h"
-#include "glm/glm.hpp"
 #include <maya/MThreadPool.h>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
@@ -48,21 +47,21 @@ struct Triangle {
     double d_ei_yz_solid[3]; // Edge distances for the yz plane (for solid voxelization)
 };
 
-struct VoxelPositions {
-    std::array<glm::vec3, 8> corners;
-};
-
 struct VoxelizationGrid {
     double gridEdgeLength;
     int voxelsPerEdge;
     MPoint gridCenter;
 };
 
+struct VoxelDimensions {
+    MFloatPoint min;
+    double edgeLength;
+};
+
 struct Voxels {
     std::vector<bool> occupied;             // Contains some part (surface or interior) of the underlying mesh
     std::vector<uint> isSurface;            // Use uints instead of bools because vector<bool> packs bools into bits, which will not work for GPU access.
-    std::vector<SurfaceMesh> cgalMeshes;    // The actual cube meshes
-    std::vector<VoxelPositions> corners;    // Ordered according to the VGS expectations
+    std::vector<VoxelDimensions> dimensions;  // Position and size of each voxel
     std::vector<uint32_t> mortonCodes;
     // Answers the question: for a given voxel morton code, what is the index of the corresponding voxel in the sorted array of voxels?
     std::unordered_map<uint32_t, uint32_t> mortonCodesToSortedIdx;
@@ -80,8 +79,7 @@ struct Voxels {
     Voxels(const Voxels& other)
         : occupied(other.occupied),
           isSurface(other.isSurface),
-          cgalMeshes(other.cgalMeshes),
-          corners(other.corners),
+          dimensions(other.dimensions),
           mortonCodes(other.mortonCodes),
           mortonCodesToSortedIdx(other.mortonCodesToSortedIdx),
           containedTris(other.containedTris),
@@ -98,8 +96,7 @@ struct Voxels {
         if (this != &other) {
             occupied = other.occupied;
             isSurface = other.isSurface;
-            // cgalMeshes is not copy-assignable, but shouldn't need to copy it anyway
-            corners = other.corners;
+            dimensions = other.dimensions;
             mortonCodes = other.mortonCodes;
             mortonCodesToSortedIdx = other.mortonCodesToSortedIdx;
             containedTris = other.containedTris;
@@ -117,8 +114,7 @@ struct Voxels {
     Voxels(Voxels&& other) noexcept
         : occupied(std::move(other.occupied)),
           isSurface(std::move(other.isSurface)),
-          cgalMeshes(std::move(other.cgalMeshes)),
-          corners(std::move(other.corners)),
+          dimensions(std::move(other.dimensions)),
           mortonCodes(std::move(other.mortonCodes)),
           mortonCodesToSortedIdx(std::move(other.mortonCodesToSortedIdx)),
           containedTris(std::move(other.containedTris)),
@@ -136,8 +132,7 @@ struct Voxels {
         _size = size;
         occupied.resize(size, false);
         isSurface.resize(size, false);
-        cgalMeshes.resize(size);
-        corners.resize(size, VoxelPositions());
+        dimensions.resize(size);
         mortonCodes.resize(size, UINT_MAX);
         containedTris.resize(size);
         overlappingTris.resize(size);
@@ -216,13 +211,6 @@ private:
     void createVoxels(
         Voxels& occupiedVoxels,
         const VoxelizationGrid& grid
-    );
-
-    void addVoxelToMesh(
-        const MPoint& voxelMin,  // min corner of the voxel
-        double voxelSize,        // edge length of a single voxel
-        Voxels& voxels,
-        int index
     );
 
     // Sorts the voxels by their Morton code, which helps later on with efficient GPU memory access.
