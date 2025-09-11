@@ -42,7 +42,7 @@ void main( uint3 gId : SV_DispatchThreadID )
     voxelCenter *= 0.125f;
     voxelCenter.w = 1.0f;
 
-    float4 viewSpaceVoxelCenter = mul(voxelCenter, viewMatrix);
+    float4 viewSpaceVoxelCenter = mul(viewMatrix, voxelCenter);
     viewSpaceVoxelCenter.z += (voxelSize * 0.5f);        // Bias the voxel towards the camera so the depth test later is really measuring the surface of the voxel.
     float voxelCameraDepth = -viewSpaceVoxelCenter.z;    // Later, we need to have the view-space depth of the voxel.
     
@@ -52,7 +52,7 @@ void main( uint3 gId : SV_DispatchThreadID )
         return;
     }
 
-    float4 pixelSpaceVoxelCenter = mul(viewSpaceVoxelCenter, projMatrix);
+    float4 pixelSpaceVoxelCenter = mul(projMatrix,viewSpaceVoxelCenter);
     pixelSpaceVoxelCenter /= pixelSpaceVoxelCenter.w; // Perspective divide
     pixelSpaceVoxelCenter.x = (pixelSpaceVoxelCenter.x + 1.0f) * 0.5f * viewportWidth;
     pixelSpaceVoxelCenter.y = (pixelSpaceVoxelCenter.y + 1.0f) * 0.5f * viewportHeight;

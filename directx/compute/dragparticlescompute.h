@@ -1,8 +1,11 @@
 #pragma once
+#include <array>
 #include "computeshader.h"
-#include "glm/glm.hpp"
 #include "../custommayaconstructs/tools/voxeldragcontext.h"
 #include "../custommayaconstructs/draw/voxelrendereroverride.h"
+#include <maya/MPoint.h>
+#include <maya/MFloatPoint.h>
+#include <maya/MFloatVector.h>
 
 // NOTE: currently, the ConstantBuffer is perfectly 16-byte aligned. Adding any values to these structs
 // or even changing their order can break this shader. Any extra data must fit into the next 16-byte chunk.
@@ -16,14 +19,14 @@ struct DragValues
 struct ConstantBuffer{
     // Difference in world space between the last and current mouse positions
     // for a hypothetical unit depth.
-    glm::vec3 dragWorldDiff{ 0.0f, 0.0f, 0.0f }; 
+    std::array<float, 3> dragWorldDiff{ { 0.0f, 0.0f, 0.0f } };
     int lastX{ 0 };
     int lastY{ 0 };
     float dragRadius{ 0.0f };
     float viewportWidth{ 0.0f };
     float viewportHeight{ 0.0f };
-    glm::mat4 viewMatrix;
-    glm::mat4 projMatrix;
+    float viewMatrix[4][4];  // Not using std::array here because MMatrix::get() requires a C-style array
+    float projMatrix[4][4];
 };
 
 class DragParticlesCompute : public ComputeShader
@@ -178,31 +181,37 @@ private:
 
     void copyConstantBufferToGPU()
     {
-        ConstantBuffer cb{
-            calculateDragWorldDiff(),
-            dragValues.lastMousePosition.x,
-            dragValues.lastMousePosition.y,
-            dragValues.selectRadius,
-            cameraMatrices.viewportWidth,
-            cameraMatrices.viewportHeight,
-            cameraMatrices.viewMatrix,
-            cameraMatrices.projMatrix,
-        };
+        ConstantBuffer cb = {};
+        cb.dragWorldDiff = calculateDragWorldDiff();
+        cb.lastX = dragValues.lastMousePosition.x;
+        cb.lastY = dragValues.lastMousePosition.y;
+        cb.dragRadius = dragValues.selectRadius;
+        cb.viewportWidth = cameraMatrices.viewportWidth;
+        cb.viewportHeight = cameraMatrices.viewportHeight;
+        cameraMatrices.viewMatrix.get(cb.viewMatrix);
+        cameraMatrices.projMatrix.get(cb.projMatrix);
 
         updateConstantBuffer(constantBuffer, cb);
     }
 
     // Reverse-project the mouse start and end points to world space at a unit depth, and return the difference.
-    glm::vec3 calculateDragWorldDiff() {
-        glm::vec2 mouseStartNDC = glm::vec2((dragValues.lastMousePosition.x / cameraMatrices.viewportWidth) * 2.0f - 1.0f,
-                                            (dragValues.lastMousePosition.y / cameraMatrices.viewportHeight) * 2.0f - 1.0f);
-        glm::vec4 mouseStartWorld =  glm::vec4(mouseStartNDC, 1.0f, 1.0f) * cameraMatrices.invViewProjMatrix;
+    std::array<float, 3> calculateDragWorldDiff() {
+        MFloatPoint mouseStartNDC(
+            (dragValues.lastMousePosition.x / cameraMatrices.viewportWidth) * 2.0f - 1.0f,
+            (dragValues.lastMousePosition.y / cameraMatrices.viewportHeight) * 2.0f - 1.0f,
+            1.0f, 1.0f
+        );
+        MVector mouseStartWorld = MVector(mouseStartNDC) * cameraMatrices.invViewProjMatrix;
 
-        glm::vec2 mouseEndNDC = glm::vec2((dragValues.currentMousePosition.x / cameraMatrices.viewportWidth) * 2.0f - 1.0f,
-                                          (dragValues.currentMousePosition.y / cameraMatrices.viewportHeight) * 2.0f - 1.0f);
-        glm::vec4 mouseEndWorld = glm::vec4(mouseEndNDC, 1.0f, 1.0f) * cameraMatrices.invViewProjMatrix;
+        MFloatPoint mouseEndNDC(
+            (dragValues.currentMousePosition.x / cameraMatrices.viewportWidth) * 2.0f - 1.0f,
+            (dragValues.currentMousePosition.y / cameraMatrices.viewportHeight) * 2.0f - 1.0f,
+            1.0f, 1.0f
+        );
+        MVector mouseEndWorld = MVector(mouseEndNDC) * cameraMatrices.invViewProjMatrix;
 
-        return (mouseEndWorld - mouseStartWorld);
+        MFloatVector diff = mouseEndWorld - mouseStartWorld;
+        return { diff.x, diff.y, diff.z };
     }
 
     void bind() override

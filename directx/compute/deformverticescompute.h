@@ -17,7 +17,7 @@ public:
         int vertexCount,
         const MMatrix& inverseWorldMatrix,
         const MFloatPoint* originalParticlePositions,   // Will be uploaded to GPU
-        const std::vector<uint>& vertexVoxelIds,      // Will be uploaded to GPU
+        const std::vector<uint>& vertexVoxelIds,        // Will be uploaded to GPU
         const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
         const ComPtr<ID3D11UnorderedAccessView>& normalsUAV,
         const ComPtr<ID3D11ShaderResourceView>& originalVertPositionsSRV,

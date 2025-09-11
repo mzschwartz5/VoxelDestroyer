@@ -10,9 +10,9 @@ struct CameraMatrices
 {
     float viewportWidth{ 0.0f };
     float viewportHeight{ 0.0f };
-    glm::mat4 viewMatrix;
-    glm::mat4 projMatrix;
-    glm::mat4 invViewProjMatrix;
+    MMatrix viewMatrix;
+    MMatrix projMatrix;
+    MMatrix invViewProjMatrix;
 };
 
 /**
@@ -38,7 +38,7 @@ public:
         mFrameContext->getViewportDimensions(viewportOriginX, viewportOriginY, viewportWidth, viewportHeight);
 
         depthTargetChangedEvent.notify(depthTarget->resourceHandle());
-        cameraInfoChangedEvent.notify({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), mayaMatrixToGlm(viewMatrix), mayaMatrixToGlm(projMatrix), mayaMatrixToGlm(invViewProjMatrix) });
+        cameraInfoChangedEvent.notify({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), viewMatrix, projMatrix, invViewProjMatrix });
 
         return MStatus::kSuccess;
     }
@@ -64,13 +64,4 @@ private:
     inline static Event<void*> depthTargetChangedEvent;
     inline static Event<CameraMatrices> cameraInfoChangedEvent;
     MString name;
-
-    inline glm::mat4 mayaMatrixToGlm(const MMatrix& matrix) {
-        return glm::mat4(
-            matrix(0, 0), matrix(1, 0), matrix(2, 0), matrix(3, 0),
-            matrix(0, 1), matrix(1, 1), matrix(2, 1), matrix(3, 1),
-            matrix(0, 2), matrix(1, 2), matrix(2, 2), matrix(3, 2),
-            matrix(0, 3), matrix(1, 3), matrix(2, 3), matrix(3, 3)
-        );
-    }
 };
