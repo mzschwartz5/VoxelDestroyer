@@ -1,11 +1,11 @@
 #pragma once
 
 #include "directx/compute/computeshader.h"
-#include "glm.hpp"
+#include <array>
 
 struct FaceContraintsCB {
-	glm::uvec4 faceOneIndices;
-	glm::uvec4 faceTwoIndices;
+	std::array<uint, 4> faceOneIndices;
+	std::array<uint, 4> faceTwoIndices;
     uint numContraints;
     int padding0;
     int padding1;
