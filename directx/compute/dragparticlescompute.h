@@ -201,16 +201,14 @@ private:
             (dragValues.lastMousePosition.y / cameraMatrices.viewportHeight) * 2.0f - 1.0f,
             1.0f, 1.0f
         );
-        MVector mouseStartWorld = MVector(mouseStartNDC) * cameraMatrices.invViewProjMatrix;
 
         MFloatPoint mouseEndNDC(
             (dragValues.currentMousePosition.x / cameraMatrices.viewportWidth) * 2.0f - 1.0f,
             (dragValues.currentMousePosition.y / cameraMatrices.viewportHeight) * 2.0f - 1.0f,
             1.0f, 1.0f
         );
-        MVector mouseEndWorld = MVector(mouseEndNDC) * cameraMatrices.invViewProjMatrix;
 
-        MFloatVector diff = mouseEndWorld - mouseStartWorld;
+        MFloatVector diff = MVector(mouseEndNDC - mouseStartNDC) * cameraMatrices.invViewProjMatrix;
         return { diff.x, diff.y, diff.z };
     }
 
