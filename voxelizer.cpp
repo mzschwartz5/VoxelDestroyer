@@ -69,7 +69,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     Voxels sortedVoxels = sortVoxelsByMortonCode(voxels); // note: assign to new var to take advantage of RVO
 
     MProgressWindow::setProgressStatus("Calculating voxel-mesh intersections...");
-    const FaceSelectionStrings faceSelectionStrings = prepareForAndDoVoxelIntersection(
+    const std::tuple<MObject, MObject> faceComponents = prepareForAndDoVoxelIntersection(
         sortedVoxels,
         selectedMesh,
         meshTris,
@@ -78,7 +78,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
         clipTriangles
     );
 
-    sortedVoxels.voxelizedMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, faceSelectionStrings); // TODO: if no boolean, should get rid of non-manifold geometry
+    sortedVoxels.voxelizedMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, faceComponents); // TODO: if no boolean, should get rid of non-manifold geometry
     MGlobal::executeCommand("delete " + originalMeshName, false, true); // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh (or just allow for undo)
 
     MThreadPool::release(); // reduce reference count incurred by init()
@@ -381,7 +381,7 @@ void Voxelizer::createVoxels(
     }
 }
 
-Voxelizer::FaceSelectionStrings Voxelizer::prepareForAndDoVoxelIntersection(
+std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
     Voxels& voxels,      
     MFnMesh& originalMesh,
     const std::vector<Triangle>& meshTris,
@@ -401,15 +401,18 @@ Voxelizer::FaceSelectionStrings Voxelizer::prepareForAndDoVoxelIntersection(
     Tree aabbTree(originalMeshCGAL.faces().first, originalMeshCGAL.faces().second, originalMeshCGAL);
     SideTester sideTester(aabbTree);
 
-    // These strings will be built up in getVoxelMeshIntersection
-    FaceSelectionStrings faceSelectionStrings;
+    // These components will be built out in getVoxelMeshIntersection
+    MFnSingleIndexedComponent singleIndexComponentFn;
+    MObject surfaceFaceComponent = singleIndexComponentFn.create(MFn::kMeshPolygonComponent);
+    MObject interiorFaceComponent = singleIndexComponentFn.create(MFn::kMeshPolygonComponent);
+
     VoxelIntersectionTaskData taskData {
         &voxels,
         &originalVertices,
         &meshTris,
         &sideTester,
-        &faceSelectionStrings.surfaceFaces,
-        &faceSelectionStrings.interiorFaces,
+        &surfaceFaceComponent,
+        &interiorFaceComponent,
         doBoolean,
         clipTriangles,
         newMeshName
@@ -422,14 +425,14 @@ Voxelizer::FaceSelectionStrings Voxelizer::prepareForAndDoVoxelIntersection(
     );
     MThreadPool::release(); // reduce reference count incurred by opening a new parallel region
 
-    return faceSelectionStrings;
+    return std::make_tuple(surfaceFaceComponent, interiorFaceComponent);
 }
 
 MDagPath Voxelizer::finalizeVoxelMesh(
     const MString& newMeshName,
     const MString& originalMeshName,
     const MPoint& originalPivot,
-    const FaceSelectionStrings& faceSelectionStrings
+    const std::tuple<MObject, MObject>& faceComponents
 ) {
     MProgressWindow::setProgressRange(0, 100);
     MProgressWindow::setProgress(0);
@@ -439,10 +442,10 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     // Retrieve the MObject of the resulting mesh
     MProgressWindow::setProgressStatus("Transferring pivot...");
     MStatus status;
-    MSelectionList resultSelectionList;
-    resultSelectionList.add(newMeshName);
+    MSelectionList selectionList;
+    selectionList.add(newMeshName);
     MObject resultMeshObject;
-    resultSelectionList.getDependNode(0, resultMeshObject);
+    selectionList.getDependNode(0, resultMeshObject);
     MDagPath resultMeshDagPath;
     MDagPath::getAPathTo(resultMeshObject, resultMeshDagPath);
     MFnMesh resultMeshFn(resultMeshDagPath, &status);
@@ -450,22 +453,29 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     resultTransformFn.setRotatePivot(originalPivot, MSpace::kTransform, false); // Set the pivot to the original mesh's pivot
     MProgressWindow::advanceProgress(progressIncrement);
 
-    // Use MEL to transferAttributes the normals / uvs / etc. from the original mesh to the new voxelized/combined one
+    // Use MEL to transferAttributes the normals / uvs / colors, and transferShadingSets, from the original mesh to the surface faces of the voxelized one
     MProgressWindow::setProgressStatus("Transferring attributes from original mesh...");
-    MGlobal::executeCommand("select -r " + originalMeshName, false, false); 
-    MGlobal::executeCommand("select -add " + faceSelectionStrings.surfaceFaces, false, false);
+    selectionList.clear();
+    selectionList.add(originalMeshName);
+    selectionList.add(resultMeshDagPath, std::get<0>(faceComponents));
+    MGlobal::setActiveSelectionList(selectionList, MGlobal::kReplaceList);
     MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
     MProgressWindow::advanceProgress(progressIncrement);
+    
     MProgressWindow::setProgressStatus("Transferring shading sets from original mesh...");
     MGlobal::executeCommand("transferShadingSets", false, false);
     MProgressWindow::advanceProgress(progressIncrement);
 
     // For now at least, let the interior faces be grey and flat shaded.
     // (Otherwise, they try to extend the shading and normals from the surface and look weird).
+    selectionList.clear();
     MProgressWindow::setProgressStatus("Setting normals and shading on interior faces...");
-    MGlobal::executeCommand("sets -e -forceElement initialShadingGroup " + faceSelectionStrings.interiorFaces, false, false); 
-    MGlobal::executeCommand("select -r " + faceSelectionStrings.interiorFaces, false, false);
+    
+    selectionList.add(resultMeshDagPath, std::get<1>(faceComponents));
+    MGlobal::setActiveSelectionList(selectionList, MGlobal::kReplaceList);
+    MGlobal::executeCommand("sets -e -forceElement initialShadingGroup", false, false);
     MGlobal::executeCommand("polySetToFaceNormal;", false, false);
+    
     MProgressWindow::advanceProgress(progressIncrement);
 
     MGlobal::executeCommand("delete -ch " + newMeshName); // Delete the history of the combined mesh to decouple it from the original mesh
@@ -505,8 +515,8 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
 void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) {
     VoxelIntersectionTaskData* taskData = static_cast<VoxelIntersectionTaskData*>(data);
     Voxels* voxels = taskData->voxels;
-    MString* surfaceFaces = taskData->surfaceFaces;
-    MString* interiorFaces = taskData->interiorFaces;
+    MFnSingleIndexedComponent surfaceFaceComponent(*(taskData->surfaceFaces));
+    MFnSingleIndexedComponent interiorFaceComponent(*(taskData->interiorFaces));
     const MString& newMeshName = taskData->newMeshName;
 
     // Threads will write the outputs of the boolean operations to these vectors
@@ -537,8 +547,8 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
 
     // Merge together all the mesh points, poly counts, and poly connects into one mesh
     MPointArray allMeshPoints;
-    MIntArray allPolyCounts;
-    MIntArray allPolyConnects;
+    MIntArray allPolyCounts, allPolyConnects;
+    MIntArray surfaceFaceIndices, interiorFaceIndices;
     int startFaceIdx = 0;
     for (int i = 0; i < voxels->numOccupied; ++i) {
         int startVertIdx = voxels->totalVerts;
@@ -548,10 +558,14 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
         int numSurfaceFaces = numSurfaceFacesAfterIntersection[i];
         int numInteriorFaces = totalFaceCount - numSurfaceFaces;
         if (numSurfaceFaces > 0) {
-            (*surfaceFaces) += newMeshName + MString(".f[") + startFaceIdx + MString(":") + (startFaceIdx + numSurfaceFaces - 1) + MString("] ");
+            for (int f = 0; f < numSurfaceFaces; ++f) {
+                surfaceFaceIndices.append(startFaceIdx + f);
+            }
         }
         if (numInteriorFaces > 0) {
-            (*interiorFaces) += newMeshName + MString(".f[") + (startFaceIdx + numSurfaceFaces) + MString(":") + (startFaceIdx + totalFaceCount - 1) + MString("] ");
+            for (int f = 0; f < numInteriorFaces; ++f) {
+                interiorFaceIndices.append(startFaceIdx + numSurfaceFaces + f);
+            }
         }
         startFaceIdx += totalFaceCount;
 
@@ -572,6 +586,9 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
         polyCountsAfterIntersection[i].clear();
         polyConnectsAfterIntersection[i].clear();
     }
+
+    surfaceFaceComponent.addElements(surfaceFaceIndices);
+    interiorFaceComponent.addElements(interiorFaceIndices);
 
     // Create Maya mesh
     // Note: the new mesh currently has no shading group or vertex attributes.

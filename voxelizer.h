@@ -9,9 +9,11 @@
 #include <vector>
 #include <array>
 #include <unordered_map>
+#include <tuple>
 
 #include "utils.h"
 #include <maya/MThreadPool.h>
+#include <maya/MFnSingleIndexedComponent.h>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
@@ -218,14 +220,11 @@ private:
         const Voxels& voxels
     );
 
-    struct FaceSelectionStrings {
-        MString surfaceFaces;
-        MString interiorFaces;
-    };
 
     // Sets up the CGAL acceleration tree and launches the MThreadPool (which, itself sets up each thread).
+    // Returns MSingleIndexedComponents for the surface and interior faces of the voxelized mesh.
     // (There are too many "do intersection" here functions IMO, but Maya's thread pool forces you into a pattern of manager functions that don't do much themselves)
-    FaceSelectionStrings prepareForAndDoVoxelIntersection(
+    std::tuple<MObject, MObject> prepareForAndDoVoxelIntersection(
         Voxels& voxels,      
         MFnMesh& originalMesh,
         const std::vector<Triangle>& meshTris,
@@ -240,8 +239,8 @@ private:
         const MPointArray* const originalVertices;
         const std::vector<Triangle>* const triangles;
         const SideTester* const sideTester;
-        MString* const surfaceFaces; // pass by pointer as this string will be very long and modified by the task
-        MString* const interiorFaces;
+        MObject* const surfaceFaces;
+        MObject* const interiorFaces;
         bool doBoolean;
         bool clipTriangles;
         MString newMeshName;
@@ -276,6 +275,6 @@ private:
         const MString& newMeshName,
         const MString& originalMesh,
         const MPoint& originalPivot,
-        const FaceSelectionStrings& faceSelectionStrings
+        const std::tuple<MObject, MObject>& faceComponents
     );
 };
