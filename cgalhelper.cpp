@@ -172,7 +172,6 @@ void openMeshBooleanIntersection(
 
     // Note: the last step is left to the caller. The openMesh and closedMesh, together, form a water tight mesh.
     // The caller can either do a logical join on the two, or merge their vertices together by distance into a manifold mesh.
-    // This is most easily done after converting back to a Maya mesh, via the Maya API's polyUnite and polyMergeVertex commands.
 }
 
 }

@@ -185,15 +185,34 @@ public:
         const VoxelizationGrid& voxelizationGrid,
         const Voxels& voxels
     ) const {
-        std::vector<uint> vertexVoxelIds(vertexPositions.size(), 0);
+        const MDagPath originalGeomPath = pathToOriginalGeometry();
+        std::vector<uint> vertexVoxelIds(vertexPositions.size() / 3, UINT_MAX);
         double voxelSize = voxelizationGrid.gridEdgeLength / voxelizationGrid.voxelsPerEdge;
         MPoint gridMin = voxelizationGrid.gridCenter - MVector(voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2);
+        gridMin = originalGeomPath.inclusiveMatrix().inverse() * gridMin; // Transform voxelization grid to object space, since that's where vertices are defined.
         const std::unordered_map<uint32_t, uint32_t>& voxelMortonCodeToIndex = voxels.mortonCodesToSortedIdx;
+        const double episilon = 1e-4 * voxelSize;
 
         for (size_t i = 0; i < vertexIndices.size(); i += 3) {
             uint idx0 = vertexIndices[i];
             uint idx1 = vertexIndices[i + 1];
             uint idx2 = vertexIndices[i + 2];
+
+            // If a vertex has been assigned a voxel ID already (as part of some other triangle),
+            // use it for this triangle's vertices as well. By construction, a vertex should be owned by one voxel,
+            // so if one triangle it's part of belongs to a voxel, all triangles it is part of should belong to the same voxel.
+            uint voxelId = UINT_MAX;
+            for (uint idx : { idx0, idx1, idx2 }) {
+                if (vertexVoxelIds[idx] != UINT_MAX) { 
+                    voxelId = vertexVoxelIds[idx]; 
+                    break; 
+                }
+            }
+
+            if (voxelId != UINT_MAX) {
+                for (uint idx : { idx0, idx1, idx2 }) vertexVoxelIds[idx] = voxelId;
+                continue;
+            }
 
             MPoint v0(vertexPositions[idx0 * 3], vertexPositions[idx0 * 3 + 1], vertexPositions[idx0 * 3 + 2]);
             MPoint v1(vertexPositions[idx1 * 3], vertexPositions[idx1 * 3 + 1], vertexPositions[idx1 * 3 + 2]);
@@ -202,18 +221,16 @@ public:
             // Triangles on the boundary between voxels will have identical centroids. To identify the correct voxel, 
             // nudge the centroid back a small epsilon along the triangle normal (by winding order).
             MVector normal = ((v1 - v0) ^ (v2 - v0)).normal();
-            MPoint centroid = ((v0 + v1 + v2) / 3.0) - (normal * 1e-6);
+            MPoint centroid = ((v0 + v1 + v2) / 3.0) - (normal * episilon);
 
             int voxelX = static_cast<int>(floor((centroid.x - gridMin.x) / voxelSize));
             int voxelY = static_cast<int>(floor((centroid.y - gridMin.y) / voxelSize));
             int voxelZ = static_cast<int>(floor((centroid.z - gridMin.z) / voxelSize));
 
             uint voxelMortonCode = Utils::toMortonCode(voxelX, voxelY, voxelZ);
-            uint voxelId = voxelMortonCodeToIndex.at(voxelMortonCode);
+            voxelId = voxelMortonCodeToIndex.at(voxelMortonCode);
 
             // Tag all three vertices of this triangle with the same voxel ID
-            // Note that this will overwrite previous assignments if a vertex is shared between triangles, but that's fine;
-            // A vertex can't be shared between voxels, by construction, so the overwrite will always be with the same value.
             vertexVoxelIds[idx0] = voxelId;
             vertexVoxelIds[idx1] = voxelId;
             vertexVoxelIds[idx2] = voxelId;
