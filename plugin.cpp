@@ -11,6 +11,7 @@
 #include "custommayaconstructs/data/d3d11data.h"
 #include "custommayaconstructs/draw/voxelshape.h"
 #include "custommayaconstructs/draw/voxelsubsceneoverride.h"
+#include "custommayaconstructs/usernodes/pbdnode.h"
 #include <maya/MFnPluginData.h>
 #include <maya/MDrawRegistry.h>
 #include "directx/compute/computeshader.h"
@@ -84,7 +85,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	MDagPath voxelizedMeshDagPath = voxels.voxelizedMeshDagPath;
 	
 	MProgressWindow::setProgressStatus("Creating PBD particles and face constraints..."); MProgressWindow::setProgressRange(0, 100); MProgressWindow::setProgress(0);
-	MObject pbdNodeObj = PBD::createPBDNode(voxels, voxelizationGrid, voxelizedMeshDagPath);
+	MObject pbdNodeObj = PBDNode::createPBDNode(voxels, voxelizationGrid, voxelizedMeshDagPath);
 	MObject voxelShapeObj = VoxelShape::createVoxelShapeNode(voxelizedMeshDagPath, pbdNodeObj);
 	MProgressWindow::setProgress(100);
 
@@ -317,7 +318,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 	}
 
 	// PBD Node
-	status = plugin.registerNode(PBD::pbdNodeName, PBD::id, PBD::creator, PBD::initialize, MPxNode::kDependNode);
+	status = plugin.registerNode(PBDNode::pbdNodeName, PBDNode::id, PBDNode::creator, PBDNode::initialize, MPxNode::kDependNode);
 	if (!status) {
 		MGlobal::displayError("Failed to register PBD node: " + status.errorString());
 		return status;
@@ -402,7 +403,7 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 		MGlobal::displayError("deregisterData failed on D3D11Data: " + status.errorString());
 
 	// PBD Node
-	status = plugin.deregisterNode(PBD::id);
+	status = plugin.deregisterNode(PBDNode::id);
 	if (!status)
 		MGlobal::displayError("deregisterNode failed on PBD: " + status.errorString());
 

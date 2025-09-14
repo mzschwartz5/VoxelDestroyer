@@ -2,31 +2,12 @@
 
 #include "voxelizer.h"
 
-#include <algorithm>
 #include <vector>
 #include <array>
-#include <numeric>
-#include <functional>
-#include "directx/compute/computeshader.h"
 #include "directx/compute/vgscompute.h"
 #include "directx/compute/prevgscompute.h"
 #include "directx/compute/faceconstraintscompute.h"
-
-#include <maya/MGlobal.h>
-#include <maya/MPxNode.h>
-#include <maya/MSelectionList.h>
-#include <maya/MDagPath.h>
-#include <maya/MFnDagNode.h>
-#include <maya/MFnDependencyNode.h>
-#include <maya/MPlug.h>
-#include <maya/MStatus.h>
-#include <maya/MPlugArray.h>
-#include <maya/MItDag.h>
-#include <maya/MFnMesh.h>
-#include <maya/MNodeMessage.h>
-#include <maya/MDataBlock.h>
-#include <maya/MCallbackIdArray.h>
-
+#include "custommayaconstructs/data/particledata.h"
 
 struct Particles
 {
@@ -36,39 +17,13 @@ struct Particles
     int numParticles{ 0 };
 };
 
-class PBD : public MPxNode
+class PBD
 {
 public:
-    static MTypeId id;
-    static MString pbdNodeName;
-    // Attributes
-    static MObject aMeshOwner;
-    // Inputs
-    static MObject aTriggerIn;
-    static MObject aVoxelDataIn;
-    static MObject aParticleBufferOffset;
-    // Output
-    static MObject aTriggerOut;
-    static MObject aVoxelDataOut;
-    static MObject aParticleData;
-    static MObject aParticleSRV;
-    static MObject aSimulateSubstepFunction;
-    
-    PBD() = default;
-    ~PBD() override = default;
-    // Functions for Maya to create and initialize the node
-    static void* creator() { return new PBD(); }
-    static MStatus initialize();
-    static MObject createPBDNode(Voxels& voxels, const VoxelizationGrid& voxelizationGrid, const MDagPath& meshDagPath);
-    void postConstructor() override;
-    MPxNode::SchedulingType schedulingType() const override {
-        // Evaluated serially amongst nodes of the same type
-        // Necessary because Maya provides a single threaded D3D11 device
-        return MPxNode::kGloballySerial; 
-    }
-    static void onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
-    static void onMeshConnectionDeleted(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
 
+    PBD() = default;
+    ~PBD() = default;
+   
     std::array<std::vector<FaceConstraint>, 3> constructFaceToFaceConstraints(
         const Voxels& voxels, 
         float xTension, float xCompression,
@@ -76,11 +31,17 @@ public:
         float zTension, float zCompression
     );
 
-    void createParticles(const Voxels& voxels);
+    ParticleDataContainer createParticles(const Voxels& voxels);
 
     void createComputeShaders(
         const Voxels& voxels, 
         const std::array<std::vector<FaceConstraint>, 3>& faceConstraints
+    );
+
+    void setGPUResourceHandles(
+        ComPtr<ID3D11UnorderedAccessView> particleUAV,
+        ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV,
+        ComPtr<ID3D11ShaderResourceView> isDraggingSRV
     );
 
     void setRadiusAndVolumeFromLength(float edge_length) {
@@ -96,20 +57,16 @@ public:
         return particles.numParticles;
     }
     
+    void simulateSubstep();
+
 private:
     Particles particles;
-
     bool initialized = false;
-    MCallbackIdArray callbackIds;
 
     // Shaders
     VGSCompute vgsCompute;
     FaceConstraintsCompute faceConstraintsCompute;
     PreVGSCompute preVGSCompute;
-
-    MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override;
-    void simulateSubstep();
-    void onParticleBufferOffsetChanged(int newOffset, MDataHandle& particleSRVHandle);
 
     float BETA{ 0.0f };
     float PARTICLE_RADIUS{ 0.25f };

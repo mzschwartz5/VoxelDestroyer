@@ -11,7 +11,7 @@
 #include <maya/MCallbackIdArray.h>
 #include <maya/MNodeMessage.h>
 #include "../../voxelizer.h"
-#include "../../pbd.h"
+#include "../usernodes/pbdnode.h"
 #include "../data/particledata.h"
 #include "../data/d3d11data.h"
 #include "../data/voxeldata.h"
@@ -114,19 +114,19 @@ public:
         MDGModifier dgMod;
         MFnDependencyNode pbdNode(pbdNodeObj);
         
-        MPlug pbdTriggerPlug = pbdNode.findPlug(PBD::aTriggerOut, false);
+        MPlug pbdTriggerPlug = pbdNode.findPlug(PBDNode::aTriggerOut, false);
         MPlug triggerPlug = dstDep.findPlug(aTrigger, false);
         dgMod.connect(pbdTriggerPlug, triggerPlug);
 
-        MPlug pbdParticleDataPlug = pbdNode.findPlug(PBD::aParticleData, false);
+        MPlug pbdParticleDataPlug = pbdNode.findPlug(PBDNode::aParticleData, false);
         MPlug particleDataPlug = dstDep.findPlug(aParticleData, false);
         dgMod.connect(pbdParticleDataPlug, particleDataPlug);
 
-        MPlug pbdParticleSRVPlug = pbdNode.findPlug(PBD::aParticleSRV, false);
+        MPlug pbdParticleSRVPlug = pbdNode.findPlug(PBDNode::aParticleSRV, false);
         MPlug particleSRVPlug = dstDep.findPlug(aParticleSRV, false);
         dgMod.connect(pbdParticleSRVPlug, particleSRVPlug);
 
-        MPlug pbdVoxelDataPlug = pbdNode.findPlug(PBD::aVoxelDataOut, false);
+        MPlug pbdVoxelDataPlug = pbdNode.findPlug(PBDNode::aVoxelDataOut, false);
         MPlug voxelDataPlug = dstDep.findPlug(aVoxelData, false);
         dgMod.connect(pbdVoxelDataPlug, voxelDataPlug); 
 
@@ -185,6 +185,9 @@ public:
         const std::unordered_map<uint32_t, uint32_t>& voxelMortonCodeToIndex = voxels.mortonCodesToSortedIdx;
         const double episilon = 1e-4 * voxelSize;
 
+        // TODO: this approach still doesn't work flawlessly... there are some cases where a triangle gets stretched between voxels.
+        // A fail-safe method would be to store face components per-voxel in Voxelizer. Though this assumes the order of triangles in the vertexIndices buffer 
+        // matches the order of triangles in the original mesh (which it should... but it's not the safest assumption).
         for (size_t i = 0; i < vertexIndices.size(); i += 3) {
             uint idx0 = vertexIndices[i];
             uint idx1 = vertexIndices[i + 1];

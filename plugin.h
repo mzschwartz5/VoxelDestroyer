@@ -15,7 +15,6 @@
 #include <maya/MVector.h>
 #include <maya/MItDag.h>
 #include "utils.h"
-#include "pbd.h"
 #include <vector>
 #include "voxelizer.h"
 #include "directx/directx.h"
@@ -59,8 +58,6 @@ public:
 
 	static void loadVoxelizerMenu();
 	static MString getActiveModelPanel();
-	
-	static PBD pbdSimulator;
 	static VoxelRendererOverride* voxelRendererOverride;
 	
 private:
