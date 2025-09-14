@@ -12,6 +12,7 @@
 #include <maya/MNodeMessage.h>
 #include "../../voxelizer.h"
 #include "../usernodes/pbdnode.h"
+#include "../usernodes/voxelizernode.h"
 #include "../data/particledata.h"
 #include "../data/d3d11data.h"
 #include "../data/voxeldata.h"
@@ -86,7 +87,7 @@ public:
         return MS::kSuccess;
     }
    
-    static MObject createVoxelShapeNode(const MDagPath& voxelTransformDagPath, const MObject& pbdNodeObj) {
+    static MObject createVoxelShapeNode(const MObject& pbdNodeObj, const MDagPath& voxelTransformDagPath) {
         MStatus status;
         MObject voxelTransform = voxelTransformDagPath.node();
         MDagPath voxelMeshDagPath = voxelTransformDagPath;

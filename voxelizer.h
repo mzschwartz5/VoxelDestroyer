@@ -1,7 +1,6 @@
 #pragma once
 
 #include <maya/MGlobal.h>
-#include <maya/MStatus.h>
 #include <maya/MBoundingBox.h>
 #include <maya/MPointArray.h>
 #include <maya/MFnMesh.h>
@@ -153,14 +152,13 @@ public:
         bool voxelizeSurface,
         bool voxelizeInterior,
         bool doBoolean,
-        bool clipTriangles,
-        MStatus& status
+        bool clipTriangles
     );
 
 private:
 
     // Iterates over Maya triangles and processes each one, calculating quantities needed for voxelization
-    std::vector<Triangle> getTrianglesOfMesh(MFnMesh& mesh, double voxelSize, MStatus& status);
+    std::vector<Triangle> getTrianglesOfMesh(MFnMesh& mesh, double voxelSize);
 
     Triangle processMayaTriangle(
         const MFnMesh& meshFn,                   // the overall mesh

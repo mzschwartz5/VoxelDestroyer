@@ -9,18 +9,15 @@
 #include "cgalhelper.h"
 #include <maya/MProgressWindow.h>
 
-// TODO: voxelizer should be an MPxNode that gets connected up to the shape node and the PBD node by the plugin command
-// (Or, better yet, VoxelizerNode should *have* a Voxelizer instance - to separate the Maya-specific stuff from the actual voxelization logic)
 Voxels Voxelizer::voxelizeSelectedMesh(
     const VoxelizationGrid& grid,
     const MDagPath& selectedMeshPath,
     bool voxelizeSurface,
     bool voxelizeInterior,
     bool doBoolean,
-    bool clipTriangles,
-    MStatus& status
+    bool clipTriangles
 ) {
-    MFnMesh selectedMesh(selectedMeshPath, &status);
+    MFnMesh selectedMesh(selectedMeshPath);
     MDagPath transformPath = selectedMesh.dagPath();
     transformPath.pop(); // Move up to the transform node
     MFnTransform transform(transformPath);
@@ -31,13 +28,13 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     Voxels voxels;
     voxels.voxelSize = grid.gridEdgeLength / grid.voxelsPerEdge;
     voxels.resize(grid.voxelsPerEdge * grid.voxelsPerEdge * grid.voxelsPerEdge);
-    status = MThreadPool::init();
+    MThreadPool::init();
     
     // Freeze transformations on the original mesh before any processing
     MGlobal::executeCommand(MString("makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 -pn 1"), false, true);
 
     MProgressWindow::setProgressStatus("Processing mesh triangles...");
-    std::vector<Triangle> meshTris = getTrianglesOfMesh(selectedMesh, voxels.voxelSize, status);
+    std::vector<Triangle> meshTris = getTrianglesOfMesh(selectedMesh, voxels.voxelSize);
 
     if (voxelizeInterior) {
         MProgressWindow::setProgressStatus("Performing interior voxelization...");
@@ -85,10 +82,10 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     return sortedVoxels;
 }
 
-std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, double voxelSize, MStatus& status) {
+std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, double voxelSize) {
     MIntArray triangleCounts;
     MIntArray vertexIndices;
-    status = meshFn.getTriangles(triangleCounts, vertexIndices);
+    meshFn.getTriangles(triangleCounts, vertexIndices);
     int numTriangles = static_cast<int>(vertexIndices.length() / 3);
     MProgressWindow::setProgressRange(0, numTriangles);
     MProgressWindow::setProgress(0);
@@ -108,7 +105,6 @@ std::vector<Triangle> Voxelizer::getTrianglesOfMesh(MFnMesh& meshFn, double voxe
     }
 
     MProgressWindow::setProgress(numTriangles);
-	status = MS::kSuccess;
     return triangles;
 }
 

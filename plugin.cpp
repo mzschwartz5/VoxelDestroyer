@@ -12,6 +12,7 @@
 #include "custommayaconstructs/draw/voxelshape.h"
 #include "custommayaconstructs/draw/voxelsubsceneoverride.h"
 #include "custommayaconstructs/usernodes/pbdnode.h"
+#include "custommayaconstructs/usernodes/voxelizernode.h"
 #include <maya/MFnPluginData.h>
 #include <maya/MDrawRegistry.h>
 #include "directx/compute/computeshader.h"
@@ -49,12 +50,10 @@ MStatus plugin::doIt(const MArgList& argList)
 	MProgressWindow::setTitle("Mesh Preparation Progress");
 	MProgressWindow::startProgress();
 
-	MStatus status;
-
 	PluginArgs pluginArgs = parsePluginArgs(argList);
 	MDagPath selectedMeshDagPath = getSelectedObject(pluginArgs.position, pluginArgs.scale);
 	// Fall back to finding the closest object to the voxel grid if nothing is selected
-	if (selectedMeshDagPath == MDagPath() || status != MS::kSuccess) {
+	if (selectedMeshDagPath == MDagPath()) {
 		selectedMeshDagPath = findClosestObjectToVoxelGrid(pluginArgs.position, pluginArgs.scale, pluginArgs.gridDisplayName);
 		if (selectedMeshDagPath == MDagPath()) {
 			MGlobal::displayError("No mesh found to voxelize.");
@@ -73,25 +72,25 @@ MStatus plugin::doIt(const MArgList& argList)
 		pluginArgs.position
 	};
 
-	Voxels voxels = voxelizer.voxelizeSelectedMesh(
+	MDagPath voxelizedMeshDagPath;
+	MObject voxelizerNodeObj = VoxelizerNode::createVoxelizerNode(
 		voxelizationGrid,
 		selectedMeshDagPath,
 		pluginArgs.voxelizeSurface,
 		pluginArgs.voxelizeInterior,
 		!pluginArgs.renderAsVoxels,
 		pluginArgs.clipTriangles,
-		status
+		voxelizedMeshDagPath
 	);
-	MDagPath voxelizedMeshDagPath = voxels.voxelizedMeshDagPath;
 	
 	MProgressWindow::setProgressStatus("Creating PBD particles and face constraints..."); MProgressWindow::setProgressRange(0, 100); MProgressWindow::setProgress(0);
-	MObject pbdNodeObj = PBDNode::createPBDNode(voxels, voxelizationGrid, voxelizedMeshDagPath);
-	MObject voxelShapeObj = VoxelShape::createVoxelShapeNode(voxelizedMeshDagPath, pbdNodeObj);
+	MObject pbdNodeObj = PBDNode::createPBDNode(voxelizerNodeObj, voxelizedMeshDagPath);
+	MObject voxelShapeObj = VoxelShape::createVoxelShapeNode(pbdNodeObj, voxelizedMeshDagPath);
 	MProgressWindow::setProgress(100);
 
 	MProgressWindow::endProgress();
 	MGlobal::executeCommand("undoInfo -closeChunk", false, false); // close the undo chunk	
-	return status;
+	return MS::kSuccess;
 }
 
 PluginArgs plugin::parsePluginArgs(const MArgList& args) {
@@ -324,6 +323,12 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	status = plugin.registerNode(VoxelizerNode::typeName, VoxelizerNode::id, VoxelizerNode::creator, VoxelizerNode::initialize, MPxNode::kDependNode);
+	if (!status) {
+		MGlobal::displayError("Failed to register Voxelizer node: " + status.errorString());
+		return status;
+	}
+
 	// Drag Context command
 	status = plugin.registerContextCommand("voxelDragContextCommand", VoxelDragContextCommand::creator);
 	if (!status) {
@@ -406,6 +411,11 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	status = plugin.deregisterNode(PBDNode::id);
 	if (!status)
 		MGlobal::displayError("deregisterNode failed on PBD: " + status.errorString());
+
+	// Voxelizer Node
+	status = plugin.deregisterNode(VoxelizerNode::id);
+	if (!status)
+		MGlobal::displayError("deregisterNode failed on Voxelizer: " + status.errorString());
 
     // Voxel Renderer Override
     MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);

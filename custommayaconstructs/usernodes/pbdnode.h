@@ -7,6 +7,7 @@
 #include "../data/particledata.h"
 #include "../data/functionaldata.h"
 #include "../data/d3d11data.h"
+#include "../usernodes/voxelizernode.h"
 
 #include <vector>
 #include <array>
@@ -31,8 +32,8 @@
 class PBDNode : public MPxNode
 {
 public:
-    static const MTypeId id;
-    static const MString pbdNodeName;
+    inline static const MString pbdNodeName{"PBD"};
+    inline static const MTypeId id{0x0013A7B0};
     // Attributes
     inline static MObject aMeshOwner;
     // Inputs
@@ -151,7 +152,7 @@ public:
         return MS::kSuccess;
     }
     
-    static MObject createPBDNode(Voxels& voxels, const VoxelizationGrid& voxelizationGrid, const MDagPath& meshDagPath) {
+    static MObject createPBDNode(const MObject& voxelizerNode, const MDagPath& meshDagPath) {
         MStatus status;
         MDGModifier dgMod;
         MObject pbdNodeObj = dgMod.createNode(PBDNode::pbdNodeName, &status);
@@ -164,15 +165,12 @@ public:
         MPlug meshMessagePlug = meshFn.findPlug("message", false, &status); // built in to every MObject
         MGlobal::executeCommandOnIdle("connectAttr " + meshMessagePlug.name() + " " + meshOwnerPlug.name(), false);
 
-        // Set voxel data to node attribute
-        MFnPluginData pluginDataFn;
-        MObject pluginDataObj = pluginDataFn.create( VoxelData::id, &status );
-        VoxelData* voxelData = static_cast<VoxelData*>(pluginDataFn.data(&status));
-        voxelData->setVoxels(voxels);
-        voxelData->setVoxelizationGrid(voxelizationGrid);
-
-        MPlug voxelDataInPlug = pbdNode.findPlug(aVoxelDataIn, false, &status);
-        voxelDataInPlug.setValue(pluginDataObj);
+        // Connect the voxelizer node's voxel data output to this PBD node's voxel data input
+        MDGModifier connMod;
+        MPlug voxelizerDataPlug = MFnDependencyNode(voxelizerNode).findPlug(VoxelizerNode::aVoxelData, false, &status);
+        MPlug pbdVoxelDataInPlug = pbdNode.findPlug(aVoxelDataIn, false, &status);
+        connMod.connect(voxelizerDataPlug, pbdVoxelDataInPlug);
+        connMod.doIt();
 
         // Connect the particle data attribute output to the global solver node's particle data (array) input.
         // And connect the particle buffer offset attribute to the global solver node's particle buffer offset (array) output.
@@ -187,7 +185,6 @@ public:
         MPlug globalSolverParticleDataPlug = globalSolverParticleDataPlugArray.elementByLogicalIndex(plugIndex, &status);
         MPlug globalSolverSimulateFunctionPlug = globalSolverSimulateFunctionPlugArray.elementByLogicalIndex(plugIndex, &status);
         
-        MDGModifier connMod;
         MPlug pbdTriggerInPlug = pbdNode.findPlug(aTriggerIn, false, &status);
         MPlug pbdSimulateSubstepPlug = pbdNode.findPlug(aSimulateSubstepFunction, false, &status);
         MPlug pbdParticleBufferOffsetPlug = pbdNode.findPlug(aParticleBufferOffset, false, &status);
@@ -206,7 +203,7 @@ public:
         MStatus status;
         MPxNode::postConstructor();
         
-        MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onVoxelDataSet, this, &status);
+        MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onVoxelDataConnected, this, &status);
         callbackIds.append(callbackId);
 
         callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onMeshConnectionDeleted, this, &status);
@@ -227,10 +224,10 @@ public:
         return MPxNode::kGloballySerial; 
     }
     
-    static void onVoxelDataSet(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+    static void onVoxelDataConnected(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
         // Only respond to changes to the voxel data attribute
         // Only respond to attribute value changes
-        if (plug != aVoxelDataIn || !(msg & MNodeMessage::kAttributeSet)) {
+        if (plug != aVoxelDataIn || !(msg & MNodeMessage::kConnectionMade)) {
             return;
         }
 
@@ -326,6 +323,3 @@ private:
     }
 
 };
-
-const MString PBDNode::pbdNodeName("PBD");
-const MTypeId PBDNode::id(0x0013A7B0);

@@ -19,53 +19,31 @@ struct RenderItemInfo {
 };
 
 class VoxelSubSceneOverride : public MPxSubSceneOverride {
-public:
-    inline static MString drawDbClassification = "drawdb/subscene/voxelSubsceneOverride";
-    inline static MString drawRegistrantId = "VoxelSubSceneOverridePlugin";
-
-    static MPxSubSceneOverride* creator(const MObject& obj) 
-    {
-        return new VoxelSubSceneOverride(obj);
-    }
-
-    ~VoxelSubSceneOverride() override {
-        // Tell MRenderer that we don't need the GPU memory anymore.
-        D3D11_BUFFER_DESC desc;
-        if (positionsBuffer) {
-            positionsBuffer->GetDesc(&desc);
-            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
-            positionsBuffer.Reset();
-        }
-
-        if (normalsBuffer) {
-            normalsBuffer->GetDesc(&desc);
-            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
-            normalsBuffer.Reset();
-        }
-
-        if (originalPositionsBuffer) {
-            originalPositionsBuffer->GetDesc(&desc);
-            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
-            originalPositionsBuffer.Reset();
-        }
-
-        if (originalNormalsBuffer) {
-            originalNormalsBuffer->GetDesc(&desc);
-            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
-            originalNormalsBuffer.Reset();
-        }
-    }
+private:
+    VoxelShape* voxelShape;
     
-    DrawAPI supportedDrawAPIs() const override {
-        return kDirectX11;
+    ComPtr<ID3D11Buffer> positionsBuffer;
+    ComPtr<ID3D11UnorderedAccessView> positionsUAV;
+
+    ComPtr<ID3D11Buffer> normalsBuffer;
+    ComPtr<ID3D11UnorderedAccessView> normalsUAV;
+
+    // The deform shader also needs the original vertex positions and normals to do its transformations
+    ComPtr<ID3D11Buffer> originalPositionsBuffer;
+    ComPtr<ID3D11ShaderResourceView> originalPositionsSRV;
+
+    ComPtr<ID3D11Buffer> originalNormalsBuffer;
+    ComPtr<ID3D11ShaderResourceView> originalNormalsSRV;
+
+    std::unordered_map<MGeometry::Semantic, unique_ptr<MVertexBuffer>> mayaVertexBuffers;
+    std::vector<unique_ptr<MIndexBuffer>> indexBuffers;
+
+    VoxelSubSceneOverride(const MObject& obj)
+    : MPxSubSceneOverride(obj) {
+        MFnDependencyNode dn(obj);
+        voxelShape = static_cast<VoxelShape*>(dn.userNode());
     }
 
-    bool requiresUpdate(
-        const MSubSceneContainer& container,
-        const MFrameContext& frameContext) const override
-    {
-        return (container.count() == 0);
-    }
 
     MShaderInstance* getVertexBufferDescriptorsForShader(const MObject& shaderNode, const MDagPath& geomDagPath, MVertexBufferDescriptorList& vertexBufferDescriptors) {
         MRenderer* renderer = MRenderer::theRenderer();
@@ -289,6 +267,54 @@ public:
         extractor.populateIndexBuffer(vertexIndices.data(), primitiveCount * 3, indexDesc);
     }
 
+public:
+    inline static MString drawDbClassification = "drawdb/subscene/voxelSubsceneOverride";
+    inline static MString drawRegistrantId = "VoxelSubSceneOverridePlugin";
+
+    static MPxSubSceneOverride* creator(const MObject& obj) 
+    {
+        return new VoxelSubSceneOverride(obj);
+    }
+
+    ~VoxelSubSceneOverride() override {
+        // Tell MRenderer that we don't need the GPU memory anymore.
+        D3D11_BUFFER_DESC desc;
+        if (positionsBuffer) {
+            positionsBuffer->GetDesc(&desc);
+            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
+            positionsBuffer.Reset();
+        }
+
+        if (normalsBuffer) {
+            normalsBuffer->GetDesc(&desc);
+            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
+            normalsBuffer.Reset();
+        }
+
+        if (originalPositionsBuffer) {
+            originalPositionsBuffer->GetDesc(&desc);
+            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
+            originalPositionsBuffer.Reset();
+        }
+
+        if (originalNormalsBuffer) {
+            originalNormalsBuffer->GetDesc(&desc);
+            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
+            originalNormalsBuffer.Reset();
+        }
+    }
+    
+    DrawAPI supportedDrawAPIs() const override {
+        return kDirectX11;
+    }
+
+    bool requiresUpdate(
+        const MSubSceneContainer& container,
+        const MFrameContext& frameContext) const override
+    {
+        return (container.count() == 0);
+    }
+
     /**
      * This method is responsible for populating the MSubSceneContainer with render items. In our case, we want the our custom VoxelShape
      * to have the same geometry, topology, and shading as the original mesh it deforms. To do so, we use the shading sets of the original mesh
@@ -358,30 +384,5 @@ public:
             originalPositionsSRV, 
             originalNormalsSRV
         );
-    }
-
-private:
-    VoxelShape* voxelShape;
-    
-    ComPtr<ID3D11Buffer> positionsBuffer;
-    ComPtr<ID3D11UnorderedAccessView> positionsUAV;
-
-    ComPtr<ID3D11Buffer> normalsBuffer;
-    ComPtr<ID3D11UnorderedAccessView> normalsUAV;
-
-    // The deform shader also needs the original vertex positions and normals to do its transformations
-    ComPtr<ID3D11Buffer> originalPositionsBuffer;
-    ComPtr<ID3D11ShaderResourceView> originalPositionsSRV;
-
-    ComPtr<ID3D11Buffer> originalNormalsBuffer;
-    ComPtr<ID3D11ShaderResourceView> originalNormalsSRV;
-
-    std::unordered_map<MGeometry::Semantic, unique_ptr<MVertexBuffer>> mayaVertexBuffers;
-    std::vector<unique_ptr<MIndexBuffer>> indexBuffers;
-
-    VoxelSubSceneOverride(const MObject& obj)
-    : MPxSubSceneOverride(obj) {
-        MFnDependencyNode dn(obj);
-        voxelShape = static_cast<VoxelShape*>(dn.userNode());
     }
 };
