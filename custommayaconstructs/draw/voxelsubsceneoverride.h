@@ -333,7 +333,9 @@ public:
         }
 
         // Create an index buffer + render item for each shading set of the original mesh (which corresponds to an indexing requirement)
-        const MBoundingBox bounds = voxelShape->boundingBox();
+        // Use an effectively infinite bounding box because the voxel shape can deform and shatter.
+        double bound = 1e10;
+        const MBoundingBox bounds(MPoint(-bound, -bound, -bound), MPoint(bound, bound, bound));
         for (const RenderItemInfo& itemInfo : renderItemInfos) {
             MIndexBuffer* rawIndexBuffer = createIndexBuffer(itemInfo, extractor);
             if (!rawIndexBuffer) continue;
