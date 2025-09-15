@@ -9,6 +9,8 @@
 #include "directx/compute/faceconstraintscompute.h"
 #include "custommayaconstructs/data/particledata.h"
 
+#include <maya/MSharedPtr.h>
+
 struct Particles
 {
     // Inverse mass (w) and particle radius stored, packed at half-precision, as 4th component.
@@ -25,16 +27,16 @@ public:
     ~PBD() = default;
    
     std::array<std::vector<FaceConstraint>, 3> constructFaceToFaceConstraints(
-        const Voxels& voxels, 
+        MSharedPtr<Voxels> voxels, 
         float xTension, float xCompression,
         float yTension, float yCompression,
         float zTension, float zCompression
     );
 
-    ParticleDataContainer createParticles(const Voxels& voxels);
+    ParticleDataContainer createParticles(MSharedPtr<Voxels> voxels);
 
     void createComputeShaders(
-        const Voxels& voxels, 
+        MSharedPtr<Voxels> voxels, 
         const std::array<std::vector<FaceConstraint>, 3>& faceConstraints
     );
 

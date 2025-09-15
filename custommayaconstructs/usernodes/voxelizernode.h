@@ -6,6 +6,7 @@
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MStatus.h>
 #include <maya/MFnPluginData.h>
+#include <maya/MSharedPtr.h>
 
 #include "../../voxelizer.h"
 #include "../data/voxeldata.h"
@@ -50,15 +51,17 @@ public:
         MFnDependencyNode voxelizerNode(voxelizerNodeObj);
         VoxelizerNode* thisVoxelizer = static_cast<VoxelizerNode*>(voxelizerNode.userNode());
 
-        Voxels voxels = thisVoxelizer->voxelizer.voxelizeSelectedMesh(
-            voxelizationGrid,
-            selectedMeshDagPath,
-            voxelizeSurface,
-            voxelizeInterior,
-            doBoolean,
-            clipTriangles
+        MSharedPtr<Voxels> voxels = MSharedPtr<Voxels>::make(
+            thisVoxelizer->voxelizer.voxelizeSelectedMesh(
+                voxelizationGrid,
+                selectedMeshDagPath,
+                voxelizeSurface,
+                voxelizeInterior,
+                doBoolean,
+                clipTriangles
+            )
         );
-        outDagPath = voxels.voxelizedMeshDagPath;
+        outDagPath = voxels->voxelizedMeshDagPath;
 
         MFnPluginData pluginDataFn;
         MObject pluginDataObj = pluginDataFn.create( VoxelData::id, &status );

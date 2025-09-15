@@ -235,11 +235,11 @@ public:
         MStatus status = plug.getValue(voxelDataObj);
         MFnPluginData fnData(voxelDataObj, &status);
         VoxelData* voxelData = static_cast<VoxelData*>(fnData.data(&status));
-        const Voxels& voxels = voxelData->getVoxels();
+        MSharedPtr<Voxels> voxels = voxelData->getVoxels();
         PBDNode* pbdNode = static_cast<PBDNode*>(clientData);
         PBD& pbd = pbdNode->pbd;
 
-        pbd.setRadiusAndVolumeFromLength(voxels.voxelSize);
+        pbd.setRadiusAndVolumeFromLength(voxels->voxelSize);
         ParticleDataContainer particleDataContainer = pbd.createParticles(voxels);
 
         MObject particleDataObj = fnData.create( ParticleData::id, &status );

@@ -176,14 +176,14 @@ public:
         const std::vector<uint>& vertexIndices,
         const std::vector<float>& vertexPositions,
         const VoxelizationGrid& voxelizationGrid,
-        const Voxels& voxels
+        const MSharedPtr<Voxels> voxels
     ) const {
         const MDagPath originalGeomPath = pathToOriginalGeometry();
         std::vector<uint> vertexVoxelIds(vertexPositions.size() / 3, UINT_MAX);
         double voxelSize = voxelizationGrid.gridEdgeLength / voxelizationGrid.voxelsPerEdge;
         MPoint gridMin = voxelizationGrid.gridCenter - MVector(voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2);
         gridMin = originalGeomPath.inclusiveMatrix().inverse() * gridMin; // Transform voxelization grid to object space, since that's where vertices are defined.
-        const std::unordered_map<uint32_t, uint32_t>& voxelMortonCodeToIndex = voxels.mortonCodesToSortedIdx;
+        const std::unordered_map<uint32_t, uint32_t>& voxelMortonCodeToIndex = voxels->mortonCodesToSortedIdx;
         const double episilon = 1e-4 * voxelSize;
 
         // TODO: this approach still doesn't work flawlessly... there are some cases where a triangle gets stretched between voxels.

@@ -1,23 +1,29 @@
 #include "pbd.h"
 #include "utils.h"
 
-std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(const Voxels& voxels,
+std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(
+    const MSharedPtr<Voxels> voxels,
     float xTension, float xCompression,
     float yTension, float yCompression,
-    float zTension, float zCompression) {
+    float zTension, float zCompression
+) {
     std::array<std::vector<FaceConstraint>, 3> faceConstraints;
 
-    for (int i = 0; i < voxels.numOccupied; i++) {
+    const std::vector<uint32_t>& mortonCodes = voxels->mortonCodes;
+    const std::unordered_map<uint32_t, uint32_t>& mortonCodesToSortedIdx = voxels->mortonCodesToSortedIdx;
+    const int numOccupied = voxels->numOccupied;
+
+    for (int i = 0; i < numOccupied; i++) {
         uint32_t x, y, z;
-        Utils::fromMortonCode(voxels.mortonCodes[i], x, y, z);
+        Utils::fromMortonCode(mortonCodes[i], x, y, z);
 
         int rightVoxelMortonCode = static_cast<int>(Utils::toMortonCode(x + 1, y, z));
         int upVoxelMortonCode = static_cast<int>(Utils::toMortonCode(x, y + 1, z));
         int frontVoxelMortonCode = static_cast<int>(Utils::toMortonCode(x, y, z + 1));
 
         // Checks that the right voxel is in the grid and is occupied
-        if (voxels.mortonCodesToSortedIdx.find(rightVoxelMortonCode) != voxels.mortonCodesToSortedIdx.end()) {
-            int rightNeighborIndex = voxels.mortonCodesToSortedIdx.at(rightVoxelMortonCode);
+        if (mortonCodesToSortedIdx.find(rightVoxelMortonCode) != mortonCodesToSortedIdx.end()) {
+            int rightNeighborIndex = mortonCodesToSortedIdx.at(rightVoxelMortonCode);
             FaceConstraint newConstraint;
             newConstraint.voxelOneIdx = i;
             newConstraint.voxelTwoIdx = rightNeighborIndex;
@@ -27,8 +33,8 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(c
         }
 
         // Checks that the up voxel is in the grid and is occupied
-        if (voxels.mortonCodesToSortedIdx.find(upVoxelMortonCode) != voxels.mortonCodesToSortedIdx.end()) {
-            int upNeighborIndex = voxels.mortonCodesToSortedIdx.at(upVoxelMortonCode);
+        if (mortonCodesToSortedIdx.find(upVoxelMortonCode) != mortonCodesToSortedIdx.end()) {
+            int upNeighborIndex = mortonCodesToSortedIdx.at(upVoxelMortonCode);
 
             FaceConstraint newConstraint;
             newConstraint.voxelOneIdx = i;
@@ -39,8 +45,8 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(c
         }
 
         // Checks that the front voxel is in the grid and is occupied
-        if (voxels.mortonCodesToSortedIdx.find(frontVoxelMortonCode) != voxels.mortonCodesToSortedIdx.end()) {
-            int frontNeighborIndex = voxels.mortonCodesToSortedIdx.at(frontVoxelMortonCode);
+        if (mortonCodesToSortedIdx.find(frontVoxelMortonCode) != mortonCodesToSortedIdx.end()) {
+            int frontNeighborIndex = mortonCodesToSortedIdx.at(frontVoxelMortonCode);
 
             FaceConstraint newConstraint;
             newConstraint.voxelOneIdx = i;
@@ -66,9 +72,12 @@ std::array<std::array<int, 3>, 8> cornerOffsets = {{
     {{1, 1, 1}}
 }};
 
-ParticleDataContainer PBD::createParticles(const Voxels& voxels) {
-    for (int i = 0; i < voxels.numOccupied; i++) {
-        const VoxelDimensions& voxelDims = voxels.dimensions[i];
+ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
+    const int numOccupied = voxels->numOccupied;
+    const std::vector<VoxelDimensions>& dimensions = voxels->dimensions;
+
+    for (int i = 0; i < numOccupied; i++) {
+        const VoxelDimensions& voxelDims = dimensions[i];
         const MFloatPoint& voxelMin = voxelDims.min;
         double edgeLength = voxelDims.edgeLength;
         const MFloatPoint voxelCenter = MFloatPoint(
@@ -97,17 +106,17 @@ ParticleDataContainer PBD::createParticles(const Voxels& voxels) {
         particles.numParticles,
         particles.positions.data(),
         PARTICLE_RADIUS,
-        voxels.isSurface.data()
+        voxels->isSurface.data()
     };
 }
 
 void PBD::createComputeShaders(
-    const Voxels& voxels, 
+    const MSharedPtr<Voxels> voxels, 
     const std::array<std::vector<FaceConstraint>, 3>& faceConstraints
 ) {
     vgsCompute = VGSCompute(
         numParticles(),
-        VGSConstantBuffer{ RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, voxels.size() }
+        VGSConstantBuffer{ RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, voxels->size() }
     );
 
 	faceConstraintsCompute = FaceConstraintsCompute(
