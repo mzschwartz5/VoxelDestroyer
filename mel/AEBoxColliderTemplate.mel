@@ -1,0 +1,26 @@
+global proc AEBoxColliderTemplate(string $nodeName)
+{
+    editorTemplate -beginScrollLayout;
+
+    editorTemplate -beginLayout "Box Collider" -collapse 0;
+        editorTemplate -label "Width" -addControl "boxWidth" ;
+        editorTemplate -label "Height" -addControl "boxHeight";
+        editorTemplate -label "Depth" -addControl "boxDepth";
+    editorTemplate -endLayout;
+
+    // suppress all other attributes programmatically
+    string $keep[] = {"boxWidth","boxHeight","boxDepth"};
+    string $attrs[] = `listAttr -r $nodeName`;
+    for ($i = 0; $i < size($attrs); ++$i) {
+        string $a = $attrs[$i];
+        int $skip = 0;
+        for ($j = 0; $j < size($keep); ++$j) {
+            if ($a == $keep[$j]) { $skip = 1; break; }
+        }
+        if (!$skip) {
+            editorTemplate -suppress $a;
+        }
+    }
+
+    editorTemplate -endScrollLayout;
+}
