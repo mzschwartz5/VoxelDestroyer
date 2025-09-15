@@ -11,8 +11,10 @@
 #include "custommayaconstructs/data/d3d11data.h"
 #include "custommayaconstructs/draw/voxelshape.h"
 #include "custommayaconstructs/draw/voxelsubsceneoverride.h"
+#include "custommayaconstructs/draw/colliderdrawoverride.h"
 #include "custommayaconstructs/usernodes/pbdnode.h"
 #include "custommayaconstructs/usernodes/voxelizernode.h"
+#include "custommayaconstructs/usernodes/boxcollider.h"
 #include <maya/MFnPluginData.h>
 #include <maya/MDrawRegistry.h>
 #include "directx/compute/computeshader.h"
@@ -266,6 +268,23 @@ void plugin::loadVoxelizerMenu() {
 	}
 }
 
+void plugin::loadColliderNodeAETemplate() {
+	void* data = nullptr;
+	DWORD size = Utils::loadResourceFile(MhInstPlugin, IDR_MEL3, L"MEL", &data);
+	if (size == 0) {
+		MGlobal::displayError("Failed to load BoxCollider AETemplate resource.");
+		return;
+	}
+
+	MString melScript(static_cast<char*>(data), size);
+
+	// Execute the MEL script to load the BoxCollider AETemplate into memory
+	MStatus status = MGlobal::executeCommand(melScript);
+	if (status != MS::kSuccess) {
+		MGlobal::displayError("Failed to execute BoxCollider AETemplate MEL script: " + status.errorString());
+	}
+}
+
 MString plugin::getActiveModelPanel() {
 	MString result;
 	MGlobal::executeCommand("playblast -ae", result);
@@ -329,6 +348,12 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	status = plugin.registerNode(BoxCollider::typeName, BoxCollider::id, BoxCollider::creator, BoxCollider::initialize, MPxNode::kLocatorNode, &ColliderDrawOverride::drawDbClassification);
+	if (!status) {
+		MGlobal::displayError("Failed to register BoxCollider node: " + status.errorString());
+		return status;
+	}
+
 	// Drag Context command
 	status = plugin.registerContextCommand("voxelDragContextCommand", VoxelDragContextCommand::creator);
 	if (!status) {
@@ -341,6 +366,12 @@ EXPORT MStatus initializePlugin(MObject obj)
 	status = MRenderer::theRenderer()->registerOverride(plugin::voxelRendererOverride);
 	if (!status) {
 		MGlobal::displayError("Failed to register VoxelRendererOverride: " + status.errorString());
+		return status;
+	}
+
+	status = MDrawRegistry::registerDrawOverrideCreator(ColliderDrawOverride::drawDbClassification, ColliderDrawOverride::drawRegistrantId, ColliderDrawOverride::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register ColliderDrawOverride: " + status.errorString());
 		return status;
 	}
 
@@ -357,7 +388,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
-	status = MHWRender::MDrawRegistry::registerSubSceneOverrideCreator(VoxelSubSceneOverride::drawDbClassification, VoxelSubSceneOverride::drawRegistrantId, VoxelSubSceneOverride::creator);
+	status = MDrawRegistry::registerSubSceneOverrideCreator(VoxelSubSceneOverride::drawDbClassification, VoxelSubSceneOverride::drawRegistrantId, VoxelSubSceneOverride::creator);
 	if (!status) {
 		MGlobal::displayError("Failed to register VoxelSubSceneOverride: " + status.errorString());
 		return status;
@@ -368,6 +399,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
 
 	plugin::loadVoxelizerMenu();
+	plugin::loadColliderNodeAETemplate();
 
 	MGlobal::executeCommand("VoxelizerMenu_addToShelf");
 
@@ -417,10 +449,18 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	if (!status)
 		MGlobal::displayError("deregisterNode failed on Voxelizer: " + status.errorString());
 
+	status = plugin.deregisterNode(BoxCollider::id);
+	if (!status)
+		MGlobal::displayError("deregisterNode failed on BoxCollider: " + status.errorString());
+
     // Voxel Renderer Override
     MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);
     delete plugin::voxelRendererOverride;
     plugin::voxelRendererOverride = nullptr;
+
+	status = MDrawRegistry::deregisterDrawOverrideCreator(ColliderDrawOverride::drawDbClassification, ColliderDrawOverride::drawRegistrantId);
+	if (!status)
+		MGlobal::displayError("deregisterDrawOverrideCreator failed on ColliderDrawOverride: " + status.errorString());
 
 	// Global Solver Node
 	GlobalSolver::tearDown();
@@ -434,7 +474,7 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 		MGlobal::displayError("deregisterNode failed on VoxelShape: " + status.errorString());
 
 	// Voxel SubScene Override
-	status = MHWRender::MDrawRegistry::deregisterSubSceneOverrideCreator(VoxelSubSceneOverride::drawDbClassification, VoxelSubSceneOverride::drawRegistrantId);
+	status = MDrawRegistry::deregisterSubSceneOverrideCreator(VoxelSubSceneOverride::drawDbClassification, VoxelSubSceneOverride::drawRegistrantId);
 	if (!status)
 		MGlobal::displayError("deregisterSubSceneOverrideCreator failed on VoxelSubSceneOverride: " + status.errorString());
 
