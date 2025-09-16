@@ -57,18 +57,15 @@ public:
         MPlug(thisNode, aBoxWidth).getValue(cachedWidth);
         MPlug(thisNode, aBoxHeight).getValue(cachedHeight);
         MPlug(thisNode, aBoxDepth).getValue(cachedDepth);
+
+        cachedWidth *= 0.5f;
+        cachedHeight *= 0.5f;
+        cachedDepth *= 0.5f;
     }
 
     void draw(MUIDrawManager& drawManager) override
     {
-        drawManager.beginDrawable();
-        drawManager.beginDrawInXray();
-        drawManager.setColor(color);
-
-        drawManager.box(MPoint::origin, MVector::yAxis, MVector::xAxis, cachedWidth / 2.0f, cachedHeight / 2.0f, cachedDepth / 2.0f, false);
-        
-        drawManager.endDrawInXray();
-        drawManager.endDrawable();
+        drawManager.box(MPoint::origin, MVector::yAxis, MVector::xAxis, cachedWidth, cachedHeight, cachedDepth, false);
     }
 
 private:

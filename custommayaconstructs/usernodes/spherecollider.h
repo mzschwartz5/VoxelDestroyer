@@ -37,14 +37,7 @@ public:
 
     void draw(MUIDrawManager& drawManager) override
     {
-        drawManager.beginDrawable();
-        drawManager.beginDrawInXray();
-        drawManager.setColor(color);
-
         drawManager.sphere(MPoint::origin, cachedRadius, 20, 20, false);
-        
-        drawManager.endDrawInXray();
-        drawManager.endDrawable();
     }
 
 private:

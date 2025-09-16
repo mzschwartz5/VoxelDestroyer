@@ -198,6 +198,9 @@
     <ClInclude Include="custommayaconstructs\usernodes\colliderlocator.h" />
     <ClInclude Include="custommayaconstructs\usernodes\boxcollider.h" />
     <ClInclude Include="custommayaconstructs\usernodes\spherecollider.h" />
+    <ClInclude Include="custommayaconstructs\usernodes\capsulecollider.h" />
+    <ClInclude Include="custommayaconstructs\usernodes\cylindercollider.h" />
+    <ClInclude Include="custommayaconstructs\usernodes\planecollider.h" />
     <ClInclude Include="directx\directx.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\vgscompute.h" />
