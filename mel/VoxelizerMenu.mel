@@ -236,13 +236,14 @@ global proc VoxelizerMenu_syncScale(string $cubeName, string $scaleField) {
 }
 
 global proc VoxelizerMenu_addToShelf() {
-    // Ensure the "Custom" shelf exists
-    if (!`shelfLayout -exists "Custom"`) {
-        shelfLayout "Custom";
+    // Ensure the "VoxelDestroyer" shelf exists
+    global string $gShelfTopLevel;
+    if (!`shelfLayout -exists "VoxelDestroyer"`) {
+        shelfLayout -p $gShelfTopLevel "VoxelDestroyer";
     }
 
-    // Get all buttons in the "Custom" shelf
-    string $buttons[] = `shelfLayout -query -childArray "Custom"`;
+    // Get all buttons in the "VoxelDestroyer" shelf
+    string $buttons[] = `shelfLayout -query -childArray "VoxelDestroyer"`;
 
     // Check if the "VoxelDestroyer" button already exists
     int $exists = 0;
@@ -255,37 +256,63 @@ global proc VoxelizerMenu_addToShelf() {
 
     // Add the "VoxelDestroyer" button if it doesn't exist
     if (!$exists) {
-        shelfButton -parent "Custom"
+        shelfButton -parent "VoxelDestroyer"
             -label "VoxelDestroyer"
             -annotation "Run VoxelDestroyer Plugin"
             -image1 "TypeSeparateMaterials_200.png"
             -command "VoxelizerMenu();";
         
         // Also add a button for the live-interaction tool
-        shelfButton -parent "Custom"
+        shelfButton -parent "VoxelDestroyer"
             -label "VoxelDragTool"
             -annotation "Interactively drag voxels in the viewport while previewing an animation"
             -image1 "out_colorComposite_200.png"
             -command "string $ctx = `voxelDragContextCommand`; setToolTo $ctx;";
+
+        shelfButton -parent "VoxelDestroyer"
+            -label "VoxelCollider"
+            -annotation "Add a collider primitive to the simulation"
+            -image1 "fx_animWires_200.png"
+            -command "createCollider(\"Plane\");"
+            -menuItem "Plane Collider" "createCollider(\"Plane\");"
+            -menuItem "Sphere Collider" "createCollider(\"Sphere\");"
+            -menuItem "Capsule Collider" "createCollider(\"Capsule\");"
+            -menuItem "Box Collider" "createCollider(\"Box\");"
+            -menuItem "Cylinder Collider" "createCollider(\"Cylinder\");";
     }
+
+    shelfTabLayout -edit -selectTab "VoxelDestroyer" $gShelfTopLevel;
 }
 
 global proc VoxelizerMenu_removeFromShelf() {
-    // Check if the "Custom" shelf exists
-    if (`shelfLayout -exists "Custom"`) {
-        // Get all buttons in the "Custom" shelf
-        string $buttons[] = `shelfLayout -query -childArray "Custom"`;
-
-        // Iterate through the buttons and remove the "VoxelDestroyer" button if it exists
-        for ($button in $buttons) {
-            string $label = `shelfButton -query -label $button`;
-            if ($label == "VoxelDestroyer" || $label == "VoxelDragTool") {
-                deleteUI -control $button;
-            }
-        }
+    if (`shelfLayout -exists "VoxelDestroyer"`) {
+        deleteUI -control "VoxelDestroyer";
     }
 }
 
 global proc float Voxelizer_max(float $a, float $b) {
     return ($a > $b) ? $a : $b;
+}
+
+global proc createCollider(string $type) {
+    string $selection[] = `ls -sl`;
+    string $parent = "";
+
+    // Get transform, or its parent transform if the selection is not a transform
+    if (size($selection) == 0) {
+        $parent = `createNode transform -n ($type + "ColliderTransform#")`;
+    }
+    else {
+        string $candidate = $selection[0];
+        string $nodeType = `nodeType $candidate`;
+        if ($nodeType == "transform") {
+            $parent = $candidate;
+        } else {
+            string $p[] = `listRelatives -parent $candidate`;
+            $parent = $p[0];
+        }
+    }
+
+    string $cmd = "createNode \"" + $type + "Collider\" -n \"" + $type + "Collider#\" -p \"" + $parent + "\"";
+    eval($cmd);
 }
