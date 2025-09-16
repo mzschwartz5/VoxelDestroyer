@@ -299,10 +299,7 @@ global proc createCollider(string $type) {
     string $parent = "";
 
     // Get transform, or its parent transform if the selection is not a transform
-    if (size($selection) == 0) {
-        $parent = `createNode transform -n ($type + "ColliderTransform#")`;
-    }
-    else {
+    if (size($selection) > 0) {
         string $candidate = $selection[0];
         string $nodeType = `nodeType $candidate`;
         if ($nodeType == "transform") {
@@ -312,7 +309,14 @@ global proc createCollider(string $type) {
             $parent = $p[0];
         }
     }
+    
+    string $colliderParent;
+    if ($parent != "") {
+        $colliderParent = `createNode transform -n ($type + "ColliderTransform#") -p $parent`;
+    } else {
+        $colliderParent = `createNode transform -n ($type + "ColliderTransform#")`;
+    }
 
-    string $cmd = "createNode \"" + $type + "Collider\" -n \"" + $type + "Collider#\" -p \"" + $parent + "\"";
-    eval($cmd);
+    string $colliderNode = `createNode ($type + "Collider") -n ($type + "Collider#") -p $colliderParent`;
+    showEditor $colliderNode;
 }
