@@ -57,10 +57,6 @@ public:
         MPlug(thisNode, aBoxWidth).getValue(cachedWidth);
         MPlug(thisNode, aBoxHeight).getValue(cachedHeight);
         MPlug(thisNode, aBoxDepth).getValue(cachedDepth);
-
-        MPoint center(0.0, 0.0, 0.0);
-        MVector upLocal(0.0, 1.0, 0.0);
-        MVector rightLocal(1.0, 0.0, 0.0);
     }
 
     void draw(MUIDrawManager& drawManager) override
@@ -69,7 +65,7 @@ public:
         drawManager.beginDrawInXray();
         drawManager.setColor(color);
 
-        drawManager.box(MPoint::origin, MVector::yAxis, MVector::xAxis, cachedWidth, cachedHeight, cachedDepth, false);
+        drawManager.box(MPoint::origin, MVector::yAxis, MVector::xAxis, cachedWidth / 2.0f, cachedHeight / 2.0f, cachedDepth / 2.0f, false);
         
         drawManager.endDrawInXray();
         drawManager.endDrawable();
@@ -80,11 +76,7 @@ private:
     float cachedHeight = 1.0f;
     float cachedDepth = 1.0f;
 
-    BoxCollider() : ColliderLocator()
-    {
-
-    }
-    
+    BoxCollider() : ColliderLocator() {}
     ~BoxCollider() override {}
 
 };
