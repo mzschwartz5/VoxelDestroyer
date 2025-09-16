@@ -13,14 +13,13 @@
 class ColliderLocator : public MPxLocatorNode {
 public:
 
-    ColliderLocator(const MColor& col = MColor(0.5f, 1.0f, 0.5f)) : color(col) {}
+    ColliderLocator() {}
     ~ColliderLocator() override {}
 
     virtual void draw(MUIDrawManager& drawManager) = 0;
     virtual void prepareForDraw() = 0;
 
 protected:
-    MColor color;
 
 private:
 };

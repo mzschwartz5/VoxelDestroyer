@@ -16,6 +16,9 @@
 #include "custommayaconstructs/usernodes/voxelizernode.h"
 #include "custommayaconstructs/usernodes/boxcollider.h"
 #include "custommayaconstructs/usernodes/spherecollider.h"
+#include "custommayaconstructs/usernodes/capsulecollider.h"
+#include "custommayaconstructs/usernodes/cylindercollider.h"
+#include "custommayaconstructs/usernodes/planecollider.h"
 #include <maya/MFnPluginData.h>
 #include <maya/MDrawRegistry.h>
 #include "directx/compute/computeshader.h"
@@ -366,6 +369,24 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	status = plugin.registerNode(CapsuleCollider::typeName, CapsuleCollider::id, CapsuleCollider::creator, CapsuleCollider::initialize, MPxNode::kLocatorNode, &ColliderDrawOverride::drawDbClassification);
+	if (!status) {
+		MGlobal::displayError("Failed to register CapsuleCollider node: " + status.errorString());
+		return status;
+	}
+
+	status = plugin.registerNode(CylinderCollider::typeName, CylinderCollider::id, CylinderCollider::creator, CylinderCollider::initialize, MPxNode::kLocatorNode, &ColliderDrawOverride::drawDbClassification);
+	if (!status) {
+		MGlobal::displayError("Failed to register CylinderCollider node: " + status.errorString());
+		return status;
+	}
+
+	status = plugin.registerNode(PlaneCollider::typeName, PlaneCollider::id, PlaneCollider::creator, PlaneCollider::initialize, MPxNode::kLocatorNode, &ColliderDrawOverride::drawDbClassification);
+	if (!status) {
+		MGlobal::displayError("Failed to register PlaneCollider node: " + status.errorString());
+		return status;
+	}
+
 	// Drag Context command
 	status = plugin.registerContextCommand("voxelDragContextCommand", VoxelDragContextCommand::creator);
 	if (!status) {
@@ -468,6 +489,18 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	status = plugin.deregisterNode(SphereCollider::id);
 	if (!status)
 		MGlobal::displayError("deregisterNode failed on SphereCollider: " + status.errorString());
+
+	status = plugin.deregisterNode(CapsuleCollider::id);
+	if (!status)
+		MGlobal::displayError("deregisterNode failed on CapsuleCollider: " + status.errorString());
+
+	status = plugin.deregisterNode(CylinderCollider::id);
+	if (!status)
+		MGlobal::displayError("deregisterNode failed on CylinderCollider: " + status.errorString());
+
+	status = plugin.deregisterNode(PlaneCollider::id);
+	if (!status)
+		MGlobal::displayError("deregisterNode failed on PlaneCollider: " + status.errorString());
 
     // Voxel Renderer Override
     MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);

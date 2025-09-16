@@ -46,7 +46,14 @@ public:
         ColliderLocator* locator = static_cast<ColliderLocator*>(MFnDagNode(node).userNode());
         if (!locator) return;
 
+        drawManager.beginDrawable();
+        drawManager.beginDrawInXray();
+        drawManager.setColor(color);
+
         locator->draw(drawManager);
+
+        drawManager.endDrawInXray();
+        drawManager.endDrawable();
     }
 
     /**
@@ -68,6 +75,7 @@ public:
     }
 
 private:
+    MColor color = MColor(0.5f, 1.0f, 0.5f);
     ColliderDrawOverride(const MObject& obj) : MPxDrawOverride(obj, /* no callback necessary - UI only */ nullptr) {}
 
 };
