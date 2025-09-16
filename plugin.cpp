@@ -15,6 +15,7 @@
 #include "custommayaconstructs/usernodes/pbdnode.h"
 #include "custommayaconstructs/usernodes/voxelizernode.h"
 #include "custommayaconstructs/usernodes/boxcollider.h"
+#include "custommayaconstructs/usernodes/spherecollider.h"
 #include <maya/MFnPluginData.h>
 #include <maya/MDrawRegistry.h>
 #include "directx/compute/computeshader.h"
@@ -268,20 +269,25 @@ void plugin::loadVoxelizerMenu() {
 	}
 }
 
+/**
+ * Note: typically, AE Template's have to be named according to the node type. That's only if you put the file in a path and want
+ * Maya to detect it automatically. Here, we are loading it manually, so naming isn't strict. This has the advantage of allowing us to
+ * put all the collider templates in the same file and reuse functionality.
+ */
 void plugin::loadColliderNodeAETemplate() {
 	void* data = nullptr;
 	DWORD size = Utils::loadResourceFile(MhInstPlugin, IDR_MEL3, L"MEL", &data);
 	if (size == 0) {
-		MGlobal::displayError("Failed to load BoxCollider AETemplate resource.");
+		MGlobal::displayError("Failed to load AEColliderTemplate resource.");
 		return;
 	}
 
 	MString melScript(static_cast<char*>(data), size);
 
-	// Execute the MEL script to load the BoxCollider AETemplate into memory
+	// Execute the MEL script to load the AEColliderTemplate into memory
 	MStatus status = MGlobal::executeCommand(melScript);
 	if (status != MS::kSuccess) {
-		MGlobal::displayError("Failed to execute BoxCollider AETemplate MEL script: " + status.errorString());
+		MGlobal::displayError("Failed to execute AEColliderTemplate MEL script: " + status.errorString());
 	}
 }
 
@@ -351,6 +357,12 @@ EXPORT MStatus initializePlugin(MObject obj)
 	status = plugin.registerNode(BoxCollider::typeName, BoxCollider::id, BoxCollider::creator, BoxCollider::initialize, MPxNode::kLocatorNode, &ColliderDrawOverride::drawDbClassification);
 	if (!status) {
 		MGlobal::displayError("Failed to register BoxCollider node: " + status.errorString());
+		return status;
+	}
+
+	status = plugin.registerNode(SphereCollider::typeName, SphereCollider::id, SphereCollider::creator, SphereCollider::initialize, MPxNode::kLocatorNode, &ColliderDrawOverride::drawDbClassification);
+	if (!status) {
+		MGlobal::displayError("Failed to register SphereCollider node: " + status.errorString());
 		return status;
 	}
 
@@ -452,6 +464,10 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	status = plugin.deregisterNode(BoxCollider::id);
 	if (!status)
 		MGlobal::displayError("deregisterNode failed on BoxCollider: " + status.errorString());
+
+	status = plugin.deregisterNode(SphereCollider::id);
+	if (!status)
+		MGlobal::displayError("deregisterNode failed on SphereCollider: " + status.errorString());
 
     // Voxel Renderer Override
     MRenderer::theRenderer()->deregisterOverride(plugin::voxelRendererOverride);

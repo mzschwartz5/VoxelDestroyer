@@ -8,19 +8,37 @@ global proc AEBoxColliderTemplate(string $nodeName)
         editorTemplate -label "Depth" -addControl "boxDepth";
     editorTemplate -endLayout;
 
-    // suppress all other attributes programmatically
     string $keep[] = {"boxWidth","boxHeight","boxDepth"};
+    suppressAttributesExcept($nodeName, $keep);
+
+    editorTemplate -endScrollLayout;
+}
+
+global proc AESphereColliderTemplate(string $nodeName)
+{
+    editorTemplate -beginScrollLayout;
+
+    editorTemplate -beginLayout "Sphere Collider" -collapse 0;
+        editorTemplate -label "Radius" -addControl "radius" ;
+    editorTemplate -endLayout;
+
+    string $keep[] = {"radius"};
+    suppressAttributesExcept($nodeName, $keep);
+
+    editorTemplate -endScrollLayout;
+}
+
+global proc suppressAttributesExcept(string $nodeName, string $keep[])
+{
     string $attrs[] = `listAttr -r $nodeName`;
-    for ($i = 0; $i < size($attrs); ++$i) {
+    for (int $i = 0; $i < size($attrs); ++$i) {
         string $a = $attrs[$i];
         int $skip = 0;
-        for ($j = 0; $j < size($keep); ++$j) {
+        for (int $j = 0; $j < size($keep); ++$j) {
             if ($a == $keep[$j]) { $skip = 1; break; }
         }
         if (!$skip) {
             editorTemplate -suppress $a;
         }
     }
-
-    editorTemplate -endScrollLayout;
 }
