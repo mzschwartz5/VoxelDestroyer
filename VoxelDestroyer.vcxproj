@@ -197,6 +197,7 @@
     <ClInclude Include="custommayaconstructs\usernodes\voxelizernode.h" />
     <ClInclude Include="custommayaconstructs\usernodes\colliderlocator.h" />
     <ClInclude Include="custommayaconstructs\usernodes\boxcollider.h" />
+    <ClInclude Include="custommayaconstructs\usernodes\spherecollider.h" />
     <ClInclude Include="directx\directx.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\vgscompute.h" />
@@ -227,7 +228,7 @@
   <ItemGroup>
     <None Include="mel\AEVoxelSimulationNodeTemplate.mel" />
     <None Include="mel\VoxelizerMenu.mel" />
-    <None Include="mel\AEBoxColliderTemplate.mel" />
+    <None Include="mel\AEColliderTemplate.mel" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
