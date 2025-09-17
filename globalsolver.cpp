@@ -145,15 +145,17 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
 
     // Now, disconnect parallel-array plug entries associated with this PBD node.
     if (msg & MNodeMessage::kConnectionBroken) {
+        MDGModifier dgMod;
         uint logicalIndex = plug.logicalIndex();
         MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(logicalIndex);
-        MGlobal::executeCommandOnIdle(MString("removeMultiInstance ") + particleBufferOffsetPlug.name());
-
+        dgMod.removeMultiInstance(particleBufferOffsetPlug, true);
+        
         MPlug simulateFunctionArrayPlug = globalSolverNode.findPlug(aSimulateFunction, false);
         MPlug simulateFunctionPlug = simulateFunctionArrayPlug.elementByLogicalIndex(logicalIndex);
-        MGlobal::executeCommandOnIdle(MString("removeMultiInstance ") + simulateFunctionPlug.name());
-
-        MGlobal::executeCommandOnIdle(MString("removeMultiInstance ") + plug.name());
+        dgMod.removeMultiInstance(simulateFunctionPlug, true);
+        
+        dgMod.removeMultiInstance(plug, true);
+        dgMod.doIt();
     }
 }
 
@@ -477,7 +479,9 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
     
     // Finally, remove the disconnected plug from the array
     if (connectionRemoved) {
-        MGlobal::executeCommandOnIdle(MString("removeMultiInstance ") + plug.name());
+        MDGModifier dgMod;
+        dgMod.removeMultiInstance(plug, true);
+        dgMod.doIt();
     }
 }
 
