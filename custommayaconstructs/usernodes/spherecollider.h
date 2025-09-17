@@ -46,19 +46,30 @@ public:
         drawManager.sphere(MPoint::origin, cachedRadius, 20, 20, false);
     }
 
+    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer) override
+    {
+        int index = colliderBuffer.numSpheres++; // note post-increment
+        colliderBuffer.sphereRadius[index] = data->getRadius();
+        data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
+    }
+
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
     {
         if (plug != aColliderData) return MS::kUnknownParameter;
 
         MDataHandle worldMatrixHandle = dataBlock.inputValue(aWorldMatrix);
         MMatrix worldMat = worldMatrixHandle.asMatrix();
+        MDataHandle radiusHandle = dataBlock.inputValue(aRadius);
+        float radius = radiusHandle.asFloat();
 
-        MDataHandle colliderDataHandle = dataBlock.outputValue(aColliderData);
-        ColliderData* colliderData = static_cast<ColliderData*>(colliderDataHandle.asPluginData());
-
+        MFnPluginData fnData;
+        MObject newDataObj = fnData.create(ColliderData::id);
+        ColliderData* colliderData = static_cast<ColliderData*>(fnData.data());
+        
         colliderData->setWorldMatrix(worldMat);
-        colliderData->setRadius(cachedRadius);
-
+        colliderData->setRadius(radius);
+        
+        MDataHandle colliderDataHandle = dataBlock.outputValue(aColliderData);
         colliderDataHandle.set(colliderData);
         dataBlock.setClean(plug);
 

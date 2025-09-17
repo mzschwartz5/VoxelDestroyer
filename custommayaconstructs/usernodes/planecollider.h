@@ -78,21 +78,37 @@ public:
         drawManager.cone(MPoint::origin + MVector::yAxis * uiNormalLength, MVector::yAxis, uiConeRadius, uiConeHeight, 10, true);
     }
 
+    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer) override
+    {
+        int index = colliderBuffer.numPlanes++; // note post-increment
+        colliderBuffer.planeWidth[index] = data->getWidth();
+        colliderBuffer.planeHeight[index] = data->getHeight();
+        data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
+    }
+
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
     {
         if (plug != aColliderData) return MS::kUnknownParameter;
 
         MDataHandle worldMatrixHandle = dataBlock.inputValue(aWorldMatrix);
         MMatrix worldMat = worldMatrixHandle.asMatrix();
+        MDataHandle widthHandle = dataBlock.inputValue(aWidth);
+        float width = widthHandle.asFloat();
+        MDataHandle heightHandle = dataBlock.inputValue(aHeight);
+        float height = heightHandle.asFloat();
+        MDataHandle infiniteHandle = dataBlock.inputValue(aInfinite);
+        bool infinite = infiniteHandle.asBool();
 
-        MDataHandle colliderDataHandle = dataBlock.outputValue(aColliderData);
-        ColliderData* colliderData = static_cast<ColliderData*>(colliderDataHandle.asPluginData());
+        MFnPluginData fnData;
+        MObject newDataObj = fnData.create(ColliderData::id);
+        ColliderData* colliderData = static_cast<ColliderData*>(fnData.data());
 
         colliderData->setWorldMatrix(worldMat);
-        colliderData->setWidth(cachedWidth);
-        colliderData->setHeight(cachedHeight);
-        colliderData->setInfinite(cachedInfinite);
-
+        colliderData->setWidth(width);
+        colliderData->setHeight(height);
+        colliderData->setInfinite(infinite);
+        
+        MDataHandle colliderDataHandle = dataBlock.outputValue(aColliderData);
         colliderDataHandle.set(colliderData);
         dataBlock.setClean(plug);
 

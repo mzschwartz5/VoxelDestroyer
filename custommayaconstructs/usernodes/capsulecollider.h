@@ -59,20 +59,34 @@ public:
         drawManager.capsule(MPoint::origin, MVector::yAxis, cachedRadius, cachedHeight, 20, 10, false);
     }
 
+    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer) override
+    {
+        int index = colliderBuffer.numCapsules++; // note post-increment
+        colliderBuffer.capsuleRadius[index] = data->getRadius();
+        colliderBuffer.capsuleHeight[index] = data->getHeight();
+        data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
+    }
+
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
     {
         if (plug != aColliderData) return MS::kUnknownParameter;
 
         MDataHandle worldMatrixHandle = dataBlock.inputValue(aWorldMatrix);
         MMatrix worldMat = worldMatrixHandle.asMatrix();
+        MDataHandle radiusHandle = dataBlock.inputValue(aRadius);
+        float radius = radiusHandle.asFloat();
+        MDataHandle heightHandle = dataBlock.inputValue(aHeight);
+        float height = heightHandle.asFloat();
 
-        MDataHandle colliderDataHandle = dataBlock.outputValue(aColliderData);
-        ColliderData* colliderData = static_cast<ColliderData*>(colliderDataHandle.asPluginData());
-
+        MFnPluginData fnData;
+        MObject newDataObj = fnData.create(ColliderData::id);
+        ColliderData* colliderData = static_cast<ColliderData*>(fnData.data());
+        
         colliderData->setWorldMatrix(worldMat);
-        colliderData->setRadius(cachedRadius);
-        colliderData->setHeight(cachedHeight);
-
+        colliderData->setRadius(radius);
+        colliderData->setHeight(height);
+        
+        MDataHandle colliderDataHandle = dataBlock.outputValue(aColliderData);
         colliderDataHandle.set(colliderData);
         dataBlock.setClean(plug);
 

@@ -4,6 +4,7 @@
 #include <maya/MCallbackIdArray.h>
 #include "custommayaconstructs/data/particledata.h"
 #include "custommayaconstructs/data/functionaldata.h"
+#include "custommayaconstructs/data/colliderdata.h"
 #include "directx/compute/dragparticlescompute.h"
 #include "directx/compute/buildcollisiongridcompute.h"
 #include "directx/compute/prefixscancompute.h"
@@ -27,7 +28,8 @@ public:
     enum BufferType {
         PARTICLE,
         SURFACE,
-        DRAGGING
+        DRAGGING,
+        COLLIDER
     };
     static std::unordered_map<BufferType, ComPtr<ID3D11Buffer>> buffers;
 
@@ -36,6 +38,7 @@ public:
     // Input attributes
     static MObject aTime;
     static MObject aParticleData;
+    static MObject aColliderData;
     // Output attributes
     static MObject aParticleBufferOffset;
     static MObject aTrigger;
@@ -47,7 +50,7 @@ public:
     static MStatus initialize();
     static void tearDown();
     static const MObject& getOrCreateGlobalSolver();
-    static uint getNextParticleDataPlugIndex();
+    static uint getNextArrayPlugIndex(MPlug& arrayPlug);
     static ComPtr<ID3D11UnorderedAccessView> createUAV(uint offset, uint numElements, BufferType bufferType);
     static ComPtr<ID3D11ShaderResourceView> createSRV(uint offset, uint numElements, BufferType bufferType);
 
@@ -60,6 +63,7 @@ private:
     void postConstructor() override;
     static void onSimulateFunctionConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
+    static void onColliderDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static void addParticleData(MPlug& particleDataToAddPlug);
     static void deleteParticleData(MPlug& particleDataToRemovePlug);
     static void calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNodeMessage::AttributeMessage changeType, std::unordered_map<int, int>& offsetForLogicalPlug, float& maximumParticleRadius);

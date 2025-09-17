@@ -8,11 +8,13 @@
 #include <maya/MFnDependencyNode.h>
 #include <maya/MItDependencyNodes.h>
 #include "custommayaconstructs/tools/voxeldragcontext.h"
+#include "custommayaconstructs/usernodes/colliderlocator.h"
 
 const MTypeId GlobalSolver::id(0x0013A7B1);
 const MString GlobalSolver::globalSolverNodeName("globalSolverNode");
 MObject GlobalSolver::globalSolverNodeObject = MObject::kNullObj;
 MObject GlobalSolver::aParticleData = MObject::kNullObj;
+MObject GlobalSolver::aColliderData = MObject::kNullObj;
 MObject GlobalSolver::aParticleBufferOffset = MObject::kNullObj;
 MObject GlobalSolver::aTime = MObject::kNullObj;
 MObject GlobalSolver::aTrigger = MObject::kNullObj;
@@ -62,7 +64,10 @@ void GlobalSolver::postConstructor() {
     });
 
     MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onParticleDataConnectionChange, this, &status);
+    callbackIds.append(callbackId);
     callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onSimulateFunctionConnectionChange, this, &status);
+    callbackIds.append(callbackId);
+    callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onColliderDataConnectionChange, this, &status);
     callbackIds.append(callbackId);
 
     // Effectively a destructor callback to clean up when the node is deleted
@@ -89,17 +94,15 @@ void GlobalSolver::tearDown() {
 
 /**
  * Logical indices are sparse, mapped to contiguous physical indices.
- * This method finds the next available logical index for creating a new particle data plug in the array.
+ * This method finds the next available logical index for creating a new plug in the array.
  */
-uint GlobalSolver::getNextParticleDataPlugIndex() {
+uint GlobalSolver::getNextArrayPlugIndex(MPlug& arrayPlug) {
     MStatus status;
-    MFnDependencyNode globalSolverNode(globalSolverNodeObject, &status);
-    MPlug particleDataArrayPlug = globalSolverNode.findPlug(aParticleData, false, &status);
 
     uint nextIndex = 0;
-    const uint numElements = particleDataArrayPlug.evaluateNumElements(&status);
+    const uint numElements = arrayPlug.evaluateNumElements(&status);
     for (uint i = 0; i < numElements; ++i) {
-        uint idx = particleDataArrayPlug.elementByPhysicalIndex(i, &status).logicalIndex();
+        uint idx = arrayPlug.elementByPhysicalIndex(i, &status).logicalIndex();
         if (idx >= nextIndex) {
             nextIndex = idx + 1;
         }
@@ -414,6 +417,70 @@ void GlobalSolver::onSimulateFunctionConnectionChange(MNodeMessage::AttributeMes
     }
 }
 
+/**
+ * Whenever any collider is added or removed, rebuild the entire collider buffer from scratch. Because the amount of data here is very, very small (compared to
+ * something like particle data), this is not a big performance concern. (By contrast, for particle data, we append or shift data rather than reconstructing the entire buffer.)
+ */
+void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+    if (plug != GlobalSolver::aColliderData || !(msg & (MNodeMessage::kConnectionMade | MNodeMessage::kConnectionBroken))) {
+        return;
+    }
+    bool connectionRemoved = (msg & MNodeMessage::kConnectionBroken);
+
+    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
+    MPlug colliderDataArrayPlug = globalSolverNode.findPlug(aColliderData, false);
+    int numColliders = colliderDataArrayPlug.evaluateNumElements(); // Does not reflect the removed plug yet, if this is a kConnectionBroken callback
+    int plugLogicalIndex = plug.logicalIndex();
+
+    if (numColliders > MAX_COLLIDERS) {
+        MGlobal::displayError("Voxel destroyer supports " + MString(std::to_string(MAX_COLLIDERS).c_str()) + " or fewer collider primitives. The added collider will not participate in collisions.");
+        return;
+    }
+
+    ColliderBuffer colliderBuffer;
+    MObject colliderDataObj;
+    MFnPluginData colliderDataFn; 
+    MPlugArray connectedColliderPlug;
+    for (int i = 0; i < numColliders; ++i) {
+        MPlug colliderDataPlug = colliderDataArrayPlug.elementByPhysicalIndex(i);
+        if (connectionRemoved && colliderDataPlug.logicalIndex() == plugLogicalIndex) {
+            // On removal, the removed plug is still in the array at this point. Skip it.
+            continue;
+        }
+
+        colliderDataPlug.getValue(colliderDataObj);
+        colliderDataFn.setObject(colliderDataObj);
+        const ColliderData* const colliderData = static_cast<ColliderData*>(colliderDataFn.data());
+
+        colliderDataPlug.connectedTo(connectedColliderPlug, true, false);
+        MObject connectedLocatorObj = connectedColliderPlug[0].node();
+        MFnDependencyNode connectedLocatorNode(connectedLocatorObj);
+        ColliderLocator* colliderLocator = static_cast<ColliderLocator*>(connectedLocatorNode.userNode());
+
+        colliderLocator->writeDataIntoBuffer(colliderData, colliderBuffer);
+    }
+
+    // Create the GPU buffer resource
+    D3D11_BUFFER_DESC bufferDesc = {};
+    D3D11_SUBRESOURCE_DATA initData = {};
+    ComPtr<ID3D11Buffer> newColliderBuffer;
+
+    bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+    bufferDesc.ByteWidth = sizeof(ColliderBuffer);
+    bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    bufferDesc.MiscFlags = 0;
+    initData.pSysMem = &colliderBuffer;
+    DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, newColliderBuffer.GetAddressOf());
+    MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
+    buffers[BufferType::COLLIDER] = newColliderBuffer;
+    
+    // Finally, remove the disconnected plug from the array
+    if (connectionRemoved) {
+        MGlobal::executeCommandOnIdle(MString("removeMultiInstance ") + plug.name());
+    }
+}
+
 ComPtr<ID3D11UnorderedAccessView> GlobalSolver::createUAV(uint offset, uint numElements, BufferType bufferType) {
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
     uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
@@ -473,6 +540,16 @@ MStatus GlobalSolver::initialize() {
     tAttr.setReadable(false);
     tAttr.setArray(true);
     status = addAttribute(aSimulateFunction);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    // Static collider primitives (spheres, boxes, planes)
+    aColliderData = tAttr.create("colliderdata", "cld", ColliderData::id, MObject::kNullObj, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    tAttr.setStorable(false);
+    tAttr.setWritable(true);
+    tAttr.setReadable(false);
+    tAttr.setArray(true);
+    status = addAttribute(aColliderData);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     // Output attribute

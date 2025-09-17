@@ -72,21 +72,38 @@ public:
         drawManager.box(MPoint::origin, MVector::yAxis, MVector::xAxis, 0.5f * cachedWidth, 0.5f * cachedHeight, 0.5f * cachedDepth, false);
     }
 
+    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer) override
+    {
+        int index = colliderBuffer.numBoxes++; // note post-increment
+        colliderBuffer.boxWidth[index] = data->getWidth();
+        colliderBuffer.boxHeight[index] = data->getHeight();
+        colliderBuffer.boxDepth[index] = data->getDepth();
+        data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
+    }
+
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
     {
         if (plug != aColliderData) return MS::kUnknownParameter;
 
         MDataHandle worldMatrixHandle = dataBlock.inputValue(aWorldMatrix);
         MMatrix worldMat = worldMatrixHandle.asMatrix();
+        MDataHandle widthHandle = dataBlock.inputValue(aBoxWidth);
+        float width = widthHandle.asFloat();
+        MDataHandle heightHandle = dataBlock.inputValue(aBoxHeight);
+        float height = heightHandle.asFloat();
+        MDataHandle depthHandle = dataBlock.inputValue(aBoxDepth);
+        float depth = depthHandle.asFloat();
+
+        MFnPluginData fnData;
+        MObject newDataObj = fnData.create(ColliderData::id);
+        ColliderData* colliderData = static_cast<ColliderData*>(fnData.data());
+        
+        colliderData->setWorldMatrix(worldMat);
+        colliderData->setWidth(width);
+        colliderData->setHeight(height);
+        colliderData->setDepth(depth);
 
         MDataHandle colliderDataHandle = dataBlock.outputValue(aColliderData);
-        ColliderData* colliderData = static_cast<ColliderData*>(colliderDataHandle.asPluginData());
-
-        colliderData->setWorldMatrix(worldMat);
-        colliderData->setWidth(cachedWidth);
-        colliderData->setHeight(cachedHeight);
-        colliderData->setDepth(cachedDepth);
-
         colliderDataHandle.set(colliderData);
         dataBlock.setClean(plug);
 
