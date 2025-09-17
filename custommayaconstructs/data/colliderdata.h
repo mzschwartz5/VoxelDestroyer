@@ -22,6 +22,7 @@ public:
 
     void copy(const MPxData& src) override {
         const ColliderData* funcData = static_cast<const ColliderData*>(&src);
+        *this = *funcData;
     }
 
     MStatus writeASCII(std::ostream& out) override {
@@ -39,6 +40,25 @@ public:
     MStatus readBinary(std::istream& in, unsigned int length) override {
         return MS::kNotImplemented;
     }
+
+    void setWorldMatrix(const MMatrix& matrix) {
+        worldMatrix = matrix;
+    }
+
+    MMatrix getWorldMatrix() const {
+        return worldMatrix;
+    }
+
+    void setWidth(float w) { width = w; }
+    float getWidth() const { return width; }
+    void setHeight(float h) { height = h; }
+    float getHeight() const { return height; }
+    void setDepth(float d) { depth = d; }
+    float getDepth() const { return depth; }
+    void setRadius(float r) { radius = r; }
+    float getRadius() const { return radius; }
+    void setInfinite(bool inf) { infinite = inf; }
+    bool isInfinite() const { return infinite; }
 
 private:
     MMatrix worldMatrix;

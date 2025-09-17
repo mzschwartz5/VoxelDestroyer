@@ -65,20 +65,32 @@ public:
         MPlug(thisNode, aBoxWidth).getValue(cachedWidth);
         MPlug(thisNode, aBoxHeight).getValue(cachedHeight);
         MPlug(thisNode, aBoxDepth).getValue(cachedDepth);
-
-        cachedWidth *= 0.5f;
-        cachedHeight *= 0.5f;
-        cachedDepth *= 0.5f;
     }
 
     void draw(MUIDrawManager& drawManager) override
     {
-        drawManager.box(MPoint::origin, MVector::yAxis, MVector::xAxis, cachedWidth, cachedHeight, cachedDepth, false);
+        drawManager.box(MPoint::origin, MVector::yAxis, MVector::xAxis, 0.5f * cachedWidth, 0.5f * cachedHeight, 0.5f * cachedDepth, false);
     }
 
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
     {
-        return ColliderLocator::compute(plug, dataBlock);
+        if (plug != aColliderData) return MS::kUnknownParameter;
+
+        MDataHandle worldMatrixHandle = dataBlock.inputValue(aWorldMatrix);
+        MMatrix worldMat = worldMatrixHandle.asMatrix();
+
+        MDataHandle colliderDataHandle = dataBlock.outputValue(aColliderData);
+        ColliderData* colliderData = static_cast<ColliderData*>(colliderDataHandle.asPluginData());
+
+        colliderData->setWorldMatrix(worldMat);
+        colliderData->setWidth(cachedWidth);
+        colliderData->setHeight(cachedHeight);
+        colliderData->setDepth(cachedDepth);
+
+        colliderDataHandle.set(colliderData);
+        dataBlock.setClean(plug);
+
+        return MS::kSuccess;
     }
 
 private:

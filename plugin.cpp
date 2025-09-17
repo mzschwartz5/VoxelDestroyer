@@ -28,7 +28,6 @@
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
 
-Voxelizer plugin::voxelizer = Voxelizer();
 VoxelRendererOverride* plugin::voxelRendererOverride = nullptr;
 
 // Maya Plugin creator function
@@ -314,7 +313,11 @@ EXPORT MStatus initializePlugin(MObject obj)
 
 	MStatus status;
 	MFnPlugin plugin(obj, "VoxelDestroyer", "1.0", "Any");
-	status = plugin.registerCommand("VoxelDestroyer", plugin::creator);
+	status = plugin.registerCommand("VoxelDestroyer", plugin::creator, plugin::syntax);
+	if (!status)
+		status.perror("registerCommand failed");
+
+	status = plugin.registerCommand(CreateColliderCommand::commandName, CreateColliderCommand::creator, CreateColliderCommand::syntax);
 	if (!status)
 		status.perror("registerCommand failed");
 
@@ -456,6 +459,10 @@ EXPORT MStatus uninitializePlugin(MObject obj)
     status = plugin.deregisterCommand("VoxelDestroyer");
     if (!status)
         MGlobal::displayError("deregisterCommand failed on VoxelDestroyer: " + status.errorString());
+
+	status = plugin.deregisterCommand("createCollider");
+	if (!status)
+		MGlobal::displayError("deregisterCommand failed on createCollider: " + status.errorString());
 
     // Deregister the custom maya constructs (nodes, contexts, render overrides, etc.)
     // Voxel Drag Context command

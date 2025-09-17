@@ -9,9 +9,15 @@
 #include <maya/MColor.h>
 #include <maya/MFnMatrixAttribute.h>
 #include <maya/MFnTypedAttribute.h>
-#include <maya/MFnDagNode.h>
+#include <maya/MDagModifier.h>
 #include <maya/MDGModifier.h>
+#include <maya/MPxCommand.h>
+#include <maya/MSelectionList.h>
 #include "../data/colliderdata.h"
+#include "../../globalsolver.h"
+
+// Forward declaration
+class CreateColliderCommand;
 
 /**
  * UI locator node for collision primitives.
@@ -24,22 +30,6 @@ public:
 
     virtual void draw(MUIDrawManager& drawManager) = 0;
     virtual void prepareForDraw() = 0;
-
-    virtual MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override {
-        // No-op for now, just pull the data to prove it works.
-        MFnDependencyNode thisNode(thisMObject());
-        MPlug colliderDataPlug = thisNode.findPlug(colliderDataAttrName, true);
-        if (plug == colliderDataPlug) {
-            MPlug wmPlug = thisNode.findPlug(worldMatrixAttrName, true);
-            MDataHandle wmHandle = dataBlock.inputValue(wmPlug);
-            MMatrix worldMat = wmHandle.asMatrix();
-            MDataHandle colliderDataHandle = dataBlock.outputValue(colliderDataPlug);
-            colliderDataHandle.setClean();
-            return MS::kSuccess;
-        }
-        
-        return MS::kUnknownParameter;
-    }
 
 protected:
     static MStatus initializeColliderDataAttribute(
@@ -72,7 +62,70 @@ protected:
     }
 
 private:
+    friend class CreateColliderCommand;
     inline static const MString colliderDataAttrName = MString("colliderData");
     // Can't use the name "worldMatrix" here because Maya uses that already for an _output_ attribute
     inline static const MString worldMatrixAttrName = MString("worldMatrixIn");
+};
+
+
+/**
+ * Callable command from MEL shelf button to create collider nodes.
+ */
+class CreateColliderCommand : public MPxCommand {
+public:
+    inline static const MString commandName = MString("createCollider");
+
+	static void* creator() {
+        return new CreateColliderCommand();
+    }
+    
+    static MSyntax syntax() {
+        MSyntax syntax;
+        syntax.addFlag("-n", "-name", MSyntax::kString);
+        return syntax;
+    }
+
+    // Create a collider of a given type (by type name)
+	MStatus doIt(const MArgList& args) override {
+        MString colliderName;
+        MArgDatabase argData(syntax(), args);
+        argData.getFlagArgument("-n", 0, colliderName);
+
+        // Get the selected object to parent the collider under
+        MSelectionList selection;
+        MGlobal::getActiveSelectionList(selection);
+        MDagPath selectedDagPath;
+        if (!selection.isEmpty()) {
+            selection.getDagPath(0, selectedDagPath);
+        }
+
+        // Create a transform under the selected object (or world if nothing selected)
+        MDagModifier dagMod;
+        MObject parentObj = (selectedDagPath.length() > 0) ? selectedDagPath.node() : MObject::kNullObj;
+        MObject colliderParentObj = dagMod.createNode("transform", parentObj);
+        dagMod.doIt();
+        MFnDagNode fnParent(colliderParentObj);
+        fnParent.setName(colliderName + "Transform");
+
+        // Create the collider shape node under the transform
+        MObject colliderNodeObj = dagMod.createNode(colliderName, colliderParentObj);
+        dagMod.doIt();
+        MFnDagNode fnCollider(colliderNodeObj);
+        fnCollider.setName(colliderName + "Shape");
+
+        // Connect the transform's worldMatrix to the collider's worldMatrixIn attribute
+        MFnDependencyNode fnColliderDep(colliderNodeObj);
+        MFnDependencyNode fnTransformDep(colliderParentObj);
+        MPlug worldMatrixPlug = fnTransformDep.findPlug("worldMatrix", true);
+        MPlug worldMatrixElemPlug = worldMatrixPlug.elementByLogicalIndex(0); // Safe to access 0 element. Plug is array in case of instancing.
+        MPlug worldMatrixInPlug = fnColliderDep.findPlug(ColliderLocator::worldMatrixAttrName, true);
+
+        MDGModifier dgMod;
+        dgMod.connect(worldMatrixElemPlug, worldMatrixInPlug);
+        dgMod.doIt();
+
+        MGlobal::executeCommand(MString("showEditor \"" + fnCollider.name() + "\";"));
+        return MStatus::kSuccess;
+    }
 };

@@ -63,8 +63,6 @@ public:
         MObject thisNode = thisMObject();
         MPlug(thisNode, aWidth).getValue(cachedWidth);
         MPlug(thisNode, aHeight).getValue(cachedHeight);
-        cachedWidth *= 0.5f;
-        cachedHeight *= 0.5f;
 
         uiNormalLength = std::max(cachedWidth, cachedHeight) * 0.5f;
         uiConeRadius = uiNormalLength * 0.1f;
@@ -75,14 +73,30 @@ public:
 
     void draw(MUIDrawManager& drawManager) override
     {
-        drawManager.rect(MPoint::origin, MVector::zAxis, MVector::yAxis, cachedWidth, cachedHeight, false);
+        drawManager.rect(MPoint::origin, MVector::zAxis, MVector::yAxis, 0.5f * cachedWidth, 0.5f * cachedHeight, false);
         drawManager.line(MPoint::origin, MPoint::origin + MVector::yAxis * uiNormalLength);
         drawManager.cone(MPoint::origin + MVector::yAxis * uiNormalLength, MVector::yAxis, uiConeRadius, uiConeHeight, 10, true);
     }
 
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
     {
-        return ColliderLocator::compute(plug, dataBlock);
+        if (plug != aColliderData) return MS::kUnknownParameter;
+
+        MDataHandle worldMatrixHandle = dataBlock.inputValue(aWorldMatrix);
+        MMatrix worldMat = worldMatrixHandle.asMatrix();
+
+        MDataHandle colliderDataHandle = dataBlock.outputValue(aColliderData);
+        ColliderData* colliderData = static_cast<ColliderData*>(colliderDataHandle.asPluginData());
+
+        colliderData->setWorldMatrix(worldMat);
+        colliderData->setWidth(cachedWidth);
+        colliderData->setHeight(cachedHeight);
+        colliderData->setInfinite(cachedInfinite);
+
+        colliderDataHandle.set(colliderData);
+        dataBlock.setClean(plug);
+
+        return MS::kSuccess;
     }
 
 private:

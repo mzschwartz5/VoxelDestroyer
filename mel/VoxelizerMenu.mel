@@ -273,12 +273,12 @@ global proc VoxelizerMenu_addToShelf() {
             -label "VoxelCollider"
             -annotation "Add a collider primitive to the simulation"
             -image1 "fx_animWires_200.png"
-            -command "createCollider(\"Plane\");"
-            -menuItem "Plane Collider" "createCollider(\"Plane\");"
-            -menuItem "Sphere Collider" "createCollider(\"Sphere\");"
-            -menuItem "Capsule Collider" "createCollider(\"Capsule\");"
-            -menuItem "Box Collider" "createCollider(\"Box\");"
-            -menuItem "Cylinder Collider" "createCollider(\"Cylinder\");";
+            -command "createCollider -n PlaneCollider;"
+            -menuItem "Plane Collider" "createCollider -n PlaneCollider;"
+            -menuItem "Sphere Collider" "createCollider -n SphereCollider;"
+            -menuItem "Capsule Collider" "createCollider -n CapsuleCollider;"
+            -menuItem "Box Collider" "createCollider -n BoxCollider;"
+            -menuItem "Cylinder Collider" "createCollider -n CylinderCollider;";
     }
 
     shelfTabLayout -edit -selectTab "VoxelDestroyer" $gShelfTopLevel;
@@ -292,32 +292,4 @@ global proc VoxelizerMenu_removeFromShelf() {
 
 global proc float Voxelizer_max(float $a, float $b) {
     return ($a > $b) ? $a : $b;
-}
-
-global proc createCollider(string $type) {
-    string $selection[] = `ls -sl`;
-    string $parent = "";
-
-    // Get transform, or its parent transform if the selection is not a transform
-    if (size($selection) > 0) {
-        string $candidate = $selection[0];
-        string $nodeType = `nodeType $candidate`;
-        if ($nodeType == "transform") {
-            $parent = $candidate;
-        } else {
-            string $p[] = `listRelatives -parent $candidate`;
-            $parent = $p[0];
-        }
-    }
-    
-    string $colliderParent;
-    if ($parent != "") {
-        $colliderParent = `createNode transform -n ($type + "ColliderTransform#") -p $parent`;
-    } else {
-        $colliderParent = `createNode transform -n ($type + "ColliderTransform#")`;
-    }
-
-    string $colliderNode = `createNode ($type + "Collider") -n ($type + "Collider#") -p $colliderParent`;
-    connectAttr ($colliderParent + ".worldMatrix[0]") ($colliderNode + ".worldMatrixIn");
-    showEditor $colliderNode;
 }
