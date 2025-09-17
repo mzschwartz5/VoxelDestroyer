@@ -90,4 +90,6 @@ global proc suppressAttributesExcept(string $nodeName, string $keep[])
             editorTemplate -suppress $a;
         }
     }
+
+    editorTemplate -suppress "worldMatrixIn";
 }
