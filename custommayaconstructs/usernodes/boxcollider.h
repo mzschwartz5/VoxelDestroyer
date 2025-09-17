@@ -13,10 +13,14 @@ public:
     inline static MObject aBoxWidth;
     inline static MObject aBoxHeight;
     inline static MObject aBoxDepth;
+    inline static MObject aColliderData;
+    inline static MObject aWorldMatrix;
 
     static void* creator() { return new BoxCollider(); }
     static MStatus initialize() {
-        MStatus status;
+        MStatus status = initializeColliderDataAttribute(aColliderData, aWorldMatrix);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
         MFnNumericAttribute nAttr;
         aBoxWidth = nAttr.create("boxWidth", "bw", MFnNumericData::kFloat, 1.0f);
         nAttr.setKeyable(true);
@@ -48,6 +52,10 @@ public:
         status = addAttribute(aBoxDepth);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
+        attributeAffects(aBoxWidth, aColliderData);
+        attributeAffects(aBoxHeight, aColliderData);
+        attributeAffects(aBoxDepth, aColliderData);
+
         return MS::kSuccess;
     }
 
@@ -68,6 +76,11 @@ public:
         drawManager.box(MPoint::origin, MVector::yAxis, MVector::xAxis, cachedWidth, cachedHeight, cachedDepth, false);
     }
 
+    MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
+    {
+        return ColliderLocator::compute(plug, dataBlock);
+    }
+
 private:
     float cachedWidth = 1.0f;
     float cachedHeight = 1.0f;
@@ -75,5 +88,4 @@ private:
 
     BoxCollider() : ColliderLocator() {}
     ~BoxCollider() override {}
-
 };
