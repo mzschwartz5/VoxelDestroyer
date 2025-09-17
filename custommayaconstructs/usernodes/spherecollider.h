@@ -48,7 +48,21 @@ public:
 
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
     {
-        return ColliderLocator::compute(plug, dataBlock);
+        if (plug != aColliderData) return MS::kUnknownParameter;
+
+        MDataHandle worldMatrixHandle = dataBlock.inputValue(aWorldMatrix);
+        MMatrix worldMat = worldMatrixHandle.asMatrix();
+
+        MDataHandle colliderDataHandle = dataBlock.outputValue(aColliderData);
+        ColliderData* colliderData = static_cast<ColliderData*>(colliderDataHandle.asPluginData());
+
+        colliderData->setWorldMatrix(worldMat);
+        colliderData->setRadius(cachedRadius);
+
+        colliderDataHandle.set(colliderData);
+        dataBlock.setClean(plug);
+
+        return MS::kSuccess;
     }
 
 private:

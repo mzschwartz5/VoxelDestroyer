@@ -37,8 +37,7 @@ struct PluginArgs {
 	bool clipTriangles{ false };
 };
 
-// Making most functions and members static so we can bind methods to the timeChanged event
-// and access data during the special standalone intialize and uninitialize functions
+// TODO: move this command into the commands folder
 class plugin : public MPxCommand
 {
 public:
@@ -62,5 +61,4 @@ public:
 	static VoxelRendererOverride* voxelRendererOverride;
 	
 private:
-	static Voxelizer voxelizer;
 };
