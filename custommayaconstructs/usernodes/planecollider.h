@@ -13,14 +13,16 @@ public:
 
     inline static MObject aWidth;
     inline static MObject aHeight;
-    inline static MObject aNormal;
     inline static MObject aInfinite;
+    inline static MObject aColliderData;
+    inline static MObject aWorldMatrix;
 
     static void* creator() { return new PlaneCollider(); }
     static MStatus initialize() {
-        MStatus status;
-        MFnNumericAttribute nAttr;
+        MStatus status = initializeColliderDataAttribute(aColliderData, aWorldMatrix);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
 
+        MFnNumericAttribute nAttr;
         aWidth = nAttr.create("width", "wdt", MFnNumericData::kFloat, 5.0f);
         nAttr.setKeyable(true);
         nAttr.setMin(0.0f);
@@ -49,6 +51,10 @@ public:
         status = addAttribute(aInfinite);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
+        attributeAffects(aWidth, aColliderData);
+        attributeAffects(aHeight, aColliderData);
+        attributeAffects(aInfinite, aColliderData);
+
         return MS::kSuccess;
     }
 
@@ -74,6 +80,11 @@ public:
         drawManager.cone(MPoint::origin + MVector::yAxis * uiNormalLength, MVector::yAxis, uiConeRadius, uiConeHeight, 10, true);
     }
 
+    MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
+    {
+        return ColliderLocator::compute(plug, dataBlock);
+    }
+
 private:
     float cachedWidth = 5.0f;
     float cachedHeight = 5.0f;
@@ -84,5 +95,4 @@ private:
 
     PlaneCollider() : ColliderLocator() {}
     ~PlaneCollider() override {}
-
 };

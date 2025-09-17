@@ -11,10 +11,14 @@ public:
     inline static const MString typeName = MString("SphereCollider");
 
     inline static MObject aRadius;
+    inline static MObject aColliderData;
+    inline static MObject aWorldMatrix;
 
     static void* creator() { return new SphereCollider(); }
     static MStatus initialize() {
-        MStatus status;
+        MStatus status = initializeColliderDataAttribute(aColliderData, aWorldMatrix);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
         MFnNumericAttribute nAttr;
         aRadius = nAttr.create("radius", "rds", MFnNumericData::kFloat, 1.0f);
         nAttr.setKeyable(true);
@@ -25,6 +29,8 @@ public:
         nAttr.setWritable(true);
         status = addAttribute(aRadius);
         CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        attributeAffects(aRadius, aColliderData);
 
         return MS::kSuccess;
     }
@@ -40,10 +46,14 @@ public:
         drawManager.sphere(MPoint::origin, cachedRadius, 20, 20, false);
     }
 
+    MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
+    {
+        return ColliderLocator::compute(plug, dataBlock);
+    }
+
 private:
     float cachedRadius = 1.0f;
 
     SphereCollider() : ColliderLocator() {}
     ~SphereCollider() override {}
-
 };

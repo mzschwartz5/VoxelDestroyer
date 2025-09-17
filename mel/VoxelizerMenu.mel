@@ -318,5 +318,6 @@ global proc createCollider(string $type) {
     }
 
     string $colliderNode = `createNode ($type + "Collider") -n ($type + "Collider#") -p $colliderParent`;
+    connectAttr ($colliderParent + ".worldMatrix[0]") ($colliderNode + ".worldMatrixIn");
     showEditor $colliderNode;
 }

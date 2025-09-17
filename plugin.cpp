@@ -9,6 +9,7 @@
 #include "custommayaconstructs/data/particledata.h"
 #include "custommayaconstructs/data/functionaldata.h"
 #include "custommayaconstructs/data/d3d11data.h"
+#include "custommayaconstructs/data/colliderdata.h"
 #include "custommayaconstructs/draw/voxelshape.h"
 #include "custommayaconstructs/draw/voxelsubsceneoverride.h"
 #include "custommayaconstructs/draw/colliderdrawoverride.h"
@@ -344,6 +345,12 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	status = plugin.registerData(ColliderData::fullName, ColliderData::id, ColliderData::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register ColliderData: " + status.errorString());
+		return status;
+	}
+
 	// PBD Node
 	status = plugin.registerNode(PBDNode::pbdNodeName, PBDNode::id, PBDNode::creator, PBDNode::initialize, MPxNode::kDependNode);
 	if (!status) {
@@ -471,6 +478,10 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	status = plugin.deregisterData(D3D11Data::id);
 	if (!status)
 		MGlobal::displayError("deregisterData failed on D3D11Data: " + status.errorString());
+
+	status = plugin.deregisterData(ColliderData::id);
+	if (!status)
+		MGlobal::displayError("deregisterData failed on ColliderData: " + status.errorString());
 
 	// PBD Node
 	status = plugin.deregisterNode(PBDNode::id);
