@@ -74,6 +74,7 @@ private:
     static void addParticleData(MPlug& particleDataToAddPlug);
     static void deleteParticleData(MPlug& particleDataToRemovePlug);
     static void calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNodeMessage::AttributeMessage changeType, std::unordered_map<int, int>& offsetForLogicalPlug, float& maximumParticleRadius);
+    static void maybeDeleteGlobalSolver();
     static MPlug getGlobalTimePlug();
     MCallbackIdArray callbackIds;
 
@@ -82,7 +83,6 @@ private:
     // Maps PBD node plug index to its simulate function.
     // Essentially a cache so we don't have to retrieve the function from plugs every frame.
     static std::unordered_map<uint, std::function<void()>> pbdSimulateFuncs;
-    static int numPBDNodes;
     static ColliderBuffer colliderBuffer;
     static std::unordered_set<int> dirtyColliderIndices;
     static MTime lastComputeTime;

@@ -25,7 +25,6 @@ std::unordered_map<GlobalSolver::BufferType, ComPtr<ID3D11Buffer>> GlobalSolver:
     { GlobalSolver::BufferType::DRAGGING, nullptr }
 };
 std::unordered_map<uint, std::function<void()>> GlobalSolver::pbdSimulateFuncs;
-int GlobalSolver::numPBDNodes = 0;
 ColliderBuffer GlobalSolver::colliderBuffer;
 std::unordered_set<int> GlobalSolver::dirtyColliderIndices;
 MTime GlobalSolver::lastComputeTime = MTime();
@@ -41,7 +40,8 @@ const MObject& GlobalSolver::getOrCreateGlobalSolver() {
 	dgMod.doIt();
 
     MPlug timePlug = getGlobalTimePlug();
-    MGlobal::executeCommandOnIdle("connectAttr " + timePlug.name() + " " + MFnDependencyNode(globalSolverNodeObject).name() + "." + MFnAttribute(aTime).name(), false);
+    dgMod.connect(timePlug, MPlug(globalSolverNodeObject, aTime));
+    dgMod.doIt();
 
     return globalSolverNodeObject;
 }
@@ -59,6 +59,7 @@ MPlug GlobalSolver::getGlobalTimePlug() {
 
 void GlobalSolver::postConstructor() {
     MPxNode::postConstructor();
+    setExistWithoutOutConnections(true);
     MStatus status;
     
     unsubscribeFromDragStateChange = VoxelDragContext::subscribeToDragStateChange([this](const DragState& dragState) {
@@ -82,11 +83,22 @@ void GlobalSolver::postConstructor() {
         globalSolver->unsubscribeFromDragStateChange();
         tearDown();
     }, this, &status);
+    callbackIds.append(callbackId);
+}
+
+void GlobalSolver::maybeDeleteGlobalSolver() {
+    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
+
+    int numParticleDataConnections = globalSolverNode.findPlug(aParticleData, false).evaluateNumElements();
+    int numColliderDataConnections = globalSolverNode.findPlug(aColliderData, false).evaluateNumElements();
+    if (numParticleDataConnections == 0 && numColliderDataConnections == 0) {
+        // Delete must happen on idle (node cannot delete itself from a callback)
+        MGlobal::executeCommandOnIdle("delete " + globalSolverNode.name());
+    }
 }
 
 void GlobalSolver::tearDown() {
     pbdSimulateFuncs.clear();
-    numPBDNodes = 0;
     lastComputeTime = MTime();
     for (auto& buffer : buffers) {
         if (buffer.second) {
@@ -121,18 +133,25 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
     if (plug != aParticleData || !(msg & (MNodeMessage::kConnectionMade | MNodeMessage::kConnectionBroken))) {
         return;
     }
+    bool connectionMade = (msg & MNodeMessage::kConnectionMade);
     
-    numPBDNodes += (msg & MNodeMessage::kConnectionMade) ? 1 : -1;
+    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
+    MPlug particleDataArrayPlug = globalSolverNode.findPlug(aParticleData, false);
+    int numPBDNodes = particleDataArrayPlug.evaluateNumElements();
+    numPBDNodes -= connectionMade ? 0 : 1; // If disconnecting, the plug is still counted in numElements, so subtract 1.
+    
+    MDGModifier dgMod;
     if (numPBDNodes == 0) {
-        // All PBD nodes have been deleted
-        // GlobalSolver node will delete itself upon seeing it has no connections
+        dgMod.removeMultiInstance(plug, true);
+        dgMod.doIt();
+        maybeDeleteGlobalSolver();
         return;
     }
 
     std::unordered_map<int, int> offsetForLogicalPlug;
     float maximumParticleRadius = 0;
     calculateNewOffsetsAndParticleRadius(plug, msg, offsetForLogicalPlug, maximumParticleRadius);
-    if (msg & MNodeMessage::kConnectionMade) {
+    if (connectionMade) {
         addParticleData(plug);
     } else {
         deleteParticleData(plug);
@@ -142,7 +161,6 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
     globalSolver->createGlobalComputeShaders(maximumParticleRadius);
 
     // Set these *after* creating buffers, because doing so triggers each PBD node to go make UAVs / SRVs.
-    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
     MPlug particleBufferOffsetArrayPlug = globalSolverNode.findPlug(aParticleBufferOffset, false);
     for (const auto& [logicalIndex, offset] : offsetForLogicalPlug) {
         MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(logicalIndex);
@@ -151,7 +169,6 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
 
     // Now, disconnect parallel-array plug entries associated with this PBD node.
     if (msg & MNodeMessage::kConnectionBroken) {
-        MDGModifier dgMod;
         uint logicalIndex = plug.logicalIndex();
         MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(logicalIndex);
         dgMod.removeMultiInstance(particleBufferOffsetPlug, true);
@@ -163,6 +180,8 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
         dgMod.removeMultiInstance(plug, true);
         dgMod.doIt();
     }
+
+    maybeDeleteGlobalSolver();
 }
 
 // Updates the offsets into the global buffers for each connected PBD node
@@ -451,6 +470,9 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
     MObject colliderDataObj;
     MFnPluginData colliderDataFn; 
     MPlugArray connectedColliderPlug;
+    ColliderBuffer newColliderBuffer;
+    newColliderBuffer.totalParticles = colliderBuffer.totalParticles;
+    
     for (int i = 0; i < numColliders; ++i) {
         MPlug colliderDataPlug = colliderDataArrayPlug.elementByPhysicalIndex(i);
         if (connectionRemoved && colliderDataPlug.logicalIndex() == plugLogicalIndex) {
@@ -467,9 +489,10 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
         MFnDependencyNode connectedLocatorNode(connectedLocatorObj);
         ColliderLocator* colliderLocator = static_cast<ColliderLocator*>(connectedLocatorNode.userNode());
 
-        colliderLocator->writeDataIntoBuffer(colliderData, colliderBuffer);
+        colliderLocator->writeDataIntoBuffer(colliderData, newColliderBuffer);
     }
 
+    colliderBuffer = newColliderBuffer;
     GlobalSolver* globalSolver = static_cast<GlobalSolver*>(clientData);
     globalSolver->solvePrimitiveCollisionsCompute.updateColliderBuffer(colliderBuffer);
     
@@ -479,6 +502,8 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
         dgMod.removeMultiInstance(plug, true);
         dgMod.doIt();
     }
+
+    maybeDeleteGlobalSolver();
 }
 
 void GlobalSolver::onColliderDataDirty(MObject& node, MPlug& plug, void* clientData) {
@@ -537,6 +562,7 @@ MStatus GlobalSolver::initialize() {
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     // Contains pointer to particle data
+    // NOTE: cannot use kDelete on disconnect behavior, because callback needs to copy data before plug is deleted.
     MFnTypedAttribute tAttr;
     aParticleData = tAttr.create("particledata", "ptd", ParticleData::id, MObject::kNullObj, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
