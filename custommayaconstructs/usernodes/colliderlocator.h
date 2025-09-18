@@ -98,12 +98,6 @@ private:
             return;
         }
 
-        // Also check by node object (handles cases where selection contains the node but not the same DAG path)
-        if (selection.hasItem(thisMObject()) || selection.hasItem(parentDagPath.node())) {
-            shouldDraw = true;
-            return;
-        }
-        
         shouldDraw = false;
     }
 };
@@ -176,9 +170,12 @@ public:
         dgMod.doIt();
 
         MSelectionList newSelection;
-        newSelection.add(colliderParentObj);
+        MDagPath parentDagPath;
+        MDagPath::getAPathTo(colliderParentObj, parentDagPath);
+        newSelection.add(parentDagPath);
         MGlobal::setActiveSelectionList(newSelection);
 
+        MGlobal::executeCommand("setToolTo moveSuperContext");
         MGlobal::executeCommand(MString("showEditor \"" + fnCollider.name() + "\";"));
         return MStatus::kSuccess;
     }

@@ -76,8 +76,6 @@ public:
     {
         if (!shouldDraw) return;
         drawManager.rect(MPoint::origin, MVector::zAxis, MVector::yAxis, 0.5f * cachedWidth, 0.5f * cachedHeight, false);
-        drawManager.line(MPoint::origin, MPoint::origin + MVector::yAxis * uiNormalLength);
-        drawManager.cone(MPoint::origin + MVector::yAxis * uiNormalLength, MVector::yAxis, uiConeRadius, uiConeHeight, 10, true);
     }
 
     void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer, int index = -1) override
