@@ -55,7 +55,7 @@ private:
     void unbind() override {
         DirectX::getContext()->CSSetShader(nullptr, NULL, 0);
         
-        ID3D11ShaderResourceView* srvs[] = { nullptr };
+        ID3D11ShaderResourceView* srvs[] = { nullptr, nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
         ID3D11UnorderedAccessView* uavs[] = { nullptr };

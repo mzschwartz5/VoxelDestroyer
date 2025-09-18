@@ -61,10 +61,12 @@ public:
 
     void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer, int index = -1) override
     {
-        if (index == -1) index = colliderBuffer.numCapsules++;
-        colliderBuffer.capsuleRadius[index] = data->getRadius();
-        colliderBuffer.capsuleHeight[index] = data->getHeight();
+        if (index == -1) index = colliderBuffer.numColliders++;
         data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
+        // Hijack diagonal elements to store geometric parameters. Collider locators are all locked to unit-scale, anyway.
+        colliderBuffer.worldMatrix[index][0][0] = data->getRadius();
+        colliderBuffer.worldMatrix[index][1][1] = data->getHeight();
+        colliderBuffer.worldMatrix[index][3][3] = 2.0f; // collider type 2 = capsule
     }
 
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
