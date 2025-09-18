@@ -78,9 +78,9 @@ public:
         drawManager.cone(MPoint::origin + MVector::yAxis * uiNormalLength, MVector::yAxis, uiConeRadius, uiConeHeight, 10, true);
     }
 
-    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer) override
+    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer, int index = -1) override
     {
-        int index = colliderBuffer.numPlanes++; // note post-increment
+        if (index == -1) index = colliderBuffer.numPlanes++;
         colliderBuffer.planeWidth[index] = data->getWidth();
         colliderBuffer.planeHeight[index] = data->getHeight();
         data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);

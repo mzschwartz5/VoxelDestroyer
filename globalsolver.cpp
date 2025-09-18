@@ -26,6 +26,8 @@ std::unordered_map<GlobalSolver::BufferType, ComPtr<ID3D11Buffer>> GlobalSolver:
 };
 std::unordered_map<uint, std::function<void()>> GlobalSolver::pbdSimulateFuncs;
 int GlobalSolver::numPBDNodes = 0;
+ColliderBuffer GlobalSolver::colliderBuffer;
+std::unordered_set<int> GlobalSolver::dirtyColliderIndices;
 MTime GlobalSolver::lastComputeTime = MTime();
 
 const MObject& GlobalSolver::getOrCreateGlobalSolver() {
@@ -69,6 +71,8 @@ void GlobalSolver::postConstructor() {
     callbackIds.append(callbackId);
     callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onColliderDataConnectionChange, this, &status);
     callbackIds.append(callbackId);
+    callbackId = MNodeMessage::addNodeDirtyPlugCallback(thisMObject(), onColliderDataDirty, this);
+    callbackIds.append(callbackId);
 
     // Effectively a destructor callback to clean up when the node is deleted
     // This is more reliable than a destructor, because Maya won't necessarily call destructors on node deletion (unless undo queue is flushed)
@@ -90,6 +94,8 @@ void GlobalSolver::tearDown() {
         }
     }
     globalSolverNodeObject = MObject::kNullObj;
+    colliderBuffer = ColliderBuffer();
+    dirtyColliderIndices.clear();
 }
 
 /**
@@ -420,7 +426,7 @@ void GlobalSolver::onSimulateFunctionConnectionChange(MNodeMessage::AttributeMes
 }
 
 /**
- * Whenever any collider is added or removed, rebuild the entire collider buffer from scratch. Because the amount of data here is very, very small (compared to
+ * Whenever any collider is added or removed, rebuild the entire collider buffer from scratch. Since the amount of data here is very, very small (compared to
  * something like particle data), this is not a big performance concern. (By contrast, for particle data, we append or shift data rather than reconstructing the entire buffer.)
  */
 void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
@@ -462,19 +468,8 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
         colliderLocator->writeDataIntoBuffer(colliderData, colliderBuffer);
     }
 
-    // Create the GPU buffer resource
-    D3D11_BUFFER_DESC bufferDesc = {};
-    D3D11_SUBRESOURCE_DATA initData = {};
     ComPtr<ID3D11Buffer> newColliderBuffer;
-
-    bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-    bufferDesc.ByteWidth = sizeof(ColliderBuffer);
-    bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    bufferDesc.MiscFlags = 0;
-    initData.pSysMem = &colliderBuffer;
-    DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, newColliderBuffer.GetAddressOf());
-    MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
+    createConstantBuffer<ColliderBuffer>(colliderBuffer, newColliderBuffer);
     buffers[BufferType::COLLIDER] = newColliderBuffer;
     
     // Finally, remove the disconnected plug from the array
@@ -483,6 +478,11 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
         dgMod.removeMultiInstance(plug, true);
         dgMod.doIt();
     }
+}
+
+void GlobalSolver::onColliderDataDirty(MObject& node, MPlug& plug, void* clientData) {
+    if (plug != aColliderData) return;
+    dirtyColliderIndices.insert(plug.logicalIndex());
 }
 
 ComPtr<ID3D11UnorderedAccessView> GlobalSolver::createUAV(uint offset, uint numElements, BufferType bufferType) {
@@ -591,6 +591,37 @@ MStatus GlobalSolver::initialize() {
 MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block) 
 {
     if (plug != aTrigger) return MS::kSuccess;
+
+    if (dirtyColliderIndices.size() > 0) {
+        MPlugArray connectedColliderPlug;
+        MArrayDataHandle colliderDataArrayHandle = block.inputArrayValue(aColliderData);
+        MPlug colliderDataArrayPlug = MFnDependencyNode(getOrCreateGlobalSolver()).findPlug(aColliderData, false);
+        int numElements = colliderDataArrayPlug.numElements();
+
+        for (int i = 0; i < numElements; ++i) {
+            int logicalIndex = colliderDataArrayPlug.elementByPhysicalIndex(i).logicalIndex();
+            if (dirtyColliderIndices.find(logicalIndex) == dirtyColliderIndices.end()) {
+                continue;
+            }
+
+            colliderDataArrayHandle.jumpToElement(logicalIndex);
+            MDataHandle colliderDataHandle = colliderDataArrayHandle.inputValue();
+            ColliderData* colliderData = static_cast<ColliderData*>(colliderDataHandle.asPluginData());
+            
+            // TODO: consider packing a function in ColliderData to write itself into the buffer, rather than needing to find the locator node here. (How might this be affected by serialization needs though?)
+            MPlug colliderDataPlug = colliderDataArrayPlug.elementByLogicalIndex(logicalIndex);
+            colliderDataPlug.connectedTo(connectedColliderPlug, true, false);
+            MObject connectedLocatorObj = connectedColliderPlug[0].node();
+            MFnDependencyNode connectedLocatorNode(connectedLocatorObj);
+            ColliderLocator* colliderLocator = static_cast<ColliderLocator*>(connectedLocatorNode.userNode());
+            colliderLocator->writeDataIntoBuffer(colliderData, colliderBuffer, i);
+        }
+
+        ComPtr<ID3D11Buffer> newColliderBuffer;
+        createConstantBuffer<ColliderBuffer>(colliderBuffer, newColliderBuffer);
+        buffers[BufferType::COLLIDER] = newColliderBuffer;
+        dirtyColliderIndices.clear();
+    }
 
     // Sometimes aTrigger gets triggered even when time has not explicitly changed.
     // To guard against that, cache off time on each compute and compare to last.

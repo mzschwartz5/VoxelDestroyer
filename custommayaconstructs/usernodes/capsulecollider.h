@@ -59,9 +59,9 @@ public:
         drawManager.capsule(MPoint::origin, MVector::yAxis, cachedRadius, cachedHeight, 20, 10, false);
     }
 
-    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer) override
+    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer, int index = -1) override
     {
-        int index = colliderBuffer.numCapsules++; // note post-increment
+        if (index == -1) index = colliderBuffer.numCapsules++;
         colliderBuffer.capsuleRadius[index] = data->getRadius();
         colliderBuffer.capsuleHeight[index] = data->getHeight();
         data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);

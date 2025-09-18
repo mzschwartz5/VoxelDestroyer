@@ -59,9 +59,9 @@ public:
         drawManager.cylinder(MPoint::origin, MVector::yAxis, cachedRadius, cachedHeight, 20, false);
     }
 
-    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer) override
+    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer, int index = -1) override
     {
-        int index = colliderBuffer.numCylinders++; // note post-increment
+        if (index == -1) index = colliderBuffer.numCylinders++;
         colliderBuffer.cylinderRadius[index] = data->getRadius();
         colliderBuffer.cylinderHeight[index] = data->getHeight();
         data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);

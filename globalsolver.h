@@ -16,11 +16,16 @@
 #include "directx/directx.h"
 #include <unordered_map>
 #include <functional>
+#include <unordered_set>
 using Microsoft::WRL::ComPtr;
+
+struct ColliderBuffer; // forward declaration
 
 /**
  * Global solver node - responsible for inter-voxel collisions, and interactive dragging.
  * Basically, anything that affects any and all particles without regard to which model they belong to.
+ * 
+ * Most of the code in this class is bookkeeping (updating buffers as things are added / removed / dirtied).
  */
 class GlobalSolver : public MPxNode {
     
@@ -39,10 +44,10 @@ public:
     static MObject aTime;
     static MObject aParticleData;
     static MObject aColliderData;
+    static MObject aSimulateFunction;
     // Output attributes
     static MObject aParticleBufferOffset;
     static MObject aTrigger;
-    static MObject aSimulateFunction;
 
     static MObject globalSolverNodeObject;
 
@@ -64,6 +69,7 @@ private:
     static void onSimulateFunctionConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static void onColliderDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
+    static void onColliderDataDirty(MObject& node, MPlug& plug, void* clientData);
     static void addParticleData(MPlug& particleDataToAddPlug);
     static void deleteParticleData(MPlug& particleDataToRemovePlug);
     static void calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNodeMessage::AttributeMessage changeType, std::unordered_map<int, int>& offsetForLogicalPlug, float& maximumParticleRadius);
@@ -76,6 +82,8 @@ private:
     // Essentially a cache so we don't have to retrieve the function from plugs every frame.
     static std::unordered_map<uint, std::function<void()>> pbdSimulateFuncs;
     static int numPBDNodes;
+    static ColliderBuffer colliderBuffer;
+    static std::unordered_set<int> dirtyColliderIndices;
     static MTime lastComputeTime;
 
     // Global compute shaders
@@ -102,6 +110,22 @@ private:
         bufferDesc.StructureByteStride = sizeof(T);
 
         initData.pSysMem = data.data();
+        DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, buffer.GetAddressOf());
+        MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
+    }
+
+    template<typename T>
+    static void createConstantBuffer(const T& data, ComPtr<ID3D11Buffer>& buffer) {
+        D3D11_BUFFER_DESC bufferDesc = {};
+        D3D11_SUBRESOURCE_DATA initData = {};
+
+        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+        bufferDesc.ByteWidth = sizeof(T);
+        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        bufferDesc.MiscFlags = 0;
+
+        initData.pSysMem = &data;
         DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, buffer.GetAddressOf());
         MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
     }
