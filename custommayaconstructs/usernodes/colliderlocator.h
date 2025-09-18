@@ -33,10 +33,15 @@ public:
     ~ColliderLocator() override {}
 
     virtual void draw(MUIDrawManager& drawManager) = 0;
-    virtual void prepareForDraw() = 0;
+    virtual void prepareForDraw() {
+        checkShouldDraw();
+    }
+
     virtual void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer, int index = -1) = 0;
 
 protected:
+    bool shouldDraw = false;
+
     static MStatus initializeColliderDataAttribute(
         MObject& colliderDataAttr,
         MObject& worldMatrix
@@ -71,6 +76,36 @@ private:
     inline static const MString colliderDataAttrName = MString("colliderData");
     // Can't use the name "worldMatrix" here because Maya uses that already for an _output_ attribute
     inline static const MString worldMatrixAttrName = MString("worldMatrixIn");
+
+    // Only draw when locator or parent transform is selected
+    void checkShouldDraw() {
+        MSelectionList selection;
+        MGlobal::getActiveSelectionList(selection);
+
+        MDagPath thisDagPath;
+        MDagPath::getAPathTo(thisMObject(), thisDagPath);
+
+        if (selection.hasItem(thisDagPath)) {
+            shouldDraw = true;
+            return;
+        }
+
+        MDagPath parentDagPath = thisDagPath;
+        parentDagPath.pop();
+
+        if (selection.hasItem(parentDagPath)) {
+            shouldDraw = true;
+            return;
+        }
+
+        // Also check by node object (handles cases where selection contains the node but not the same DAG path)
+        if (selection.hasItem(thisMObject()) || selection.hasItem(parentDagPath.node())) {
+            shouldDraw = true;
+            return;
+        }
+        
+        shouldDraw = false;
+    }
 };
 
 
@@ -139,6 +174,10 @@ public:
         MPlug colliderDataPlug = fnColliderDep.findPlug(ColliderLocator::colliderDataAttrName, false);
         dgMod.connect(colliderDataPlug, globalSolverColliderDataPlug);
         dgMod.doIt();
+
+        MSelectionList newSelection;
+        newSelection.add(colliderParentObj);
+        MGlobal::setActiveSelectionList(newSelection);
 
         MGlobal::executeCommand(MString("showEditor \"" + fnCollider.name() + "\";"));
         return MStatus::kSuccess;

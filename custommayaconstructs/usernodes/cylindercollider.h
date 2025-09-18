@@ -49,6 +49,7 @@ public:
 
     void prepareForDraw() override
     {
+        ColliderLocator::prepareForDraw();
         MObject thisNode = thisMObject();
         MPlug(thisNode, aRadius).getValue(cachedRadius);
         MPlug(thisNode, aHeight).getValue(cachedHeight);
@@ -56,6 +57,7 @@ public:
 
     void draw(MUIDrawManager& drawManager) override
     {
+        if (!shouldDraw) return;
         drawManager.cylinder(MPoint::origin, MVector::yAxis, cachedRadius, cachedHeight, 20, false);
     }
 
