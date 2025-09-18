@@ -61,6 +61,7 @@ public:
 
     void prepareForDraw() override
     {
+        ColliderLocator::prepareForDraw();
         MObject thisNode = thisMObject();
         MPlug(thisNode, aBoxWidth).getValue(cachedWidth);
         MPlug(thisNode, aBoxHeight).getValue(cachedHeight);
@@ -69,6 +70,7 @@ public:
 
     void draw(MUIDrawManager& drawManager) override
     {
+        if (!shouldDraw) return;
         drawManager.box(MPoint::origin, MVector::yAxis, MVector::xAxis, 0.5f * cachedWidth, 0.5f * cachedHeight, 0.5f * cachedDepth, false);
     }
 

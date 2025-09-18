@@ -37,12 +37,14 @@ public:
 
     void prepareForDraw() override
     {
+        ColliderLocator::prepareForDraw();
         MObject thisNode = thisMObject();
         MPlug(thisNode, aRadius).getValue(cachedRadius);
     }
 
     void draw(MUIDrawManager& drawManager) override
     {
+        if (!shouldDraw) return;
         drawManager.sphere(MPoint::origin, cachedRadius, 20, 20, false);
     }
 

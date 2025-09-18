@@ -60,6 +60,7 @@ public:
 
     void prepareForDraw() override
     {
+        ColliderLocator::prepareForDraw();
         MObject thisNode = thisMObject();
         MPlug(thisNode, aWidth).getValue(cachedWidth);
         MPlug(thisNode, aHeight).getValue(cachedHeight);
@@ -73,6 +74,7 @@ public:
 
     void draw(MUIDrawManager& drawManager) override
     {
+        if (!shouldDraw) return;
         drawManager.rect(MPoint::origin, MVector::zAxis, MVector::yAxis, 0.5f * cachedWidth, 0.5f * cachedHeight, false);
         drawManager.line(MPoint::origin, MPoint::origin + MVector::yAxis * uiNormalLength);
         drawManager.cone(MPoint::origin + MVector::yAxis * uiNormalLength, MVector::yAxis, uiConeRadius, uiConeHeight, 10, true);
