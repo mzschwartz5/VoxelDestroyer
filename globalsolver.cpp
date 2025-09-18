@@ -402,6 +402,10 @@ void GlobalSolver::createGlobalComputeShaders(float maximumParticleRadius) {
     dragParticlesCompute = DragParticlesCompute(totalVoxels);
     dragParticlesCompute.setParticlesUAV(particleUAV);
     buffers[BufferType::DRAGGING] = dragParticlesCompute.getIsDraggingBuffer();
+
+    solvePrimitiveCollisionsCompute = SolvePrimitiveCollisionsCompute(totalParticles, colliderBuffer);
+    solvePrimitiveCollisionsCompute.setParticlePositionsUAV(particleUAV);
+    buffers[BufferType::COLLIDER] = solvePrimitiveCollisionsCompute.getColliderBuffer();
 }
 
 void GlobalSolver::onSimulateFunctionConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
@@ -445,7 +449,6 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
         return;
     }
 
-    ColliderBuffer colliderBuffer;
     MObject colliderDataObj;
     MFnPluginData colliderDataFn; 
     MPlugArray connectedColliderPlug;
@@ -468,9 +471,8 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
         colliderLocator->writeDataIntoBuffer(colliderData, colliderBuffer);
     }
 
-    ComPtr<ID3D11Buffer> newColliderBuffer;
-    createConstantBuffer<ColliderBuffer>(colliderBuffer, newColliderBuffer);
-    buffers[BufferType::COLLIDER] = newColliderBuffer;
+    GlobalSolver* globalSolver = static_cast<GlobalSolver*>(clientData);
+    globalSolver->solvePrimitiveCollisionsCompute.updateColliderBuffer(colliderBuffer);
     
     // Finally, remove the disconnected plug from the array
     if (connectionRemoved) {
@@ -617,9 +619,7 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
             colliderLocator->writeDataIntoBuffer(colliderData, colliderBuffer, i);
         }
 
-        ComPtr<ID3D11Buffer> newColliderBuffer;
-        createConstantBuffer<ColliderBuffer>(colliderBuffer, newColliderBuffer);
-        buffers[BufferType::COLLIDER] = newColliderBuffer;
+        solvePrimitiveCollisionsCompute.updateColliderBuffer(colliderBuffer);
         dirtyColliderIndices.clear();
     }
 
