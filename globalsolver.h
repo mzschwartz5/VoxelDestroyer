@@ -10,6 +10,7 @@
 #include "directx/compute/prefixscancompute.h"
 #include "directx/compute/buildcollisionparticlescompute.h"
 #include "directx/compute/solvecollisionscompute.h"
+#include "directx/compute/solveprimitivecollisionscompute.h"
 #include <maya/MNodeMessage.h>
 #include <d3d11.h>
 #include <wrl/client.h>
@@ -93,6 +94,7 @@ private:
     PrefixScanCompute prefixScanCompute;
     BuildCollisionParticlesCompute buildCollisionParticleCompute;
     SolveCollisionsCompute solveCollisionsCompute;
+    SolvePrimitiveCollisionsCompute solvePrimitiveCollisionsCompute;
     
     bool isDragging = false;
     EventBase::Unsubscribe unsubscribeFromDragStateChange;
@@ -110,22 +112,6 @@ private:
         bufferDesc.StructureByteStride = sizeof(T);
 
         initData.pSysMem = data.data();
-        DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, buffer.GetAddressOf());
-        MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
-    }
-
-    template<typename T>
-    static void createConstantBuffer(const T& data, ComPtr<ID3D11Buffer>& buffer) {
-        D3D11_BUFFER_DESC bufferDesc = {};
-        D3D11_SUBRESOURCE_DATA initData = {};
-
-        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-        bufferDesc.ByteWidth = sizeof(T);
-        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        bufferDesc.MiscFlags = 0;
-
-        initData.pSysMem = &data;
         DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, buffer.GetAddressOf());
         MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
     }
