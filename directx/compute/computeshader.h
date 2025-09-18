@@ -23,6 +23,7 @@ public:
     virtual void dispatch() = 0;
 
     virtual void dispatch(int threadGroupCount) {
+        if (threadGroupCount <= 0) return;
         bind();
         DirectX::getContext()->Dispatch(threadGroupCount, 1, 1); 
         unbind();
@@ -101,6 +102,7 @@ protected:
         const std::string buildCollisionParticleStr = std::to_string(BUILD_COLLISION_PARTICLE_THREADS);
         const std::string prefixScanThreadsStr = std::to_string(PREFIX_SCAN_THREADS);
         const std::string solveCollisionThreadsStr = std::to_string(SOLVE_COLLISION_THREADS);
+        const std::string maxCollidersStr = std::to_string(MAX_COLLIDERS);
         D3D_SHADER_MACRO SHADER_MACROS[] = {
             { "DEFORM_VERTICES_THREADS", deformVerticesThreadStr.c_str() },
             { "VGS_THREADS", vgsThreadsStr.c_str() },
@@ -108,6 +110,7 @@ protected:
             { "BUILD_COLLISION_PARTICLE_THREADS", buildCollisionParticleStr.c_str() },
             { "PREFIX_SCAN_THREADS", prefixScanThreadsStr.c_str() },
             { "SOLVE_COLLISION_THREADS", solveCollisionThreadsStr.c_str() },
+            { "MAX_COLLIDERS", maxCollidersStr.c_str() },
             { NULL, NULL } // Terminate the array
         };
 

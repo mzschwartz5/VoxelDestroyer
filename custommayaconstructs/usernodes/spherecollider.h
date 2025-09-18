@@ -48,15 +48,16 @@ public:
 
     void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer, int index = -1) override
     {
-        if (index == -1) index = colliderBuffer.numSpheres++;
-        colliderBuffer.sphereRadius[index] = data->getRadius();
+        if (index == -1) index = colliderBuffer.numColliders++;
         data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
+        // Hijack diagonal elements to store geometric parameters. Collider locators are all locked to unit-scale, anyway.
+        colliderBuffer.worldMatrix[index][0][0] = data->getRadius();
+        colliderBuffer.worldMatrix[index][3][3] = 1.0f; // collider type 1 = sphere
     }
 
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
     {
         if (plug != aColliderData) return MS::kUnknownParameter;
-
         MDataHandle worldMatrixHandle = dataBlock.inputValue(aWorldMatrix);
         MMatrix worldMat = worldMatrixHandle.asMatrix();
         MDataHandle radiusHandle = dataBlock.inputValue(aRadius);

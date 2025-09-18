@@ -403,7 +403,8 @@ void GlobalSolver::createGlobalComputeShaders(float maximumParticleRadius) {
     dragParticlesCompute.setParticlesUAV(particleUAV);
     buffers[BufferType::DRAGGING] = dragParticlesCompute.getIsDraggingBuffer();
 
-    solvePrimitiveCollisionsCompute = SolvePrimitiveCollisionsCompute(totalParticles, colliderBuffer);
+    colliderBuffer.totalParticles = totalParticles;
+    solvePrimitiveCollisionsCompute = SolvePrimitiveCollisionsCompute(colliderBuffer);
     solvePrimitiveCollisionsCompute.setParticlePositionsUAV(particleUAV);
     buffers[BufferType::COLLIDER] = solvePrimitiveCollisionsCompute.getColliderBuffer();
 }
@@ -434,9 +435,7 @@ void GlobalSolver::onSimulateFunctionConnectionChange(MNodeMessage::AttributeMes
  * something like particle data), this is not a big performance concern. (By contrast, for particle data, we append or shift data rather than reconstructing the entire buffer.)
  */
 void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
-    if (plug != GlobalSolver::aColliderData || !(msg & (MNodeMessage::kConnectionMade | MNodeMessage::kConnectionBroken))) {
-        return;
-    }
+    if (plug != GlobalSolver::aColliderData || !(msg & (MNodeMessage::kConnectionMade | MNodeMessage::kConnectionBroken))) return;
     bool connectionRemoved = (msg & MNodeMessage::kConnectionBroken);
 
     MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
@@ -484,6 +483,16 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
 
 void GlobalSolver::onColliderDataDirty(MObject& node, MPlug& plug, void* clientData) {
     if (plug != aColliderData) return;
+    if (plug.isArray()) {
+        // If the parent array plug is dirty, mark all elements dirty.
+        // Unforunately, this is the case when animating a collider. Maya marks the parent dirty rather than the child.
+        // TODO: look for way to improve this.
+        for (unsigned int i = 0; i < plug.evaluateNumElements(); ++i) {
+            dirtyColliderIndices.insert(plug.elementByPhysicalIndex(i).logicalIndex());
+        }
+        return;
+    }
+
     dirtyColliderIndices.insert(plug.logicalIndex());
 }
 
@@ -644,6 +653,7 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
         prefixScanCompute.dispatch(); 
         buildCollisionParticleCompute.dispatch();
         solveCollisionsCompute.dispatch();
+        solvePrimitiveCollisionsCompute.dispatch();
     }
 
     return MS::kSuccess;
