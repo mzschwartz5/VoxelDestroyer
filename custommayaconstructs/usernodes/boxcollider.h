@@ -72,9 +72,9 @@ public:
         drawManager.box(MPoint::origin, MVector::yAxis, MVector::xAxis, 0.5f * cachedWidth, 0.5f * cachedHeight, 0.5f * cachedDepth, false);
     }
 
-    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer) override
+    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer, int index = -1) override
     {
-        int index = colliderBuffer.numBoxes++; // note post-increment
+        if (index == -1) index = colliderBuffer.numBoxes++;
         colliderBuffer.boxWidth[index] = data->getWidth();
         colliderBuffer.boxHeight[index] = data->getHeight();
         colliderBuffer.boxDepth[index] = data->getDepth();

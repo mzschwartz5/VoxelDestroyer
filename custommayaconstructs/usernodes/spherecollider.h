@@ -46,9 +46,9 @@ public:
         drawManager.sphere(MPoint::origin, cachedRadius, 20, 20, false);
     }
 
-    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer) override
+    void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer, int index = -1) override
     {
-        int index = colliderBuffer.numSpheres++; // note post-increment
+        if (index == -1) index = colliderBuffer.numSpheres++;
         colliderBuffer.sphereRadius[index] = data->getRadius();
         data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
     }

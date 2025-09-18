@@ -59,7 +59,7 @@ public:
 
     virtual void draw(MUIDrawManager& drawManager) = 0;
     virtual void prepareForDraw() = 0;
-    virtual void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer) = 0;
+    virtual void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer, int index = -1) = 0;
 
 protected:
     static MStatus initializeColliderDataAttribute(
