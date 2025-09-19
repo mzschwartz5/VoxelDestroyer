@@ -25,7 +25,7 @@ public:
         MFnNumericAttribute nAttr;
         aWidth = nAttr.create("width", "wdt", MFnNumericData::kFloat, 5.0f);
         nAttr.setKeyable(true);
-        nAttr.setMin(0.0f);
+        nAttr.setMin(0.0001f);
         nAttr.setSoftMax(100.0f);
         nAttr.setStorable(true);
         nAttr.setReadable(true);
@@ -35,7 +35,7 @@ public:
 
         aHeight = nAttr.create("height", "hgt", MFnNumericData::kFloat, 5.0f);
         nAttr.setKeyable(true);
-        nAttr.setMin(0.0f);
+        nAttr.setMin(0.0001f);
         nAttr.setSoftMax(100.0f);
         nAttr.setStorable(true);
         nAttr.setReadable(true);
@@ -82,10 +82,10 @@ public:
     {
         if (index == -1) index = colliderBuffer.numColliders++;
         data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
-        // Hijack diagonal elements to store geometric parameters. Collider locators are all locked to unit-scale, anyway.
-        colliderBuffer.worldMatrix[index][0][0] = data->getWidth();
-        colliderBuffer.worldMatrix[index][1][1] = data->getHeight();
-        colliderBuffer.worldMatrix[index][2][2] = data->isInfinite() ? 1.0f : 0.0f; 
+        // Hijack elements in bottom row to store geometric parameters.
+        colliderBuffer.worldMatrix[index][0][3] = data->getWidth();
+        colliderBuffer.worldMatrix[index][1][3] = data->getHeight();
+        colliderBuffer.worldMatrix[index][2][3] = data->isInfinite() ? 1.0f : 0.0f; 
         colliderBuffer.worldMatrix[index][3][3] = 4.0f; // collider type 4 = plane
     }
 

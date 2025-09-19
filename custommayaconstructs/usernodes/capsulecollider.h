@@ -23,7 +23,7 @@ public:
         MFnNumericAttribute nAttr;
         aRadius = nAttr.create("radius", "rds", MFnNumericData::kFloat, 1.0f);
         nAttr.setKeyable(true);
-        nAttr.setMin(0.0f);
+        nAttr.setMin(0.0001f);
         nAttr.setSoftMax(100.0f);
         nAttr.setStorable(true);
         nAttr.setReadable(true);
@@ -33,7 +33,7 @@ public:
 
         aHeight = nAttr.create("height", "hgt", MFnNumericData::kFloat, 2.0f);
         nAttr.setKeyable(true);
-        nAttr.setMin(0.0f);
+        nAttr.setMin(0.0001f);
         nAttr.setSoftMax(100.0f);
         nAttr.setStorable(true);
         nAttr.setReadable(true);
@@ -64,10 +64,11 @@ public:
     void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer, int index = -1) override
     {
         if (index == -1) index = colliderBuffer.numColliders++;
+        data->getWorldMatrix().inverse().get(colliderBuffer.inverseWorldMatrix[index]);
         data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
-        // Hijack diagonal elements to store geometric parameters. Collider locators are all locked to unit-scale, anyway.
-        colliderBuffer.worldMatrix[index][0][0] = data->getRadius();
-        colliderBuffer.worldMatrix[index][1][1] = data->getHeight();
+        // Hijack elements in bottom row to store geometric parameters.
+        colliderBuffer.worldMatrix[index][0][3] = data->getRadius();
+        colliderBuffer.worldMatrix[index][1][3] = data->getHeight();
         colliderBuffer.worldMatrix[index][3][3] = 2.0f; // collider type 2 = capsule
     }
 

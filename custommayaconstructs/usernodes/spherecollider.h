@@ -22,7 +22,7 @@ public:
         MFnNumericAttribute nAttr;
         aRadius = nAttr.create("radius", "rds", MFnNumericData::kFloat, 1.0f);
         nAttr.setKeyable(true);
-        nAttr.setMin(0.0f);
+        nAttr.setMin(0.0001f);
         nAttr.setSoftMax(100.0f);
         nAttr.setStorable(true);
         nAttr.setReadable(true);
@@ -52,8 +52,8 @@ public:
     {
         if (index == -1) index = colliderBuffer.numColliders++;
         data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
-        // Hijack diagonal elements to store geometric parameters. Collider locators are all locked to unit-scale, anyway.
-        colliderBuffer.worldMatrix[index][0][0] = data->getRadius();
+001        // Hijack elements in bottom row to store geometric parameters.
+        colliderBuffer.worldMatrix[index][0][3] = data->getRadius();
         colliderBuffer.worldMatrix[index][3][3] = 1.0f; // collider type 1 = sphere
     }
 
