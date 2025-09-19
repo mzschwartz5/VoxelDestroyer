@@ -8,6 +8,7 @@
 // If there's ever a use case for more, would need to optimize collision code. Cbuffer can hold more, but could also use structured buffer.
 struct ColliderBuffer {
     float worldMatrix[MAX_COLLIDERS][4][4];  // diagonal elements are hijacked to store geometric parameters (e.g. radius, height, etc)
+    float inverseWorldMatrix[MAX_COLLIDERS][4][4];
     int totalParticles = 0;
     int numColliders = 0;
     int padding[2];                          // Padding to ensure 16-byte alignment

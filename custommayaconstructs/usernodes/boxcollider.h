@@ -77,6 +77,7 @@ public:
     void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer, int index = -1) override
     {
         if (index == -1) index = colliderBuffer.numColliders++;
+        data->getWorldMatrix().inverse().get(colliderBuffer.inverseWorldMatrix[index]);
         data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
         // Hijack diagonal elements to store geometric parameters. Collider locators are all locked to unit-scale, anyway.
         colliderBuffer.worldMatrix[index][0][0] = data->getWidth();
