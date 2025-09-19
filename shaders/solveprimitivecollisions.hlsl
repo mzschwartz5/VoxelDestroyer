@@ -121,6 +121,59 @@ void solvePlaneCollision(float4x4 wMatrix, inout float4 pos, float particleRadiu
 
 void solveCylinderCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 pos, float particleRadius)
 {
+    float cylinderRadius = wMatrix[3][0];
+    float halfHeight = wMatrix[3][1] * 0.5f;
+
+    // Transform particle into cylinder local space (cylinder aligned with Y), which is easier to work with.
+    float3 localPos = mul(invWMatrix, float4(pos.xyz, 1.0f)).xyz;
+
+    // Closest point on the finite cylinder
+    float clampedY = clamp(localPos.y, -halfHeight, halfHeight);
+
+    float2 radialPos = float2(localPos.x, localPos.z);
+    float radialDistSq = dot(radialPos, radialPos);
+    float radiusSq = cylinderRadius * cylinderRadius;
+
+    // Compute closest radial point: if outside radius clamp to radius, otherwise keep radial
+    float2 clampedRadial;
+    if (radialDistSq > 0.0f) {
+        float invRad = rsqrt(radialDistSq);
+        float2 radialDir = radial * invRad;
+        float2 chosenRadial = radial;
+        if (radialDistSq > radiusSq) {
+            chosenRadial = radialDir * cylinderRadius;
+        }
+        clampedRadial = chosenRadial;
+    } else {
+        clampedRadial = float2(0.0f, 0.0f);
+    }
+
+    float3 closest = float3(clampedRadial.x, clampedY, clampedRadial.y);
+
+    // Delta from closest surface point to particle center
+    float3 delta = localPos - closest;
+    float distSq = dot(delta, delta);
+
+    float combined = cylinderRadius + particleRadius; // combined used for side-only tests isn't sufficient for caps, so use combined length check
+    float combinedSq = (particleRadius) * (particleRadius); // distance compared to particle radius from surface point
+
+    // If the squared distance from the particle center to the closest point on the cylinder surface
+    // is greater than the particle radius squared, there's no penetration
+    if (distSq >= (particleRadius * particleRadius)) return;
+
+    // Resolve penetration: push the particle center out along the delta direction by exactly particleRadius
+    float3 adjustedLocalPos;
+    if (distSq > 0.0f) {
+        float invLen = rsqrt(distSq);
+        float3 normalLocal = delta * invLen;
+        adjustedLocalPos = closest + normalLocal * particleRadius;
+    } else {
+        // Particle center exactly at the closest surface point -> push out along X
+        adjustedLocalPos = closest + float3(particleRadius, 0.0f, 0.0f);
+    }
+
+    resetMatrixScale(wMatrix);
+    pos.xyz = mul(wMatrix, float4(adjustedLocalPos, 1.0f)).xyz;
 }
 
 void solveCapsuleCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 pos, float particleRadius)

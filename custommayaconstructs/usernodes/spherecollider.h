@@ -52,7 +52,7 @@ public:
     {
         if (index == -1) index = colliderBuffer.numColliders++;
         data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
-001        // Hijack elements in bottom row to store geometric parameters.
+        // Hijack elements in bottom row to store geometric parameters.
         colliderBuffer.worldMatrix[index][0][3] = data->getRadius();
         colliderBuffer.worldMatrix[index][3][3] = 1.0f; // collider type 1 = sphere
     }
