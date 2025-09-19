@@ -251,7 +251,7 @@ public:
         particleDataPlug.setValue(particleDataObj);
         
         std::array<std::vector<FaceConstraint>, 3> faceConstraints 
-            = pbd.constructFaceToFaceConstraints(voxels, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            = pbd.constructFaceToFaceConstraints(voxels, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX);
         
         pbd.createComputeShaders(voxels, faceConstraints);
 
