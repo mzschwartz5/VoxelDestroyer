@@ -24,7 +24,7 @@ public:
         MFnNumericAttribute nAttr;
         aBoxWidth = nAttr.create("boxWidth", "bw", MFnNumericData::kFloat, 1.0f);
         nAttr.setKeyable(true);
-        nAttr.setMin(0.0f);
+        nAttr.setMin(0.0001f);
         nAttr.setSoftMax(100.0f);
         nAttr.setStorable(true);
         nAttr.setReadable(true);
@@ -34,7 +34,7 @@ public:
 
         aBoxHeight = nAttr.create("boxHeight", "bh", MFnNumericData::kFloat, 1.0f);
         nAttr.setKeyable(true);
-        nAttr.setMin(0.0f);
+        nAttr.setMin(0.0001f);
         nAttr.setSoftMax(100.0f);
         nAttr.setStorable(true);
         nAttr.setReadable(true);
@@ -44,7 +44,7 @@ public:
 
         aBoxDepth = nAttr.create("boxDepth", "bd", MFnNumericData::kFloat, 1.0f);
         nAttr.setKeyable(true);
-        nAttr.setMin(0.0f);
+        nAttr.setMin(0.0001f);
         nAttr.setSoftMax(100.0f);
         nAttr.setStorable(true);
         nAttr.setReadable(true);
@@ -79,10 +79,10 @@ public:
         if (index == -1) index = colliderBuffer.numColliders++;
         data->getWorldMatrix().inverse().get(colliderBuffer.inverseWorldMatrix[index]);
         data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
-        // Hijack diagonal elements to store geometric parameters. Collider locators are all locked to unit-scale, anyway.
-        colliderBuffer.worldMatrix[index][0][0] = data->getWidth();
-        colliderBuffer.worldMatrix[index][1][1] = data->getHeight();
-        colliderBuffer.worldMatrix[index][2][2] = data->getDepth();
+        // Hijack elements in bottom row to store geometric parameters.
+        colliderBuffer.worldMatrix[index][0][3] = data->getWidth();
+        colliderBuffer.worldMatrix[index][1][3] = data->getHeight();
+        colliderBuffer.worldMatrix[index][2][3] = data->getDepth();
         colliderBuffer.worldMatrix[index][3][3] = 0.0f; // collider type 0 = box
     }
 
