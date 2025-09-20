@@ -17,6 +17,9 @@
 #include <maya/MArgList.h>
 #include <maya/MSyntax.h>
 #include <maya/MFnDagNode.h>
+#include <maya/MFileIO.h>
+#include <maya/MMessage.h>
+#include <maya/MDagMessage.h>
 #include "../data/colliderdata.h"
 #include "../../globalsolver.h"
 
@@ -38,6 +41,34 @@ public:
     }
 
     virtual void writeDataIntoBuffer(const ColliderData* const data, ColliderBuffer& colliderBuffer, int index = -1) = 0;
+
+    void postConstructor() override {
+        MObject thisObj = thisMObject();
+        parentTransformAddedCallbackId = MDagMessage::addParentAddedCallback(ColliderLocator::parentAddedCallback, this);
+
+        preRemovalCallbackId = MNodeMessage::addNodePreRemovalCallback(thisMObject(), [](MObject& node, void* clientData) {
+                ColliderLocator* colliderLocator = static_cast<ColliderLocator*>(clientData);
+                MMessage::removeCallback(colliderLocator->parentTransformAddedCallbackId);
+                MMessage::removeCallback(colliderLocator->preRemovalCallbackId);
+        }, this);
+
+        // Connections get restored from file, no need to explicitly connect them.
+        if (MFileIO::isReadingFile() || MFileIO::isOpeningFile()) {
+            return;
+        }
+
+        // Connect the colliderData attribute to the global solver's colliderDataArray attribute
+        // Note: this is not done in the MPxCommand below, because that would not cover the case of duplicating a collider node.
+        MDGModifier dgMod;
+        MObject globalSolverNodeObj = GlobalSolver::getOrCreateGlobalSolver();
+        MPlug globalSolverColliderDataArrayPlug = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aColliderData, false);
+        uint plugIndex = GlobalSolver::getNextArrayPlugIndex(globalSolverColliderDataArrayPlug);
+        MPlug globalSolverColliderDataPlug = globalSolverColliderDataArrayPlug.elementByLogicalIndex(plugIndex);
+        MPlug colliderDataPlug = MFnDependencyNode(thisObj).findPlug(ColliderLocator::colliderDataAttrName, false);
+        dgMod.connect(colliderDataPlug, globalSolverColliderDataPlug);
+
+        dgMod.doIt();
+    }
 
 protected:
     bool shouldDraw = false;
@@ -76,6 +107,8 @@ private:
     inline static const MString colliderDataAttrName = MString("colliderData");
     // Can't use the name "worldMatrix" here because Maya uses that already for an _output_ attribute
     inline static const MString worldMatrixAttrName = MString("worldMatrixIn");
+    MCallbackId parentTransformAddedCallbackId = 0;
+    MCallbackId preRemovalCallbackId = 0;
 
     // Only draw when locator or parent transform is selected
     void checkShouldDraw() {
@@ -99,6 +132,41 @@ private:
         }
 
         shouldDraw = false;
+    }
+
+    /**
+     * Respond to (re)parenting the collider to a transform node.
+     */
+    static void parentAddedCallback(MDagPath& child, MDagPath& parent, void* clientData) {
+        if (MFileIO::isReadingFile() || MFileIO::isOpeningFile()) return;
+
+        ColliderLocator* colliderNode = static_cast<ColliderLocator*>(clientData);
+        MObject thisObj = colliderNode->thisMObject();
+        if (child.node() != thisObj) return;
+        if (!parent.node().hasFn(MFn::kTransform)) {
+            MGlobal::displayWarning("Collider nodes must be parented under a transform node.");
+            return;
+        }
+
+        // Connect the transform's worldMatrix to the collider's worldMatrixIn attribute
+        // Note: this is not done in the MPxCommand below, because that would not cover the case of duplicating nodes.
+        //       and it is not done in the postConstructor, because that would not cover the case of reparenting a collider shape.
+        MDGModifier dgMod;
+        MFnDependencyNode fnColliderDep(thisObj);
+        MFnDependencyNode fnTransformDep(parent.node());
+        MPlug worldMatrixPlug = fnTransformDep.findPlug("worldMatrix", false);
+        MPlug worldMatrixElemPlug = worldMatrixPlug.elementByLogicalIndex(0); // Safe to access 0 element. Plug is array in case of instancing.
+        MPlug worldMatrixInPlug = fnColliderDep.findPlug(ColliderLocator::worldMatrixAttrName, false);
+
+        // Disconnect any existing incoming connection(s) to worldMatrixIn
+        MPlugArray connected;
+        worldMatrixInPlug.connectedTo(connected, true, false);
+        for (unsigned int i = 0; i < connected.length(); ++i) {
+            dgMod.disconnect(connected[i], worldMatrixInPlug);
+        }
+
+        dgMod.connect(worldMatrixElemPlug, worldMatrixInPlug);
+        dgMod.doIt();
     }
 };
 
@@ -147,27 +215,6 @@ public:
         dagMod.doIt();
         MFnDagNode fnCollider(colliderNodeObj);
         fnCollider.setName(colliderName + "Shape#");
-
-        // Connect the transform's worldMatrix to the collider's worldMatrixIn attribute
-        MFnDependencyNode fnColliderDep(colliderNodeObj);
-        MFnDependencyNode fnTransformDep(colliderParentObj);
-        MPlug worldMatrixPlug = fnTransformDep.findPlug("worldMatrix", false);
-        MPlug worldMatrixElemPlug = worldMatrixPlug.elementByLogicalIndex(0); // Safe to access 0 element. Plug is array in case of instancing.
-        MPlug worldMatrixInPlug = fnColliderDep.findPlug(ColliderLocator::worldMatrixAttrName, false);
-
-        MDGModifier dgMod;
-        dgMod.connect(worldMatrixElemPlug, worldMatrixInPlug);
-        dgMod.doIt();
-
-        // Connect the colliderData attribute to the global solver's colliderDataArray attribute
-        MObject globalSolverNodeObj = GlobalSolver::getOrCreateGlobalSolver();
-        MPlug globalSolverColliderDataArrayPlug = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aColliderData, false);
-        uint plugIndex = GlobalSolver::getNextArrayPlugIndex(globalSolverColliderDataArrayPlug);
-        MPlug globalSolverColliderDataPlug = globalSolverColliderDataArrayPlug.elementByLogicalIndex(plugIndex);
-        
-        MPlug colliderDataPlug = fnColliderDep.findPlug(ColliderLocator::colliderDataAttrName, false);
-        dgMod.connect(colliderDataPlug, globalSolverColliderDataPlug);
-        dgMod.doIt();
 
         MSelectionList newSelection;
         MDagPath parentDagPath;
