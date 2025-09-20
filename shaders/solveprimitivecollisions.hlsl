@@ -14,7 +14,7 @@ cbuffer ColliderBuffer : register(b0)
     int padding[2];
 };
 
-void resetMatrixScale(inout float4x4 wMatrix)
+void restoreMatrixRow(inout float4x4 wMatrix)
 {
     wMatrix[3][0] = 0.0f;
     wMatrix[3][1] = 0.0f;
@@ -81,7 +81,7 @@ void solveBoxCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 pos, 
         }
     }
 
-    resetMatrixScale(wMatrix);
+    restoreMatrixRow(wMatrix);
     pos.xyz = mul(wMatrix, float4(adjustedLocalPos, 1.0f)).xyz;
 }
 
@@ -90,7 +90,7 @@ void solvePlaneCollision(float4x4 wMatrix, inout float4 pos, float particleRadiu
     float width = wMatrix[3][0];
     float height = wMatrix[3][1];
     float isInfinite = wMatrix[3][2];
-    resetMatrixScale(wMatrix);
+    restoreMatrixRow(wMatrix);
 
     float3 planePos = mul(wMatrix, float4(0.0, 0.0, 0.0, 1.0)).xyz; 
     float3 planeNormal  = normalize(mul(wMatrix, float4(0.0, 1.0, 0.0, 0.0)).xyz); // plane normal
@@ -172,7 +172,7 @@ void solveCylinderCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 
         adjustedLocalPos = closest + float3(particleRadius, 0.0f, 0.0f);
     }
 
-    resetMatrixScale(wMatrix);
+    restoreMatrixRow(wMatrix);
     pos.xyz = mul(wMatrix, float4(adjustedLocalPos, 1.0f)).xyz;
 }
 
@@ -213,7 +213,7 @@ void solveCapsuleCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 p
         adjustedLocalPos = closest + float3(combined, 0.0f, 0.0f);
     }
 
-    resetMatrixScale(wMatrix);
+    restoreMatrixRow(wMatrix);
     pos.xyz = mul(wMatrix, float4(adjustedLocalPos, 1.0f)).xyz;
 }
 
