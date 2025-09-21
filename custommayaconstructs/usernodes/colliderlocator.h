@@ -70,6 +70,18 @@ public:
         dgMod.doIt();
     }
 
+    /**
+     * Since each collider has a different ID, to check if a node is a collider, use a proxy: does it have the colliderData attribute?
+     */
+    static bool isColliderNode(const MObject& node) {
+        if (node.isNull()) return false;
+        if (!node.hasFn(MFn::kDependencyNode)) return false;
+        MFnDependencyNode fn(node);
+        MStatus status;
+        MPlug plug = fn.findPlug(colliderDataAttrName, false, &status);
+        return status == MS::kSuccess && !plug.isNull();
+    }
+
 protected:
     bool shouldDraw = false;
 

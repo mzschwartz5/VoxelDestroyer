@@ -22,6 +22,7 @@
 #include "custommayaconstructs/usernodes/planecollider.h"
 #include <maya/MFnPluginData.h>
 #include <maya/MDrawRegistry.h>
+#include <maya/MItDependencyNodes.h>
 #include "directx/compute/computeshader.h"
 #include "globalsolver.h"
 
@@ -93,6 +94,8 @@ MStatus plugin::doIt(const MArgList& argList)
 	MObject pbdNodeObj = PBDNode::createPBDNode(voxelizerNodeObj, voxelizedMeshDagPath);
 	MObject voxelShapeObj = VoxelShape::createVoxelShapeNode(pbdNodeObj, voxelizedMeshDagPath);
 	MProgressWindow::setProgress(100);
+
+	maybeCreateGroundCollider();
 
 	MProgressWindow::endProgress();
 	MGlobal::executeCommand("undoInfo -closeChunk", false, false); // close the undo chunk	
@@ -302,6 +305,24 @@ MString plugin::getActiveModelPanel() {
 	MStringArray parts;
 	result.split('|', parts);
 	return parts[parts.length() - 1];
+}
+
+// TODO: when gravity becomes directional, make ground plane in the "down" direction.
+// Also, the act of searching for existing colliders should be a utility.
+// Potentially have this as an opt-out feature as well (checkbox in the voxelizer menu)
+void plugin::maybeCreateGroundCollider() {
+	// First, see if there are any colliders in the scene already.
+    MItDependencyNodes it;
+    for (; !it.isDone(); it.next()) {
+        MObject node = it.thisNode();
+		if (ColliderLocator::isColliderNode(node)) return;
+    }
+
+	MDagModifier dagMod;
+	MObject planeColliderObj = dagMod.createNode(PlaneCollider::id);
+	MFnDependencyNode fn(planeColliderObj);
+	fn.setName("GroundPlaneCollider");
+	dagMod.doIt();
 }
 
 // Initialize Maya Plugin upon loading
