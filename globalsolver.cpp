@@ -271,18 +271,15 @@ void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
 void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
     MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
 
+    // Get the particle data of the node being removed
     MStatus status;
     MObject particleDataObj;
     particleDataToRemovePlug.getValue(particleDataObj);
     MFnPluginData pluginDataFn(particleDataObj);
     ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
 
-    // Create new particle buffer sized for the data minus the deleted particles
     uint totalParticles = getTotalParticles();
     uint numRemovedParticles = particleData->getData().numParticles;
-    std::vector<MFloatPoint> positions(totalParticles - numRemovedParticles);
-    ComPtr<ID3D11Buffer> newParticleBuffer;
-    createBuffer<MFloatPoint>(positions, newParticleBuffer);
 
     // Get the removed node's offset into the old particle buffer
     int offset;
@@ -291,59 +288,8 @@ void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
     MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(plugLogicalIndex);
     particleBufferOffsetPlug.getValue(offset);
 
-    // Combine the old particle data into the new buffer in (up to) two copies: 
-    // the particles before those being removed, and those after.
-    if (offset > 0) {
-        copyBufferSubregion<MFloatPoint>(
-            buffers[BufferType::PARTICLE],
-            newParticleBuffer,
-            0,             // src copy offset
-            0,             // dst copy offset
-            offset         // num elements to copy
-        );
-    }
-
-    if (static_cast<uint>(offset) + numRemovedParticles < totalParticles) {
-        copyBufferSubregion<MFloatPoint>(
-            buffers[BufferType::PARTICLE],
-            newParticleBuffer,
-            offset + numRemovedParticles,                   // src copy offset
-            offset,                                         // dst copy offset
-            totalParticles - (offset + numRemovedParticles) // num elements to copy
-        );
-    }
-    buffers[BufferType::PARTICLE] = newParticleBuffer;
-
-    // Create new surface buffer sized for the data minus the deleted voxels
-    uint numRemovedVoxels = numRemovedParticles / 8;
-    uint totalVoxels = totalParticles / 8;
-    std::vector<uint> surfaceValues(totalVoxels - numRemovedVoxels);
-    ComPtr<ID3D11Buffer> newSurfaceBuffer;
-    createBuffer<uint>(surfaceValues, newSurfaceBuffer);
-
-    // Combine the old surface data into the new buffer in (up to) two copies:
-    // the voxels before those being removed, and those after.
-    offset /= 8;
-    if (offset > 0) {
-        copyBufferSubregion<uint>(
-            buffers[BufferType::SURFACE],
-            newSurfaceBuffer,
-            0,             // src copy offset
-            0,             // dst copy offset
-            offset         // num elements to copy
-        );
-    }
-
-    if (static_cast<uint>(offset) + numRemovedVoxels < totalVoxels) {
-        copyBufferSubregion<uint>(
-            buffers[BufferType::SURFACE],
-            newSurfaceBuffer,
-            offset + numRemovedVoxels,                // src copy offset
-            offset,                                   // dst copy offset
-            totalVoxels - (offset + numRemovedVoxels) // num elements to copy
-        );
-    }
-    buffers[BufferType::SURFACE] = newSurfaceBuffer;
+    deleteFromBuffer<MFloatPoint>(BufferType::PARTICLE, numRemovedParticles, totalParticles, offset);
+    deleteFromBuffer<uint>(BufferType::SURFACE, numRemovedParticles / 8, totalParticles / 8, offset / 8);
 
     return;
 }
