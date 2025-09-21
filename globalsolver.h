@@ -33,6 +33,7 @@ class GlobalSolver : public MPxNode {
 public:
     enum BufferType {
         PARTICLE,
+        OLDPARTICLE,
         SURFACE,
         DRAGGING,
         COLLIDER

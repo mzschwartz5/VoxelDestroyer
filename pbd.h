@@ -11,14 +11,6 @@
 
 #include <maya/MSharedPtr.h>
 
-struct Particles
-{
-    // Inverse mass (w) and particle radius stored, packed at half-precision, as 4th component.
-    std::vector<MFloatPoint> positions;
-    std::vector<MFloatPoint> oldPositions;
-    int numParticles{ 0 };
-};
-
 class PBD
 {
 public:
@@ -42,6 +34,7 @@ public:
 
     void setGPUResourceHandles(
         ComPtr<ID3D11UnorderedAccessView> particleUAV,
+        ComPtr<ID3D11UnorderedAccessView> oldParticlesUAV,
         ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV,
         ComPtr<ID3D11ShaderResourceView> isDraggingSRV
     );
@@ -56,13 +49,15 @@ public:
     }
 
     int numParticles() const {
-        return particles.numParticles;
+        return totalParticles;
     }
     
     void simulateSubstep();
 
 private:
-    Particles particles;
+    // Inverse mass (w) and particle radius stored, packed at half-precision, as 4th component.
+    std::vector<MFloatPoint> particles;
+    int totalParticles{ 0 };
     bool initialized = false;
 
     // Shaders

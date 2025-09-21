@@ -96,15 +96,14 @@ ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
             // Offset the corner towards the center by the radius of the particle
             const MFloatPoint& position = corner - (PARTICLE_RADIUS * Utils::sign(corner - voxelCenter));
             float packedRadiusAndW = Utils::packTwoFloatsAsHalfs(PARTICLE_RADIUS, 1.0f); // for now, w is hardcoded to 1.0f
-            particles.positions.push_back(MFloatPoint(position.x, position.y, position.z, packedRadiusAndW));
-            particles.oldPositions.push_back(MFloatPoint(position.x, position.y, position.z, packedRadiusAndW));
-            particles.numParticles++;
+            particles.push_back(MFloatPoint(position.x, position.y, position.z, packedRadiusAndW));
+            totalParticles++;
         }
     }
 
     return {
-        particles.numParticles,
-        &particles.positions,
+        totalParticles,
+        &particles,
         &voxels->isSurface,
         PARTICLE_RADIUS
     };
@@ -127,13 +126,13 @@ void PBD::createComputeShaders(
     PreVGSConstantBuffer preVGSConstants{GRAVITY_STRENGTH, GROUND_COLLISION_Y, TIMESTEP, numParticles()};
     preVGSCompute = PreVGSCompute(
         numParticles(),
-        particles.oldPositions.data(),
 		preVGSConstants
     );
 }
 
 void PBD::setGPUResourceHandles(
     ComPtr<ID3D11UnorderedAccessView> particleUAV,
+    ComPtr<ID3D11UnorderedAccessView> oldParticlesUAV,
     ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV,
     ComPtr<ID3D11ShaderResourceView> isDraggingSRV
 ) {
@@ -141,6 +140,7 @@ void PBD::setGPUResourceHandles(
     faceConstraintsCompute.setPositionsUAV(particleUAV);
     faceConstraintsCompute.setIsSurfaceUAV(isSurfaceUAV);
     preVGSCompute.setPositionsUAV(particleUAV);
+    preVGSCompute.setOldPositionsUAV(oldParticlesUAV);
     preVGSCompute.setIsDraggingSRV(isDraggingSRV);
 }
 
