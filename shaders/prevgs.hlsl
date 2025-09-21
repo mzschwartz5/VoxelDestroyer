@@ -30,13 +30,7 @@ void main(uint3 gId : SV_DispatchThreadID)
         velocity += float4(0, GRAVITY_STRENGTH, 0, 0) * TIMESTEP; // Gravity
         pos.xyz += (velocity * TIMESTEP).xyz; // Update position
     }
-
-    // For now, lump ground collision into this shader
-    if (pos.y < GROUND_Y) {
-        pos = oldPos;
-        pos.y = GROUND_Y;
-    }
-
+    
     // Write back to global memory
     positions[gId.x] = pos;
 }

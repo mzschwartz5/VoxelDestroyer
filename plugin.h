@@ -54,6 +54,7 @@ public:
 	MDagPath findClosestObjectToVoxelGrid(const MPoint& voxelGridCenter, double voxelGridSize, MString gridDisplayName);
 	MDagPath getSelectedObject(const MPoint& voxelGridCenter, double voxelGridSize);
 	bool isBoundingBoxOverlappingVoxelGrid(const MBoundingBox& bbox, const MPoint& voxelGridCenter, double voxelGridSize);
+	void maybeCreateGroundCollider();
 
 	static void loadVoxelizerMenu();
 	static void loadColliderNodeAETemplate();
