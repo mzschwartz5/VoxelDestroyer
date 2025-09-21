@@ -40,6 +40,10 @@ public:
         this->positionsUAV = positionsUAV;
     }
 
+    void setOldParticlePositionsSRV(const ComPtr<ID3D11ShaderResourceView>& oldPositionsSRV) {
+        this->oldPositionsSRV = oldPositionsSRV;
+    }
+
     const ComPtr<ID3D11Buffer>& getColliderBuffer() const {
         return colliderBuffer;
     }
@@ -48,6 +52,7 @@ private:
     int numWorkgroups = 0;
     int numColliders = 0;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
+    ComPtr<ID3D11ShaderResourceView> oldPositionsSRV;
     ComPtr<ID3D11Buffer> colliderBuffer;
 
     void bind() override
@@ -56,6 +61,9 @@ private:
 
         ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
+
+        ID3D11ShaderResourceView* srvs[] = { oldPositionsSRV.Get() };
+        DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
         ID3D11Buffer* cbvs[] = { colliderBuffer.Get() };
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
@@ -67,6 +75,9 @@ private:
 
         ID3D11UnorderedAccessView* nullUAVs[] = { nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(nullUAVs), nullUAVs, nullptr);
+
+        ID3D11ShaderResourceView* nullSRVs[] = { nullptr };
+        DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(nullSRVs), nullSRVs);
 
         ID3D11Buffer* nullCBs[] = { nullptr };
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(nullCBs), nullCBs);

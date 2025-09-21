@@ -49,6 +49,9 @@ public:
         return worldMatrix;
     }
 
+    void setFriction(float f) { friction = f; }
+    float getFriction() const { return friction; }
+
     void setWidth(float w) { width = w; }
     float getWidth() const { return width; }
     void setHeight(float h) { height = h; }
@@ -62,6 +65,7 @@ public:
 
 private:
     MMatrix worldMatrix;
+    float friction;
 
     // Collection of collider parameters. Not all parameters are used by all collider types.
     float width;

@@ -13,10 +13,11 @@ public:
     inline static MObject aRadius;
     inline static MObject aColliderData;
     inline static MObject aWorldMatrix;
+    inline static MObject aFriction;
 
     static void* creator() { return new SphereCollider(); }
     static MStatus initialize() {
-        MStatus status = initializeColliderDataAttribute(aColliderData, aWorldMatrix);
+        MStatus status = initializeBaseAttributes(aColliderData, aWorldMatrix, aFriction);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         MFnNumericAttribute nAttr;
@@ -55,6 +56,7 @@ public:
         // Hijack elements in bottom row to store geometric parameters.
         colliderBuffer.worldMatrix[index][0][3] = data->getRadius();
         colliderBuffer.worldMatrix[index][3][3] = 1.0f; // collider type 1 = sphere
+        colliderBuffer.inverseWorldMatrix[index][3][3] = data->getFriction(); // store friction in inverse world matrix
     }
 
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
@@ -64,6 +66,8 @@ public:
         MMatrix worldMat = worldMatrixHandle.asMatrix();
         MDataHandle radiusHandle = dataBlock.inputValue(aRadius);
         float radius = radiusHandle.asFloat();
+        MDataHandle frictionHandle = dataBlock.inputValue(aFriction);
+        float friction = frictionHandle.asFloat();
 
         MFnPluginData fnData;
         MObject newDataObj = fnData.create(ColliderData::id);
@@ -71,6 +75,7 @@ public:
         
         colliderData->setWorldMatrix(worldMat);
         colliderData->setRadius(radius);
+        colliderData->setFriction(friction);
         
         MDataHandle colliderDataHandle = dataBlock.outputValue(aColliderData);
         colliderDataHandle.set(colliderData);

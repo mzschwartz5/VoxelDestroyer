@@ -14,10 +14,11 @@ public:
     inline static MObject aHeight;
     inline static MObject aColliderData;
     inline static MObject aWorldMatrix;
+    inline static MObject aFriction;
 
     static void* creator() { return new CylinderCollider(); }
     static MStatus initialize() {
-        MStatus status = initializeColliderDataAttribute(aColliderData, aWorldMatrix);
+        MStatus status = initializeBaseAttributes(aColliderData, aWorldMatrix, aFriction);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         MFnNumericAttribute nAttr;
@@ -66,6 +67,7 @@ public:
         if (index == -1) index = colliderBuffer.numColliders++;
         data->getWorldMatrix().inverse().get(colliderBuffer.inverseWorldMatrix[index]);
         data->getWorldMatrix().get(colliderBuffer.worldMatrix[index]);
+        colliderBuffer.inverseWorldMatrix[index][3][3] = data->getFriction(); // store friction in inverse world matrix
         // Hijack elements in bottom row to store geometric parameters.
         colliderBuffer.worldMatrix[index][0][3] = data->getRadius();
         colliderBuffer.worldMatrix[index][1][3] = data->getHeight();
@@ -82,6 +84,8 @@ public:
         float radius = radiusHandle.asFloat();
         MDataHandle heightHandle = dataBlock.inputValue(aHeight);
         float height = heightHandle.asFloat();
+        MDataHandle frictionHandle = dataBlock.inputValue(aFriction);
+        float friction = frictionHandle.asFloat();
 
         MFnPluginData fnData;
         MObject newDataObj = fnData.create(ColliderData::id);
@@ -90,6 +94,7 @@ public:
         colliderData->setWorldMatrix(worldMat);
         colliderData->setRadius(radius);
         colliderData->setHeight(height);
+        colliderData->setFriction(friction);
         
         MDataHandle colliderDataHandle = dataBlock.outputValue(aColliderData);
         colliderDataHandle.set(colliderData);

@@ -1,6 +1,7 @@
 #include "common.hlsl"
 
 RWStructuredBuffer<float4> particlePositions : register(u0);
+StructuredBuffer<float4> oldParticlePositions : register(t0);
 
 /**
  * Store colliders in a constant buffer for fast access. We assume a relatively small number of colliders.
@@ -14,6 +15,16 @@ cbuffer ColliderBuffer : register(b0)
     int padding[2];
 };
 
+/**
+ * Applies a friction adjustment (a factor from 0 to 1) that determines how much lateral movement occurs against a collider.
+ * A friction of 0 means no friction (full lateral movement), and a friction of 1 means full friction (no lateral movement).
+ */
+void applyFriction(inout float4 pos, float4 oldPos, float3 colliderNormal, float friction) {
+    float3 deltaPos = pos.xyz - oldPos.xyz;
+    float3 deltaTangent = deltaPos - dot(deltaPos, colliderNormal) * colliderNormal;
+    pos.xyz -= deltaTangent * friction;
+}
+
 void restoreMatrixRow(inout float4x4 wMatrix)
 {
     wMatrix[3][0] = 0.0f;
@@ -22,7 +33,7 @@ void restoreMatrixRow(inout float4x4 wMatrix)
     wMatrix[3][3] = 1.0f;
 }
 
-void solveSphereCollision(float4x4 wMatrix, inout float4 pos, float particleRadius)
+float3 solveSphereCollision(float4x4 wMatrix, inout float4 pos, float particleRadius)
 {
     float sphereRadius = wMatrix[3][0]; 
     float3 sphereCenter = float3(
@@ -33,14 +44,15 @@ void solveSphereCollision(float4x4 wMatrix, inout float4 pos, float particleRadi
 
     float3 toParticle = pos.xyz - sphereCenter;
     float distSq = dot(toParticle, toParticle);
-    float combinedRadiusSq = (sphereRadius + particleRadius) * (sphereRadius + particleRadius);
-    if (distSq >= combinedRadiusSq) return; // Include particle radius
+    float combinedRadiusSq = (sphereRadius + particleRadius) * (sphereRadius + particleRadius); // Include particle radius
+    if (distSq >= combinedRadiusSq || distSq == 0) return float3(0.0f, 0.0f, 0.0f); // No collision (and ignore divide-by-zero case)
 
     float3 norm = toParticle / sqrt(distSq);
     pos.xyz = sphereCenter + norm * (sphereRadius + particleRadius);
+    return norm;
 }
 
-void solveBoxCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 pos, float particleRadius)
+float3 solveBoxCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 pos, float particleRadius)
 {
     // In the box's object space, the box is axis-aligned and easier to work with
     float3 localPos = mul(invWMatrix, float4(pos.xyz, 1.0f)).xyz;
@@ -53,13 +65,14 @@ void solveBoxCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 pos, 
     float distSq = dot(delta, delta);
 
     float radiusSq = particleRadius * particleRadius;
-    if (distSq >= radiusSq) return;
+    if (distSq >= radiusSq) return float3(0.0f, 0.0f, 0.0f);
 
     float3 adjustedLocalPos = localPos;
+    float3 localNormal;
     if (distSq > 0.0f) { // particle center outside box
         float invSqrtDist = rsqrt(distSq);
-        float3 normalLocal = delta * invSqrtDist;
-        adjustedLocalPos = clamped + normalLocal * particleRadius;
+        localNormal = delta * invSqrtDist;
+        adjustedLocalPos = clamped + localNormal * particleRadius;
     } else { // particle center inside box: push out to nearest face
         float3 distsToFace = halfExtents - abs(localPos);
         
@@ -72,20 +85,24 @@ void solveBoxCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 pos, 
         if (axis == 0) {
             float axisSign = (localPos.x < 0.0f) ? -1.0f : 1.0f;
             adjustedLocalPos.x = (halfExtents.x + particleRadius) * axisSign;
+            localNormal = float3(axisSign, 0.0f, 0.0f);
         } else if (axis == 1) {
             float axisSign = (localPos.y < 0.0f) ? -1.0f : 1.0f;
             adjustedLocalPos.y = (halfExtents.y + particleRadius) * axisSign;
+            localNormal = float3(0.0f, axisSign, 0.0f);
         } else {
             float axisSign = (localPos.z < 0.0f) ? -1.0f : 1.0f;
             adjustedLocalPos.z = (halfExtents.z + particleRadius) * axisSign;
+            localNormal = float3(0.0f, 0.0f, axisSign);
         }
     }
 
     restoreMatrixRow(wMatrix);
     pos.xyz = mul(wMatrix, float4(adjustedLocalPos, 1.0f)).xyz;
+    return normalize(mul((float3x3)wMatrix, localNormal)); // Transform normal to world space (no transpose needed as no non-uniform scale/shear)
 }
 
-void solvePlaneCollision(float4x4 wMatrix, inout float4 pos, float particleRadius)
+float3 solvePlaneCollision(float4x4 wMatrix, inout float4 pos, float particleRadius)
 {
     float width = wMatrix[3][0];
     float height = wMatrix[3][1];
@@ -96,7 +113,7 @@ void solvePlaneCollision(float4x4 wMatrix, inout float4 pos, float particleRadiu
     float3 planeNormal  = normalize(mul(wMatrix, float4(0.0, 1.0, 0.0, 0.0)).xyz); // plane normal
     float dist = dot(pos.xyz - planePos, planeNormal) - particleRadius;
 
-    if (dist >= 0) return; // No collision
+    if (dist >= 0) return float3(0.0f, 0.0f, 0.0f); // No collision
 
     // If the plane is finite, check bounds before resolving
     if (isInfinite == 0.0f) // 0 => finite, non-zero => infinite
@@ -113,13 +130,14 @@ void solvePlaneCollision(float4x4 wMatrix, inout float4 pos, float particleRadiu
         float localZ = dot(toPoint, planeForward);
 
         // If outside rectangle bounds, skip collision
-        if (abs(localX) > halfW || abs(localZ) > halfH) return;
+        if (abs(localX) > halfW || abs(localZ) > halfH) return float3(0.0f, 0.0f, 0.0f);
     }
 
     pos.xyz -= dist * planeNormal;
+    return planeNormal;
 }
 
-void solveCylinderCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 pos, float particleRadius)
+float3 solveCylinderCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 pos, float particleRadius)
 {
     float cylinderRadius = wMatrix[3][0];
     float halfHeight = wMatrix[3][1] * 0.5f;
@@ -154,29 +172,29 @@ void solveCylinderCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 
     float3 delta = localPos - closest;
     float distSq = dot(delta, delta);
 
-    float combined = cylinderRadius + particleRadius; // combined used for side-only tests isn't sufficient for caps, so use combined length check
-    float combinedSq = (particleRadius) * (particleRadius); // distance compared to particle radius from surface point
-
     // If the squared distance from the particle center to the closest point on the cylinder surface
     // is greater than the particle radius squared, there's no penetration
-    if (distSq >= (particleRadius * particleRadius)) return;
+    if (distSq >= (particleRadius * particleRadius)) return float3(0.0f, 0.0f, 0.0f);
 
     // Resolve penetration: push the particle center out along the delta direction by exactly particleRadius
     float3 adjustedLocalPos;
+    float3 localNormal;
     if (distSq > 0.0f) {
         float invLen = rsqrt(distSq);
-        float3 normalLocal = delta * invLen;
-        adjustedLocalPos = closest + normalLocal * particleRadius;
+        localNormal = delta * invLen;
+        adjustedLocalPos = closest + localNormal * particleRadius;
     } else {
         // Particle center exactly at the closest surface point -> push out along X
         adjustedLocalPos = closest + float3(particleRadius, 0.0f, 0.0f);
+        localNormal = float3(1.0f, 0.0f, 0.0f);
     }
 
     restoreMatrixRow(wMatrix);
     pos.xyz = mul(wMatrix, float4(adjustedLocalPos, 1.0f)).xyz;
+    return normalize(mul((float3x3)wMatrix, localNormal)); // Transform normal to world space (no transpose needed as no non-uniform scale/shear)
 }
 
-void solveCapsuleCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 pos, float particleRadius)
+float3 solveCapsuleCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 pos, float particleRadius)
 {
     float capsuleRadius = wMatrix[3][0];
     float halfHeight = wMatrix[3][1] * 0.5f;
@@ -201,20 +219,23 @@ void solveCapsuleCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 p
     float combined = capsuleRadius + particleRadius;
     float combinedSq = combined * combined;
 
-    if (distSq >= combinedSq) return;
+    if (distSq >= combinedSq) return float3(0.0f, 0.0f, 0.0f); // No collision
 
     float3 adjustedLocalPos;
+    float3 localNormal;
     if (distSq > 0.0f) {
         float invLen = rsqrt(distSq);
-        float3 normalLocal = delta * invLen;
-        adjustedLocalPos = closest + normalLocal * combined;
+        localNormal = delta * invLen;
+        adjustedLocalPos = closest + localNormal * combined;
     } else {
         // Particle exactly on the capsule spine; push out along local X
         adjustedLocalPos = closest + float3(combined, 0.0f, 0.0f);
+        localNormal = float3(1.0f, 0.0f, 0.0f);
     }
 
     restoreMatrixRow(wMatrix);
     pos.xyz = mul(wMatrix, float4(adjustedLocalPos, 1.0f)).xyz;
+    return normalize(mul((float3x3)wMatrix, localNormal)); // Transform normal to world space (no transpose needed as no non-uniform scale/shear)
 }
 
 [numthreads(VGS_THREADS, 1, 1)]
@@ -225,27 +246,35 @@ void main(uint3 globalThreadId : SV_DispatchThreadID)
     
     float4 pos = particlePositions[globalThreadId.x];
     if (massIsInfinite(pos)) return;
+    float4 oldPos = oldParticlePositions[globalThreadId.x];
     float particleRadius = unpackHalf2x16(pos.w).x;
 
+    float3 colliderNormal;
     for (int i = 0; i < numColliders; i++) {
         float4x4 wMatrix = worldMatrix[i];
         float4x4 invWMatrix = inverseWorldMatrix[i];
+        float friction = invWMatrix[3][3]; // Store friction in unused part of inverse matrix
+        invWMatrix[3][3] = 1.0f;           // Reset to valid matrix
         int type = wMatrix[3][3];
+        
         if (type == 0.0f) {
-            solveBoxCollision(wMatrix, invWMatrix, pos, particleRadius);
+            colliderNormal = solveBoxCollision(wMatrix, invWMatrix, pos, particleRadius);
         } 
         else if (type == 1.0f) {
-            solveSphereCollision(wMatrix, pos, particleRadius);
+            colliderNormal = solveSphereCollision(wMatrix, pos, particleRadius);
         }
         else if (type == 2.0f) {
-            solveCapsuleCollision(wMatrix, invWMatrix, pos, particleRadius);
+            colliderNormal = solveCapsuleCollision(wMatrix, invWMatrix, pos, particleRadius);
         }
         else if (type == 3.0f) {
-            solveCylinderCollision(wMatrix, invWMatrix, pos, particleRadius);
+            colliderNormal = solveCylinderCollision(wMatrix, invWMatrix, pos, particleRadius);
         }
         else if (type == 4.0f) {
-            solvePlaneCollision(wMatrix, pos, particleRadius);
+            colliderNormal = solvePlaneCollision(wMatrix, pos, particleRadius);
         }
+
+        if (all(colliderNormal == float3(0.0f, 0.0f, 0.0f))) continue; // No collision occurred
+        applyFriction(pos, oldPos, colliderNormal, friction);
     }
 
     particlePositions[globalThreadId.x] = pos;
