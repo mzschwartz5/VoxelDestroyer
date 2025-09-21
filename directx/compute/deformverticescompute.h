@@ -16,7 +16,7 @@ public:
         int numParticles,
         int vertexCount,
         const MMatrix& inverseWorldMatrix,
-        const MFloatPoint* originalParticlePositions,   // Will be uploaded to GPU
+        const std::vector<MFloatPoint>& originalParticlePositions,   // Will be uploaded to GPU
         const std::vector<uint>& vertexVoxelIds,        // Will be uploaded to GPU
         const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
         const ComPtr<ID3D11UnorderedAccessView>& normalsUAV,
@@ -91,7 +91,7 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(nullConstBuffers), nullConstBuffers);
     };
 
-    void initializeBuffers(int numParticles, int vertexCount, const MMatrix& inverseWorldMatrix, const MFloatPoint* originalParticlePositions, const std::vector<uint>& vertexVoxelIds)
+    void initializeBuffers(int numParticles, int vertexCount, const MMatrix& inverseWorldMatrix, const std::vector<MFloatPoint>& originalParticlePositions, const std::vector<uint>& vertexVoxelIds)
     {
         numWorkgroups = Utils::divideRoundUp(vertexCount, DEFORM_VERTICES_THREADS);
         D3D11_BUFFER_DESC bufferDesc = {};

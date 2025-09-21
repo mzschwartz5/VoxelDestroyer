@@ -104,9 +104,9 @@ ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
 
     return {
         particles.numParticles,
-        particles.positions.data(),
-        PARTICLE_RADIUS,
-        voxels->isSurface.data()
+        &particles.positions,
+        &voxels->isSurface,
+        PARTICLE_RADIUS
     };
 }
 

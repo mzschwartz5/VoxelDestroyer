@@ -153,4 +153,26 @@ private:
         MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
         buffer.Reset();
     }
+
+    /**
+     * Prepend data to a buffer.
+     */
+    template<typename T>
+    static void addToBuffer(BufferType bufferType, std::vector<T>& addedData, uint numNewElements, uint numExistingElements) {
+        addedData.resize(numExistingElements + numNewElements);
+        ComPtr<ID3D11Buffer> newBuffer;
+        createBuffer<T>(addedData, newBuffer);
+
+        // If any the buffer already exists, combine old buffer into new buffer offset by numNewElements
+        if (buffers[bufferType]) {
+            copyBufferSubregion<T>(
+                buffers[bufferType], 
+                newBuffer, 
+                0,
+                numNewElements,
+                numExistingElements
+            );
+        }
+        buffers[bufferType] = newBuffer;
+    }
 };

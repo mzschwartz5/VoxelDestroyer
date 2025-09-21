@@ -255,50 +255,14 @@ void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
     particleDataToAddPlug.getValue(particleDataObj);
     MFnPluginData pluginDataFn(particleDataObj);
     ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
+    uint totalParticles = getTotalParticles();
+    
+    int numNewParticles = particleData->getData().numParticles;
+    std::vector<MFloatPoint>* const positions = particleData->getData().particlePositionsCPU;
+    addToBuffer<MFloatPoint>(BufferType::PARTICLE, *positions, numNewParticles, totalParticles);
 
-    const MFloatPoint* positions = particleData->getData().particlePositionsCPU;
-    uint numNewParticles = particleData->getData().numParticles;
-
-    // Create new particle buffer big enough for all particles
-    int totalParticles = getTotalParticles();
-    std::vector<MFloatPoint> paddedParticlePositions(totalParticles + numNewParticles);
-    std::copy(positions, positions + numNewParticles, paddedParticlePositions.begin());
-    ComPtr<ID3D11Buffer> newParticleBuffer;
-    createBuffer<MFloatPoint>(paddedParticlePositions, newParticleBuffer);
-
-    // If any particle data has already been added, combine old buffer into new buffer, offset by numNewParticles
-    if (buffers[BufferType::PARTICLE]) {
-        copyBufferSubregion<MFloatPoint>(
-            buffers[BufferType::PARTICLE], 
-            newParticleBuffer, 
-            0,
-            numNewParticles,
-            totalParticles
-        );
-    }
-    buffers[BufferType::PARTICLE] = newParticleBuffer;
-
-    // Create new surface buffer big enough for all voxels
-    const uint* surfaceVal = particleData->getData().isSurface;
-    uint numNewVoxels = numNewParticles / 8;
-    uint totalVoxels = totalParticles / 8;
-
-    std::vector<uint> paddedSurfaceValues(totalVoxels + numNewVoxels);
-    std::copy(surfaceVal, surfaceVal + numNewVoxels, paddedSurfaceValues.begin());
-    ComPtr<ID3D11Buffer> newSurfaceBuffer;
-    createBuffer<uint>(paddedSurfaceValues, newSurfaceBuffer);
-
-    // If any surface data has already been added, combine old buffer into new buffer, offset by numNewVoxels
-    if (buffers[BufferType::SURFACE]) {
-        copyBufferSubregion<uint>(
-            buffers[BufferType::SURFACE],
-            newSurfaceBuffer,
-            0,
-            numNewVoxels,  
-            totalVoxels
-        );
-    }
-    buffers[BufferType::SURFACE] = newSurfaceBuffer;
+    std::vector<uint>* const surfaceVal = particleData->getData().isSurface;
+    addToBuffer<uint>(BufferType::SURFACE, *surfaceVal, numNewParticles / 8, totalParticles / 8);
 
     return;
 }

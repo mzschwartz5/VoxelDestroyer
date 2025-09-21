@@ -280,7 +280,7 @@ public:
             particleDataContainer.numParticles,
             vertexPositions.size() / 3,
             originalGeomPath.inclusiveMatrix().inverse(),
-            particleDataContainer.particlePositionsCPU,
+            *particleDataContainer.particlePositionsCPU,
             vertexVoxelIds,
             positionsUAV,
             normalsUAV,

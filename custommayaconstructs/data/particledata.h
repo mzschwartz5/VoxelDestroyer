@@ -4,12 +4,13 @@
 #include <maya/MTypeId.h>
 #include <maya/MString.h>
 #include <maya/MPoint.h>
+#include <vector>
 
 struct ParticleDataContainer {
     int numParticles = 0;
-    const MFloatPoint* particlePositionsCPU = nullptr;
+    std::vector<MFloatPoint>* particlePositionsCPU = nullptr;
+    std::vector<uint>* isSurface = nullptr;
     float particleRadius = 0.0f;
-    const uint* isSurface = nullptr;
 };
 
 /**

@@ -138,8 +138,8 @@ void solveCylinderCollision(float4x4 wMatrix, float4x4 invWMatrix, inout float4 
     float2 clampedRadial;
     if (radialDistSq > 0.0f) {
         float invRad = rsqrt(radialDistSq);
-        float2 radialDir = radial * invRad;
-        float2 chosenRadial = radial;
+        float2 radialDir = radialPos * invRad;
+        float2 chosenRadial = radialPos;
         if (radialDistSq > radiusSq) {
             chosenRadial = radialDir * cylinderRadius;
         }
