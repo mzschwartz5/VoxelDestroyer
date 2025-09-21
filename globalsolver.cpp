@@ -302,6 +302,7 @@ void GlobalSolver::createGlobalComputeShaders(float maximumParticleRadius) {
     int totalParticles = getTotalParticles();
     int totalVoxels = totalParticles / 8;
     ComPtr<ID3D11ShaderResourceView> particleSRV = createSRV(0, totalParticles, BufferType::PARTICLE);
+    ComPtr<ID3D11ShaderResourceView> oldParticlesSRV = createSRV(0, totalParticles, BufferType::OLDPARTICLE);
     ComPtr<ID3D11UnorderedAccessView> particleUAV = createUAV(0, totalParticles, BufferType::PARTICLE);
     ComPtr<ID3D11ShaderResourceView> isSurfaceSRV = createSRV(0, totalVoxels, BufferType::SURFACE);
 
@@ -339,6 +340,7 @@ void GlobalSolver::createGlobalComputeShaders(float maximumParticleRadius) {
     colliderBuffer.totalParticles = totalParticles;
     solvePrimitiveCollisionsCompute = SolvePrimitiveCollisionsCompute(colliderBuffer);
     solvePrimitiveCollisionsCompute.setParticlePositionsUAV(particleUAV);
+    solvePrimitiveCollisionsCompute.setOldParticlePositionsSRV(oldParticlesSRV);
     buffers[BufferType::COLLIDER] = solvePrimitiveCollisionsCompute.getColliderBuffer();
 }
 

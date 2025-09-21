@@ -73,30 +73,44 @@ public:
 protected:
     bool shouldDraw = false;
 
-    static MStatus initializeColliderDataAttribute(
-        MObject& colliderDataAttr,
-        MObject& worldMatrix
+    static MStatus initializeBaseAttributes(
+        MObject& aColliderData,
+        MObject& aWorldMatrix,
+        MObject& aFriction
     ) {
         MStatus status;
         MFnTypedAttribute tAttr;
-        colliderDataAttr = tAttr.create(colliderDataAttrName, "cd", ColliderData::id);
+        aColliderData = tAttr.create(colliderDataAttrName, "cd", ColliderData::id);
         tAttr.setStorable(false);
         tAttr.setReadable(true);
         tAttr.setWritable(false);
 
-        status = addAttribute(colliderDataAttr);
+        status = addAttribute(aColliderData);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         MFnMatrixAttribute mAttr;
-        worldMatrix = mAttr.create(worldMatrixAttrName, "wmi", MFnMatrixAttribute::kDouble);
+        aWorldMatrix = mAttr.create(worldMatrixAttrName, "wmi", MFnMatrixAttribute::kDouble);
         mAttr.setStorable(false);
         mAttr.setReadable(false);
         mAttr.setWritable(true);
 
-        status = addAttribute(worldMatrix);
+        status = addAttribute(aWorldMatrix);
         CHECK_MSTATUS_AND_RETURN_IT(status);
-        
-        status = attributeAffects(worldMatrix, colliderDataAttr);
+
+        MFnNumericAttribute nAttr;
+        aFriction = nAttr.create("friction", "fric", MFnNumericData::kFloat, 1.0f);
+        nAttr.setStorable(true);
+        nAttr.setReadable(true);
+        nAttr.setWritable(true);
+        nAttr.setMin(0.0f);
+        nAttr.setMax(1.0f);
+
+        status = addAttribute(aFriction);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        status = attributeAffects(aWorldMatrix, aColliderData);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        status = attributeAffects(aFriction, aColliderData);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         return status;

@@ -6,6 +6,7 @@ global proc AEBoxColliderTemplate(string $nodeName)
         editorTemplate -label "Width" -addControl "boxWidth";
         editorTemplate -label "Height" -addControl "boxHeight";
         editorTemplate -label "Depth" -addControl "boxDepth";
+        editorTemplate -label "Friction" -addControl "friction";
     editorTemplate -endLayout;
 
     string $keep[] = {"boxWidth","boxHeight","boxDepth"};
@@ -20,6 +21,7 @@ global proc AESphereColliderTemplate(string $nodeName)
 
     editorTemplate -beginLayout "Sphere Collider" -collapse 0;
         editorTemplate -label "Radius" -addControl "radius";
+        editorTemplate -label "Friction" -addControl "friction";
     editorTemplate -endLayout;
 
     string $keep[] = {"radius"};
@@ -35,6 +37,7 @@ global proc AECapsuleColliderTemplate(string $nodeName)
     editorTemplate -beginLayout "Capsule Collider" -collapse 0;
         editorTemplate -label "Radius" -addControl "radius";
         editorTemplate -label "Height" -addControl "height";
+        editorTemplate -label "Friction" -addControl "friction";
     editorTemplate -endLayout;
 
     string $keep[] = {"radius", "height"};
@@ -50,6 +53,7 @@ global proc AECylinderColliderTemplate(string $nodeName)
     editorTemplate -beginLayout "Capsule Collider" -collapse 0;
         editorTemplate -label "Radius" -addControl "radius";
         editorTemplate -label "Height" -addControl "height";
+        editorTemplate -label "Friction" -addControl "friction";
     editorTemplate -endLayout;
 
     string $keep[] = {"radius", "height"};
@@ -67,6 +71,7 @@ global proc AEPlaneColliderTemplate(string $nodeName)
         editorTemplate -label "Height" -addControl "height";
         editorTemplate -label "Normal" -addControl "normal";
         editorTemplate -label "Infinite" -addControl "infinite";
+        editorTemplate -label "Friction" -addControl "friction";
     editorTemplate -endLayout;
 
     string $keep[] = {"width", "height", "normal", "infinite"};
