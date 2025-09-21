@@ -162,6 +162,7 @@ private:
         addedData.resize(numExistingElements + numNewElements);
         ComPtr<ID3D11Buffer> newBuffer;
         createBuffer<T>(addedData, newBuffer);
+        addedData.resize(numNewElements); // resize back to original size (so .size() is accurate, and we don't waste memory)
 
         // If any the buffer already exists, combine old buffer into new buffer offset by numNewElements
         if (buffers[bufferType]) {
@@ -173,6 +174,38 @@ private:
                 numExistingElements
             );
         }
+        buffers[bufferType] = newBuffer;
+    }
+
+    template<typename T>
+    static void deleteFromBuffer(BufferType bufferType, uint numRemovedElements, uint numExistingElements, uint offset) {
+        // Create a new buffer sized for the data minus the deleted elements
+        std::vector<T> newData(numExistingElements - numRemovedElements);
+        ComPtr<ID3D11Buffer> newBuffer;
+        createBuffer<T>(newData, newBuffer);
+
+        // Combine the old data into the new buffer in (up to) two copies: 
+        // the elements before those being removed, and those after.
+        if (offset > 0) {
+            copyBufferSubregion<T>(
+                buffers[bufferType],
+                newBuffer,
+                0,             // src copy offset
+                0,             // dst copy offset
+                offset         // num elements to copy
+            );
+        }
+
+        if (static_cast<uint>(offset) + numRemovedElements < numExistingElements) {
+            copyBufferSubregion<T>(
+                buffers[bufferType],
+                newBuffer,
+                offset + numRemovedElements,                        // src copy offset
+                offset,                                             // dst copy offset
+                numExistingElements - (offset + numRemovedElements) // num elements to copy
+            );
+        }
+
         buffers[bufferType] = newBuffer;
     }
 };
