@@ -21,8 +21,10 @@ MObject GlobalSolver::aTrigger = MObject::kNullObj;
 MObject GlobalSolver::aSimulateFunction = MObject::kNullObj;
 std::unordered_map<GlobalSolver::BufferType, ComPtr<ID3D11Buffer>> GlobalSolver::buffers = {
     { GlobalSolver::BufferType::PARTICLE, nullptr },
+    { GlobalSolver::BufferType::OLDPARTICLE, nullptr },
     { GlobalSolver::BufferType::SURFACE, nullptr },
-    { GlobalSolver::BufferType::DRAGGING, nullptr }
+    { GlobalSolver::BufferType::DRAGGING, nullptr },
+    { GlobalSolver::BufferType::COLLIDER, nullptr }
 };
 std::unordered_map<uint, std::function<void()>> GlobalSolver::pbdSimulateFuncs;
 ColliderBuffer GlobalSolver::colliderBuffer;
@@ -260,6 +262,7 @@ void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
     int numNewParticles = particleData->getData().numParticles;
     std::vector<MFloatPoint>* const positions = particleData->getData().particlePositionsCPU;
     addToBuffer<MFloatPoint>(BufferType::PARTICLE, *positions, numNewParticles, totalParticles);
+    addToBuffer<MFloatPoint>(BufferType::OLDPARTICLE, *positions, numNewParticles, totalParticles);
 
     std::vector<uint>* const surfaceVal = particleData->getData().isSurface;
     addToBuffer<uint>(BufferType::SURFACE, *surfaceVal, numNewParticles / 8, totalParticles / 8);
@@ -289,6 +292,7 @@ void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
     particleBufferOffsetPlug.getValue(offset);
 
     deleteFromBuffer<MFloatPoint>(BufferType::PARTICLE, numRemovedParticles, totalParticles, offset);
+    deleteFromBuffer<MFloatPoint>(BufferType::OLDPARTICLE, numRemovedParticles, totalParticles, offset);
     deleteFromBuffer<uint>(BufferType::SURFACE, numRemovedParticles / 8, totalParticles / 8, offset / 8);
 
     return;

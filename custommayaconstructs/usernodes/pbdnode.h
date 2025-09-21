@@ -285,11 +285,12 @@ private:
         int voxelOffset = particleBufferOffset / 8;
         int numVoxels = numberParticles / 8;
         ComPtr<ID3D11UnorderedAccessView> particleUAV = GlobalSolver::createUAV(particleBufferOffset, numberParticles, GlobalSolver::BufferType::PARTICLE);
+        ComPtr<ID3D11UnorderedAccessView> oldParticlesUAV = GlobalSolver::createUAV(particleBufferOffset, numberParticles, GlobalSolver::BufferType::OLDPARTICLE);
         ComPtr<ID3D11ShaderResourceView> particleSRV = GlobalSolver::createSRV(particleBufferOffset, numberParticles, GlobalSolver::BufferType::PARTICLE);
         ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV = GlobalSolver::createUAV(voxelOffset, numVoxels, GlobalSolver::BufferType::SURFACE);
         ComPtr<ID3D11ShaderResourceView> isDraggingSRV = GlobalSolver::createSRV(voxelOffset, numVoxels, GlobalSolver::BufferType::DRAGGING);
 
-        pbd.setGPUResourceHandles(particleUAV, isSurfaceUAV, isDraggingSRV);
+        pbd.setGPUResourceHandles(particleUAV, oldParticlesUAV, isSurfaceUAV, isDraggingSRV);
 
         MFnPluginData pluginDataFn;
         MObject pluginDataObj = pluginDataFn.create(D3D11Data::id);
