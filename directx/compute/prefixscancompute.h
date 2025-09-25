@@ -21,6 +21,12 @@ public:
         initializeBuffers();
     }
 
+    ~PrefixScanCompute() {
+        for (int i = 0; i < numScans; ++i) {
+           DirectX::notifyMayaOfMemoryUsage(partialSumsBuffers[i]);
+        }
+    }
+
     void dispatch() override {
         activeUAVForScan = collisionCellParticleCountsUAV;
         ComputeShader::dispatch(numWorkgroupsForScan[0]);
@@ -85,10 +91,6 @@ private:
     }
 
     void initializeBuffers() {
-        D3D11_BUFFER_DESC bufferDesc = {};
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-
         collisionCellParticleCountsUAV->GetDesc(&uavQueryDesc);
         numElements = uavQueryDesc.Buffer.NumElements;
 
@@ -109,26 +111,10 @@ private:
             numElementsInBuffer /= base; 
             numElementsInBuffer = std::max(numElementsInBuffer, 1);
 
-            // Create the partial sums buffer and its UAV and SRV
-            bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-            bufferDesc.ByteWidth = numElementsInBuffer * sizeof(unsigned int);
-            bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
-            bufferDesc.CPUAccessFlags = 0;
-            bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-            bufferDesc.StructureByteStride = sizeof(unsigned int);
-            CreateBuffer(&bufferDesc, nullptr, &partialSumsBuffers[i]);
-
-            srvDesc.Format = DXGI_FORMAT_UNKNOWN; // Structured buffer, no specific format
-            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-            srvDesc.Buffer.FirstElement = 0;
-            srvDesc.Buffer.NumElements = numElementsInBuffer;
-            DirectX::getDevice()->CreateShaderResourceView(partialSumsBuffers[i].Get(), &srvDesc, &partialSumsSRVs[i]);
-    
-            uavDesc.Format = DXGI_FORMAT_UNKNOWN; // Structured buffer, no specific format
-            uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-            uavDesc.Buffer.FirstElement = 0;
-            uavDesc.Buffer.NumElements = numElementsInBuffer;
-            DirectX::getDevice()->CreateUnorderedAccessView(partialSumsBuffers[i].Get(), &uavDesc, &partialSumsUAVs[i]);
+            std::vector<unsigned int> emptyData(numElementsInBuffer, 0u);
+            partialSumsBuffers[i] = DirectX::createReadWriteBuffer(emptyData);
+            partialSumsSRVs[i] = DirectX::createSRV(partialSumsBuffers[i]);
+            partialSumsUAVs[i] = DirectX::createUAV(partialSumsBuffers[i]);
         }
 
     }

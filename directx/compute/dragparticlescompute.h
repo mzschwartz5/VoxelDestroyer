@@ -243,38 +243,16 @@ private:
 
     void initializeBuffers(int numVoxels)
     {
-        D3D11_BUFFER_DESC bufferDesc = {};
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
         numWorkgroups = Utils::divideRoundUp(numVoxels, VGS_THREADS);
 
         // Create CBV for the drag values (mouse position, drag distance, grab radius)
-        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-        bufferDesc.ByteWidth = sizeof(ConstantBuffer);
-        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        bufferDesc.MiscFlags = 0;
-    
-        CreateBuffer(&bufferDesc, nullptr, &constantBuffer);
+        ConstantBuffer cb = {};
+        constantBuffer = DirectX::createConstantBuffer<ConstantBuffer>(cb);
 
         // Create isDragging buffer and its SRV/UAV
-        bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        bufferDesc.ByteWidth = sizeof(UINT) * numVoxels;
-        bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
-        bufferDesc.CPUAccessFlags = 0;
-        bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-        bufferDesc.StructureByteStride = sizeof(UINT);
-
-        CreateBuffer(&bufferDesc, nullptr, &isDraggingBuffer);
-
-        // Create the UAV for the isDragging buffer
-        uavDesc.Format = DXGI_FORMAT_UNKNOWN;
-        uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-        uavDesc.Buffer.FirstElement = 0;
-        uavDesc.Buffer.NumElements = numVoxels;
-
-        DirectX::getDevice()->CreateUnorderedAccessView(isDraggingBuffer.Get(), &uavDesc, &isDraggingUAV);
-        clearUintBuffer(isDraggingUAV);
+        std::vector<UINT> emptyData(numVoxels, 0);
+        isDraggingBuffer = DirectX::createReadWriteBuffer<UINT>(emptyData);
+        isDraggingUAV = DirectX::createUAV(isDraggingBuffer);
     };
 
     void removeSubscriptions() {

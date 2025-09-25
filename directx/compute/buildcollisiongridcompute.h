@@ -23,6 +23,10 @@ public:
         initializeBuffers(numParticles, particleSize);
     };
 
+    ~BuildCollisionGridCompute() override {
+        DirectX::notifyMayaOfMemoryUsage(collisionCellParticleCountsBuffer);
+    }
+
     void dispatch() override {
         clearUintBuffer(collisionCellParticleCountsUAV);
         ComputeShader::dispatch(numWorkgroups);

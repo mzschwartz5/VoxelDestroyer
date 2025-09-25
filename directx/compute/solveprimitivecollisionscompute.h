@@ -85,17 +85,7 @@ private:
 
     void initializeBuffers(const ColliderBuffer& initColliderBuffer) {
         int totalParticles = initColliderBuffer.totalParticles;
-        numColliders = initColliderBuffer.numColliders;
         numWorkgroups = Utils::divideRoundUp(totalParticles, VGS_THREADS); // TODO: use own thread group size
-        D3D11_BUFFER_DESC bufferDesc = {};
-        D3D11_SUBRESOURCE_DATA initData = {};
-		
-        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-		bufferDesc.ByteWidth = sizeof(ColliderBuffer);
-		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        bufferDesc.MiscFlags = 0;
-        initData.pSysMem = &initColliderBuffer;
-		CreateBuffer(&bufferDesc, &initData, colliderBuffer.GetAddressOf());
+        colliderBuffer = DirectX::createConstantBuffer(initColliderBuffer);
     }
 };

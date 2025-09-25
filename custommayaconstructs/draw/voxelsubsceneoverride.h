@@ -150,54 +150,23 @@ private:
         // So create them as DX11 buffers with the unordered access flag, then pass the underlying resource handle to the Maya MVertexBuffer.
         if (semantic == MGeometry::kPosition || semantic == MGeometry::kNormal) {
             ComPtr<ID3D11Buffer>& buffer = (semantic == MGeometry::kPosition) ? positionsBuffer : normalsBuffer;
-            D3D11_BUFFER_DESC bufferDesc = {};
-            D3D11_SUBRESOURCE_DATA initData = {};
             
             // Create the buffer - must be a raw buffer because Maya doesn't seem to accept structured buffers 
             // for binding as vertex buffers.
             std::vector<float> data(vertexCount * vbDesc.dimension(), 0.0f);
             extractor.populateVertexBuffer(data.data(), vertexCount, vbDesc);
+            buffer = DirectX::createReadWriteBuffer(data, D3D11_BIND_VERTEX_BUFFER, true);
+            vertexBuffer->resourceHandle(buffer.Get(), sizeof(float) * data.size());
 
-            bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-            bufferDesc.ByteWidth = data.size() * sizeof(float);
-            bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER | D3D11_BIND_UNORDERED_ACCESS;
-            bufferDesc.CPUAccessFlags = 0;
-            bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
-
-            initData.pSysMem = data.data();
-            DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, buffer.GetAddressOf());
-            MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
-
-            vertexBuffer->resourceHandle(buffer.Get(), bufferDesc.ByteWidth);
-
-            // Create the UAV
             ComPtr<ID3D11UnorderedAccessView>& uav = (semantic == MGeometry::kPosition) ? positionsUAV : normalsUAV;
-            D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-            uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-            uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-            uavDesc.Buffer.FirstElement = 0;
-            uavDesc.Buffer.Flags = D3D11_BUFFER_UAV_FLAG_RAW;
-            uavDesc.Buffer.NumElements = bufferDesc.ByteWidth / 4; // RAW = count of 32-bit units
-
-            DirectX::getDevice()->CreateUnorderedAccessView(buffer.Get(), &uavDesc, uav.GetAddressOf());
+            uav = DirectX::createUAV(buffer, true);
 
             // Also need to create a buffer with the original positions/normals for the deform shader to read from
             ComPtr<ID3D11Buffer>& originalBuffer = (semantic == MGeometry::kPosition) ? originalPositionsBuffer : originalNormalsBuffer;
-            bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-            bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-            bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-            bufferDesc.StructureByteStride = sizeof(float) * vbDesc.dimension();
-            DirectX::getDevice()->CreateBuffer(&bufferDesc, &initData, originalBuffer.GetAddressOf());
-            MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
+            originalBuffer = DirectX::createReadOnlyBuffer(data);
             
             ComPtr<ID3D11ShaderResourceView>& originalSRV = (semantic == MGeometry::kPosition) ? originalPositionsSRV : originalNormalsSRV;
-            D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-            srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-            srvDesc.Buffer.FirstElement = 0;
-            srvDesc.Buffer.NumElements = vertexCount;
-
-            DirectX::getDevice()->CreateShaderResourceView(originalBuffer.Get(), &srvDesc, originalSRV.GetAddressOf());
+            originalSRV = DirectX::createSRV(originalBuffer);
         }
         else {
             void* data = vertexBuffer->acquire(vertexCount, true);
@@ -277,29 +246,23 @@ public:
     }
 
     ~VoxelSubSceneOverride() override {
-        // Tell MRenderer that we don't need the GPU memory anymore.
-        D3D11_BUFFER_DESC desc;
         if (positionsBuffer) {
-            positionsBuffer->GetDesc(&desc);
-            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
+            DirectX::notifyMayaOfMemoryUsage(positionsBuffer);
             positionsBuffer.Reset();
         }
 
         if (normalsBuffer) {
-            normalsBuffer->GetDesc(&desc);
-            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
+            DirectX::notifyMayaOfMemoryUsage(normalsBuffer);
             normalsBuffer.Reset();
         }
 
         if (originalPositionsBuffer) {
-            originalPositionsBuffer->GetDesc(&desc);
-            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
+            DirectX::notifyMayaOfMemoryUsage(originalPositionsBuffer);
             originalPositionsBuffer.Reset();
         }
 
         if (originalNormalsBuffer) {
-            originalNormalsBuffer->GetDesc(&desc);
-            MRenderer::theRenderer()->releaseGPUMemory(desc.ByteWidth);
+            DirectX::notifyMayaOfMemoryUsage(originalNormalsBuffer);
             originalNormalsBuffer.Reset();
         }
     }

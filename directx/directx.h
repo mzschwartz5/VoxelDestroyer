@@ -22,7 +22,7 @@ public:
 
     template<typename T>
     static ComPtr<ID3D11Buffer> createReadOnlyBuffer(
-        std::vector<T>& data,
+        const std::vector<T>& data,
         UINT additionalBindFlags = 0,
         bool rawBuffer = false
     ) {
@@ -51,7 +51,7 @@ public:
 
     template<typename T>
     static ComPtr<ID3D11Buffer> createReadWriteBuffer(
-        std::vector<T>& data,
+        const std::vector<T>& data,
         UINT additionalBindFlags = 0,
         bool rawBuffer = false
     ) {
@@ -80,10 +80,10 @@ public:
     }
     
     template<typename T>
-    static ComPtr<ID3D11Buffer> createConstantBuffer(const T& data) {
+    static ComPtr<ID3D11Buffer> createConstantBuffer(const T& data, bool dynamic = true) {
         D3D11_BUFFER_DESC bufferDesc = {};
 
-        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+        bufferDesc.Usage = dynamic ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_IMMUTABLE;
         bufferDesc.ByteWidth = static_cast<UINT>(sizeof(T));
         bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -99,16 +99,16 @@ public:
 
     static ComPtr<ID3D11ShaderResourceView> createSRV(
         ComPtr<ID3D11Buffer>& buffer,
+        bool rawBuffer = false,
         UINT elementCount = 0,
-        UINT offset = 0,
-        bool rawBuffer = false
+        UINT offset = 0
     );
 
     static ComPtr<ID3D11UnorderedAccessView> createUAV(
         ComPtr<ID3D11Buffer>& buffer,
+        bool rawBuffer = false,
         UINT elementCount = 0,
-        UINT offset = 0,
-        bool rawBuffer = false
+        UINT offset = 0
     );
 
     /**
