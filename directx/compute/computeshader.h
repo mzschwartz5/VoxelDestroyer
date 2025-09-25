@@ -16,9 +16,7 @@ public:
     ComputeShader(int id) : id(id) {
         load();
     }
-    virtual ~ComputeShader() { tearDown(); };
-    
-    int getId() const { return id; };
+    virtual ~ComputeShader() = default;
 
     virtual void dispatch() = 0;
 
@@ -36,10 +34,6 @@ public:
 protected:    
     ComPtr<ID3D11ComputeShader> shaderPtr;
 
-    virtual void tearDown() {
-        MRenderer::theRenderer()->releaseGPUMemory(heldMemory);
-        heldMemory = 0;
-    };
     virtual void bind() = 0;
     virtual void unbind() = 0;
 
@@ -52,8 +46,6 @@ protected:
         ID3D11Buffer** ppBuffer
     ) {
         HRESULT hr = DirectX::getDevice()->CreateBuffer(pDesc, pInitialData, ppBuffer);
-        MRenderer::theRenderer()->holdGPUMemory(pDesc->ByteWidth);
-        heldMemory += pDesc->ByteWidth;
         return hr;
     }
 
@@ -142,7 +134,6 @@ private:
     // Cache of created shaders to avoid loading and recompiling the same shader multiple times,
     // as multiple instances of the same shader may be used across different PBD nodes.
     inline static std::unordered_map<int, ComPtr<ID3D11ComputeShader>> shaderCache;
-    MInt64 heldMemory = 0; // Memory held by this shader, used for Maya's GPU memory tracking
     int id;
 
 };

@@ -90,9 +90,6 @@ private:
     }
 
     void initializeBuffers(int numParticles, float particleSize) {
-        D3D11_BUFFER_DESC bufferDesc = {};
-        D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         numWorkgroups = Utils::divideRoundUp(numParticles, BUILD_COLLISION_GRID_THREADS);
 
         // Multiplpy by a factor to reduce hash collisions.
@@ -100,37 +97,16 @@ private:
         // Round up to the nearest power of two so it can be prefix scanned.
         int numBufferElements = static_cast<int>(pow(2, Utils::ilogbaseceil(HASH_TABLE_SIZE_TO_PARTICLES * numParticles + 1, 2))); 
 
-        // Create the collision cell particle counts buffer
-        bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        bufferDesc.ByteWidth = sizeof(uint) * numBufferElements;
-        bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-        bufferDesc.CPUAccessFlags = 0;
-        bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-        bufferDesc.StructureByteStride = sizeof(uint);
-        CreateBuffer(&bufferDesc, nullptr, &collisionCellParticleCountsBuffer);
+        std::vector<uint> emptyData(numBufferElements, 0);
+        collisionCellParticleCountsBuffer = DirectX::createReadWriteBuffer<uint>(emptyData);
+        collisionCellParticleCountsSRV = DirectX::createSRV(collisionCellParticleCountsBuffer);
+        collisionCellParticleCountsUAV = DirectX::createUAV(collisionCellParticleCountsBuffer);
 
-        // Create the SRV for the collision cell particle counts buffer
-        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-        srvDesc.Buffer.FirstElement = 0;
-        srvDesc.Buffer.NumElements = numBufferElements;
-        DirectX::getDevice()->CreateShaderResourceView(collisionCellParticleCountsBuffer.Get(), &srvDesc, &collisionCellParticleCountsSRV);
+        ParticleCollisionCB particleCollisionCBData = {};
+        particleCollisionCBData.inverseCellSize = 1.0f / (2.0f * particleSize);
+        particleCollisionCBData.hashGridSize = HASH_TABLE_SIZE_TO_PARTICLES * numParticles;
+        particleCollisionCBData.numParticles = numParticles;
 
-        // Create the UAV for the collision cell particle counts buffer
-        uavDesc.Format = DXGI_FORMAT_UNKNOWN;
-        uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-        uavDesc.Buffer.FirstElement = 0;
-        uavDesc.Buffer.NumElements = numBufferElements;
-        DirectX::getDevice()->CreateUnorderedAccessView(collisionCellParticleCountsBuffer.Get(), &uavDesc, &collisionCellParticleCountsUAV);
-
-        // Create the particle collision constant buffer
-        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;              // Dynamic for CPU updates
-        bufferDesc.ByteWidth = sizeof(ParticleCollisionCB);  // Size of the constant buffer
-        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;   // Bind as a constant buffer
-        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;  // Allow CPU writes
-        bufferDesc.MiscFlags = 0;
-
-        CreateBuffer(&bufferDesc, nullptr, &particleCollisionCB);
-        updateParticleCollisionCB(numParticles, particleSize);
+        particleCollisionCB = DirectX::createConstantBuffer<ParticleCollisionCB>(particleCollisionCBData);
     }
 };
