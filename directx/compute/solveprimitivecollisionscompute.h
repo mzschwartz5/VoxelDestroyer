@@ -85,6 +85,7 @@ private:
 
     void initializeBuffers(const ColliderBuffer& initColliderBuffer) {
         int totalParticles = initColliderBuffer.totalParticles;
+        numColliders = initColliderBuffer.numColliders;
         numWorkgroups = Utils::divideRoundUp(totalParticles, VGS_THREADS); // TODO: use own thread group size
         colliderBuffer = DirectX::createConstantBuffer(initColliderBuffer);
     }
