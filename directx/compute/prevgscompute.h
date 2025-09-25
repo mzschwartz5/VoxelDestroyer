@@ -22,7 +22,7 @@ public:
     };
 
     void updateSimConstants(const PreVGSConstantBuffer& newCB) {
-        updateConstantBuffer(simConstantsBuffer, newCB);
+        DirectX::updateConstantBuffer(simConstantsBuffer, newCB);
     }
 
     void dispatch() override {

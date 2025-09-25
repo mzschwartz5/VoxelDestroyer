@@ -23,7 +23,7 @@ public:
     }
 
     void dispatch() override {
-        clearUintBuffer(particlesByCollisionCellUAV);
+        DirectX::clearUintBuffer(particlesByCollisionCellUAV);
         ComputeShader::dispatch(numWorkgroups);
     }
 

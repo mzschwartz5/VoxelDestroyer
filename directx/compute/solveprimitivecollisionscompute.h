@@ -28,7 +28,7 @@ public:
     void updateColliderBuffer(const ColliderBuffer& newCB) {
         if (colliderBuffer.Get() == nullptr) return;
         numColliders = newCB.numColliders;
-        updateConstantBuffer(colliderBuffer, newCB);
+        DirectX::updateConstantBuffer(colliderBuffer, newCB);
     }
 
     void dispatch() override {

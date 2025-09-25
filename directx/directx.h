@@ -172,6 +172,30 @@ public:
         buffer = newBuffer;
     }
 
+    /**
+     * Generic method to update a constant buffer with new data.
+     */
+    template<typename T>
+    static void updateConstantBuffer(const ComPtr<ID3D11Buffer>& buffer, const T& data) {
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        HRESULT hr = DirectX::getContext()->Map(buffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        if (SUCCEEDED(hr)) {
+            memcpy(mappedResource.pData, &data, sizeof(T));
+            DirectX::getContext()->Unmap(buffer.Get(), 0);
+        } else {
+            MGlobal::displayError("Failed to map constant buffer.");
+        }
+    }
+
+    /*
+    * Clears a UINT buffer with the value 0.
+    */
+    static void clearUintBuffer(const ComPtr<ID3D11UnorderedAccessView>& uav) {
+        // See docs: 4 values are required even though only the first will be used, in our case.
+        UINT clearValues[4] = { 0, 0, 0, 0 };
+        DirectX::getContext()->ClearUnorderedAccessViewUint(uav.Get(), clearValues);
+    }
+
     static void notifyMayaOfMemoryUsage(const ComPtr<ID3D11Buffer>& buffer, bool acquire = false);
     static int getNumElementsInBuffer(const ComPtr<ID3D11Buffer>& buffer);
     

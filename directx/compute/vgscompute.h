@@ -32,7 +32,7 @@ public:
     };
 
     void updateConstantBuffer(const VGSConstantBuffer& newCB) {
-        ComputeShader::updateConstantBuffer(voxelSimInfoBuffer, newCB);
+        DirectX::updateConstantBuffer(voxelSimInfoBuffer, newCB);
     }
 
     const ComPtr<ID3D11Buffer>& getVoxelSimInfoBuffer() const { return voxelSimInfoBuffer; }

@@ -28,7 +28,7 @@ public:
     }
 
     void dispatch() override {
-        clearUintBuffer(collisionCellParticleCountsUAV);
+        DirectX::clearUintBuffer(collisionCellParticleCountsUAV);
         ComputeShader::dispatch(numWorkgroups);
     }
 
@@ -46,7 +46,7 @@ public:
         particleCollisionCBData.inverseCellSize = 1.0f / (2.0f * particleSize);
         particleCollisionCBData.hashGridSize = HASH_TABLE_SIZE_TO_PARTICLES * numParticles;
         particleCollisionCBData.numParticles = numParticles;
-        ComputeShader::updateConstantBuffer(particleCollisionCB, particleCollisionCBData);
+        DirectX::updateConstantBuffer(particleCollisionCB, particleCollisionCBData);
     }
 
     void setParticlePositionsSRV(const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV) {

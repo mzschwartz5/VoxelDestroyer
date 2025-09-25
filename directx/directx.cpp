@@ -57,21 +57,12 @@ ComPtr<ID3D11ShaderResourceView> DirectX::createSRV(
 ) {
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     D3D11_BUFFER_DESC bufferDesc = {};
-    int numElements = elementCount;
-    if (numElements == 0) {
-        buffer->GetDesc(&bufferDesc);
-        numElements = rawBuffer ?  bufferDesc.ByteWidth / 4 : 
-                                   bufferDesc.ByteWidth / bufferDesc.StructureByteStride;
-    }
+    int numElements = (elementCount == 0) ? getNumElementsInBuffer(buffer) : elementCount;
 
     srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
     srvDesc.Buffer.FirstElement = offset;
     srvDesc.Buffer.NumElements = numElements;
-    if (rawBuffer) {
-        srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-    } else {
-        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-    }
+    srvDesc.Format = rawBuffer ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_UNKNOWN;
 
     ComPtr<ID3D11ShaderResourceView> srv;
     HRESULT hr = dxDevice->CreateShaderResourceView(buffer.Get(), &srvDesc, srv.GetAddressOf());
@@ -87,12 +78,7 @@ ComPtr<ID3D11UnorderedAccessView> DirectX::createUAV(
 ) {
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
     D3D11_BUFFER_DESC bufferDesc = {};
-    int numElements = elementCount;
-    if (numElements == 0) {
-        buffer->GetDesc(&bufferDesc);
-        numElements = rawBuffer ?  bufferDesc.ByteWidth / 4 : 
-                                   bufferDesc.ByteWidth / bufferDesc.StructureByteStride;
-    }
+    int numElements = (elementCount == 0) ? getNumElementsInBuffer(buffer) : elementCount;
 
     uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
     uavDesc.Buffer.FirstElement = offset;
@@ -132,11 +118,9 @@ int DirectX::getNumElementsInBuffer(const ComPtr<ID3D11Buffer>& buffer) {
     D3D11_BUFFER_DESC desc;
     buffer->GetDesc(&desc);
     
-    if (desc.StructureByteStride > 0) {
-        return desc.ByteWidth / desc.StructureByteStride;
-    } else if (desc.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS) {
+    if (desc.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS) {
         return desc.ByteWidth / 4; // Raw buffers are treated as arrays of uint32_t
     }
-
-    return 0; // Unknown format
+    
+    return desc.ByteWidth / desc.StructureByteStride;
 }

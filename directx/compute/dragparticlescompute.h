@@ -129,7 +129,7 @@ public:
             dragValues.selectRadius = dragState.selectRadius;
             copyConstantBufferToGPU();
         } else {
-            clearUintBuffer(isDraggingUAV);
+            DirectX::clearUintBuffer(isDraggingUAV);
         }
     }
 
@@ -192,7 +192,7 @@ private:
         cameraMatrices.viewMatrix.get(cb.viewMatrix);
         cameraMatrices.projMatrix.get(cb.projMatrix);
 
-        updateConstantBuffer(constantBuffer, cb);
+        DirectX::updateConstantBuffer(constantBuffer, cb);
     }
 
     // Reverse-project the mouse start and end points to world space at a unit depth, and return the difference.
