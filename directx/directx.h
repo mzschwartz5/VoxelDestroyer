@@ -98,14 +98,14 @@ public:
     }
 
     static ComPtr<ID3D11ShaderResourceView> createSRV(
-        ComPtr<ID3D11Buffer>& buffer,
+        const ComPtr<ID3D11Buffer>& buffer,
         bool rawBuffer = false,
         UINT elementCount = 0,
         UINT offset = 0
     );
 
     static ComPtr<ID3D11UnorderedAccessView> createUAV(
-        ComPtr<ID3D11Buffer>& buffer,
+        const ComPtr<ID3D11Buffer>& buffer,
         bool rawBuffer = false,
         UINT elementCount = 0,
         UINT offset = 0

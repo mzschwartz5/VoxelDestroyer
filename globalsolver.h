@@ -39,6 +39,9 @@ public:
         COLLIDER
     };
     static std::unordered_map<BufferType, ComPtr<ID3D11Buffer>> buffers;
+    static const ComPtr<ID3D11Buffer>& getBuffer(BufferType bufferType) {
+        return buffers[bufferType];
+    }
 
     static const MTypeId id;
     static const MString globalSolverNodeName;
@@ -58,8 +61,6 @@ public:
     static void tearDown();
     static const MObject& getOrCreateGlobalSolver();
     static uint getNextArrayPlugIndex(MPlug& arrayPlug);
-    static ComPtr<ID3D11UnorderedAccessView> createUAV(uint offset, uint numElements, BufferType bufferType);
-    static ComPtr<ID3D11ShaderResourceView> createSRV(uint offset, uint numElements, BufferType bufferType);
 
     // Time input triggers compute which runs simulation step for all connected PBD nodes.
     MStatus compute(const MPlug& plug, MDataBlock& block) override;

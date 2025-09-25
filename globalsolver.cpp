@@ -295,10 +295,10 @@ void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
 void GlobalSolver::createGlobalComputeShaders(float maximumParticleRadius) {
     int totalParticles = getTotalParticles();
     int totalVoxels = totalParticles / 8;
-    ComPtr<ID3D11ShaderResourceView> particleSRV = createSRV(0, totalParticles, BufferType::PARTICLE);
-    ComPtr<ID3D11ShaderResourceView> oldParticlesSRV = createSRV(0, totalParticles, BufferType::OLDPARTICLE);
-    ComPtr<ID3D11UnorderedAccessView> particleUAV = createUAV(0, totalParticles, BufferType::PARTICLE);
-    ComPtr<ID3D11ShaderResourceView> isSurfaceSRV = createSRV(0, totalVoxels, BufferType::SURFACE);
+    ComPtr<ID3D11ShaderResourceView> particleSRV = DirectX::createSRV(buffers[BufferType::PARTICLE]);
+    ComPtr<ID3D11ShaderResourceView> oldParticlesSRV = DirectX::createSRV(buffers[BufferType::OLDPARTICLE]);
+    ComPtr<ID3D11UnorderedAccessView> particleUAV = DirectX::createUAV(buffers[BufferType::PARTICLE]);
+    ComPtr<ID3D11ShaderResourceView> isSurfaceSRV = DirectX::createSRV(buffers[BufferType::SURFACE]);
 
     buildCollisionGridCompute = BuildCollisionGridCompute(
         totalParticles,
@@ -429,32 +429,6 @@ void GlobalSolver::onColliderDataDirty(MObject& node, MPlug& plug, void* clientD
     }
 
     dirtyColliderIndices.insert(plug.logicalIndex());
-}
-
-ComPtr<ID3D11UnorderedAccessView> GlobalSolver::createUAV(uint offset, uint numElements, BufferType bufferType) {
-    D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-    uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-    uavDesc.Format = DXGI_FORMAT_UNKNOWN;
-    uavDesc.Buffer.FirstElement = offset;
-    uavDesc.Buffer.NumElements = numElements;
-
-    ComPtr<ID3D11UnorderedAccessView> particleUAV;
-    ComPtr<ID3D11Buffer> buffer = buffers[bufferType];
-    DirectX::getDevice()->CreateUnorderedAccessView(buffer.Get(), &uavDesc, particleUAV.GetAddressOf());
-    return particleUAV;
-}
-
-ComPtr<ID3D11ShaderResourceView> GlobalSolver::createSRV(uint offset, uint numElements, BufferType bufferType) {
-    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-    srvDesc.Buffer.FirstElement = offset;
-    srvDesc.Buffer.NumElements = numElements;
-
-    ComPtr<ID3D11ShaderResourceView> particleSRV;
-    ComPtr<ID3D11Buffer> buffer = buffers[bufferType];
-    DirectX::getDevice()->CreateShaderResourceView(buffer.Get(), &srvDesc, particleSRV.GetAddressOf());
-    return particleSRV;
 }
 
 MStatus GlobalSolver::initialize() {
