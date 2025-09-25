@@ -42,13 +42,6 @@ public:
         return particleCollisionCBData.hashGridSize;
     }
 
-    void updateParticleCollisionCB(int numParticles, float particleSize) {
-        particleCollisionCBData.inverseCellSize = 1.0f / (2.0f * particleSize);
-        particleCollisionCBData.hashGridSize = HASH_TABLE_SIZE_TO_PARTICLES * numParticles;
-        particleCollisionCBData.numParticles = numParticles;
-        DirectX::updateConstantBuffer(particleCollisionCB, particleCollisionCBData);
-    }
-
     void setParticlePositionsSRV(const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV) {
         this->particlePositionsSRV = particlePositionsSRV;
     }
@@ -106,11 +99,9 @@ private:
         collisionCellParticleCountsSRV = DirectX::createSRV(collisionCellParticleCountsBuffer);
         collisionCellParticleCountsUAV = DirectX::createUAV(collisionCellParticleCountsBuffer);
 
-        ParticleCollisionCB particleCollisionCBData = {};
         particleCollisionCBData.inverseCellSize = 1.0f / (2.0f * particleSize);
         particleCollisionCBData.hashGridSize = HASH_TABLE_SIZE_TO_PARTICLES * numParticles;
         particleCollisionCBData.numParticles = numParticles;
-
         particleCollisionCB = DirectX::createConstantBuffer<ParticleCollisionCB>(particleCollisionCBData);
     }
 };
