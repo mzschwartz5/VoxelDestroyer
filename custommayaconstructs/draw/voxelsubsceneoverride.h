@@ -163,7 +163,7 @@ private:
 
             // Also need to create a buffer with the original positions/normals for the deform shader to read from
             ComPtr<ID3D11Buffer>& originalBuffer = (semantic == MGeometry::kPosition) ? originalPositionsBuffer : originalNormalsBuffer;
-            originalBuffer = DirectX::createReadOnlyBuffer(data);
+            originalBuffer = DirectX::createReadOnlyBuffer(data, 0, false, sizeof(float) * vbDesc.dimension());
             
             ComPtr<ID3D11ShaderResourceView>& originalSRV = (semantic == MGeometry::kPosition) ? originalPositionsSRV : originalNormalsSRV;
             originalSRV = DirectX::createSRV(originalBuffer);
