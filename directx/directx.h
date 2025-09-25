@@ -24,7 +24,8 @@ public:
     static ComPtr<ID3D11Buffer> createReadOnlyBuffer(
         const std::vector<T>& data,
         UINT additionalBindFlags = 0,
-        bool rawBuffer = false
+        bool rawBuffer = false,
+        UINT stride = 0
     ) {
         D3D11_BUFFER_DESC bufferDesc = {};
 
@@ -37,7 +38,7 @@ public:
         }
         else {
             bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-            bufferDesc.StructureByteStride = sizeof(T);
+            bufferDesc.StructureByteStride = (stride > 0) ? stride : sizeof(T);
         }
 
         D3D11_SUBRESOURCE_DATA initData = {};

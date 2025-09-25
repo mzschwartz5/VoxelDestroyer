@@ -107,8 +107,6 @@ private:
             reducedOriginalParticles.push_back(originalParticlePositions[i]);
         }
 
-        int reducedNumParticles = static_cast<int>(reducedOriginalParticles.size());
-        
         originalParticlePositionsBuffer = DirectX::createReadOnlyBuffer<MFloatPoint>(reducedOriginalParticles);
         originalParticlePositionsSRV = DirectX::createSRV(originalParticlePositionsBuffer);
 
