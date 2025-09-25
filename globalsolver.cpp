@@ -19,13 +19,7 @@ MObject GlobalSolver::aParticleBufferOffset = MObject::kNullObj;
 MObject GlobalSolver::aTime = MObject::kNullObj;
 MObject GlobalSolver::aTrigger = MObject::kNullObj;
 MObject GlobalSolver::aSimulateFunction = MObject::kNullObj;
-std::unordered_map<GlobalSolver::BufferType, ComPtr<ID3D11Buffer>> GlobalSolver::buffers = {
-    { GlobalSolver::BufferType::PARTICLE, nullptr },
-    { GlobalSolver::BufferType::OLDPARTICLE, nullptr },
-    { GlobalSolver::BufferType::SURFACE, nullptr },
-    { GlobalSolver::BufferType::DRAGGING, nullptr },
-    { GlobalSolver::BufferType::COLLIDER, nullptr }
-};
+std::unordered_map<GlobalSolver::BufferType, ComPtr<ID3D11Buffer>> GlobalSolver::buffers;
 std::unordered_map<uint, std::function<void()>> GlobalSolver::pbdSimulateFuncs;
 ColliderBuffer GlobalSolver::colliderBuffer;
 std::unordered_set<int> GlobalSolver::dirtyColliderIndices;
@@ -104,7 +98,8 @@ void GlobalSolver::tearDown() {
     lastComputeTime = MTime();
     for (auto& buffer : buffers) {
         if (buffer.second) {
-            resetBuffer(buffer.second);
+            DirectX::notifyMayaOfMemoryUsage(buffer.second);
+            buffer.second.Reset();
         }
     }
     globalSolverNodeObject = MObject::kNullObj;
@@ -259,13 +254,12 @@ void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
     ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
     uint totalParticles = getTotalParticles();
     
-    int numNewParticles = particleData->getData().numParticles;
     std::vector<MFloatPoint>* const positions = particleData->getData().particlePositionsCPU;
-    addToBuffer<MFloatPoint>(BufferType::PARTICLE, *positions, numNewParticles, totalParticles);
-    addToBuffer<MFloatPoint>(BufferType::OLDPARTICLE, *positions, numNewParticles, totalParticles);
+    DirectX::addToBuffer<MFloatPoint>(buffers[BufferType::PARTICLE], *positions);
+    DirectX::addToBuffer<MFloatPoint>(buffers[BufferType::OLDPARTICLE], *positions);
 
     std::vector<uint>* const surfaceVal = particleData->getData().isSurface;
-    addToBuffer<uint>(BufferType::SURFACE, *surfaceVal, numNewParticles / 8, totalParticles / 8);
+    DirectX::addToBuffer<uint>(buffers[BufferType::SURFACE], *surfaceVal);
 
     return;
 }
@@ -291,9 +285,9 @@ void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
     MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(plugLogicalIndex);
     particleBufferOffsetPlug.getValue(offset);
 
-    deleteFromBuffer<MFloatPoint>(BufferType::PARTICLE, numRemovedParticles, totalParticles, offset);
-    deleteFromBuffer<MFloatPoint>(BufferType::OLDPARTICLE, numRemovedParticles, totalParticles, offset);
-    deleteFromBuffer<uint>(BufferType::SURFACE, numRemovedParticles / 8, totalParticles / 8, offset / 8);
+    DirectX::deleteFromBuffer<MFloatPoint>(buffers[BufferType::PARTICLE], numRemovedParticles, offset);
+    DirectX::deleteFromBuffer<MFloatPoint>(buffers[BufferType::OLDPARTICLE], numRemovedParticles, offset);
+    DirectX::deleteFromBuffer<uint>(buffers[BufferType::SURFACE], numRemovedParticles / 8, offset / 8);
 
     return;
 }

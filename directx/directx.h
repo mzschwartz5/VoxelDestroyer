@@ -44,7 +44,8 @@ public:
         initData.pSysMem = data.data();
 
         ComPtr<ID3D11Buffer> buffer;
-        HRESULT hr = dxDevice->CreateBuffer(&bufferDesc, &initData, &buffer);
+        HRESULT hr = dxDevice->CreateBuffer(&bufferDesc, &initData, buffer.GetAddressOf());
+        notifyMayaOfMemoryUsage(buffer, true);
         return buffer;   
     }
 
@@ -73,7 +74,8 @@ public:
         initData.pSysMem = data.data();
 
         ComPtr<ID3D11Buffer> buffer;
-        HRESULT hr = dxDevice->CreateBuffer(&bufferDesc, &initData, &buffer);
+        HRESULT hr = dxDevice->CreateBuffer(&bufferDesc, &initData, buffer.GetAddressOf());
+        notifyMayaOfMemoryUsage(buffer, true);
         return buffer;   
     }
     
@@ -91,7 +93,7 @@ public:
         initData.pSysMem = &data;
 
         ComPtr<ID3D11Buffer> buffer;
-        HRESULT hr = dxDevice->CreateBuffer(&bufferDesc, &initData, &buffer);
+        HRESULT hr = dxDevice->CreateBuffer(&bufferDesc, &initData, buffer.GetAddressOf());
         return buffer;   
     }
 
@@ -109,8 +111,118 @@ public:
         bool rawBuffer = false
     );
 
+    /**
+     * Prepend data to a buffer.
+     */
+    template<typename T>
+    static void addToBuffer(ComPtr<ID3D11Buffer>& buffer, std::vector<T>& addedData) {
+        // Default to a read/write buffer if buffer doesn't exist yet. (Reasonable default since adding to a buffer implies it's writeable)
+        if (!buffer) {
+            buffer = createReadWriteBuffer<T>(addedData);
+            return;
+        }
+
+        uint numNewElements = static_cast<uint>(addedData.size());
+        uint numExistingElements = getNumElementsInBuffer(buffer);
+
+        addedData.resize(numExistingElements + numNewElements);
+        ComPtr<ID3D11Buffer> newBuffer = createBufferFromExisting<T>(buffer, addedData);
+        addedData.resize(numNewElements); // resize back to original size (so .size() is accurate, and we don't waste memory)
+
+        copyBufferSubregion<T>(
+            buffer,
+            newBuffer,
+            0,
+            numNewElements,
+            numExistingElements
+        );
+
+        buffer = newBuffer;
+    }
+
+    template<typename T>
+    static void deleteFromBuffer(ComPtr<ID3D11Buffer>& buffer, uint numRemovedElements, uint offset) {
+        // Create a new buffer sized for the data minus the deleted elements
+        uint numExistingElements = getNumElementsInBuffer(buffer);
+        std::vector<T> newData(numExistingElements - numRemovedElements);
+        ComPtr<ID3D11Buffer> newBuffer = createBufferFromExisting<T>(buffer, newData);
+
+        // Combine the old data into the new buffer in (up to) two copies: 
+        // the elements before those being removed, and those after.
+        if (offset > 0) {
+            copyBufferSubregion<T>(
+                buffer,
+                newBuffer,
+                0,             // src copy offset
+                0,             // dst copy offset
+                offset         // num elements to copy
+            );
+        }
+
+        if (static_cast<uint>(offset) + numRemovedElements < numExistingElements) {
+            copyBufferSubregion<T>(
+                buffer,
+                newBuffer,
+                offset + numRemovedElements,                        // src copy offset
+                offset,                                             // dst copy offset
+                numExistingElements - (offset + numRemovedElements) // num elements to copy
+            );
+        }
+
+        buffer = newBuffer;
+    }
+
+    static void notifyMayaOfMemoryUsage(const ComPtr<ID3D11Buffer>& buffer, bool acquire = false);
+    static int getNumElementsInBuffer(const ComPtr<ID3D11Buffer>& buffer);
+    
 private:
     static HINSTANCE pluginInstance;
     static ID3D11Device* dxDevice;
     static ID3D11DeviceContext* dxContext;
+
+    template<typename T>
+    static void copyBufferSubregion(ComPtr<ID3D11Buffer>& srcBuffer, ComPtr<ID3D11Buffer>& dstBuffer, uint srcOffset, uint dstOffset, uint numElements) {
+        D3D11_BOX srcBox = {};
+        srcBox.left = srcOffset * sizeof(T);
+        srcBox.right = (srcOffset + numElements) * sizeof(T);
+        srcBox.top = 0;
+        srcBox.bottom = 1;
+        srcBox.front = 0;
+        srcBox.back = 1;
+
+        DirectX::getContext()->CopySubresourceRegion(
+            dstBuffer.Get(),
+            0, 
+            sizeof(T) * dstOffset, 
+            0, 0, 
+            srcBuffer.Get(),
+            0, 
+            &srcBox
+        );
+    }
+
+    /**
+     * Uses the existingBuffer to create a new buffer with the same flags, but with the provided data.
+     * In other words, the existingBuffer is a template for the new buffer.
+     */
+    template<typename T>
+    static ComPtr<ID3D11Buffer> createBufferFromExisting(
+        const ComPtr<ID3D11Buffer>& existingBuffer,
+        std::vector<T>& data
+    ) {
+        D3D11_BUFFER_DESC desc;
+        existingBuffer->GetDesc(&desc);
+        bool isRawBuffer = (desc.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS) != 0;
+
+        desc.ByteWidth = static_cast<UINT>(sizeof(T) * data.size());
+        if (!isRawBuffer) desc.StructureByteStride = sizeof(T);
+
+        D3D11_SUBRESOURCE_DATA initData = {};
+        initData.pSysMem = data.data();
+
+        ComPtr<ID3D11Buffer> buffer;
+        HRESULT hr = dxDevice->CreateBuffer(&desc, &initData, buffer.GetAddressOf());
+        notifyMayaOfMemoryUsage(buffer, true);
+        return buffer;
+    }
 };

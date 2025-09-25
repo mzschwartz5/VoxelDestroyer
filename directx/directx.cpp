@@ -64,15 +64,14 @@ ComPtr<ID3D11ShaderResourceView> DirectX::createSRV(
                                    bufferDesc.ByteWidth / bufferDesc.StructureByteStride;
     }
 
-    if (rawBuffer) {
-        srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-    } else {
-        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-    }
+    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
     srvDesc.Buffer.FirstElement = offset;
     srvDesc.Buffer.NumElements = numElements;
+    if (rawBuffer) {
+        srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+    } else {
+        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    }
 
     ComPtr<ID3D11ShaderResourceView> srv;
     HRESULT hr = dxDevice->CreateShaderResourceView(buffer.Get(), &srvDesc, srv.GetAddressOf());
@@ -95,18 +94,49 @@ ComPtr<ID3D11UnorderedAccessView> DirectX::createUAV(
                                    bufferDesc.ByteWidth / bufferDesc.StructureByteStride;
     }
 
+    uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+    uavDesc.Buffer.FirstElement = offset;
+    uavDesc.Buffer.NumElements = numElements;
     if (rawBuffer) {
         uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-        uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
         uavDesc.Buffer.Flags = D3D11_BUFFER_UAV_FLAG_RAW;
     } else {
         uavDesc.Format = DXGI_FORMAT_UNKNOWN;
-        uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
     }
-    uavDesc.Buffer.FirstElement = offset;
-    uavDesc.Buffer.NumElements = numElements;
 
     ComPtr<ID3D11UnorderedAccessView> uav;
     HRESULT hr = dxDevice->CreateUnorderedAccessView(buffer.Get(), &uavDesc, uav.GetAddressOf());
     return uav;
+}
+
+/**
+ * It's a courtesy to let Maya know how much GPU memory we're using, so it can
+ * evict other things if necessary.
+ */
+void DirectX::notifyMayaOfMemoryUsage(const ComPtr<ID3D11Buffer>& buffer, bool acquire) {
+    if (!buffer) return;
+
+    D3D11_BUFFER_DESC bufferDesc = {};
+    buffer->GetDesc(&bufferDesc);
+
+    if (acquire) {
+        MRenderer::theRenderer()->holdGPUMemory(bufferDesc.ByteWidth);
+    } else {
+        MRenderer::theRenderer()->releaseGPUMemory(bufferDesc.ByteWidth);
+    }
+}
+
+int DirectX::getNumElementsInBuffer(const ComPtr<ID3D11Buffer>& buffer) {
+    if (!buffer) return 0;
+
+    D3D11_BUFFER_DESC desc;
+    buffer->GetDesc(&desc);
+    
+    if (desc.StructureByteStride > 0) {
+        return desc.ByteWidth / desc.StructureByteStride;
+    } else if (desc.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS) {
+        return desc.ByteWidth / 4; // Raw buffers are treated as arrays of uint32_t
+    }
+
+    return 0; // Unknown format
 }

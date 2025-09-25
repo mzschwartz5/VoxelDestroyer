@@ -43,7 +43,8 @@ public:
     };
 
     ~DragParticlesCompute() override {
-        tearDown();
+        DirectX::notifyMayaOfMemoryUsage(isDraggingBuffer);
+        removeSubscriptions();
     }
 
     void setParticlesUAV(const ComPtr<ID3D11UnorderedAccessView>& particlesUAV)
@@ -71,7 +72,7 @@ public:
 
     // This class needs a move assignment operator override because the subscriptions it creates capture the `this` pointer.
     // We need to unsubscribe on move and re-subscribe in the moved-to object to avoid dangling pointers.
-    // This is used implicitly (via RVO) in PBD initialization.
+    // This is used implicitly (via RVO) in global-solver compute initialization.
     DragParticlesCompute& operator=(DragParticlesCompute&& other) noexcept
     {
         if (this != &other)
@@ -274,12 +275,6 @@ private:
 
         DirectX::getDevice()->CreateUnorderedAccessView(isDraggingBuffer.Get(), &uavDesc, &isDraggingUAV);
         clearUintBuffer(isDraggingUAV);
-    };
-
-    void tearDown() override
-    {
-        ComputeShader::tearDown();
-        removeSubscriptions();
     };
 
     void removeSubscriptions() {
