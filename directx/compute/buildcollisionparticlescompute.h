@@ -18,6 +18,10 @@ public:
         initializeBuffers(numParticles);
     }
 
+    ~BuildCollisionParticlesCompute() {
+        DirectX::notifyMayaOfMemoryUsage(particlesByCollisionCellBuffer);
+    }
+
     void dispatch() override {
         clearUintBuffer(particlesByCollisionCellUAV);
         ComputeShader::dispatch(numWorkgroups);
@@ -73,33 +77,13 @@ private:
     }
 
     void initializeBuffers(int numParticles) {
-        D3D11_BUFFER_DESC bufferDesc = {};
-        D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-
         // Each particle can overlap up to 8 cells, so we need to allocate memory accordingly.
         int numBufferElements = 8 * numParticles;
         numWorkgroups = Utils::divideRoundUp(numBufferElements, BUILD_COLLISION_PARTICLE_THREADS);
 
-        // Create the particles by collision cell buffer, and its UAV and SRV.
-        bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        bufferDesc.ByteWidth = numBufferElements * sizeof(uint);
-        bufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-        bufferDesc.CPUAccessFlags = 0;
-        bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-        bufferDesc.StructureByteStride = sizeof(uint);
-        CreateBuffer(&bufferDesc, nullptr, &particlesByCollisionCellBuffer);
-
-        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-        srvDesc.Buffer.FirstElement = 0;
-        srvDesc.Buffer.NumElements = numBufferElements;
-        DirectX::getDevice()->CreateShaderResourceView(particlesByCollisionCellBuffer.Get(), &srvDesc, &particlesByCollisionCellSRV);
-
-        uavDesc.Format = DXGI_FORMAT_UNKNOWN;
-        uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-        uavDesc.Buffer.FirstElement = 0;
-        uavDesc.Buffer.NumElements = numBufferElements;
-        DirectX::getDevice()->CreateUnorderedAccessView(particlesByCollisionCellBuffer.Get(), &uavDesc, &particlesByCollisionCellUAV);
+        std::vector<uint> emptyData(numBufferElements, 0);
+        particlesByCollisionCellBuffer = DirectX::createReadWriteBuffer<uint>(emptyData);
+        particlesByCollisionCellSRV = DirectX::createSRV(particlesByCollisionCellBuffer);
+        particlesByCollisionCellUAV = DirectX::createUAV(particlesByCollisionCellBuffer);
     }
 };

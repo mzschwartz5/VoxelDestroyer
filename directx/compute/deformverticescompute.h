@@ -28,6 +28,11 @@ public:
         initializeBuffers(numParticles, vertexCount, inverseWorldMatrix, originalParticlePositions, vertexVoxelIds);
     }
 
+    ~DeformVerticesCompute() {
+        DirectX::notifyMayaOfMemoryUsage(originalParticlePositionsBuffer);
+        DirectX::notifyMayaOfMemoryUsage(vertexVoxelIdsBuffer);
+    }
+
     void dispatch() override
     {
         ComputeShader::dispatch(numWorkgroups);
@@ -94,9 +99,6 @@ private:
     void initializeBuffers(int numParticles, int vertexCount, const MMatrix& inverseWorldMatrix, const std::vector<MFloatPoint>& originalParticlePositions, const std::vector<uint>& vertexVoxelIds)
     {
         numWorkgroups = Utils::divideRoundUp(vertexCount, DEFORM_VERTICES_THREADS);
-        D3D11_BUFFER_DESC bufferDesc = {};
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        D3D11_SUBRESOURCE_DATA initData = {};
 
         // We only need one reference particle per voxel, not the whole shebang
         std::vector<MFloatPoint> reducedOriginalParticles;
@@ -106,54 +108,17 @@ private:
         }
 
         int reducedNumParticles = static_cast<int>(reducedOriginalParticles.size());
-
-        // Create originalParticlePositions buffer and SRV
-        bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        bufferDesc.ByteWidth = reducedNumParticles * sizeof(MFloatPoint);
-        bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-        bufferDesc.CPUAccessFlags = 0;
-        bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-        bufferDesc.StructureByteStride = sizeof(MFloatPoint);
-
-        initData.pSysMem = reducedOriginalParticles.data();
-        CreateBuffer(&bufferDesc, &initData, originalParticlePositionsBuffer.GetAddressOf());
-
-        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-        srvDesc.Buffer.FirstElement = 0;
-        srvDesc.Buffer.NumElements = reducedNumParticles;
-        DirectX::getDevice()->CreateShaderResourceView(originalParticlePositionsBuffer.Get(), &srvDesc, originalParticlePositionsSRV.GetAddressOf());
-
-        // Create vertexVoxelIds buffer and SRV
-        bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-        bufferDesc.ByteWidth = vertexVoxelIds.size() * sizeof(uint);
-        bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-        bufferDesc.CPUAccessFlags = 0;
-        bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-        bufferDesc.StructureByteStride = sizeof(uint);
-
-        initData.pSysMem = vertexVoxelIds.data();
-        CreateBuffer(&bufferDesc, &initData, vertexVoxelIdsBuffer.GetAddressOf());
-
-        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-        srvDesc.Buffer.FirstElement = 0;
-        srvDesc.Buffer.NumElements = vertexVoxelIds.size();
-        DirectX::getDevice()->CreateShaderResourceView(vertexVoxelIdsBuffer.Get(), &srvDesc, vertexVoxelIdsSRV.GetAddressOf());
-
-        // Make a constants buffer for vertexCount
-        bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
-        bufferDesc.ByteWidth = static_cast<UINT>(sizeof(DeformVerticesConstantBuffer)); // Must be multiple of 16 bytes
-        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-        bufferDesc.CPUAccessFlags = 0;
-        bufferDesc.MiscFlags = 0;
         
+        originalParticlePositionsBuffer = DirectX::createReadOnlyBuffer<MFloatPoint>(reducedOriginalParticles);
+        originalParticlePositionsSRV = DirectX::createSRV(originalParticlePositionsBuffer);
+
+        vertexVoxelIdsBuffer = DirectX::createReadOnlyBuffer<uint>(vertexVoxelIds);
+        vertexVoxelIdsSRV = DirectX::createSRV(vertexVoxelIdsBuffer);
+       
         DeformVerticesConstantBuffer constants = {};
         inverseWorldMatrix.get(constants.inverseWorldMatrix);
         constants.vertexCount = vertexCount;
-        initData.pSysMem = &constants;
-
-        CreateBuffer(&bufferDesc, &initData, &constantsBuffer);
+        constantsBuffer = DirectX::createConstantBuffer<DeformVerticesConstantBuffer>(constants);
     }
 
 };

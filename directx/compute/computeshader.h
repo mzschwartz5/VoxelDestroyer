@@ -38,18 +38,6 @@ protected:
     virtual void unbind() = 0;
 
     /**
-     * Wrapper around D3D11 CreateBuffer which uses Maya's hardware renderer to log GPU memory usage.
-     */
-    HRESULT CreateBuffer(
-        const D3D11_BUFFER_DESC* pDesc,
-        const D3D11_SUBRESOURCE_DATA* pInitialData,
-        ID3D11Buffer** ppBuffer
-    ) {
-        HRESULT hr = DirectX::getDevice()->CreateBuffer(pDesc, pInitialData, ppBuffer);
-        return hr;
-    }
-
-    /**
      * Generic method to update a constant buffer with new data.
      */
     template<typename T>

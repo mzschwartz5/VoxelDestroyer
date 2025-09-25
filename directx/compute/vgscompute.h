@@ -69,16 +69,6 @@ private:
     };
 
     void initializeBuffers(const VGSConstantBuffer& voxelSimInfo) {
-        D3D11_BUFFER_DESC bufferDesc = {};
-        D3D11_SUBRESOURCE_DATA initData = {};
-
-        //Initialize constant buffer
-        bufferDesc.Usage = D3D11_USAGE_DYNAMIC; // Dynamic for CPU updates
-        bufferDesc.ByteWidth = sizeof(VGSConstantBuffer);  // Size of the constant buffer
-        bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; // Bind as a constant buffer
-        bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // Allow CPU writes
-        bufferDesc.MiscFlags = 0;
-        initData.pSysMem = &voxelSimInfo;
-        CreateBuffer(&bufferDesc, &initData, &voxelSimInfoBuffer);
+        voxelSimInfoBuffer = DirectX::createConstantBuffer<VGSConstantBuffer>(voxelSimInfo);
     }
 };

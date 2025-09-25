@@ -51,9 +51,9 @@ HINSTANCE DirectX::getPluginInstance()
 
 ComPtr<ID3D11ShaderResourceView> DirectX::createSRV(
     ComPtr<ID3D11Buffer>& buffer,
+    bool rawBuffer,
     UINT elementCount,
-    UINT offset,
-    bool rawBuffer
+    UINT offset
 ) {
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     D3D11_BUFFER_DESC bufferDesc = {};
@@ -81,9 +81,9 @@ ComPtr<ID3D11ShaderResourceView> DirectX::createSRV(
 
 ComPtr<ID3D11UnorderedAccessView> DirectX::createUAV(
     ComPtr<ID3D11Buffer>& buffer,
+    bool rawBuffer,
     UINT elementCount,
-    UINT offset,
-    bool rawBuffer
+    UINT offset
 ) {
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
     D3D11_BUFFER_DESC bufferDesc = {};

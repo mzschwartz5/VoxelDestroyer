@@ -78,16 +78,6 @@ private:
 
     void initializeBuffers(int numParticles, const PreVGSConstantBuffer& simConstants) {
         numWorkgroups = Utils::divideRoundUp(numParticles, VGS_THREADS);
-        D3D11_BUFFER_DESC bufferDesc = {};
-        D3D11_SUBRESOURCE_DATA initData = {};
-
-		// Create simConstants buffer
-		bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-		bufferDesc.ByteWidth = sizeof(PreVGSConstantBuffer);
-		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        bufferDesc.MiscFlags = 0;
-		initData.pSysMem = &simConstants;
-		CreateBuffer(&bufferDesc, &initData, &simConstantsBuffer);
+        simConstantsBuffer = DirectX::createConstantBuffer<PreVGSConstantBuffer>(simConstants);
     }
 };
