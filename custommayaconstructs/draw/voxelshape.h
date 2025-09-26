@@ -248,32 +248,18 @@ public:
         const ComPtr<ID3D11ShaderResourceView>& originalPositionsSRV,
         const ComPtr<ID3D11ShaderResourceView>& originalNormalsSRV
     ) {
-        MObject particleDataObj;
-        MPlug particleDataPlug(thisMObject(), aParticleData);
-        particleDataPlug.getValue(particleDataObj);
-        MFnPluginData particleDataFn(particleDataObj);
-        ParticleData* particleData = static_cast<ParticleData*>(particleDataFn.data());
-        const ParticleDataContainer& particleDataContainer = particleData->getData();
 
-        MObject particleSRVObj;
-        MPlug particleSRVPlug(thisMObject(), aParticleSRV);
-        particleSRVPlug.getValue(particleSRVObj);
-        MFnPluginData d3d11DataFn(particleSRVObj);
-        D3D11Data* particleSRVData = static_cast<D3D11Data*>(d3d11DataFn.data());
-
-        MObject voxelDataObj;
-        MPlug voxelDataPlug(thisMObject(), aVoxelData);
-        voxelDataPlug.getValue(voxelDataObj);
-        MFnPluginData voxelDataFn(voxelDataObj);
-        VoxelData* voxelData = static_cast<VoxelData*>(voxelDataFn.data());
-
+        Utils::PluginData<VoxelData> voxelData(thisMObject(), aVoxelData);
         std::vector<uint> vertexVoxelIds = getVoxelIdsForVertices(
             vertexIndices, 
             vertexPositions,
-            voxelData->getVoxelizationGrid(),
-            voxelData->getVoxels()
+            voxelData.get()->getVoxelizationGrid(),
+            voxelData.get()->getVoxels()
         );
-
+        
+        Utils::PluginData<ParticleData> particleData(thisMObject(), aParticleData);
+        Utils::PluginData<D3D11Data> particleSRVData(thisMObject(), aParticleSRV);
+        const ParticleDataContainer& particleDataContainer = particleData.get()->getData();
         const MDagPath originalGeomPath = pathToOriginalGeometry();
 
         deformVerticesCompute = DeformVerticesCompute(
@@ -286,7 +272,7 @@ public:
             normalsUAV,
             originalPositionsSRV,
             originalNormalsSRV,
-            particleSRVData->getSRV()
+            particleSRVData.get()->getSRV()
         );
 
         isInitialized = true;
