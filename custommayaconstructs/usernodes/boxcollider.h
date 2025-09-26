@@ -103,19 +103,17 @@ public:
         MDataHandle frictionHandle = dataBlock.inputValue(aFriction);
         float friction = frictionHandle.asFloat();
 
-        MFnPluginData fnData;
-        MObject newDataObj = fnData.create(ColliderData::id);
-        ColliderData* colliderData = static_cast<ColliderData*>(fnData.data());
-        
-        colliderData->setWorldMatrix(worldMat);
-        colliderData->setWidth(width);
-        colliderData->setHeight(height);
-        colliderData->setDepth(depth);
-        colliderData->setFriction(friction);
-
-        MDataHandle colliderDataHandle = dataBlock.outputValue(aColliderData);
-        colliderDataHandle.set(colliderData);
-        dataBlock.setClean(plug);
+        Utils::createPluginData<ColliderData>(
+            dataBlock,
+            aColliderData,
+            [&worldMat, &width, &height, &depth, &friction](ColliderData* colliderData) {
+                colliderData->setWorldMatrix(worldMat);
+                colliderData->setWidth(width);
+                colliderData->setHeight(height);
+                colliderData->setDepth(depth);
+                colliderData->setFriction(friction);
+            }
+        );
 
         return MS::kSuccess;
     }

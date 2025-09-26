@@ -20,7 +20,6 @@
 #include "custommayaconstructs/usernodes/capsulecollider.h"
 #include "custommayaconstructs/usernodes/cylindercollider.h"
 #include "custommayaconstructs/usernodes/planecollider.h"
-#include <maya/MFnPluginData.h>
 #include <maya/MDrawRegistry.h>
 #include <maya/MItDependencyNodes.h>
 #include "directx/compute/computeshader.h"
