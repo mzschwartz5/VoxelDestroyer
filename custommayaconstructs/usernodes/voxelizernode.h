@@ -5,7 +5,6 @@
 #include <maya/MString.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MStatus.h>
-#include <maya/MFnPluginData.h>
 #include <maya/MSharedPtr.h>
 
 #include "../../voxelizer.h"
@@ -63,14 +62,14 @@ public:
         );
         outDagPath = voxels->voxelizedMeshDagPath;
 
-        MFnPluginData pluginDataFn;
-        MObject pluginDataObj = pluginDataFn.create( VoxelData::id, &status );
-        VoxelData* voxelData = static_cast<VoxelData*>(pluginDataFn.data(&status));
-        voxelData->setVoxels(voxels);
-        voxelData->setVoxelizationGrid(voxelizationGrid);
-
-        MPlug voxelDataInPlug = voxelizerNode.findPlug(aVoxelData, false, &status);
-        voxelDataInPlug.setValue(pluginDataObj);
+        Utils::createPluginData<VoxelData>(
+            voxelizerNodeObj,
+            aVoxelData,
+            [&voxels, &voxelizationGrid](VoxelData* voxelData) {
+                voxelData->setVoxels(voxels);
+                voxelData->setVoxelizationGrid(voxelizationGrid);
+            }
+        );
 
         return voxelizerNodeObj;
     }

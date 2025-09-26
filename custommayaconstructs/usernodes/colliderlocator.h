@@ -22,6 +22,7 @@
 #include <maya/MDagMessage.h>
 #include "../data/colliderdata.h"
 #include "../../globalsolver.h"
+#include "../../utils.h"
 
 // Forward declarations
 class CreateColliderCommand;

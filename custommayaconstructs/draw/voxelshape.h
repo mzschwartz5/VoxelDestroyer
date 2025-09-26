@@ -4,7 +4,6 @@
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnSingleIndexedComponent.h>
-#include <maya/MFnPluginData.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MDagModifier.h>
 #include <maya/MDGModifier.h>

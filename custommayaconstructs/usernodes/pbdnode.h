@@ -26,7 +26,6 @@
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnMessageAttribute.h>
-#include <maya/MFnPluginData.h>
 #include <maya/MTypeId.h>
 #include <maya/MString.h>
 
@@ -240,27 +239,26 @@ public:
         pbd.setRadiusAndVolumeFromLength(voxels->voxelSize);
         ParticleDataContainer particleDataContainer = pbd.createParticles(voxels);
 
-        MFnPluginData fnData;
-        MStatus status;
-        MObject particleDataObj = fnData.create( ParticleData::id, &status );
-        ParticleData* particleData = static_cast<ParticleData*>(fnData.data(&status));
-        particleData->setData(particleDataContainer);
-
-        MFnDependencyNode pbdDepNode(pbdNode->thisMObject());
-        MPlug particleDataPlug = pbdDepNode.findPlug(aParticleData, false);
-        particleDataPlug.setValue(particleDataObj);
+        Utils::createPluginData<ParticleData>(
+            pbdNode->thisMObject(),
+            aParticleData,
+            [&particleDataContainer](ParticleData* particleData) {
+                particleData->setData(particleDataContainer);
+            }
+        );
         
         std::array<std::vector<FaceConstraint>, 3> faceConstraints 
             = pbd.constructFaceToFaceConstraints(voxels, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX);
         
         pbd.createComputeShaders(voxels, faceConstraints);
 
-        // Set the simulateSubstep function attribute (used by GlobalSolver to invoke simulation on each node)
-        MObject simulateSubstepObj = fnData.create(FunctionalData::id, &status);
-        FunctionalData* simulateSubstepData = static_cast<FunctionalData*>(fnData.data(&status));
-        simulateSubstepData->setFunction([&pbd]() { pbd.simulateSubstep(); });
-        MPlug simulateSubstepPlug = pbdDepNode.findPlug(aSimulateSubstepFunction, false);
-        simulateSubstepPlug.setValue(simulateSubstepObj);
+        Utils::createPluginData<FunctionalData>(
+            pbdNode->thisMObject(),
+            aSimulateSubstepFunction,
+            [&pbd](FunctionalData* functionalData) {
+                functionalData->setFunction([&pbd]() { pbd.simulateSubstep(); });
+            }
+        );
     }
     
     static void onMeshConnectionDeleted(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
@@ -280,7 +278,7 @@ private:
     PBD pbd;
     MCallbackIdArray callbackIds;
 
-    void onParticleBufferOffsetChanged(int particleBufferOffset, MDataHandle& particleSRVHandle) {
+    void onParticleBufferOffsetChanged(int particleBufferOffset, MDataBlock& dataBlock) {
         int numberParticles = pbd.numParticles();
         int voxelOffset = particleBufferOffset / 8;
         int numVoxels = numberParticles / 8;
@@ -292,12 +290,13 @@ private:
 
         pbd.setGPUResourceHandles(particleUAV, oldParticlesUAV, isSurfaceUAV, isDraggingSRV);
 
-        MFnPluginData pluginDataFn;
-        MObject pluginDataObj = pluginDataFn.create(D3D11Data::id);
-        D3D11Data* d3d11Data = static_cast<D3D11Data*>(pluginDataFn.data());
-        d3d11Data->setSRV(particleSRV);
-        particleSRVHandle.set(pluginDataObj);
-        particleSRVHandle.setClean();
+        Utils::createPluginData<D3D11Data>(
+            dataBlock,
+            aParticleSRV,
+            [&particleSRV](D3D11Data* d3d11Data) {
+                d3d11Data->setSRV(particleSRV);
+            }
+        );
 
         pbd.setInitialized(true);
     }
@@ -315,8 +314,7 @@ private:
 
         if (plug == aParticleSRV) {
             int particleBufferOffset = dataBlock.inputValue(aParticleBufferOffset).asInt();
-            MDataHandle particleSRVHandle = dataBlock.outputValue(aParticleSRV);
-            onParticleBufferOffsetChanged(particleBufferOffset, particleSRVHandle);
+            onParticleBufferOffsetChanged(particleBufferOffset, dataBlock);
             return MS::kSuccess;
         }
 

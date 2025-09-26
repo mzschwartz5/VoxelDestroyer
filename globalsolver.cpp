@@ -4,7 +4,6 @@
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnUnitAttribute.h>
 #include <maya/MDGModifier.h>
-#include <maya/MFnPluginData.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MItDependencyNodes.h>
 #include "custommayaconstructs/tools/voxeldragcontext.h"

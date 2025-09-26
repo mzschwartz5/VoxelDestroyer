@@ -3,10 +3,14 @@
 #include <maya/MFloatVector.h>
 #include <maya/MPlug.h>
 #include <maya/MFnPluginData.h>
+#include <maya/MDataBlock.h>
+#include <maya/MDataHandle.h>
 #include <maya/MObject.h>
 #include <maya/MString.h>
 #include <windows.h>
 #include <cstdint>
+#include <type_traits>
+#include <utility>
 
 namespace Utils {
 
@@ -56,5 +60,54 @@ struct PluginData {
 
     T* get() const { return data; }
 };
+
+/**
+ * Create an instance of (subclass of) MPxData, initialize it using the provided initializer function,
+ * then set the provided plug on the dependency node to the new data object.
+ */
+template<typename T, typename Initializer>
+MStatus createPluginData(const MObject& dependencyNode, const MObject& plugAttribute, Initializer&& initializer) {
+    MStatus status;
+    MFnPluginData fnData;
+    MObject dataObj = fnData.create(T::id, &status);
+    if (status != MStatus::kSuccess) return status;
+
+    T* data = static_cast<T*>(fnData.data(&status));
+    if (status != MStatus::kSuccess || !data) return status;
+
+    // Call the initializer function passed in by the user
+    std::forward<Initializer>(initializer)(data);
+
+    // Set the plug value to the new data object
+    MPlug plug(dependencyNode, plugAttribute);
+    status = plug.setValue(dataObj);
+    return status;
+}
+
+/**
+ * Overload: create MPxData, initialize it, and set it onto an MDataBlock output handle.
+ * Useful inside compute() implementations.
+ */
+template<typename T, typename Initializer>
+MStatus createPluginData(MDataBlock& dataBlock, const MObject& outputAttribute, Initializer&& initializer) {
+    MStatus status;
+    MFnPluginData fnData;
+    MObject dataObj = fnData.create(T::id, &status);
+    if (status != MStatus::kSuccess) return status;
+
+    T* data = static_cast<T*>(fnData.data(&status));
+    if (status != MStatus::kSuccess || !data) return status;
+
+    // Initialize the MPxData instance
+    std::forward<Initializer>(initializer)(data);
+
+    // Get the output handle and attach the MObject
+    MDataHandle outHandle = dataBlock.outputValue(outputAttribute, &status);
+    if (status != MStatus::kSuccess) return status;
+
+    outHandle.setMObject(dataObj);
+    outHandle.setClean();
+    return status;
+}
 
 } // namespace Utils
