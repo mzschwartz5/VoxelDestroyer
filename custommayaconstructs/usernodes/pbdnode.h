@@ -8,6 +8,7 @@
 #include "../data/functionaldata.h"
 #include "../data/d3d11data.h"
 #include "../usernodes/voxelizernode.h"
+#include "../../utils.h"
 
 #include <vector>
 #include <array>
@@ -231,17 +232,16 @@ public:
             return;
         }
 
-        MObject voxelDataObj;
-        MStatus status = plug.getValue(voxelDataObj);
-        MFnPluginData fnData(voxelDataObj, &status);
-        VoxelData* voxelData = static_cast<VoxelData*>(fnData.data(&status));
-        MSharedPtr<Voxels> voxels = voxelData->getVoxels();
+        Utils::PluginData<VoxelData> voxelData(plug);
+        MSharedPtr<Voxels> voxels = voxelData.get()->getVoxels();
+
         PBDNode* pbdNode = static_cast<PBDNode*>(clientData);
         PBD& pbd = pbdNode->pbd;
-
         pbd.setRadiusAndVolumeFromLength(voxels->voxelSize);
         ParticleDataContainer particleDataContainer = pbd.createParticles(voxels);
 
+        MFnPluginData fnData;
+        MStatus status;
         MObject particleDataObj = fnData.create( ParticleData::id, &status );
         ParticleData* particleData = static_cast<ParticleData*>(fnData.data(&status));
         particleData->setData(particleDataContainer);

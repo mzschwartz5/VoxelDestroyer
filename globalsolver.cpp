@@ -188,14 +188,9 @@ void GlobalSolver::calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNode
 {
     MStatus status;
 
-    // Retrieve data from the changed plug
-    MObject particleDataObj;
-    MFnPluginData pluginDataFn;
-    changedPlug.getValue(particleDataObj);
-    pluginDataFn.setObject(particleDataObj);
-    ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
-    uint numChangedParticles = particleData->getData().numParticles;
-    float particleRadius = particleData->getData().particleRadius;
+    Utils::PluginData<ParticleData> particleData(changedPlug);
+    uint numChangedParticles = particleData.get()->getData().numParticles;
+    float particleRadius = particleData.get()->getData().particleRadius;
 
     // If plug was added, take care of it specially, because it won't be iterated over below.
     if (changeType & MNodeMessage::kConnectionMade) {
@@ -215,13 +210,10 @@ void GlobalSolver::calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNode
         if (plugLogicalIndex == changedPlug.logicalIndex()) continue;
 
         MPlug particleDataPlug = particleDataArrayPlug.elementByLogicalIndex(plugLogicalIndex); // parallel array, shares logical indices with offset plug array
+        Utils::PluginData<ParticleData> currentParticleData(particleDataPlug);
 
-        // Update maximum particle radius
-        particleDataPlug.getValue(particleDataObj);
-        pluginDataFn.setObject(particleDataObj);
-        ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
-        float particleRadius = particleData->getData().particleRadius;
-        maximumParticleRadius = (particleRadius > maximumParticleRadius) ? particleRadius : maximumParticleRadius;
+        float currentParticleRadius = currentParticleData.get()->getData().particleRadius;
+        maximumParticleRadius = (currentParticleRadius > maximumParticleRadius) ? currentParticleRadius : maximumParticleRadius;
 
         // Now update offset
         particleBufferOffsetPlug.getValue(offset_i);
@@ -248,17 +240,14 @@ void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
     MStatus status;
     MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
     
-    MObject particleDataObj;
-    particleDataToAddPlug.getValue(particleDataObj);
-    MFnPluginData pluginDataFn(particleDataObj);
-    ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
+    Utils::PluginData<ParticleData> particleData(particleDataToAddPlug);
     uint totalParticles = getTotalParticles();
     
-    std::vector<MFloatPoint>* const positions = particleData->getData().particlePositionsCPU;
+    std::vector<MFloatPoint>* const positions = particleData.get()->getData().particlePositionsCPU;
     DirectX::addToBuffer<MFloatPoint>(buffers[BufferType::PARTICLE], *positions);
     DirectX::addToBuffer<MFloatPoint>(buffers[BufferType::OLDPARTICLE], *positions);
 
-    std::vector<uint>* const surfaceVal = particleData->getData().isSurface;
+    std::vector<uint>* const surfaceVal = particleData.get()->getData().isSurface;
     DirectX::addToBuffer<uint>(buffers[BufferType::SURFACE], *surfaceVal);
 
     return;
@@ -268,15 +257,9 @@ void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
 void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
     MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
 
-    // Get the particle data of the node being removed
-    MStatus status;
-    MObject particleDataObj;
-    particleDataToRemovePlug.getValue(particleDataObj);
-    MFnPluginData pluginDataFn(particleDataObj);
-    ParticleData* particleData = static_cast<ParticleData*>(pluginDataFn.data(&status));
-
+    Utils::PluginData<ParticleData> particleData(particleDataToRemovePlug);
     uint totalParticles = getTotalParticles();
-    uint numRemovedParticles = particleData->getData().numParticles;
+    uint numRemovedParticles = particleData.get()->getData().numParticles;
 
     // Get the removed node's offset into the old particle buffer
     int offset;
@@ -343,14 +326,9 @@ void GlobalSolver::onSimulateFunctionConnectionChange(MNodeMessage::AttributeMes
         return;
     }
 
-    MStatus status;
-    MObject functionalDataObj;
-    plug.getValue(functionalDataObj);
-    MFnPluginData pluginDataFn(functionalDataObj); 
-    FunctionalData* functionalData = static_cast<FunctionalData*>(pluginDataFn.data(&status));
-
+    Utils::PluginData<FunctionalData> functionalData(plug);
     if (msg & MNodeMessage::kConnectionMade) {
-        pbdSimulateFuncs[plug.logicalIndex()] = functionalData->getFunction();
+        pbdSimulateFuncs[plug.logicalIndex()] = functionalData.get()->getFunction();
         return;
     }
     if (msg & MNodeMessage::kConnectionBroken) {
@@ -377,8 +355,6 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
         return;
     }
 
-    MObject colliderDataObj;
-    MFnPluginData colliderDataFn; 
     MPlugArray connectedColliderPlug;
     ColliderBuffer newColliderBuffer;
     newColliderBuffer.totalParticles = colliderBuffer.totalParticles;
@@ -390,16 +366,13 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
             continue;
         }
 
-        colliderDataPlug.getValue(colliderDataObj);
-        colliderDataFn.setObject(colliderDataObj);
-        const ColliderData* const colliderData = static_cast<ColliderData*>(colliderDataFn.data());
-
         colliderDataPlug.connectedTo(connectedColliderPlug, true, false);
         MObject connectedLocatorObj = connectedColliderPlug[0].node();
         MFnDependencyNode connectedLocatorNode(connectedLocatorObj);
         ColliderLocator* colliderLocator = static_cast<ColliderLocator*>(connectedLocatorNode.userNode());
-
-        colliderLocator->writeDataIntoBuffer(colliderData, newColliderBuffer);
+        
+        Utils::PluginData<ColliderData> colliderData(colliderDataPlug);
+        colliderLocator->writeDataIntoBuffer(colliderData.get(), newColliderBuffer);
     }
 
     colliderBuffer = newColliderBuffer;
