@@ -65,14 +65,12 @@ void GlobalSolver::postConstructor() {
 }
 
 void GlobalSolver::maybeDeleteGlobalSolver() {
-    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
+    MObject globalSolverObj = getOrCreateGlobalSolver();
+    if (Utils::arrayPlugNumElements(globalSolverObj, aParticleData) > 0) return;
+    if (Utils::arrayPlugNumElements(globalSolverObj, aColliderData) > 0) return;
 
-    int numParticleDataConnections = globalSolverNode.findPlug(aParticleData, false).evaluateNumElements();
-    int numColliderDataConnections = globalSolverNode.findPlug(aColliderData, false).evaluateNumElements();
-    if (numParticleDataConnections == 0 && numColliderDataConnections == 0) {
-        // Delete must happen on idle (node cannot delete itself from a callback)
-        MGlobal::executeCommandOnIdle("delete " + globalSolverNode.name());
-    }
+    // Delete must happen on idle (node cannot delete itself from a callback)
+    MGlobal::executeCommandOnIdle("delete " + MFnDagNode(globalSolverObj).name());
 }
 
 void GlobalSolver::tearDown() {
@@ -96,15 +94,12 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
     }
     bool connectionMade = (msg & MNodeMessage::kConnectionMade);
     
-    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
-    MPlug particleDataArrayPlug = globalSolverNode.findPlug(aParticleData, false);
-    int numPBDNodes = particleDataArrayPlug.evaluateNumElements();
+    MObject globalSolverObj = getOrCreateGlobalSolver();
+    int numPBDNodes = Utils::arrayPlugNumElements(globalSolverObj, aParticleData);
     numPBDNodes -= connectionMade ? 0 : 1; // If disconnecting, the plug is still counted in numElements, so subtract 1.
     
-    MDGModifier dgMod;
     if (numPBDNodes == 0) {
-        dgMod.removeMultiInstance(plug, true);
-        dgMod.doIt();
+        Utils::removePlugMultiInstance(plug);
         maybeDeleteGlobalSolver();
         return;
     }
@@ -122,7 +117,7 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
     globalSolver->createGlobalComputeShaders(maximumParticleRadius);
 
     // Set these *after* creating buffers, because doing so triggers each PBD node to go make UAVs / SRVs.
-    MPlug particleBufferOffsetArrayPlug = globalSolverNode.findPlug(aParticleBufferOffset, false);
+    MPlug particleBufferOffsetArrayPlug(globalSolverObj, aParticleBufferOffset);
     for (const auto& [logicalIndex, offset] : offsetForLogicalPlug) {
         MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(logicalIndex);
         particleBufferOffsetPlug.setInt(offset);
@@ -131,15 +126,9 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
     // Now, disconnect parallel-array plug entries associated with this PBD node.
     if (msg & MNodeMessage::kConnectionBroken) {
         uint logicalIndex = plug.logicalIndex();
-        MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(logicalIndex);
-        dgMod.removeMultiInstance(particleBufferOffsetPlug, true);
-        
-        MPlug simulateFunctionArrayPlug = globalSolverNode.findPlug(aSimulateFunction, false);
-        MPlug simulateFunctionPlug = simulateFunctionArrayPlug.elementByLogicalIndex(logicalIndex);
-        dgMod.removeMultiInstance(simulateFunctionPlug, true);
-        
-        dgMod.removeMultiInstance(plug, true);
-        dgMod.doIt();
+        Utils::removePlugMultiInstance(particleBufferOffsetArrayPlug, logicalIndex);
+        Utils::removePlugMultiInstance(MPlug(globalSolverObj, aSimulateFunction), logicalIndex);
+        Utils::removePlugMultiInstance(plug);
     }
 
     maybeDeleteGlobalSolver();
@@ -162,9 +151,9 @@ void GlobalSolver::calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNode
         offsetForLogicalPlug[changedPlug.logicalIndex()] = 0; // Newly added plug data is prepended to buffers, so offset is 0.
     }
 
-    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
-    MPlug particleDataArrayPlug = globalSolverNode.findPlug(aParticleData, false);
-    MPlug particleBufferOffsetArrayPlug = globalSolverNode.findPlug(aParticleBufferOffset, false);
+    MObject globalSolverObj = getOrCreateGlobalSolver();
+    MPlug particleDataArrayPlug(globalSolverObj, aParticleData);
+    MPlug particleBufferOffsetArrayPlug(globalSolverObj, aParticleBufferOffset);
     int numBufferOffsetPlugs = particleBufferOffsetArrayPlug.evaluateNumElements();
 
     int offset_i;
@@ -219,7 +208,7 @@ void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
 
 // Deletes a region of particle data (corresponding to a deleted model) from the particle (and related) buffer(s)
 void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
-    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
+    MObject globalSolverObj = getOrCreateGlobalSolver();
 
     Utils::PluginData<ParticleData> particleData(particleDataToRemovePlug);
     uint totalParticles = getTotalParticles();
@@ -228,7 +217,7 @@ void GlobalSolver::deleteParticleData(MPlug& particleDataToRemovePlug) {
     // Get the removed node's offset into the old particle buffer
     int offset;
     uint plugLogicalIndex = particleDataToRemovePlug.logicalIndex();
-    MPlug particleBufferOffsetArrayPlug = globalSolverNode.findPlug(aParticleBufferOffset, false);
+    MPlug particleBufferOffsetArrayPlug(globalSolverObj, aParticleBufferOffset);
     MPlug particleBufferOffsetPlug = particleBufferOffsetArrayPlug.elementByLogicalIndex(plugLogicalIndex);
     particleBufferOffsetPlug.getValue(offset);
 
@@ -309,8 +298,8 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
     if (plug != GlobalSolver::aColliderData || !(msg & (MNodeMessage::kConnectionMade | MNodeMessage::kConnectionBroken))) return;
     bool connectionRemoved = (msg & MNodeMessage::kConnectionBroken);
 
-    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
-    MPlug colliderDataArrayPlug = globalSolverNode.findPlug(aColliderData, false);
+    MObject globalSolverObj = getOrCreateGlobalSolver();
+    MPlug colliderDataArrayPlug(globalSolverObj, aColliderData);
     int numColliders = colliderDataArrayPlug.evaluateNumElements(); // Does not reflect the removed plug yet, if this is a kConnectionBroken callback
     int plugLogicalIndex = plug.logicalIndex();
 
@@ -319,7 +308,6 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
         return;
     }
 
-    MPlugArray connectedColliderPlug;
     ColliderBuffer newColliderBuffer;
     newColliderBuffer.totalParticles = colliderBuffer.totalParticles;
     
@@ -330,11 +318,9 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
             continue;
         }
 
-        colliderDataPlug.connectedTo(connectedColliderPlug, true, false);
-        MObject connectedLocatorObj = connectedColliderPlug[0].node();
-        MFnDependencyNode connectedLocatorNode(connectedLocatorObj);
-        ColliderLocator* colliderLocator = static_cast<ColliderLocator*>(connectedLocatorNode.userNode());
-        
+        ColliderLocator* colliderLocator = static_cast<ColliderLocator*>(Utils::connectedNode(colliderDataPlug));
+        if (!colliderLocator) continue; // Should not happen, but just in case
+
         Utils::PluginData<ColliderData> colliderData(colliderDataPlug);
         colliderLocator->writeDataIntoBuffer(colliderData.get(), newColliderBuffer);
     }
@@ -344,12 +330,7 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
     globalSolver->solvePrimitiveCollisionsCompute.updateColliderBuffer(colliderBuffer);
     
     // Finally, remove the disconnected plug from the array
-    if (connectionRemoved) {
-        MDGModifier dgMod;
-        dgMod.removeMultiInstance(plug, true);
-        dgMod.doIt();
-    }
-
+    if (connectionRemoved) Utils::removePlugMultiInstance(plug);
     maybeDeleteGlobalSolver();
 }
 
@@ -451,13 +432,13 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
     if (plug != aTrigger) return MS::kSuccess;
 
     if (dirtyColliderIndices.size() > 0) {
-        MPlugArray connectedColliderPlug;
         MArrayDataHandle colliderDataArrayHandle = block.inputArrayValue(aColliderData);
-        MPlug colliderDataArrayPlug = MFnDependencyNode(getOrCreateGlobalSolver()).findPlug(aColliderData, false);
+        MPlug colliderDataArrayPlug(getOrCreateGlobalSolver(), aColliderData);
         int numElements = colliderDataArrayPlug.numElements();
 
         for (int i = 0; i < numElements; ++i) {
-            int logicalIndex = colliderDataArrayPlug.elementByPhysicalIndex(i).logicalIndex();
+            MPlug colliderDataPlug = colliderDataArrayPlug.elementByPhysicalIndex(i);
+            int logicalIndex = colliderDataPlug.logicalIndex();
             if (dirtyColliderIndices.find(logicalIndex) == dirtyColliderIndices.end()) {
                 continue;
             }
@@ -466,12 +447,8 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
             MDataHandle colliderDataHandle = colliderDataArrayHandle.inputValue();
             ColliderData* colliderData = static_cast<ColliderData*>(colliderDataHandle.asPluginData());
             
-            // TODO: consider packing a function in ColliderData to write itself into the buffer, rather than needing to find the locator node here. (How might this be affected by serialization needs though?)
-            MPlug colliderDataPlug = colliderDataArrayPlug.elementByLogicalIndex(logicalIndex);
-            colliderDataPlug.connectedTo(connectedColliderPlug, true, false);
-            MObject connectedLocatorObj = connectedColliderPlug[0].node();
-            MFnDependencyNode connectedLocatorNode(connectedLocatorObj);
-            ColliderLocator* colliderLocator = static_cast<ColliderLocator*>(connectedLocatorNode.userNode());
+            ColliderLocator* colliderLocator = static_cast<ColliderLocator*>(Utils::connectedNode(colliderDataPlug));
+            if (!colliderLocator) continue; // Should not happen, but just in case
             colliderLocator->writeDataIntoBuffer(colliderData, colliderBuffer, i);
         }
 

@@ -3,6 +3,7 @@
 #include <maya/MItDependencyNodes.h>
 #include <maya/MDGModifier.h>
 #include <maya/MDagModifier.h>
+#include <maya/MPlugArray.h>
 #include <windows.h>
 #include <sstream>
 #include <cstring>
@@ -186,6 +187,29 @@ void connectPlugs(
     MDGModifier dgMod;
     dgMod.connect(srcPlug, dstPlug);
     dgMod.doIt();
+}
+
+void removePlugMultiInstance(const MPlug& plug, int logicalIndexToRemove) {
+    MDGModifier dgMod;
+    MPlug plugToRemove = plug;
+    if (logicalIndexToRemove != -1) {
+        plugToRemove = plug.elementByLogicalIndex(logicalIndexToRemove);
+    }
+    
+    dgMod.removeMultiInstance(plugToRemove, true);
+    dgMod.doIt();
+}
+
+int arrayPlugNumElements(const MObject& dependencyNode, const MObject& arrayAttribute) {
+    return MPlug(dependencyNode, arrayAttribute).evaluateNumElements();
+}
+
+MPxNode* connectedNode(const MPlug& plug, bool nodeIsSource) {
+    MPlugArray conns;
+    if (!plug.connectedTo(conns, nodeIsSource, !nodeIsSource) || conns.length() == 0) return nullptr;
+    MObject connectedObj = conns[0].node(); // API returns a plug array but util assumes only one connection
+    MFnDependencyNode fnNode(connectedObj);
+    return fnNode.userNode();
 }
 
 MObject createDGNode(const MString& typeName) 
