@@ -153,49 +153,19 @@ public:
     }
     
     static MObject createPBDNode(const MObject& voxelizerNode, const MDagPath& meshDagPath) {
-        MStatus status;
-        MDGModifier dgMod;
-        MObject pbdNodeObj = dgMod.createNode(PBDNode::pbdNodeName, &status);
-        dgMod.doIt();
-        MFnDependencyNode pbdNode(pbdNodeObj);
-
-        // Connect the mesh owner attribute to the mesh's dag path
-        MPlug meshOwnerPlug = pbdNode.findPlug(aMeshOwner, false, &status);
-        MFnDependencyNode meshFn(meshDagPath.node());
-        MPlug meshMessagePlug = meshFn.findPlug("message", false, &status); // built in to every MObject
-        MGlobal::executeCommandOnIdle("connectAttr " + meshMessagePlug.name() + " " + meshOwnerPlug.name(), false);
-
-        // Connect the voxelizer node's voxel data output to this PBD node's voxel data input
-        MDGModifier connMod;
-        MPlug voxelizerDataPlug = MFnDependencyNode(voxelizerNode).findPlug(VoxelizerNode::aVoxelData, false, &status);
-        MPlug pbdVoxelDataInPlug = pbdNode.findPlug(aVoxelDataIn, false, &status);
-        connMod.connect(voxelizerDataPlug, pbdVoxelDataInPlug);
-        connMod.doIt();
+        MObject pbdNodeObj = Utils::createDGNode(PBDNode::pbdNodeName);
+        Utils::connectPlugs(pbdNodeObj, aMeshOwner, meshDagPath.node(), MPxNode::message);
+        Utils::connectPlugs(voxelizerNode, VoxelizerNode::aVoxelData, pbdNodeObj, aVoxelDataIn);
 
         // Connect the particle data attribute output to the global solver node's particle data (array) input.
         // And connect the particle buffer offset attribute to the global solver node's particle buffer offset (array) output.
         MObject globalSolverNodeObj = GlobalSolver::getOrCreateGlobalSolver();
-        MPlug globalSolverTriggerPlug = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aTrigger, false, &status);
-        MPlug globalSolverParticleBufferOffsetPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aParticleBufferOffset, false, &status);
-        MPlug globalSolverParticleDataPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aParticleData, false, &status);
-        MPlug globalSolverSimulateFunctionPlugArray = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aSimulateFunction, false, &status);
-        
-        uint plugIndex = GlobalSolver::getNextArrayPlugIndex(globalSolverParticleDataPlugArray);
-        MPlug globalSolverParticleBufferOffsetPlug = globalSolverParticleBufferOffsetPlugArray.elementByLogicalIndex(plugIndex, &status);
-        MPlug globalSolverParticleDataPlug = globalSolverParticleDataPlugArray.elementByLogicalIndex(plugIndex, &status);
-        MPlug globalSolverSimulateFunctionPlug = globalSolverSimulateFunctionPlugArray.elementByLogicalIndex(plugIndex, &status);
-        
-        MPlug pbdTriggerInPlug = pbdNode.findPlug(aTriggerIn, false, &status);
-        MPlug pbdSimulateSubstepPlug = pbdNode.findPlug(aSimulateSubstepFunction, false, &status);
-        MPlug pbdParticleBufferOffsetPlug = pbdNode.findPlug(aParticleBufferOffset, false, &status);
-        MPlug pbdParticleDataPlug = pbdNode.findPlug(aParticleData, false, &status);
+        uint plugIndex = Utils::getNextArrayPlugIndex(globalSolverNodeObj, GlobalSolver::aParticleData);
         // Note: the GlobalSolver operates on the assumption that the buffer offset plug is connected before the particle data plug
-        connMod.connect(globalSolverTriggerPlug, pbdTriggerInPlug);
-        connMod.connect(pbdSimulateSubstepPlug, globalSolverSimulateFunctionPlug);
-        connMod.connect(globalSolverParticleBufferOffsetPlug, pbdParticleBufferOffsetPlug);
-        connMod.connect(pbdParticleDataPlug, globalSolverParticleDataPlug);
-        connMod.doIt();
-
+        Utils::connectPlugs(globalSolverNodeObj, GlobalSolver::aTrigger, pbdNodeObj, aTriggerIn);
+        Utils::connectPlugs(pbdNodeObj, aSimulateSubstepFunction, globalSolverNodeObj, GlobalSolver::aSimulateFunction, -1, plugIndex);
+        Utils::connectPlugs(globalSolverNodeObj, GlobalSolver::aParticleBufferOffset, pbdNodeObj, aParticleBufferOffset, plugIndex, -1);
+        Utils::connectPlugs(pbdNodeObj, aParticleData, globalSolverNodeObj, GlobalSolver::aParticleData, -1, plugIndex);
         return pbdNodeObj;
     }
     

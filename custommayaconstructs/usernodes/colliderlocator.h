@@ -60,15 +60,9 @@ public:
 
         // Connect the colliderData attribute to the global solver's colliderDataArray attribute
         // Note: this is not done in the MPxCommand below, because that would not cover the case of duplicating a collider node.
-        MDGModifier dgMod;
         MObject globalSolverNodeObj = GlobalSolver::getOrCreateGlobalSolver();
-        MPlug globalSolverColliderDataArrayPlug = MFnDependencyNode(globalSolverNodeObj).findPlug(GlobalSolver::aColliderData, false);
-        uint plugIndex = GlobalSolver::getNextArrayPlugIndex(globalSolverColliderDataArrayPlug);
-        MPlug globalSolverColliderDataPlug = globalSolverColliderDataArrayPlug.elementByLogicalIndex(plugIndex);
-        MPlug colliderDataPlug = MFnDependencyNode(thisObj).findPlug(ColliderLocator::colliderDataAttrName, false);
-        dgMod.connect(colliderDataPlug, globalSolverColliderDataPlug);
-
-        dgMod.doIt();
+        uint plugIndex = Utils::getNextArrayPlugIndex(globalSolverNodeObj, GlobalSolver::aColliderData);
+        Utils::connectPlugs(thisObj, colliderDataAttrName, globalSolverNodeObj, GlobalSolver::aColliderData, -1, plugIndex);
     }
 
     /**
@@ -230,18 +224,11 @@ public:
         }
 
         // Create a transform under the selected object (or world if nothing selected)
-        MDagModifier dagMod;
         MObject parentObj = (selectedDagPath.length() > 0) ? selectedDagPath.node() : MObject::kNullObj;
-        MObject colliderParentObj = dagMod.createNode("transform", parentObj);
-        dagMod.doIt();
-        MFnDagNode fnParent(colliderParentObj);
-        fnParent.setName(colliderName + "Transform");
+        MObject colliderParentObj = Utils::createDagNode("transform", parentObj, colliderName + "Transform");
 
         // Create the collider shape node under the transform
-        MObject colliderNodeObj = dagMod.createNode(colliderName, colliderParentObj);
-        dagMod.doIt();
-        MFnDagNode fnCollider(colliderNodeObj);
-        fnCollider.setName(colliderName + "Shape#");
+        MObject colliderNodeObj = Utils::createDagNode(colliderName, colliderParentObj, colliderName + "Shape#");
 
         MSelectionList newSelection;
         MDagPath parentDagPath;
@@ -250,7 +237,7 @@ public:
         MGlobal::setActiveSelectionList(newSelection);
 
         MGlobal::executeCommand("setToolTo moveSuperContext");
-        MGlobal::executeCommand(MString("showEditor \"" + fnCollider.name() + "\";"));
+        MGlobal::executeCommand(MString("showEditor \"" + MFnDagNode(colliderNodeObj).name() + "\";"));
         return MStatus::kSuccess;
     }
 };

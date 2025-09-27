@@ -29,27 +29,10 @@ const MObject& GlobalSolver::getOrCreateGlobalSolver() {
         return globalSolverNodeObject;
     }
 
-    MStatus status;
-    MDGModifier dgMod;
-    globalSolverNodeObject = dgMod.createNode(GlobalSolver::globalSolverNodeName, &status);
-	dgMod.doIt();
-
-    MPlug timePlug = getGlobalTimePlug();
-    dgMod.connect(timePlug, MPlug(globalSolverNodeObject, aTime));
-    dgMod.doIt();
-
+    globalSolverNodeObject = Utils::createDGNode(GlobalSolver::globalSolverNodeName);
+    Utils::connectPlugs(Utils::getGlobalTimePlug(), MPlug(globalSolverNodeObject, aTime));
+    
     return globalSolverNodeObject;
-}
-
-MPlug GlobalSolver::getGlobalTimePlug() {
-    MItDependencyNodes it(MFn::kTime);
-    // Assumes there's only one time node in the scene, which is a pretty safe assumption.
-    if (!it.isDone()) {
-        MFnDependencyNode timeNode(it.thisNode());
-        return timeNode.findPlug("outTime", false);
-    }
-
-    return MPlug();
 }
 
 void GlobalSolver::postConstructor() {
@@ -104,24 +87,6 @@ void GlobalSolver::tearDown() {
     globalSolverNodeObject = MObject::kNullObj;
     colliderBuffer = ColliderBuffer();
     dirtyColliderIndices.clear();
-}
-
-/**
- * Logical indices are sparse, mapped to contiguous physical indices.
- * This method finds the next available logical index for creating a new plug in the array.
- */
-uint GlobalSolver::getNextArrayPlugIndex(MPlug& arrayPlug) {
-    MStatus status;
-
-    uint nextIndex = 0;
-    const uint numElements = arrayPlug.evaluateNumElements(&status);
-    for (uint i = 0; i < numElements; ++i) {
-        uint idx = arrayPlug.elementByPhysicalIndex(i, &status).logicalIndex();
-        if (idx >= nextIndex) {
-            nextIndex = idx + 1;
-        }
-    }
-    return nextIndex;
 }
 
 // TODO: on file load, we don't want to recreate the buffer for each connection, just once. Is total numConnections known at load?

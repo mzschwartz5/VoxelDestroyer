@@ -43,10 +43,7 @@ public:
         bool clipTriangles,
         MDagPath& outDagPath
     ) {
-        MStatus status;
-        MDGModifier dgMod;
-        MObject voxelizerNodeObj = dgMod.createNode(VoxelizerNode::typeName, &status);
-        dgMod.doIt();
+        MObject voxelizerNodeObj = Utils::createDGNode(VoxelizerNode::typeName);
         MFnDependencyNode voxelizerNode(voxelizerNodeObj);
         VoxelizerNode* thisVoxelizer = static_cast<VoxelizerNode*>(voxelizerNode.userNode());
 

@@ -1,5 +1,8 @@
 #include "utils.h"
 #include <maya/MGlobal.h>
+#include <maya/MItDependencyNodes.h>
+#include <maya/MDGModifier.h>
+#include <maya/MDagModifier.h>
 #include <windows.h>
 #include <sstream>
 #include <cstring>
@@ -144,6 +147,64 @@ MFloatVector sign(const MFloatVector& v) {
         (v.y > 0) ? 1.0f : (v.y < 0) ? -1.0f : 0.0f,
         (v.z > 0) ? 1.0f : (v.z < 0) ? -1.0f : 0.0f
     );
+}
+
+/**
+ * Logical indices are sparse, mapped to contiguous physical indices.
+ * This method finds the next available logical index for creating a new plug in the array.
+ */
+uint getNextArrayPlugIndex(const MObject& dependencyNode, const MObject& arrayAttribute) {
+    MStatus status;
+
+    uint nextIndex = 0;
+    MPlug arrayPlug(dependencyNode, arrayAttribute);
+    const uint numElements = arrayPlug.evaluateNumElements(&status);
+    for (uint i = 0; i < numElements; ++i) {
+        uint idx = arrayPlug.elementByPhysicalIndex(i, &status).logicalIndex();
+        if (idx >= nextIndex) {
+            nextIndex = idx + 1;
+        }
+    }
+    return nextIndex;
+}
+
+MPlug getGlobalTimePlug() {
+    MItDependencyNodes it(MFn::kTime);
+    // Assumes there's only one time node in the scene, which is a pretty safe assumption.
+    if (!it.isDone()) {
+        MFnDependencyNode timeNode(it.thisNode());
+        return timeNode.findPlug("outTime", false);
+    }
+
+    return MPlug();
+}
+
+void connectPlugs(
+    const MPlug& srcPlug,
+    const MPlug& dstPlug
+) {
+    MDGModifier dgMod;
+    dgMod.connect(srcPlug, dstPlug);
+    dgMod.doIt();
+}
+
+MObject createDGNode(const MString& typeName) 
+{
+    MDGModifier dgMod;
+    MObject nodeObj = dgMod.createNode(typeName);
+    dgMod.doIt();
+    return nodeObj;
+}
+
+MObject createDagNode(const MString& typeName, const MObject& parent, const MString& name) 
+{
+    MDagModifier dagMod;
+    MObject nodeObj = dagMod.createNode(typeName, parent);
+    dagMod.doIt();
+    
+    MFnDependencyNode fnNode(nodeObj);
+    fnNode.setName(name);
+    return nodeObj;
 }
 
 } // namespace Utils
