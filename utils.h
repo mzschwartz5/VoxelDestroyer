@@ -154,6 +154,16 @@ void connectPlugs(
     const MPlug& dstPlug
 );
 
+
+void removePlugMultiInstance(const MPlug& plug, int logicalIndexToRemove = -1);
+
+int arrayPlugNumElements(const MObject& dependencyNode, const MObject& arrayAttribute);
+
+/**
+ * Gets the MPxNode connected to the given plug. Assumes only one connection.
+ */
+MPxNode* connectedNode(const MPlug& plug, bool nodeIsSource = true);
+
 MObject createDGNode(const MString& typeName);
 
 MObject createDagNode(const MString& typeName, const MObject& parent = MObject::kNullObj, const MString& name = "");
