@@ -3,6 +3,7 @@
 #include <maya/MFloatVector.h>
 #include <maya/MPlug.h>
 #include <maya/MFnPluginData.h>
+#include <maya/MFnDependencyNode.h>
 #include <maya/MDataBlock.h>
 #include <maya/MDataHandle.h>
 #include <maya/MObject.h>
@@ -109,5 +110,52 @@ MStatus createPluginData(MDataBlock& dataBlock, const MObject& outputAttribute, 
     outHandle.setClean();
     return status;
 }
+
+uint getNextArrayPlugIndex(const MObject& dependencyNode, const MObject& arrayAttribute);
+
+MPlug getGlobalTimePlug();
+
+
+// Helper overloads which build MPlug from either attribute name or MObject
+inline MPlug makePlugFromAttr(const MObject& node, const MObject& attr) {
+    return MPlug(node, attr);
+}
+
+inline MPlug makePlugFromAttr(const MObject& node, const MString& attrName) {
+    MFnDependencyNode fn(node);
+    return fn.findPlug(attrName, false);
+}
+
+template<typename SrcAttrT, typename DstAttrT>
+void connectPlugs(
+    const MObject& srcNode, 
+    const SrcAttrT& srcAttr, 
+    const MObject& dstNode, 
+    const DstAttrT& dstAttr,
+    int srcLogicalIndex = -1,
+    int dstLogicalIndex = -1
+) {
+    MPlug srcPlug = makePlugFromAttr(srcNode, srcAttr);
+    MPlug dstPlug = makePlugFromAttr(dstNode, dstAttr);
+
+    if (srcLogicalIndex != -1) {
+        srcPlug = srcPlug.elementByLogicalIndex(srcLogicalIndex);
+    }
+
+    if (dstLogicalIndex != -1) {
+        dstPlug = dstPlug.elementByLogicalIndex(dstLogicalIndex);
+    }
+
+    connectPlugs(srcPlug, dstPlug);
+}
+
+void connectPlugs(
+    const MPlug& srcPlug,
+    const MPlug& dstPlug
+);
+
+MObject createDGNode(const MString& typeName);
+
+MObject createDagNode(const MString& typeName, const MObject& parent = MObject::kNullObj, const MString& name = "");
 
 } // namespace Utils

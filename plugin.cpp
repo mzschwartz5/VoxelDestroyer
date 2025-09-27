@@ -317,11 +317,7 @@ void plugin::maybeCreateGroundCollider() {
 		if (ColliderLocator::isColliderNode(node)) return;
     }
 
-	MDagModifier dagMod;
-	MObject planeColliderObj = dagMod.createNode(PlaneCollider::id);
-	MFnDependencyNode fn(planeColliderObj);
-	fn.setName("GroundPlaneCollider");
-	dagMod.doIt();
+	MObject planeColliderObj = Utils::createDagNode(PlaneCollider::typeName, MObject::kNullObj, "GroundPlaneCollider");
 }
 
 // Initialize Maya Plugin upon loading

@@ -60,7 +60,6 @@ public:
     static MStatus initialize();
     static void tearDown();
     static const MObject& getOrCreateGlobalSolver();
-    static uint getNextArrayPlugIndex(MPlug& arrayPlug);
 
     // Time input triggers compute which runs simulation step for all connected PBD nodes.
     MStatus compute(const MPlug& plug, MDataBlock& block) override;
@@ -77,7 +76,6 @@ private:
     static void deleteParticleData(MPlug& particleDataToRemovePlug);
     static void calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNodeMessage::AttributeMessage changeType, std::unordered_map<int, int>& offsetForLogicalPlug, float& maximumParticleRadius);
     static void maybeDeleteGlobalSolver();
-    static MPlug getGlobalTimePlug();
     MCallbackIdArray callbackIds;
 
     static constexpr int SUBSTEPS = 10;

@@ -93,44 +93,17 @@ public:
         status = voxelMeshDagPath.extendToShape();
 
         // Create the new shape under the existing transform
-        MDagModifier dagMod;
-        MObject newShapeObj = dagMod.createNode(typeName, voxelTransform);
+        MObject newShapeObj = Utils::createDagNode(typeName, voxelTransform);
 
         // Relegate the old shape to an intermediate object
         MFnDagNode oldShapeDagNode(voxelMeshDagPath);
         oldShapeDagNode.setIntermediateObject(true);
 
-        // Connect the old shape's geometry to the new shape as its input
-        MFnDependencyNode srcDep(voxelMeshDagPath.node(), &status);
-        MPlug srcOutMesh = srcDep.findPlug("outMesh", true, &status);
-
-        MFnDependencyNode dstDep(newShapeObj, &status);
-        MPlug dstInMesh = dstDep.findPlug(aInputGeom, false, &status);
-
-        dagMod.connect(srcOutMesh, dstInMesh);
-        dagMod.doIt();
-
-        // Connect the PBD node outputs to the shape's inputs
-        MDGModifier dgMod;
-        MFnDependencyNode pbdNode(pbdNodeObj);
-        
-        MPlug pbdTriggerPlug = pbdNode.findPlug(PBDNode::aTriggerOut, false);
-        MPlug triggerPlug = dstDep.findPlug(aTrigger, false);
-        dgMod.connect(pbdTriggerPlug, triggerPlug);
-
-        MPlug pbdParticleDataPlug = pbdNode.findPlug(PBDNode::aParticleData, false);
-        MPlug particleDataPlug = dstDep.findPlug(aParticleData, false);
-        dgMod.connect(pbdParticleDataPlug, particleDataPlug);
-
-        MPlug pbdParticleSRVPlug = pbdNode.findPlug(PBDNode::aParticleSRV, false);
-        MPlug particleSRVPlug = dstDep.findPlug(aParticleSRV, false);
-        dgMod.connect(pbdParticleSRVPlug, particleSRVPlug);
-
-        MPlug pbdVoxelDataPlug = pbdNode.findPlug(PBDNode::aVoxelDataOut, false);
-        MPlug voxelDataPlug = dstDep.findPlug(aVoxelData, false);
-        dgMod.connect(pbdVoxelDataPlug, voxelDataPlug); 
-
-        dgMod.doIt();
+        Utils::connectPlugs(voxelMeshDagPath.node(), MString("outMesh"), newShapeObj, aInputGeom);
+        Utils::connectPlugs(pbdNodeObj, PBDNode::aTriggerOut, newShapeObj, aTrigger);
+        Utils::connectPlugs(pbdNodeObj, PBDNode::aParticleData, newShapeObj, aParticleData);
+        Utils::connectPlugs(pbdNodeObj, PBDNode::aParticleSRV, newShapeObj, aParticleSRV);
+        Utils::connectPlugs(pbdNodeObj, PBDNode::aVoxelDataOut, newShapeObj, aVoxelData);
 
         return newShapeObj;
     }
