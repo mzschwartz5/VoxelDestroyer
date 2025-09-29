@@ -374,7 +374,7 @@ void Voxelizer::createVoxels(
                 modelMatrix.setTranslation(MVector(voxelCenter), MSpace::kWorld);
                 modelMatrix.setScale(std::array<double,3>{voxelSize, voxelSize, voxelSize}.data(), MSpace::kWorld);
 
-                overlappedVoxels.modelMatrices.insert(modelMatrix.asMatrix(), index);
+                overlappedVoxels.modelMatrices.set(modelMatrix.asMatrix(), index);
                 overlappedVoxels.numOccupied++;
             }
         }
@@ -407,7 +407,7 @@ std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
     MObject interiorFaceComponent = singleIndexComponentFn.create(MFn::kMeshPolygonComponent);
     for (int i = 0; i < voxels.numOccupied; ++i) {
         MObject voxelFaceComponent = singleIndexComponentFn.create(MFn::kMeshPolygonComponent);
-        voxels.faceComponents.append(voxelFaceComponent);
+        voxels.faceComponents.set(voxelFaceComponent, i);
     }
 
     VoxelIntersectionTaskData taskData {
