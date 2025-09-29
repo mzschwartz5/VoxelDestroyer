@@ -219,21 +219,17 @@ private:
         shaderManager->releaseShader(shaderInstance);
     }
 
-    void getAllMeshVertices(
+    unsigned int getAllMeshVertices(
         const MGeometryExtractor& extractor,
-        std::vector<uint>& vertexIndices,
-        std::vector<float>& vertexPositions
+        std::vector<uint>& vertexIndices
     ) {
-        MVertexBufferDescriptor posDesc("position", MGeometry::kPosition, MGeometry::kFloat, 3);
-        const unsigned int vertexCount = extractor.vertexCount(); 
-        vertexPositions.resize(vertexCount * 3);
-        extractor.populateVertexBuffer(vertexPositions.data(), vertexCount, posDesc);
-
         // No face component arg --> whole mesh
         MIndexBufferDescriptor indexDesc(MIndexBufferDescriptor::kTriangle, MString(), MGeometry::kTriangles, 0);
         const unsigned int primitiveCount = extractor.primitiveCount(indexDesc);
         vertexIndices.resize(primitiveCount * 3);
         extractor.populateIndexBuffer(vertexIndices.data(), primitiveCount * 3, indexDesc);
+
+        return extractor.vertexCount(); 
     }
 
 public:
@@ -333,15 +329,14 @@ public:
             setGeometryForRenderItem(*renderItem, vertexBufferArray, *rawIndexBuffer, &bounds);
         }
 
-        // The voxel shape needs the whole mesh's vertex positions and indices to tag each vertex with the voxel it belongs to.
-        // It's important to do this in the order that MGeometryExtractor provides the buffers to us.
+        // The voxel shape needs the whole mesh's vertex indices to tag each vertex with the voxel it belongs to.
+        // It's important to do the tagging using the vertex buffer that MGeometryExtractor provides.
         std::vector<uint> vertexIndices;
-        std::vector<float> vertexPositions;
-        getAllMeshVertices(extractor, vertexIndices, vertexPositions);
+        unsigned int numVertices = getAllMeshVertices(extractor, vertexIndices);
 
         voxelShape->initializeDeformVerticesCompute(
             vertexIndices,
-            vertexPositions,
+            numVertices,
             positionsUAV,
             normalsUAV,
             originalPositionsSRV, 

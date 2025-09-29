@@ -405,6 +405,10 @@ std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
     MFnSingleIndexedComponent singleIndexComponentFn;
     MObject surfaceFaceComponent = singleIndexComponentFn.create(MFn::kMeshPolygonComponent);
     MObject interiorFaceComponent = singleIndexComponentFn.create(MFn::kMeshPolygonComponent);
+    for (int i = 0; i < voxels.numOccupied; ++i) {
+        MObject voxelFaceComponent = singleIndexComponentFn.create(MFn::kMeshPolygonComponent);
+        voxels.faceComponents.append(voxelFaceComponent);
+    }
 
     VoxelIntersectionTaskData taskData {
         &voxels,
@@ -413,6 +417,7 @@ std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
         &sideTester,
         &surfaceFaceComponent,
         &interiorFaceComponent,
+        &voxels.faceComponents,
         doBoolean,
         clipTriangles,
         newMeshName
@@ -521,6 +526,7 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
     Voxels* voxels = taskData->voxels;
     MFnSingleIndexedComponent surfaceFaceComponent(*(taskData->surfaceFaces));
     MFnSingleIndexedComponent interiorFaceComponent(*(taskData->interiorFaces));
+    const MObjectArray& voxelFaceComponents = *(taskData->faceComponents);
     const MString& newMeshName = taskData->newMeshName;
 
     // Threads will write the outputs of the boolean operations to these vectors
@@ -550,11 +556,16 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
     threadData.clear();
 
     // Merge together all the mesh points, poly counts, and poly connects into one mesh
+    // Also, build the face components for surface and interior faces (for the whole mesh), and a face component per voxel.
     MPointArray allMeshPoints;
     MIntArray allPolyCounts, allPolyConnects;
     MIntArray surfaceFaceIndices, interiorFaceIndices;
+    MFnSingleIndexedComponent fnVoxelFaceComponent;
     int startFaceIdx = 0;
     for (int i = 0; i < voxels->numOccupied; ++i) {
+        MIntArray voxelFaceIndices;
+        fnVoxelFaceComponent.setObject(voxelFaceComponents[i]);
+
         int startVertIdx = voxels->totalVerts;
         voxels->totalVerts += meshPointsAfterIntersection[i].length();
 
@@ -564,13 +575,16 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
         if (numSurfaceFaces > 0) {
             for (int f = 0; f < numSurfaceFaces; ++f) {
                 surfaceFaceIndices.append(startFaceIdx + f);
+                voxelFaceIndices.append(startFaceIdx + f);
             }
         }
         if (numInteriorFaces > 0) {
             for (int f = 0; f < numInteriorFaces; ++f) {
                 interiorFaceIndices.append(startFaceIdx + numSurfaceFaces + f);
+                voxelFaceIndices.append(startFaceIdx + numSurfaceFaces + f);
             }
         }
+        fnVoxelFaceComponent.addElements(voxelFaceIndices);
         startFaceIdx += totalFaceCount;
 
         for (unsigned int j = 0; j < meshPointsAfterIntersection[i].length(); ++j) {
