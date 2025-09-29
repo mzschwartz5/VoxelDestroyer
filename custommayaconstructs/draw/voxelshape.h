@@ -132,48 +132,14 @@ public:
         return srcDagPath;
     }
     
-    bool excludeAsPluginShape() const {
+    bool excludeAsPluginShape() const override {
         // Always display this shape in the outliner, even when plugin shapes are excluded.
         return false;
     }
-
-    /**
-     * Associate each vertex in the buffer created by the subscene override with a voxel ID it belongs to.
-     * We do this by iterating over the faces indices of each voxel face component, using them to access the index buffer of the whole mesh,
-     * and tagging the vertices of each face with the voxel ID.
-     * 
-     * Note that this makes implicit assumptions about the order of face indices from MGeometryExtractor.
-     * 
-     * We do this now, instead of in the voxelizer, because the subscene override is the ultimate source of truth on the order of vertices in the GPU buffers.
-     * Supporting split normals, UV seams, etc. requires duplicating vertices. So we have to do this step after the subscene override has created the final vertex buffers.
-     */
-    std::vector<uint> getVoxelIdsForVertices(
-        const std::vector<uint>& vertexIndices,
-        const unsigned int numVertices,
-        const MSharedPtr<Voxels>& voxels
-    ) const {
-        std::vector<uint> vertexVoxelIds(numVertices, UINT_MAX);
-        const MObjectArray& faceComponents = voxels->faceComponents;
-        const std::vector<uint32_t>& mortonCodes = voxels->mortonCodes;
-        const std::unordered_map<uint32_t, uint32_t>& mortonCodesToSortedIdx = voxels->mortonCodesToSortedIdx;
-
-        MFnSingleIndexedComponent fnFaceComponent;
-        for (int i = 0; i < voxels->numOccupied; ++i) {
-            int voxelIndex = mortonCodesToSortedIdx.at(mortonCodes[i]);
-            MObject faceComponent = faceComponents[i];
-            fnFaceComponent.setObject(faceComponent);
-
-            for (int j = 0; j < fnFaceComponent.elementCount(); ++j) {
-                int faceIndex = fnFaceComponent.element(j);
-
-                for (int k = 0; k < 3; ++k) {
-                    uint vertexIndex = vertexIndices[3 * faceIndex + k];
-                    vertexVoxelIds[vertexIndex] = voxelIndex;
-                }
-            }
-        }
-
-        return vertexVoxelIds;
+    
+    MSharedPtr<Voxels> getVoxels() {
+        Utils::PluginData<VoxelData> voxelData(thisMObject(), aVoxelData);
+        return voxelData.get()->getVoxels();
     }
 
     /**
@@ -190,8 +156,7 @@ public:
         const ComPtr<ID3D11ShaderResourceView>& originalNormalsSRV
     ) {
 
-        Utils::PluginData<VoxelData> voxelData(thisMObject(), aVoxelData);
-        std::vector<uint> vertexVoxelIds = getVoxelIdsForVertices(vertexIndices, numVertices, voxelData.get()->getVoxels());
+        std::vector<uint> vertexVoxelIds = getVoxelIdsForVertices(vertexIndices, numVertices, getVoxels());
 
         Utils::PluginData<ParticleData> particleData(thisMObject(), aParticleData);
         Utils::PluginData<D3D11Data> particleSRVData(thisMObject(), aParticleSRV);
@@ -271,6 +236,45 @@ private:
             MMessage::removeCallbacks(voxelShape->callbackIds);
         }, this);
         callbackIds.append(callbackId);
+    }
+
+    /**
+     * Associate each vertex in the buffer created by the subscene override with a voxel ID it belongs to.
+     * We do this by iterating over the faces indices of each voxel face component, using them to access the index buffer of the whole mesh,
+     * and tagging the vertices of each face with the voxel ID.
+     * 
+     * Note that this makes implicit assumptions about the order of face indices from MGeometryExtractor.
+     * 
+     * We do this now, instead of in the voxelizer, because the subscene override is the ultimate source of truth on the order of vertices in the GPU buffers.
+     * Supporting split normals, UV seams, etc. requires duplicating vertices. So we have to do this step after the subscene override has created the final vertex buffers.
+     */
+    std::vector<uint> getVoxelIdsForVertices(
+        const std::vector<uint>& vertexIndices,
+        const unsigned int numVertices,
+        const MSharedPtr<Voxels>& voxels
+    ) const {
+        std::vector<uint> vertexVoxelIds(numVertices, UINT_MAX);
+        const MObjectArray& faceComponents = voxels->faceComponents;
+        const std::vector<uint32_t>& mortonCodes = voxels->mortonCodes;
+        const std::unordered_map<uint32_t, uint32_t>& mortonCodesToSortedIdx = voxels->mortonCodesToSortedIdx;
+
+        MFnSingleIndexedComponent fnFaceComponent;
+        for (int i = 0; i < voxels->numOccupied; ++i) {
+            int voxelIndex = mortonCodesToSortedIdx.at(mortonCodes[i]);
+            MObject faceComponent = faceComponents[i];
+            fnFaceComponent.setObject(faceComponent);
+
+            for (int j = 0; j < fnFaceComponent.elementCount(); ++j) {
+                int faceIndex = fnFaceComponent.element(j);
+
+                for (int k = 0; k < 3; ++k) {
+                    uint vertexIndex = vertexIndices[3 * faceIndex + k];
+                    vertexVoxelIds[vertexIndex] = voxelIndex;
+                }
+            }
+        }
+
+        return vertexVoxelIds;
     }
 
 };
