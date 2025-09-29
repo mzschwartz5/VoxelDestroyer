@@ -139,69 +139,38 @@ public:
 
     /**
      * Associate each vertex in the buffer created by the subscene override with a voxel ID it belongs to.
-     * This is done by computing the centroid of each triangle and seeing which voxel it falls into. All vertices of that triangle get tagged with that voxel ID.
+     * We do this by iterating over the faces indices of each voxel face component, using them to access the index buffer of the whole mesh,
+     * and tagging the vertices of each face with the voxel ID.
+     * 
+     * Note that this makes implicit assumptions about the order of face indices from MGeometryExtractor.
      * 
      * We do this now, instead of in the voxelizer, because the subscene override is the ultimate source of truth on the order of vertices in the GPU buffers.
-     * Aside from possible internal Maya reasons, supporting split normals, UV seams, etc. requires duplicating vertices. So we have to do this step after the subscene override has created the final vertex buffers.
+     * Supporting split normals, UV seams, etc. requires duplicating vertices. So we have to do this step after the subscene override has created the final vertex buffers.
      */
     std::vector<uint> getVoxelIdsForVertices(
         const std::vector<uint>& vertexIndices,
-        const std::vector<float>& vertexPositions,
-        const VoxelizationGrid& voxelizationGrid,
-        const MSharedPtr<Voxels> voxels
+        const unsigned int numVertices,
+        const MSharedPtr<Voxels>& voxels
     ) const {
-        const MDagPath originalGeomPath = pathToOriginalGeometry();
-        std::vector<uint> vertexVoxelIds(vertexPositions.size() / 3, UINT_MAX);
-        double voxelSize = voxelizationGrid.gridEdgeLength / voxelizationGrid.voxelsPerEdge;
-        MPoint gridMin = voxelizationGrid.gridCenter - MVector(voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2, voxelizationGrid.gridEdgeLength / 2);
-        gridMin = originalGeomPath.inclusiveMatrix().inverse() * gridMin; // Transform voxelization grid to object space, since that's where vertices are defined.
-        const std::unordered_map<uint32_t, uint32_t>& voxelMortonCodeToIndex = voxels->mortonCodesToSortedIdx;
-        const double episilon = 1e-4 * voxelSize;
+        std::vector<uint> vertexVoxelIds(numVertices, UINT_MAX);
+        const MObjectArray& faceComponents = voxels->faceComponents;
+        const std::vector<uint32_t>& mortonCodes = voxels->mortonCodes;
+        const std::unordered_map<uint32_t, uint32_t>& mortonCodesToSortedIdx = voxels->mortonCodesToSortedIdx;
 
-        // TODO: this approach still doesn't work flawlessly... there are some cases where a triangle gets stretched between voxels.
-        // A fail-safe method would be to store face components per-voxel in Voxelizer. Though this assumes the order of triangles in the vertexIndices buffer 
-        // matches the order of triangles in the original mesh (which it should... but it's not the safest assumption).
-        for (size_t i = 0; i < vertexIndices.size(); i += 3) {
-            uint idx0 = vertexIndices[i];
-            uint idx1 = vertexIndices[i + 1];
-            uint idx2 = vertexIndices[i + 2];
+        MFnSingleIndexedComponent fnFaceComponent;
+        for (int i = 0; i < voxels->numOccupied; ++i) {
+            int voxelIndex = mortonCodesToSortedIdx.at(mortonCodes[i]);
+            MObject faceComponent = faceComponents[i];
+            fnFaceComponent.setObject(faceComponent);
 
-            // If a vertex has been assigned a voxel ID already (as part of some other triangle),
-            // use it for this triangle's vertices as well. By construction, a vertex should be owned by one voxel,
-            // so if one triangle it's part of belongs to a voxel, all triangles it is part of should belong to the same voxel.
-            uint voxelId = UINT_MAX;
-            for (uint idx : { idx0, idx1, idx2 }) {
-                if (vertexVoxelIds[idx] != UINT_MAX) { 
-                    voxelId = vertexVoxelIds[idx]; 
-                    break; 
+            for (int j = 0; j < fnFaceComponent.elementCount(); ++j) {
+                int faceIndex = fnFaceComponent.element(j);
+
+                for (int k = 0; k < 3; ++k) {
+                    uint vertexIndex = vertexIndices[3 * faceIndex + k];
+                    vertexVoxelIds[vertexIndex] = voxelIndex;
                 }
             }
-
-            if (voxelId != UINT_MAX) {
-                for (uint idx : { idx0, idx1, idx2 }) vertexVoxelIds[idx] = voxelId;
-                continue;
-            }
-
-            MPoint v0(vertexPositions[idx0 * 3], vertexPositions[idx0 * 3 + 1], vertexPositions[idx0 * 3 + 2]);
-            MPoint v1(vertexPositions[idx1 * 3], vertexPositions[idx1 * 3 + 1], vertexPositions[idx1 * 3 + 2]);
-            MPoint v2(vertexPositions[idx2 * 3], vertexPositions[idx2 * 3 + 1], vertexPositions[idx2 * 3 + 2]);
-
-            // Triangles on the boundary between voxels will have identical centroids. To identify the correct voxel, 
-            // nudge the centroid back a small epsilon along the triangle normal (by winding order).
-            MVector normal = ((v1 - v0) ^ (v2 - v0)).normal();
-            MPoint centroid = ((v0 + v1 + v2) / 3.0) - (normal * episilon);
-
-            int voxelX = static_cast<int>(floor((centroid.x - gridMin.x) / voxelSize));
-            int voxelY = static_cast<int>(floor((centroid.y - gridMin.y) / voxelSize));
-            int voxelZ = static_cast<int>(floor((centroid.z - gridMin.z) / voxelSize));
-
-            uint voxelMortonCode = Utils::toMortonCode(voxelX, voxelY, voxelZ);
-            voxelId = voxelMortonCodeToIndex.at(voxelMortonCode);
-
-            // Tag all three vertices of this triangle with the same voxel ID
-            vertexVoxelIds[idx0] = voxelId;
-            vertexVoxelIds[idx1] = voxelId;
-            vertexVoxelIds[idx2] = voxelId;
         }
 
         return vertexVoxelIds;
@@ -214,7 +183,7 @@ public:
      */
     void initializeDeformVerticesCompute(
         const std::vector<uint>& vertexIndices,
-        const std::vector<float>& vertexPositions,
+        const unsigned int numVertices,
         const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
         const ComPtr<ID3D11UnorderedAccessView>& normalsUAV,
         const ComPtr<ID3D11ShaderResourceView>& originalPositionsSRV,
@@ -222,13 +191,8 @@ public:
     ) {
 
         Utils::PluginData<VoxelData> voxelData(thisMObject(), aVoxelData);
-        std::vector<uint> vertexVoxelIds = getVoxelIdsForVertices(
-            vertexIndices, 
-            vertexPositions,
-            voxelData.get()->getVoxelizationGrid(),
-            voxelData.get()->getVoxels()
-        );
-        
+        std::vector<uint> vertexVoxelIds = getVoxelIdsForVertices(vertexIndices, numVertices, voxelData.get()->getVoxels());
+
         Utils::PluginData<ParticleData> particleData(thisMObject(), aParticleData);
         Utils::PluginData<D3D11Data> particleSRVData(thisMObject(), aParticleSRV);
         const ParticleDataContainer& particleDataContainer = particleData.get()->getData();
@@ -236,7 +200,7 @@ public:
 
         deformVerticesCompute = DeformVerticesCompute(
             particleDataContainer.numParticles,
-            vertexPositions.size() / 3,
+            numVertices,
             originalGeomPath.inclusiveMatrix().inverse(),
             *particleDataContainer.particlePositionsCPU,
             vertexVoxelIds,

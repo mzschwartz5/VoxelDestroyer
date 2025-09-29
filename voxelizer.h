@@ -6,6 +6,7 @@
 #include <maya/MFnMesh.h>
 #include <maya/MDagPath.h>
 #include <maya/MMatrixArray.h>
+#include <maya/MObjectArray.h>
 #include <vector>
 #include <array>
 #include <unordered_map>
@@ -69,6 +70,7 @@ struct Voxels {
     std::unordered_map<uint32_t, uint32_t> mortonCodesToSortedIdx;
     std::vector<std::vector<int>> containedTris;   // Indices of triangles (of the input mesh) whose centroids are contained within the voxel
     std::vector<std::vector<int>> overlappingTris; // Indices of triangles (of the input mesh) that overlap the voxel, but whose centroids are not contained within the voxel
+    MObjectArray faceComponents;                   // Face component per voxel, post voxelization
     MDagPath voxelizedMeshDagPath;
     
     int totalVerts = 0; // total number of vertices in the voxelized mesh
@@ -86,6 +88,7 @@ struct Voxels {
           mortonCodesToSortedIdx(other.mortonCodesToSortedIdx),
           containedTris(other.containedTris),
           overlappingTris(other.overlappingTris),
+          faceComponents(other.faceComponents),
           voxelizedMeshDagPath(other.voxelizedMeshDagPath),
           totalVerts(other.totalVerts),
           numOccupied(other.numOccupied),
@@ -103,6 +106,7 @@ struct Voxels {
             mortonCodesToSortedIdx = other.mortonCodesToSortedIdx;
             containedTris = other.containedTris;
             overlappingTris = other.overlappingTris;
+            faceComponents = other.faceComponents;
             voxelizedMeshDagPath = other.voxelizedMeshDagPath;
             totalVerts = other.totalVerts;
             numOccupied = other.numOccupied;
@@ -121,6 +125,7 @@ struct Voxels {
           mortonCodesToSortedIdx(std::move(other.mortonCodesToSortedIdx)),
           containedTris(std::move(other.containedTris)),
           overlappingTris(std::move(other.overlappingTris)),
+          faceComponents(std::move(other.faceComponents)),
           voxelizedMeshDagPath(std::move(other.voxelizedMeshDagPath)),
           totalVerts(other.totalVerts),
           numOccupied(other.numOccupied),
@@ -240,6 +245,7 @@ private:
         const SideTester* const sideTester;
         MObject* const surfaceFaces;
         MObject* const interiorFaces;
+        MObjectArray* const faceComponents;
         bool doBoolean;
         bool clipTriangles;
         MString newMeshName;
