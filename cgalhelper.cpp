@@ -8,6 +8,7 @@
 #include <maya/MDagPath.h>
 #include "voxelizer.h" // needed for Triangle type definition
 #include <unordered_map>
+#include "cube.h"
 
 namespace CGALHelper {
 
@@ -19,36 +20,20 @@ SurfaceMesh cube(const MMatrix& modelMatrix)
     MPoint center = tmat.getTranslation(MSpace::kWorld);
     double scaleArr[3] = {1.0, 1.0, 1.0};
     tmat.getScale(scaleArr, MSpace::kWorld);
-    const float halfEdge = 0.5f * static_cast<float>(scaleArr[0]);
+    const float edge = static_cast<float>(scaleArr[0]);
 
-    std::array<Point_3, 8> vertices = {
-        Point_3(center.x - halfEdge, center.y - halfEdge, center.z - halfEdge),
-        Point_3(center.x + halfEdge, center.y - halfEdge, center.z - halfEdge),
-        Point_3(center.x - halfEdge, center.y + halfEdge, center.z - halfEdge),
-        Point_3(center.x + halfEdge, center.y + halfEdge, center.z - halfEdge),
-        Point_3(center.x - halfEdge, center.y - halfEdge, center.z + halfEdge),
-        Point_3(center.x + halfEdge, center.y - halfEdge, center.z + halfEdge),
-        Point_3(center.x - halfEdge, center.y + halfEdge, center.z + halfEdge),
-        Point_3(center.x + halfEdge, center.y + halfEdge, center.z + halfEdge)
-    };
-
-    // Add vertices
     std::array<SurfaceMesh::Vertex_index, 8> vertexIndices;
-    for (size_t i = 0; i < vertices.size(); ++i) {
-        vertexIndices[i] = cubeMesh.add_vertex(vertices[i]);
+    for (size_t i = 0; i < 8; ++i) {
+        Point_3 p(
+            static_cast<double>(center.x + cubeCorners[i][0] * edge),
+            static_cast<double>(center.y + cubeCorners[i][1] * edge),
+            static_cast<double>(center.z + cubeCorners[i][2] * edge)
+        );
+        vertexIndices[i] = cubeMesh.add_vertex(p);
     }
 
-    std::array<std::array<int, 3>, 12> faces = {
-        std::array<int, 3>{0, 4, 6}, std::array<int, 3>{0, 6, 2}, // Bottom
-        std::array<int, 3>{1, 3, 7}, std::array<int, 3>{1, 7, 5}, // Top
-        std::array<int, 3>{0, 1, 5}, std::array<int, 3>{0, 5, 4}, // Front
-        std::array<int, 3>{4, 5, 7}, std::array<int, 3>{4, 7, 6}, // Right
-        std::array<int, 3>{6, 7, 3}, std::array<int, 3>{6, 3, 2}, // Back
-        std::array<int, 3>{2, 3, 1}, std::array<int, 3>{2, 1, 0}  // Left
-    };
-
     // Add faces
-    for (const auto& face : faces) {
+    for (const auto& face : cubeFaces) {
         cubeMesh.add_face(vertexIndices[face[0]], vertexIndices[face[1]], vertexIndices[face[2]]);
     }
 
