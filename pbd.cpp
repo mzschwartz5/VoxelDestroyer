@@ -80,7 +80,7 @@ ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
             );
 
             // Offset the corner towards the center by the radius of the particle
-            const MFloatPoint& position = corner - (PARTICLE_RADIUS * Utils::sign(corner - voxelCenter));
+            const MFloatPoint position = corner - (PARTICLE_RADIUS * Utils::sign(corner - voxelCenter));
             float packedRadiusAndW = Utils::packTwoFloatsAsHalfs(PARTICLE_RADIUS, 1.0f); // for now, w is hardcoded to 1.0f
             particles.push_back(MFloatPoint(position.x, position.y, position.z, packedRadiusAndW));
             totalParticles++;

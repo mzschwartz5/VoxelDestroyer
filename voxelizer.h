@@ -139,7 +139,8 @@ struct Voxels {
         _size = size;
         occupied.resize(size, false);
         isSurface.resize(size, false);
-        modelMatrices = MMatrixArray(size);
+        modelMatrices.setLength(size);
+        faceComponents.setLength(size);
         mortonCodes.resize(size, UINT_MAX);
         containedTris.resize(size);
         overlappingTris.resize(size);
