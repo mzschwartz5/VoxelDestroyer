@@ -20,7 +20,7 @@ SurfaceMesh cube(const MMatrix& modelMatrix)
     MPoint center = tmat.getTranslation(MSpace::kWorld);
     double scaleArr[3] = {1.0, 1.0, 1.0};
     tmat.getScale(scaleArr, MSpace::kWorld);
-    const float edge = static_cast<float>(scaleArr[0]);
+    const double edge = (1.0 - 1e-9) * scaleArr[0]; // Slightly shrink the cube to avoid precision issues.
 
     std::array<SurfaceMesh::Vertex_index, 8> vertexIndices;
     for (size_t i = 0; i < 8; ++i) {
