@@ -156,7 +156,7 @@ private:
             std::vector<float> data(vertexCount * vbDesc.dimension(), 0.0f);
             extractor.populateVertexBuffer(data.data(), vertexCount, vbDesc);
             buffer = DirectX::createReadWriteBuffer(data, D3D11_BIND_VERTEX_BUFFER, true);
-            vertexBuffer->resourceHandle(buffer.Get(), sizeof(float) * data.size());
+            vertexBuffer->resourceHandle(buffer.Get(), data.size());
 
             ComPtr<ID3D11UnorderedAccessView>& uav = (semantic == MGeometry::kPosition) ? positionsUAV : normalsUAV;
             uav = DirectX::createUAV(buffer, true);
