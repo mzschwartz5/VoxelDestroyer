@@ -5,6 +5,7 @@
 #include <maya/MFnMesh.h>
 #include <maya/MShaderManager.h>
 #include "voxelshape.h"
+#include "../../cube.h"
 #include <maya/MGeometryRequirements.h>
 #include <maya/MGeometryExtractor.h>
 #include <memory>
@@ -35,7 +36,7 @@ private:
     ComPtr<ID3D11Buffer> originalNormalsBuffer;
     ComPtr<ID3D11ShaderResourceView> originalNormalsSRV;
 
-    std::unordered_map<MGeometry::Semantic, unique_ptr<MVertexBuffer>> mayaVertexBuffers;
+    std::vector<unique_ptr<MVertexBuffer>> mayaVertexBuffers;
     std::vector<unique_ptr<MIndexBuffer>> indexBuffers;
 
     VoxelSubSceneOverride(const MObject& obj)
@@ -43,7 +44,6 @@ private:
         MFnDependencyNode dn(obj);
         voxelShape = static_cast<VoxelShape*>(dn.userNode());
     }
-
 
     MShaderInstance* getVertexBufferDescriptorsForShader(const MObject& shaderNode, const MDagPath& geomDagPath, MVertexBufferDescriptorList& vertexBufferDescriptors) {
         MRenderer* renderer = MRenderer::theRenderer();
@@ -175,7 +175,7 @@ private:
         }
         
         vertexBufferArray.addBuffer(vbDesc.name(), vertexBuffer.get());
-        mayaVertexBuffers.insert({semantic, std::move(vertexBuffer)});
+        mayaVertexBuffers.push_back(std::move(vertexBuffer));
     }
 
     MIndexBuffer* createIndexBuffer(const RenderItemInfo& itemInfo, const MGeometryExtractor& extractor) {
@@ -230,6 +230,52 @@ private:
         extractor.populateIndexBuffer(vertexIndices.data(), primitiveCount * 3, indexDesc);
 
         return extractor.vertexCount(); 
+    }
+
+    // WORK IN PROGRESS (shouldn't be enabled all the time, need render items for selection and selection highlighting)
+    void createSelectionRenderItems(MSubSceneContainer& container) {
+        MRenderItem* voxelRenderItem = MRenderItem::Create("VoxelRenderItem", MRenderItem::MaterialSceneItem, MGeometry::kLines);
+        MShaderInstance* voxelShader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dThickLineShader);
+        voxelShader->setParameter("lineWidth", 0.25f);
+        const float solidColor[] = {0.0f, 1.0f, 0.25f, 1.0f};
+        voxelShader->setParameter("solidColor", solidColor);
+
+        voxelRenderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kWireframe | MGeometry::kShaded | MGeometry::kTextured));
+        voxelRenderItem->setSelectionMask(MSelectionMask::kSelectMeshes);
+        voxelRenderItem->depthPriority(MRenderItem::sActiveWireDepthPriority);
+        voxelRenderItem->setWantConsolidation(true);
+        voxelRenderItem->setShader(voxelShader);
+        container.add(voxelRenderItem);
+
+        MVertexBufferArray vbArray;
+        MVertexBufferDescriptor posDesc("", MGeometry::kPosition, MGeometry::kFloat, 3);
+        auto posVB = make_unique<MVertexBuffer>(posDesc);
+        float* posData = static_cast<float*>(posVB->acquire(8, true));
+        for (int i = 0; i < 8; ++i) {
+            posData[i * 3 + 0] = cubeCorners[i][0];
+            posData[i * 3 + 1] = cubeCorners[i][1];
+            posData[i * 3 + 2] = cubeCorners[i][2];
+        }
+        posVB->commit(posData);
+        vbArray.addBuffer(posDesc.name(), posVB.get());
+        mayaVertexBuffers.push_back(std::move(posVB));
+
+        auto idxBuf = make_unique<MIndexBuffer>(MGeometry::kUnsignedInt32);
+        uint32_t* idxData = static_cast<uint32_t*>(idxBuf->acquire(24, true));
+        for (int e = 0; e < 12; ++e) {
+            idxData[e * 2 + 0] = static_cast<uint32_t>(cubeEdges[e][0]);
+            idxData[e * 2 + 1] = static_cast<uint32_t>(cubeEdges[e][1]);
+        }
+        idxBuf->commit(idxData);
+        MIndexBuffer* rawIdxBuf = idxBuf.get();
+        indexBuffers.push_back(std::move(idxBuf));
+
+        const MBoundingBox bounds(MPoint(-0.5, -0.5, -0.5), MPoint(0.5, 0.5, 0.5));
+        setGeometryForRenderItem(*voxelRenderItem, vbArray, *rawIdxBuf, &bounds);
+        releaseShaderInstance(voxelShader);
+
+        const MMatrixArray& voxelInstanceTransforms = voxelShape->getVoxels().get()->modelMatrices;
+        setInstanceTransformArray(*voxelRenderItem, voxelInstanceTransforms);
     }
 
 public:
@@ -333,6 +379,8 @@ public:
         // It's important to do the tagging using the vertex buffer that MGeometryExtractor provides.
         std::vector<uint> vertexIndices;
         unsigned int numVertices = getAllMeshVertices(extractor, vertexIndices);
+
+        createSelectionRenderItems(container);
 
         voxelShape->initializeDeformVerticesCompute(
             vertexIndices,
