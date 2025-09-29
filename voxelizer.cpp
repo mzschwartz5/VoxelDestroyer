@@ -364,13 +364,17 @@ void Voxelizer::createVoxels(
                 
                 overlappedVoxels.mortonCodes[index] = Utils::toMortonCode(x, y, z);
 
-                MPoint voxelMin = MPoint(
-                    x * voxelSize + gridMin.x,
-                    y * voxelSize + gridMin.y,
-                    z * voxelSize + gridMin.z
+                // For now, voxels are axis-aligned, so the model matrix is just a translation and scale.
+                MTransformationMatrix modelMatrix;
+                MPoint voxelCenter(
+                    (x + 0.5) * voxelSize + gridMin.x,
+                    (y + 0.5) * voxelSize + gridMin.y,
+                    (z + 0.5) * voxelSize + gridMin.z
                 );
+                modelMatrix.setTranslation(MVector(voxelCenter), MSpace::kWorld);
+                modelMatrix.setScale(std::array<double,3>{voxelSize, voxelSize, voxelSize}.data(), MSpace::kWorld);
 
-                overlappedVoxels.dimensions[index] = { voxelMin, voxelSize };
+                overlappedVoxels.modelMatrices.insert(modelMatrix.asMatrix(), index);
                 overlappedVoxels.numOccupied++;
             }
         }
@@ -420,6 +424,10 @@ std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
         (void*)&taskData
     );
     MThreadPool::release(); // reduce reference count incurred by opening a new parallel region
+
+    // At this point, we no longer need certain members of voxels, so we can free up some memory
+    voxels.containedTris.clear();
+    voxels.overlappingTris.clear();
 
     return std::make_tuple(surfaceFaceComponent, interiorFaceComponent);
 }
@@ -495,7 +503,7 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
 
     for (size_t i = 0; i < voxels.numOccupied; ++i) {
         sortedVoxels.isSurface[i] = voxels.isSurface[voxelIndices[i]];
-        sortedVoxels.dimensions[i] = voxels.dimensions[voxelIndices[i]];
+        sortedVoxels.modelMatrices[i] = voxels.modelMatrices[voxelIndices[i]];
         sortedVoxels.mortonCodes[i] = voxels.mortonCodes[voxelIndices[i]];
         sortedVoxels.mortonCodesToSortedIdx[voxels.mortonCodes[voxelIndices[i]]] = static_cast<uint32_t>(i);
         sortedVoxels.containedTris[i] = voxels.containedTris[voxelIndices[i]];
@@ -618,8 +626,8 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
     std::unordered_map<Point_3, int, CGALHelper::Point3Hash> cgalVertexToMayaIdx;
 
     const Voxels* voxels = taskData->voxels;
-    const VoxelDimensions& voxelDim = voxels->dimensions[voxelIndex];
-    SurfaceMesh cube = CGALHelper::cube(voxelDim.min, voxelDim.edgeLength);
+    const MMatrix& modelMatrix = voxels->modelMatrices[voxelIndex];
+    SurfaceMesh cube = CGALHelper::cube(modelMatrix);
 
     // In this case, we just return the points of the cube without intersection.
     if (!voxels->isSurface[voxelIndex] || !doBoolean) {

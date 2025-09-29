@@ -39,10 +39,7 @@ namespace CGALHelper {
     /**
      * Creates a cube mesh centered at the given point with the specified edge length.
      */
-    SurfaceMesh cube(
-        const MPoint& minCorner,
-        float edgeLength
-    );
+    SurfaceMesh cube(const MMatrix& modelMatrix);
 
     /**
      * Converts a Maya mesh (or subset of it) to a CGAL SurfaceMesh.

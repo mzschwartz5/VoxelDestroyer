@@ -11,14 +11,15 @@
 
 namespace CGALHelper {
 
-SurfaceMesh cube(
-    const MPoint& minCorner,
-    float edgeLength
-)
+SurfaceMesh cube(const MMatrix& modelMatrix)
 {
     SurfaceMesh cubeMesh;
-    const float halfEdge = edgeLength * 0.5f;
-    const MPoint center(minCorner.x + halfEdge, minCorner.y + halfEdge, minCorner.z + halfEdge);
+    // Extract translation (center) and uniform scale (edge length) from the transform matrix.
+    MTransformationMatrix tmat(modelMatrix);
+    MPoint center = tmat.getTranslation(MSpace::kWorld);
+    double scaleArr[3] = {1.0, 1.0, 1.0};
+    tmat.getScale(scaleArr, MSpace::kWorld);
+    const float halfEdge = 0.5f * static_cast<float>(scaleArr[0]);
 
     std::array<Point_3, 8> vertices = {
         Point_3(center.x - halfEdge, center.y - halfEdge, center.z - halfEdge),
