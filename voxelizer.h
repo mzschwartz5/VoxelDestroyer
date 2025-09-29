@@ -5,6 +5,7 @@
 #include <maya/MPointArray.h>
 #include <maya/MFnMesh.h>
 #include <maya/MDagPath.h>
+#include <maya/MMatrixArray.h>
 #include <vector>
 #include <array>
 #include <unordered_map>
@@ -62,12 +63,12 @@ struct VoxelDimensions {
 struct Voxels {
     std::vector<bool> occupied;             // Contains some part (surface or interior) of the underlying mesh
     std::vector<uint> isSurface;            // Use uints instead of bools because vector<bool> packs bools into bits, which will not work for GPU access.
-    std::vector<VoxelDimensions> dimensions;  // Position and size of each voxel
+    MMatrixArray modelMatrices;             // Model matrix for each voxel - aside from size and position, this array is directly used to instance voxels in voxelsubsceneoverride
     std::vector<uint32_t> mortonCodes;
     // Answers the question: for a given voxel morton code, what is the index of the corresponding voxel in the sorted array of voxels?
     std::unordered_map<uint32_t, uint32_t> mortonCodesToSortedIdx;
-    std::vector<std::vector<int>> containedTris;   // Indices of triangles whose centroids are contained within the voxel
-    std::vector<std::vector<int>> overlappingTris; // Indicies of triangles that overlap the voxel, but whose centroids are not contained within the voxel
+    std::vector<std::vector<int>> containedTris;   // Indices of triangles (of the input mesh) whose centroids are contained within the voxel
+    std::vector<std::vector<int>> overlappingTris; // Indices of triangles (of the input mesh) that overlap the voxel, but whose centroids are not contained within the voxel
     MDagPath voxelizedMeshDagPath;
     
     int totalVerts = 0; // total number of vertices in the voxelized mesh
@@ -80,7 +81,7 @@ struct Voxels {
     Voxels(const Voxels& other)
         : occupied(other.occupied),
           isSurface(other.isSurface),
-          dimensions(other.dimensions),
+          modelMatrices(other.modelMatrices),
           mortonCodes(other.mortonCodes),
           mortonCodesToSortedIdx(other.mortonCodesToSortedIdx),
           containedTris(other.containedTris),
@@ -97,7 +98,7 @@ struct Voxels {
         if (this != &other) {
             occupied = other.occupied;
             isSurface = other.isSurface;
-            dimensions = other.dimensions;
+            modelMatrices = other.modelMatrices;
             mortonCodes = other.mortonCodes;
             mortonCodesToSortedIdx = other.mortonCodesToSortedIdx;
             containedTris = other.containedTris;
@@ -115,7 +116,7 @@ struct Voxels {
     Voxels(Voxels&& other) noexcept
         : occupied(std::move(other.occupied)),
           isSurface(std::move(other.isSurface)),
-          dimensions(std::move(other.dimensions)),
+          modelMatrices(std::move(other.modelMatrices)),
           mortonCodes(std::move(other.mortonCodes)),
           mortonCodesToSortedIdx(std::move(other.mortonCodesToSortedIdx)),
           containedTris(std::move(other.containedTris)),
@@ -133,7 +134,7 @@ struct Voxels {
         _size = size;
         occupied.resize(size, false);
         isSurface.resize(size, false);
-        dimensions.resize(size);
+        modelMatrices = MMatrixArray(size);
         mortonCodes.resize(size, UINT_MAX);
         containedTris.resize(size);
         overlappingTris.resize(size);

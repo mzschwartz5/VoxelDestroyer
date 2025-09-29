@@ -61,36 +61,33 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(
 }
 
 // Importantly: in Morton order (the order the VGS algorithm expects)
-std::array<std::array<int, 3>, 8> cornerOffsets = {{
-    {{0, 0, 0}},
-    {{1, 0, 0}},
-    {{0, 1, 0}},
-    {{1, 1, 0}},
-    {{0, 0, 1}},
-    {{1, 0, 1}},
-    {{0, 1, 1}},
-    {{1, 1, 1}}
+std::array<std::array<float, 3>, 8> cornerOffsets = {{
+    {{-0.5f, -0.5f, -0.5f}},
+    {{ 0.5f, -0.5f, -0.5f}},
+    {{-0.5f,  0.5f, -0.5f}},
+    {{ 0.5f,  0.5f, -0.5f}},
+    {{-0.5f, -0.5f,  0.5f}},
+    {{ 0.5f, -0.5f,  0.5f}},
+    {{-0.5f,  0.5f,  0.5f}},
+    {{ 0.5f,  0.5f,  0.5f}}
 }};
 
 ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
     const int numOccupied = voxels->numOccupied;
-    const std::vector<VoxelDimensions>& dimensions = voxels->dimensions;
+    const MMatrixArray& modelMatrices = voxels->modelMatrices;
+    double scaleArr[3] = {1.0, 1.0, 1.0};
 
     for (int i = 0; i < numOccupied; i++) {
-        const VoxelDimensions& voxelDims = dimensions[i];
-        const MFloatPoint& voxelMin = voxelDims.min;
-        double edgeLength = voxelDims.edgeLength;
-        const MFloatPoint voxelCenter = MFloatPoint(
-            voxelMin.x + (edgeLength * 0.5),
-            voxelMin.y + (edgeLength * 0.5),
-            voxelMin.z + (edgeLength * 0.5)
-        );
+        MTransformationMatrix tmat(modelMatrices[i]);
+        MFloatPoint voxelCenter = tmat.getTranslation(MSpace::kWorld);
+        tmat.getScale(scaleArr, MSpace::kWorld);
+        const float edgeLength = static_cast<float>(scaleArr[0]);
 
         for (int j = 0; j < 8; j++) {
             MFloatPoint corner = MFloatPoint(
-                voxelMin.x + (cornerOffsets[j][0] * edgeLength),
-                voxelMin.y + (cornerOffsets[j][1] * edgeLength),
-                voxelMin.z + (cornerOffsets[j][2] * edgeLength)
+                voxelCenter.x + (cornerOffsets[j][0] * edgeLength),
+                voxelCenter.y + (cornerOffsets[j][1] * edgeLength),
+                voxelCenter.z + (cornerOffsets[j][2] * edgeLength)
             );
 
             // Offset the corner towards the center by the radius of the particle

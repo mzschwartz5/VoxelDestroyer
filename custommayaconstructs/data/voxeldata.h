@@ -30,7 +30,6 @@ public:
         out.write(reinterpret_cast<const char*>(&size), sizeof(size));
 
         out.write(reinterpret_cast<const char*>(voxels->isSurface.data()), size * sizeof(uint));
-        out.write(reinterpret_cast<const char*>(voxels->dimensions.data()), size * sizeof(VoxelDimensions));
         out.write(reinterpret_cast<const char*>(voxels->mortonCodes.data()), size * sizeof(uint32_t));
 
         // If it proves to be too slow to serialize the map entry-by-entry, try copying it first into a vector of pairs for one contiguous write.
@@ -58,7 +57,6 @@ public:
         voxels->resize(static_cast<int>(size));
 
         in.read(reinterpret_cast<char*>(voxels->isSurface.data()), size * sizeof(uint));
-        in.read(reinterpret_cast<char*>(voxels->dimensions.data()), size * sizeof(VoxelDimensions));
         in.read(reinterpret_cast<char*>(voxels->mortonCodes.data()), size * sizeof(uint32_t));
 
         size_t mapSize;
