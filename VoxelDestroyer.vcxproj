@@ -182,6 +182,7 @@
     <ClInclude Include="voxelizer.h" />
     <ClInclude Include="cgalhelper.h" />
     <ClInclude Include="constants.h" />
+    <ClInclude Include="cube.h" />
     <ClInclude Include="globalsolver.h" />
     <ClInclude Include="custommayaconstructs\tools\voxeldragcontext.h" />
     <ClInclude Include="custommayaconstructs\tools\voxeldragcontextcommand.h" />

@@ -1,5 +1,6 @@
 #include "pbd.h"
 #include "utils.h"
+#include "cube.h"
 
 std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(
     const MSharedPtr<Voxels> voxels,
@@ -60,18 +61,6 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(
     return faceConstraints;
 }
 
-// Importantly: in Morton order (the order the VGS algorithm expects)
-std::array<std::array<float, 3>, 8> cornerOffsets = {{
-    {{-0.5f, -0.5f, -0.5f}},
-    {{ 0.5f, -0.5f, -0.5f}},
-    {{-0.5f,  0.5f, -0.5f}},
-    {{ 0.5f,  0.5f, -0.5f}},
-    {{-0.5f, -0.5f,  0.5f}},
-    {{ 0.5f, -0.5f,  0.5f}},
-    {{-0.5f,  0.5f,  0.5f}},
-    {{ 0.5f,  0.5f,  0.5f}}
-}};
-
 ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
     const int numOccupied = voxels->numOccupied;
     const MMatrixArray& modelMatrices = voxels->modelMatrices;
@@ -85,9 +74,9 @@ ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
 
         for (int j = 0; j < 8; j++) {
             MFloatPoint corner = MFloatPoint(
-                voxelCenter.x + (cornerOffsets[j][0] * edgeLength),
-                voxelCenter.y + (cornerOffsets[j][1] * edgeLength),
-                voxelCenter.z + (cornerOffsets[j][2] * edgeLength)
+                voxelCenter.x + (cubeCorners[j][0] * edgeLength),
+                voxelCenter.y + (cubeCorners[j][1] * edgeLength),
+                voxelCenter.z + (cubeCorners[j][2] * edgeLength)
             );
 
             // Offset the corner towards the center by the radius of the particle
