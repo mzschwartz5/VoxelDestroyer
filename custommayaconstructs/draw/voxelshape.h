@@ -9,6 +9,9 @@
 #include <maya/MDGModifier.h>
 #include <maya/MCallbackIdArray.h>
 #include <maya/MNodeMessage.h>
+#include <maya/MAttributeSpecArray.h>
+#include <maya/MAttributeSpec.h>
+#include <maya/MAttributeIndex.h>
 #include "../../voxelizer.h"
 #include "../usernodes/pbdnode.h"
 #include "../usernodes/voxelizernode.h"
@@ -140,6 +143,14 @@ public:
     MSharedPtr<Voxels> getVoxels() {
         Utils::PluginData<VoxelData> voxelData(thisMObject(), aVoxelData);
         return voxelData.get()->getVoxels();
+    }
+
+    MSelectionMask getShapeSelectionMask() const override {
+        return MSelectionMask::kSelectMeshes;
+    }
+
+    MSelectionMask getComponentSelectionMask() const override {
+        return MSelectionMask::kSelectMeshFaces;
     }
 
     /**

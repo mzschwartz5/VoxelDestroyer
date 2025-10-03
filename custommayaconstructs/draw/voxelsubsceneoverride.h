@@ -8,7 +8,10 @@
 #include "../../cube.h"
 #include <maya/MGeometryRequirements.h>
 #include <maya/MGeometryExtractor.h>
+#include <maya/MPxComponentConverter.h>
 #include <memory>
+#include <maya/MUserData.h>
+#include <maya/MSharedPtr.h>
 using namespace MHWRender;
 using std::unique_ptr;
 using std::make_unique;
@@ -19,10 +22,71 @@ struct RenderItemInfo {
     MString renderItemName;
 };
 
+class VoxelFaceUserData : public MUserData {
+public:
+    VoxelFaceUserData(const MObjectArray& voxelFaces)
+        : MUserData()
+        , voxelFaces(voxelFaces)
+    {}
+    ~VoxelFaceUserData() override = default;
+
+    MObjectArray voxelFaces;
+};
+
+class VoxelSubSceneComponentConverter : public MPxComponentConverter {
+public:
+    static MPxComponentConverter* creator() {
+        return new VoxelSubSceneComponentConverter();
+    }
+
+    VoxelSubSceneComponentConverter() = default;
+    ~VoxelSubSceneComponentConverter() override = default;
+
+    void addIntersection(MIntersection& intersection) override {
+        int instanceID = intersection.instanceID();
+        if (instanceID < 0 || instanceID >= (int)voxelFaces.length()) return;
+
+        MObject voxelFaceComponentObject = voxelFaces[instanceID];
+        MFnSingleIndexedComponent fnFaceComp;
+        fnFaceComp.setObject(voxelFaceComponentObject);
+        int elemCount = fnFaceComp.elementCount();
+        MGlobal::displayInfo("Adding " + MString() + elemCount + " elements from voxel face component");
+
+        for (int i = 0; i < elemCount; ++i) {
+            int elem = fnFaceComp.element(i);
+            fnComp.addElement(elem);
+        }
+    }
+
+    MSelectionMask selectionMask() const override {
+        return MSelectionMask::kSelectMeshFaces;
+    }
+
+    void initialize(const MRenderItem& renderItem) override {
+        componentObj = fnComp.create(MFn::kMeshPolygonComponent);
+        MSharedPtr<MUserData> ud = renderItem.getCustomData();
+        if (!ud) return;
+        VoxelFaceUserData* faceData = static_cast<VoxelFaceUserData*>(ud.get());
+        voxelFaces = faceData->voxelFaces;
+    }
+
+    MObject component() override {
+        return componentObj;
+    }
+
+private:
+    MObjectArray voxelFaces;
+    MObject componentObj = MObject::kNullObj;
+    MFnSingleIndexedComponent fnComp;
+};
+
 class VoxelSubSceneOverride : public MPxSubSceneOverride {
 private:
     VoxelShape* voxelShape;
-    
+    MObject voxelShapeObj;
+
+    bool shouldUpdate = true;
+
     ComPtr<ID3D11Buffer> positionsBuffer;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
 
@@ -36,11 +100,14 @@ private:
     ComPtr<ID3D11Buffer> originalNormalsBuffer;
     ComPtr<ID3D11ShaderResourceView> originalNormalsSRV;
 
-    std::vector<unique_ptr<MVertexBuffer>> mayaVertexBuffers;
-    std::vector<unique_ptr<MIndexBuffer>> indexBuffers;
+    std::vector<unique_ptr<MVertexBuffer>> meshVertexBuffers;
+    std::vector<unique_ptr<MIndexBuffer>> meshIndexBuffers;
+
+    unique_ptr<MVertexBuffer> voxelVertexBuffer;
+    std::unordered_map<MGeometry::Primitive, unique_ptr<MIndexBuffer>> voxelIndexBuffers;
 
     VoxelSubSceneOverride(const MObject& obj)
-    : MPxSubSceneOverride(obj) {
+    : MPxSubSceneOverride(obj), voxelShapeObj(obj) {
         MFnDependencyNode dn(obj);
         voxelShape = static_cast<VoxelShape*>(dn.userNode());
     }
@@ -175,7 +242,7 @@ private:
         }
         
         vertexBufferArray.addBuffer(vbDesc.name(), vertexBuffer.get());
-        mayaVertexBuffers.push_back(std::move(vertexBuffer));
+        meshVertexBuffers.push_back(std::move(vertexBuffer));
     }
 
     MIndexBuffer* createIndexBuffer(const RenderItemInfo& itemInfo, const MGeometryExtractor& extractor) {
@@ -189,18 +256,18 @@ private:
         indexBuffer->commit(indexData);
 
         MIndexBuffer* rawIndexBuffer = indexBuffer.get();
-        indexBuffers.push_back(std::move(indexBuffer));
+        meshIndexBuffers.push_back(std::move(indexBuffer));
         
         return rawIndexBuffer;
     }
 
-    MRenderItem* createRenderItem(MSubSceneContainer& container, const RenderItemInfo& itemInfo) {
+
+    MRenderItem* createSingleMeshRenderItem(MSubSceneContainer& container, const RenderItemInfo& itemInfo) {
         MRenderItem* renderItem = container.find(itemInfo.renderItemName);
         if (renderItem) return renderItem;
 
         renderItem = MRenderItem::Create(itemInfo.renderItemName, MRenderItem::MaterialSceneItem, MGeometry::kTriangles);
         renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kShaded | MGeometry::kTextured));
-        renderItem->setSelectionMask(MSelectionMask::kSelectMeshes);
         renderItem->setWantConsolidation(true);
         renderItem->setShader(itemInfo.shaderInstance);
         container.add(renderItem);
@@ -232,105 +299,97 @@ private:
         return extractor.vertexCount(); 
     }
 
-    // WORK IN PROGRESS (shouldn't be enabled all the time, need render items for selection and selection highlighting)
-    void createSelectionRenderItems(MSubSceneContainer& container) {
-        MRenderItem* voxelRenderItem = MRenderItem::Create("VoxelRenderItem", MRenderItem::MaterialSceneItem, MGeometry::kLines);
-        MShaderInstance* voxelShader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dThickLineShader);
-        voxelShader->setParameter("lineWidth", 0.25f);
+    void updateSelectionGranularity(
+		const MDagPath& path,
+		MSelectionContext& selectionContext) 
+    {
+        selectionContext.setSelectionLevel(MHWRender::MSelectionContext::kComponent);    
+    }
+
+    void createVoxelWireframeRenderItem(MSubSceneContainer& container) {
+        MRenderItem* voxelRenderItem = MRenderItem::Create("VoxelRenderItem", MRenderItem::DecorationItem, MGeometry::kLines);
+        MShaderInstance* voxelShader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dSolidShader);
         const float solidColor[] = {0.0f, 1.0f, 0.25f, 1.0f};
         voxelShader->setParameter("solidColor", solidColor);
 
         voxelRenderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kWireframe | MGeometry::kShaded | MGeometry::kTextured));
-        voxelRenderItem->setSelectionMask(MSelectionMask::kSelectMeshes);
         voxelRenderItem->depthPriority(MRenderItem::sActiveWireDepthPriority);
         voxelRenderItem->setWantConsolidation(true);
+        voxelRenderItem->setHideOnPlayback(true);
         voxelRenderItem->setShader(voxelShader);
         container.add(voxelRenderItem);
 
-        MVertexBufferArray vbArray;
-        MVertexBufferDescriptor posDesc("", MGeometry::kPosition, MGeometry::kFloat, 3);
-        auto posVB = make_unique<MVertexBuffer>(posDesc);
-        float* posData = static_cast<float*>(posVB->acquire(8, true));
-        for (int i = 0; i < 8; ++i) {
-            posData[i * 3 + 0] = cubeCorners[i][0];
-            posData[i * 3 + 1] = cubeCorners[i][1];
-            posData[i * 3 + 2] = cubeCorners[i][2];
-        }
-        posVB->commit(posData);
-        vbArray.addBuffer(posDesc.name(), posVB.get());
-        mayaVertexBuffers.push_back(std::move(posVB));
-
-        auto idxBuf = make_unique<MIndexBuffer>(MGeometry::kUnsignedInt32);
-        uint32_t* idxData = static_cast<uint32_t*>(idxBuf->acquire(24, true));
-        for (int e = 0; e < 12; ++e) {
-            idxData[e * 2 + 0] = static_cast<uint32_t>(cubeEdges[e][0]);
-            idxData[e * 2 + 1] = static_cast<uint32_t>(cubeEdges[e][1]);
-        }
-        idxBuf->commit(idxData);
-        MIndexBuffer* rawIdxBuf = idxBuf.get();
-        indexBuffers.push_back(std::move(idxBuf));
-
-        const MBoundingBox bounds(MPoint(-0.5, -0.5, -0.5), MPoint(0.5, 0.5, 0.5));
-        setGeometryForRenderItem(*voxelRenderItem, vbArray, *rawIdxBuf, &bounds);
-        releaseShaderInstance(voxelShader);
+        setVoxelGeometryForRenderItem(*voxelRenderItem, MGeometry::kLines);
 
         const MMatrixArray& voxelInstanceTransforms = voxelShape->getVoxels().get()->modelMatrices;
         setInstanceTransformArray(*voxelRenderItem, voxelInstanceTransforms);
     }
 
-public:
-    inline static MString drawDbClassification = "drawdb/subscene/voxelSubsceneOverride";
-    inline static MString drawRegistrantId = "VoxelSubSceneOverridePlugin";
+    void createVoxelSelectionRenderItem(MSubSceneContainer& container) {
+        MRenderItem* voxelRenderItem = MRenderItem::Create("VoxelSelectionItem", MRenderItem::DecorationItem, MGeometry::kTriangles);
+        MShaderInstance* voxelShader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dDefaultMaterialShader);
+        const MObjectArray& voxelFaces = voxelShape->getVoxels().get()->faceComponents;
+        MSharedPtr<MUserData> faceData(new VoxelFaceUserData(voxelFaces));
 
-    static MPxSubSceneOverride* creator(const MObject& obj) 
-    {
-        return new VoxelSubSceneOverride(obj);
+        MSelectionMask selMask;
+        selMask.addMask(MSelectionMask::kSelectMeshFaces);
+        selMask.addMask(MSelectionMask::kSelectMeshes);
+
+        voxelRenderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kSelectionOnly));
+        voxelRenderItem->setSelectionMask(selMask);
+        voxelRenderItem->depthPriority(MRenderItem::sSelectionDepthPriority);
+        voxelRenderItem->setWantConsolidation(true);
+        voxelRenderItem->setHideOnPlayback(true);
+        voxelRenderItem->setShader(voxelShader);
+        voxelRenderItem->setCustomData(faceData);
+        container.add(voxelRenderItem);
+
+        setVoxelGeometryForRenderItem(*voxelRenderItem, MGeometry::kTriangles);
+
+        const MMatrixArray& voxelInstanceTransforms = voxelShape->getVoxels().get()->modelMatrices;
+        setInstanceTransformArray(*voxelRenderItem, voxelInstanceTransforms);
     }
 
-    ~VoxelSubSceneOverride() override {
-        if (positionsBuffer) {
-            DirectX::notifyMayaOfMemoryUsage(positionsBuffer);
-            positionsBuffer.Reset();
-        }
+    void createVoxelGeometryBuffers() {
+        MVertexBufferDescriptor posDesc("", MGeometry::kPosition, MGeometry::kFloat, 3);
+        auto posVB = make_unique<MVertexBuffer>(posDesc);
+        float* posData = static_cast<float*>(posVB->acquire(8, true));
+        std::copy(cubeCornersFlattened.begin(), cubeCornersFlattened.end(), posData);
+        posVB->commit(posData);
+        voxelVertexBuffer = std::move(posVB);
 
-        if (normalsBuffer) {
-            DirectX::notifyMayaOfMemoryUsage(normalsBuffer);
-            normalsBuffer.Reset();
-        }
+        auto makeIndexBuffer = [&](MGeometry::Primitive prim, const auto& src) {
+            auto buf = make_unique<MIndexBuffer>(MGeometry::kUnsignedInt32);
+            uint32_t* data = static_cast<uint32_t*>(buf->acquire(static_cast<uint>(src.size()), true));
+            for (size_t i = 0; i < src.size(); ++i) {
+                data[i] = static_cast<uint32_t>(src[i]);
+            }
+            buf->commit(data);
+            voxelIndexBuffers[prim] = std::move(buf);
+        };
 
-        if (originalPositionsBuffer) {
-            DirectX::notifyMayaOfMemoryUsage(originalPositionsBuffer);
-            originalPositionsBuffer.Reset();
-        }
-
-        if (originalNormalsBuffer) {
-            DirectX::notifyMayaOfMemoryUsage(originalNormalsBuffer);
-            originalNormalsBuffer.Reset();
-        }
-    }
-    
-    DrawAPI supportedDrawAPIs() const override {
-        return kDirectX11;
+        makeIndexBuffer(MGeometry::kTriangles, cubeFacesFlattened);
+        makeIndexBuffer(MGeometry::kLines, cubeEdgesFlattened);
+        makeIndexBuffer(MGeometry::kPoints, cubeCornersFlattened);
     }
 
-    bool requiresUpdate(
-        const MSubSceneContainer& container,
-        const MFrameContext& frameContext) const override
-    {
-        return (container.count() == 0);
+    void setVoxelGeometryForRenderItem(
+        MRenderItem& renderItem,
+        MGeometry::Primitive primitiveType
+    ) {
+        MVertexBufferArray vbArray;
+        vbArray.addBuffer("", voxelVertexBuffer.get());
+        const MBoundingBox bounds(MPoint(-0.5, -0.5, -0.5), MPoint(0.5, 0.5, 0.5));
+        setGeometryForRenderItem(renderItem, vbArray, *voxelIndexBuffers[primitiveType].get(), &bounds);
     }
 
     /**
-     * This method is responsible for populating the MSubSceneContainer with render items. In our case, we want the our custom VoxelShape
-     * to have the same geometry, topology, and shading as the original mesh it deforms. To do so, we use the shading sets of the original mesh
-     * to tell us what geometry requirements we need to extract and recreate here.
+     * Creates the actual, visible, voxelized mesh render items (multiple, possibly, if the original, unvoxelized mesh has multiple shaders / face sets).
      */
-    void update(MSubSceneContainer& container, const MFrameContext& frameContext) override
-    {
-        if (!voxelShape) return;
+    void createMeshRenderItems(MSubSceneContainer& container) {
         MStatus status;
-        mayaVertexBuffers.clear();
-        indexBuffers.clear();
+        meshVertexBuffers.clear();
+        meshIndexBuffers.clear();
 
         const MDagPath originalGeomPath = voxelShape->pathToOriginalGeometry();
         MFnMesh originalMeshFn(originalGeomPath.node());
@@ -371,7 +430,7 @@ public:
             MIndexBuffer* rawIndexBuffer = createIndexBuffer(itemInfo, extractor);
             if (!rawIndexBuffer) continue;
 
-            MRenderItem* renderItem = createRenderItem(container, itemInfo);
+            MRenderItem* renderItem = createSingleMeshRenderItem(container, itemInfo);
             setGeometryForRenderItem(*renderItem, vertexBufferArray, *rawIndexBuffer, &bounds);
         }
 
@@ -379,9 +438,7 @@ public:
         // It's important to do the tagging using the vertex buffer that MGeometryExtractor provides.
         std::vector<uint> vertexIndices;
         unsigned int numVertices = getAllMeshVertices(extractor, vertexIndices);
-
-        createSelectionRenderItems(container);
-
+                
         voxelShape->initializeDeformVerticesCompute(
             vertexIndices,
             numVertices,
@@ -390,5 +447,83 @@ public:
             originalPositionsSRV, 
             originalNormalsSRV
         );
+    }
+
+public:
+    inline static MString drawDbClassification = "drawdb/subscene/voxelSubsceneOverride";
+    inline static MString drawRegistrantId = "VoxelSubSceneOverridePlugin";
+
+    static MPxSubSceneOverride* creator(const MObject& obj) 
+    {
+        return new VoxelSubSceneOverride(obj);
+    }
+
+    /**
+     * Overriding this to tell Maya that any instance of a render item that gets selected still belongs
+     * to the same original shape node.
+     */
+    bool getInstancedSelectionPath(
+        const MRenderItem& renderItem, 
+        const MIntersection& intersection, 
+        MDagPath& dagPath) const override
+    {
+        if (!voxelShape) return false;
+        MFnDagNode fnDag(voxelShapeObj);
+        fnDag.getPath(dagPath);
+        return true;
+    }
+
+    ~VoxelSubSceneOverride() override {
+        if (positionsBuffer) {
+            DirectX::notifyMayaOfMemoryUsage(positionsBuffer);
+            positionsBuffer.Reset();
+        }
+
+        if (normalsBuffer) {
+            DirectX::notifyMayaOfMemoryUsage(normalsBuffer);
+            normalsBuffer.Reset();
+        }
+
+        if (originalPositionsBuffer) {
+            DirectX::notifyMayaOfMemoryUsage(originalPositionsBuffer);
+            originalPositionsBuffer.Reset();
+        }
+
+        if (originalNormalsBuffer) {
+            DirectX::notifyMayaOfMemoryUsage(originalNormalsBuffer);
+            originalNormalsBuffer.Reset();
+        }
+    }
+    
+    DrawAPI supportedDrawAPIs() const override {
+        return kDirectX11;
+    }
+
+    bool requiresUpdate(
+        const MSubSceneContainer& container,
+        const MFrameContext& frameContext) const override
+    {
+        return shouldUpdate;
+    }
+
+    /**
+     * This method is responsible for populating the MSubSceneContainer with render items. In our case, we want the our custom VoxelShape
+     * to have the same geometry, topology, and shading as the original mesh it deforms. To do so, we use the shading sets of the original mesh
+     * to tell us what geometry requirements we need to extract and recreate here.
+     */
+    void update(MSubSceneContainer& container, const MFrameContext& frameContext) override
+    {
+        if (!voxelShape) return;
+        
+        if (container.count() <= 0) {
+            // The render items for the actual, voxelized mesh.
+            createMeshRenderItems(container);
+
+            createVoxelGeometryBuffers();
+            // The visible wireframe render item
+            createVoxelWireframeRenderItem(container);
+            // Invisible item, only gets drawn to the selection buffer
+            createVoxelSelectionRenderItem(container);
+        }
     }
 };
