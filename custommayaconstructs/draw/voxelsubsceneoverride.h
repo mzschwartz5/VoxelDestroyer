@@ -12,6 +12,9 @@
 #include <memory>
 #include <maya/MUserData.h>
 #include <maya/MSharedPtr.h>
+#include <maya/MEventMessage.h>
+#include <maya/MCallbackIdArray.h>
+
 using namespace MHWRender;
 using std::unique_ptr;
 using std::make_unique;
@@ -22,13 +25,13 @@ struct RenderItemInfo {
     MString renderItemName;
 };
 
-class VoxelFaceUserData : public MUserData {
+class VoxelInstanceData : public MUserData {
 public:
-    VoxelFaceUserData(const MObjectArray& voxelFaces)
+    VoxelInstanceData(const MObjectArray& voxelFaces)
         : MUserData()
         , voxelFaces(voxelFaces)
     {}
-    ~VoxelFaceUserData() override = default;
+    ~VoxelInstanceData() override = default;
 
     MObjectArray voxelFaces;
 };
@@ -43,19 +46,15 @@ public:
     ~VoxelSubSceneComponentConverter() override = default;
 
     void addIntersection(MIntersection& intersection) override {
-        int instanceID = intersection.instanceID();
-        if (instanceID < 0 || instanceID >= (int)voxelFaces.length()) return;
+        // Instance IDs are 1-based, so subtract 1 to get a 0-based index.
+        int instanceID = intersection.instanceID() - 1;
+        if (instanceID < 0) return;
 
-        MObject voxelFaceComponentObject = voxelFaces[instanceID];
         MFnSingleIndexedComponent fnFaceComp;
-        fnFaceComp.setObject(voxelFaceComponentObject);
-        int elemCount = fnFaceComp.elementCount();
-        MGlobal::displayInfo("Adding " + MString() + elemCount + " elements from voxel face component");
+        fnFaceComp.setObject(componentObj);
 
-        for (int i = 0; i < elemCount; ++i) {
-            int elem = fnFaceComp.element(i);
-            fnComp.addElement(elem);
-        }
+        // Hijack this face component to store the voxel instance ID rather than a face index.
+        fnFaceComp.addElement(instanceID);
     }
 
     MSelectionMask selectionMask() const override {
@@ -64,10 +63,7 @@ public:
 
     void initialize(const MRenderItem& renderItem) override {
         componentObj = fnComp.create(MFn::kMeshPolygonComponent);
-        MSharedPtr<MUserData> ud = renderItem.getCustomData();
-        if (!ud) return;
-        VoxelFaceUserData* faceData = static_cast<VoxelFaceUserData*>(ud.get());
-        voxelFaces = faceData->voxelFaces;
+        customData = renderItem.getCustomData();
     }
 
     MObject component() override {
@@ -75,7 +71,7 @@ public:
     }
 
 private:
-    MObjectArray voxelFaces;
+    MSharedPtr<MUserData> customData = nullptr;
     MObject componentObj = MObject::kNullObj;
     MFnSingleIndexedComponent fnComp;
 };
@@ -86,6 +82,11 @@ private:
     MObject voxelShapeObj;
 
     bool shouldUpdate = true;
+    bool selectionChanged = false;
+    MCallbackIdArray callbackIds;
+    MMatrixArray selectedVoxelMatrices;
+
+    inline static const MString voxelSelectedHighlightItemName = "VoxelSelectedHighlightItem";
 
     ComPtr<ID3D11Buffer> positionsBuffer;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
@@ -110,6 +111,30 @@ private:
     : MPxSubSceneOverride(obj), voxelShapeObj(obj) {
         MFnDependencyNode dn(obj);
         voxelShape = static_cast<VoxelShape*>(dn.userNode());
+
+        MCallbackId callbackId = MEventMessage::addEventCallback("SelectionChanged", onSelectionChanged, this, nullptr);
+        callbackIds.append(callbackId);
+    }
+
+    static void onSelectionChanged(void* clientData) {
+        VoxelSubSceneOverride* subscene = static_cast<VoxelSubSceneOverride*>(clientData);
+        
+        // Collect the voxel instances that are selected
+        const MObjectArray& activeComponents = subscene->voxelShape->activeComponents();
+        const MMatrixArray& voxelMatrices = subscene->voxelShape->getVoxels().get()->modelMatrices;
+        subscene->selectedVoxelMatrices.clear();
+
+        for (const MObject& comp : activeComponents) {
+            MFnSingleIndexedComponent fnComp(comp);
+            for (int i = 0; i < fnComp.elementCount(); ++i) {
+                int voxelInstanceId = fnComp.element(i);
+                if (voxelInstanceId < 0 || voxelInstanceId >= (int)voxelMatrices.length()) continue;
+                subscene->selectedVoxelMatrices.append(voxelMatrices[voxelInstanceId]);
+            }
+        }
+
+        subscene->shouldUpdate = true;
+        subscene->selectionChanged = true;
     }
 
     MShaderInstance* getVertexBufferDescriptorsForShader(const MObject& shaderNode, const MDagPath& geomDagPath, MVertexBufferDescriptorList& vertexBufferDescriptors) {
@@ -209,7 +234,7 @@ private:
 
     }
 
-    void createVertexBuffer(const MVertexBufferDescriptor& vbDesc, const MGeometryExtractor& extractor, uint vertexCount, MVertexBufferArray& vertexBufferArray) {
+    void createMeshVertexBuffer(const MVertexBufferDescriptor& vbDesc, const MGeometryExtractor& extractor, uint vertexCount, MVertexBufferArray& vertexBufferArray) {
         auto vertexBuffer = make_unique<MVertexBuffer>(vbDesc);
         const MGeometry::Semantic semantic = vbDesc.semantic();
         
@@ -245,7 +270,7 @@ private:
         meshVertexBuffers.push_back(std::move(vertexBuffer));
     }
 
-    MIndexBuffer* createIndexBuffer(const RenderItemInfo& itemInfo, const MGeometryExtractor& extractor) {
+    MIndexBuffer* createMeshIndexBuffer(const RenderItemInfo& itemInfo, const MGeometryExtractor& extractor) {
         unsigned int numTriangles = extractor.primitiveCount(itemInfo.indexDesc);
         if (numTriangles == 0) return nullptr;
     
@@ -307,47 +332,64 @@ private:
     }
 
     void createVoxelWireframeRenderItem(MSubSceneContainer& container) {
-        MRenderItem* voxelRenderItem = MRenderItem::Create("VoxelRenderItem", MRenderItem::DecorationItem, MGeometry::kLines);
-        MShaderInstance* voxelShader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dSolidShader);
+        MRenderItem* renderItem = MRenderItem::Create("VoxelRenderItem", MRenderItem::DecorationItem, MGeometry::kLines);
+        MShaderInstance* shader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dSolidShader);
         const float solidColor[] = {0.0f, 1.0f, 0.25f, 1.0f};
-        voxelShader->setParameter("solidColor", solidColor);
+        shader->setParameter("solidColor", solidColor);
 
-        voxelRenderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kWireframe | MGeometry::kShaded | MGeometry::kTextured));
-        voxelRenderItem->depthPriority(MRenderItem::sActiveWireDepthPriority);
-        voxelRenderItem->setWantConsolidation(true);
-        voxelRenderItem->setHideOnPlayback(true);
-        voxelRenderItem->setShader(voxelShader);
-        container.add(voxelRenderItem);
+        renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kWireframe | MGeometry::kShaded | MGeometry::kTextured));
+        renderItem->depthPriority(MRenderItem::sActiveWireDepthPriority);
+        renderItem->setWantConsolidation(true);
+        renderItem->setHideOnPlayback(true);
+        renderItem->setShader(shader);
+        container.add(renderItem);
 
-        setVoxelGeometryForRenderItem(*voxelRenderItem, MGeometry::kLines);
+        setVoxelGeometryForRenderItem(*renderItem, MGeometry::kLines);
 
         const MMatrixArray& voxelInstanceTransforms = voxelShape->getVoxels().get()->modelMatrices;
-        setInstanceTransformArray(*voxelRenderItem, voxelInstanceTransforms);
+        setInstanceTransformArray(*renderItem, voxelInstanceTransforms);
     }
 
     void createVoxelSelectionRenderItem(MSubSceneContainer& container) {
-        MRenderItem* voxelRenderItem = MRenderItem::Create("VoxelSelectionItem", MRenderItem::DecorationItem, MGeometry::kTriangles);
-        MShaderInstance* voxelShader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dDefaultMaterialShader);
+        MRenderItem* renderItem = MRenderItem::Create("VoxelSelectionItem", MRenderItem::DecorationItem, MGeometry::kTriangles);
+        MShaderInstance* shader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dDefaultMaterialShader);
         const MObjectArray& voxelFaces = voxelShape->getVoxels().get()->faceComponents;
-        MSharedPtr<MUserData> faceData(new VoxelFaceUserData(voxelFaces));
+        MSharedPtr<MUserData> faceData(new VoxelInstanceData(voxelFaces));
 
         MSelectionMask selMask;
         selMask.addMask(MSelectionMask::kSelectMeshFaces);
         selMask.addMask(MSelectionMask::kSelectMeshes);
 
-        voxelRenderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kSelectionOnly));
-        voxelRenderItem->setSelectionMask(selMask);
-        voxelRenderItem->depthPriority(MRenderItem::sSelectionDepthPriority);
-        voxelRenderItem->setWantConsolidation(true);
-        voxelRenderItem->setHideOnPlayback(true);
-        voxelRenderItem->setShader(voxelShader);
-        voxelRenderItem->setCustomData(faceData);
-        container.add(voxelRenderItem);
+        renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kSelectionOnly));
+        renderItem->setSelectionMask(selMask);
+        renderItem->depthPriority(MRenderItem::sSelectionDepthPriority);
+        renderItem->setWantConsolidation(true);
+        renderItem->setHideOnPlayback(true);
+        renderItem->setShader(shader);
+        renderItem->setCustomData(faceData);
+        container.add(renderItem);
 
-        setVoxelGeometryForRenderItem(*voxelRenderItem, MGeometry::kTriangles);
+        setVoxelGeometryForRenderItem(*renderItem, MGeometry::kTriangles);
 
         const MMatrixArray& voxelInstanceTransforms = voxelShape->getVoxels().get()->modelMatrices;
-        setInstanceTransformArray(*voxelRenderItem, voxelInstanceTransforms);
+        setInstanceTransformArray(*renderItem, voxelInstanceTransforms);
+    }
+
+    void createVoxelSelectedHighlightRenderItem(MSubSceneContainer& container) {
+        MRenderItem* renderItem = MRenderItem::Create(voxelSelectedHighlightItemName, MRenderItem::DecorationItem, MGeometry::kTriangles);
+        MShaderInstance* shader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dSolidShader);
+        const float solidColor[] = {0.0f, 1.0f, 0.25f, 0.5f};
+        shader->setParameter("solidColor", solidColor);
+
+        renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kWireframe | MGeometry::kShaded | MGeometry::kTextured));
+        renderItem->depthPriority(MRenderItem::sSelectionDepthPriority);
+        renderItem->setWantConsolidation(true);
+        renderItem->setHideOnPlayback(true);
+        renderItem->setShader(shader);
+        renderItem->enable(false);
+        container.add(renderItem);
+
+        setVoxelGeometryForRenderItem(*renderItem, MGeometry::kTriangles);
     }
 
     void createVoxelGeometryBuffers() {
@@ -419,7 +461,7 @@ private:
             MVertexBufferDescriptor vbDesc;
             if (!vbDescList.getDescriptor(i, vbDesc)) continue;
 
-            createVertexBuffer(vbDesc, extractor, vertexCount, vertexBufferArray);
+            createMeshVertexBuffer(vbDesc, extractor, vertexCount, vertexBufferArray);
         }
 
         // Create an index buffer + render item for each shading set of the original mesh (which corresponds to an indexing requirement)
@@ -427,7 +469,7 @@ private:
         double bound = 1e10;
         const MBoundingBox bounds(MPoint(-bound, -bound, -bound), MPoint(bound, bound, bound));
         for (const RenderItemInfo& itemInfo : renderItemInfos) {
-            MIndexBuffer* rawIndexBuffer = createIndexBuffer(itemInfo, extractor);
+            MIndexBuffer* rawIndexBuffer = createMeshIndexBuffer(itemInfo, extractor);
             if (!rawIndexBuffer) continue;
 
             MRenderItem* renderItem = createSingleMeshRenderItem(container, itemInfo);
@@ -493,6 +535,8 @@ public:
             DirectX::notifyMayaOfMemoryUsage(originalNormalsBuffer);
             originalNormalsBuffer.Reset();
         }
+
+        MEventMessage::removeCallbacks(callbackIds);
     }
     
     DrawAPI supportedDrawAPIs() const override {
@@ -524,6 +568,17 @@ public:
             createVoxelWireframeRenderItem(container);
             // Invisible item, only gets drawn to the selection buffer
             createVoxelSelectionRenderItem(container);
+            
+            createVoxelSelectedHighlightRenderItem(container);
         }
+        
+        if (selectionChanged) {
+            MRenderItem* highlightItem = container.find(voxelSelectedHighlightItemName);
+            MStatus status = setInstanceTransformArray(*highlightItem, selectedVoxelMatrices);
+            highlightItem->enable(selectedVoxelMatrices.length() > 0);
+            selectionChanged = false;
+        }
+
+        shouldUpdate = false;
     }
 };
