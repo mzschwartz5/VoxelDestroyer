@@ -14,6 +14,7 @@
 #include <maya/MSharedPtr.h>
 #include <maya/MEventMessage.h>
 #include <maya/MCallbackIdArray.h>
+#include <functional>
 
 using namespace MHWRender;
 using std::unique_ptr;
@@ -25,15 +26,15 @@ struct RenderItemInfo {
     MString renderItemName;
 };
 
-class VoxelInstanceData : public MUserData {
+class SelectionCustomData : public MUserData {
 public:
-    VoxelInstanceData(const MObjectArray& voxelFaces)
-        : MUserData()
-        , voxelFaces(voxelFaces)
+    SelectionCustomData(const MObjectArray& voxelFaces, std::function<void(int)> onHover)
+        : MUserData(), voxelFaces(voxelFaces), hoverCallback(std::move(onHover))
     {}
-    ~VoxelInstanceData() override = default;
+    ~SelectionCustomData() override = default;
 
     MObjectArray voxelFaces;
+    std::function<void(int)> hoverCallback;
 };
 
 class VoxelSubSceneComponentConverter : public MPxComponentConverter {
@@ -55,6 +56,7 @@ public:
 
         // Hijack this face component to store the voxel instance ID rather than a face index.
         fnFaceComp.addElement(instanceID);
+        customData->hoverCallback(instanceID);
     }
 
     MSelectionMask selectionMask() const override {
@@ -63,7 +65,7 @@ public:
 
     void initialize(const MRenderItem& renderItem) override {
         componentObj = fnComp.create(MFn::kMeshPolygonComponent);
-        customData = renderItem.getCustomData();
+        customData = static_cast<SelectionCustomData*>(renderItem.getCustomData().get());
     }
 
     MObject component() override {
@@ -71,7 +73,7 @@ public:
     }
 
 private:
-    MSharedPtr<MUserData> customData = nullptr;
+    SelectionCustomData* customData = nullptr;
     MObject componentObj = MObject::kNullObj;
     MFnSingleIndexedComponent fnComp;
 };
@@ -83,10 +85,13 @@ private:
 
     bool shouldUpdate = true;
     bool selectionChanged = false;
+    bool hoveredVoxelChanged = false;
     MCallbackIdArray callbackIds;
     MMatrixArray selectedVoxelMatrices;
+    MMatrixArray hoveredVoxelMatrices; // Will only ever have 0 or 1 matrix in it.
 
     inline static const MString voxelSelectedHighlightItemName = "VoxelSelectedHighlightItem";
+    inline static const MString voxelPreviewSelectionHighlightItemName = "VoxelPreviewSelectionHighlightItem";
 
     ComPtr<ID3D11Buffer> positionsBuffer;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
@@ -135,6 +140,17 @@ private:
 
         subscene->shouldUpdate = true;
         subscene->selectionChanged = true;
+    }
+
+    void onHoveredVoxelChange(int hoveredVoxelInstanceId) {
+        hoveredVoxelMatrices.clear();
+        const MMatrixArray& voxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
+        if (hoveredVoxelInstanceId < 0 || hoveredVoxelInstanceId >= (int)voxelMatrices.length()) return;
+
+        hoveredVoxelMatrices.append(voxelMatrices[hoveredVoxelInstanceId]);
+
+        shouldUpdate = true;
+        hoveredVoxelChanged = true;
     }
 
     MShaderInstance* getVertexBufferDescriptorsForShader(const MObject& shaderNode, const MDagPath& geomDagPath, MVertexBufferDescriptorList& vertexBufferDescriptors) {
@@ -354,7 +370,10 @@ private:
         MRenderItem* renderItem = MRenderItem::Create("VoxelSelectionItem", MRenderItem::DecorationItem, MGeometry::kTriangles);
         MShaderInstance* shader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dDefaultMaterialShader);
         const MObjectArray& voxelFaces = voxelShape->getVoxels().get()->faceComponents;
-        MSharedPtr<MUserData> faceData(new VoxelInstanceData(voxelFaces));
+        MSharedPtr<MUserData> customData(new SelectionCustomData(
+            voxelFaces, 
+            std::bind(&VoxelSubSceneOverride::onHoveredVoxelChange, this, std::placeholders::_1)
+        ));
 
         MSelectionMask selMask;
         selMask.addMask(MSelectionMask::kSelectMeshFaces);
@@ -366,7 +385,7 @@ private:
         renderItem->setWantConsolidation(true);
         renderItem->setHideOnPlayback(true);
         renderItem->setShader(shader);
-        renderItem->setCustomData(faceData);
+        renderItem->setCustomData(customData);
         container.add(renderItem);
 
         setVoxelGeometryForRenderItem(*renderItem, MGeometry::kTriangles);
@@ -375,15 +394,14 @@ private:
         setInstanceTransformArray(*renderItem, voxelInstanceTransforms);
     }
 
-    void createVoxelSelectedHighlightRenderItem(MSubSceneContainer& container) {
-        MRenderItem* renderItem = MRenderItem::Create(voxelSelectedHighlightItemName, MRenderItem::DecorationItem, MGeometry::kTriangles);
+    void createVoxelSelectedHighlightRenderItem(MSubSceneContainer& container, const MString& renderItemName, const std::array<float, 4>& color) {
+        MRenderItem* renderItem = MRenderItem::Create(renderItemName, MRenderItem::DecorationItem, MGeometry::kTriangles);
         MShaderInstance* shader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dSolidShader);
-        const float solidColor[] = {0.0f, 1.0f, 0.25f, 0.5f};
-        shader->setParameter("solidColor", solidColor);
+        shader->setParameter("solidColor", color.data());
 
         renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kWireframe | MGeometry::kShaded | MGeometry::kTextured));
         renderItem->depthPriority(MRenderItem::sSelectionDepthPriority);
-        renderItem->setWantConsolidation(true);
+        renderItem->setWantConsolidation(false);
         renderItem->setHideOnPlayback(true);
         renderItem->setShader(shader);
         renderItem->enable(false);
@@ -566,17 +584,26 @@ public:
             createVoxelGeometryBuffers();
             // The visible wireframe render item
             createVoxelWireframeRenderItem(container);
-            // Invisible item, only gets drawn to the selection buffer
+            // Invisible item, only gets drawn to the selection buffer to enable selection
             createVoxelSelectionRenderItem(container);
-            
-            createVoxelSelectedHighlightRenderItem(container);
+            // Shows highlights for selected voxels
+            createVoxelSelectedHighlightRenderItem(container, voxelSelectedHighlightItemName, {0.0f, 1.0f, 0.25f, 0.5f});
+            // Shows highlight for hovered voxel
+            createVoxelSelectedHighlightRenderItem(container, voxelPreviewSelectionHighlightItemName, {1.0f, 1.0f, 0.0f, 0.5f});
         }
         
         if (selectionChanged) {
             MRenderItem* highlightItem = container.find(voxelSelectedHighlightItemName);
-            MStatus status = setInstanceTransformArray(*highlightItem, selectedVoxelMatrices);
+            setInstanceTransformArray(*highlightItem, selectedVoxelMatrices);
             highlightItem->enable(selectedVoxelMatrices.length() > 0);
             selectionChanged = false;
+        }
+
+        if (hoveredVoxelChanged) {
+            MRenderItem* previewHighlightItem = container.find(voxelPreviewSelectionHighlightItemName);
+            setInstanceTransformArray(*previewHighlightItem, hoveredVoxelMatrices);
+            previewHighlightItem->enable(hoveredVoxelMatrices.length() > 0);
+            hoveredVoxelChanged = false;
         }
 
         shouldUpdate = false;
