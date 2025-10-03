@@ -115,6 +115,16 @@ uint getNextArrayPlugIndex(const MObject& dependencyNode, const MObject& arrayAt
 
 MPlug getGlobalTimePlug();
 
+struct MStringHash {
+    size_t operator()(const MString& s) const noexcept {
+        int len = 0;
+        const char* utf = s.asUTF8(len);
+        return std::hash<std::string_view>()(std::string_view(utf, static_cast<size_t>(len)));
+    }
+};
+struct MStringEq {
+    bool operator()(const MString& a, const MString& b) const noexcept { return a == b; }
+};
 
 // Helper overloads which build MPlug from either attribute name or MObject
 inline MPlug makePlugFromAttr(const MObject& node, const MObject& attr) {
