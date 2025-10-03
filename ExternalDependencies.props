@@ -10,8 +10,14 @@
     <VcpkgTriplet>x64-windows-static</VcpkgTriplet>
   </PropertyGroup>
 
+  <!-- avoid duplicate import when user-wide integration exists -->
+  <PropertyGroup>
+    <VcpkgUserTargetsExists Condition="Exists('$(LOCALAPPDATA)\vcpkg\vcpkg.user.targets')">true</VcpkgUserTargetsExists>
+    <VcpkgUserTargetsExists Condition="'$(VcpkgUserTargetsExists)'==''">false</VcpkgUserTargetsExists>
+  </PropertyGroup>
+
   <Import
     Project="$(VcpkgRoot)\scripts\buildsystems\msbuild\vcpkg.targets"
-    Condition="Exists('$(VcpkgRoot)\scripts\buildsystems\msbuild\vcpkg.targets')"
+    Condition="Exists('$(VcpkgRoot)\scripts\buildsystems\msbuild\vcpkg.targets') And '$(VcpkgUserTargetsExists)'=='false'"
   />
 </Project>

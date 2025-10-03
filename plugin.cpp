@@ -447,6 +447,13 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	// TODO: use a constant for the string "VoxelSelectionItem"?
+	status = MDrawRegistry::registerComponentConverter(MString("VoxelSelectionItem"), VoxelSubSceneComponentConverter::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelSubSceneComponentConverter: " + status.errorString());
+		return status;
+	}
+
 	status = MDrawRegistry::registerSubSceneOverrideCreator(VoxelSubSceneOverride::drawDbClassification, VoxelSubSceneOverride::drawRegistrantId, VoxelSubSceneOverride::creator);
 	if (!status) {
 		MGlobal::displayError("Failed to register VoxelSubSceneOverride: " + status.errorString());
@@ -555,6 +562,10 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	status = plugin.deregisterNode(VoxelShape::id);
 	if (!status)
 		MGlobal::displayError("deregisterNode failed on VoxelShape: " + status.errorString());
+
+	status = MDrawRegistry::deregisterComponentConverter("VoxelSelectionItem");
+	if (!status)
+		MGlobal::displayError("deregisterComponentConverter failed on VoxelSubSceneComponentConverter: " + status.errorString());
 
 	// Voxel SubScene Override
 	status = MDrawRegistry::deregisterSubSceneOverrideCreator(VoxelSubSceneOverride::drawDbClassification, VoxelSubSceneOverride::drawRegistrantId);
