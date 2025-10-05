@@ -4,6 +4,8 @@
 #include <maya/MDGModifier.h>
 #include <maya/MDagModifier.h>
 #include <maya/MPlugArray.h>
+#include <maya/MDagPath.h> 
+#include <maya/MMatrix.h>
 #include <windows.h>
 #include <sstream>
 #include <cstring>
@@ -229,6 +231,14 @@ MObject createDagNode(const MString& typeName, const MObject& parent, const MStr
     MFnDependencyNode fnNode(nodeObj);
     fnNode.setName(name);
     return nodeObj;
+}
+
+MMatrix getWorldMatrix(const MObject& node) {
+    MDagPath dagPath;
+    if (MDagPath::getAPathTo(node, dagPath) == MS::kSuccess) {
+        return dagPath.inclusiveMatrix();
+    }
+    return MMatrix::identity;
 }
 
 } // namespace Utils

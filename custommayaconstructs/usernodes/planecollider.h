@@ -15,12 +15,12 @@ public:
     inline static MObject aHeight;
     inline static MObject aInfinite;
     inline static MObject aColliderData;
-    inline static MObject aWorldMatrix;
+    inline static MObject aParentTransformMatrix;
     inline static MObject aFriction;
 
     static void* creator() { return new PlaneCollider(); }
     static MStatus initialize() {
-        MStatus status = initializeBaseAttributes(aColliderData, aWorldMatrix, aFriction);
+        MStatus status = initializeBaseAttributes(aColliderData, aParentTransformMatrix, aFriction);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         MFnNumericAttribute nAttr;
@@ -95,8 +95,8 @@ public:
     {
         if (plug != aColliderData) return MS::kUnknownParameter;
 
-        MDataHandle worldMatrixHandle = dataBlock.inputValue(aWorldMatrix);
-        MMatrix worldMat = worldMatrixHandle.asMatrix();
+        MDataHandle parentTransformMatHandle = dataBlock.inputValue(aParentTransformMatrix);
+        MMatrix worldMat = Utils::getWorldMatrix(thisMObject());
         MDataHandle widthHandle = dataBlock.inputValue(aWidth);
         float width = widthHandle.asFloat();
         MDataHandle heightHandle = dataBlock.inputValue(aHeight);

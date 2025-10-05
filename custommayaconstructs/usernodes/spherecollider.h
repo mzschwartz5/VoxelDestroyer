@@ -12,12 +12,12 @@ public:
 
     inline static MObject aRadius;
     inline static MObject aColliderData;
-    inline static MObject aWorldMatrix;
+    inline static MObject aParentTransformMatrix;
     inline static MObject aFriction;
 
     static void* creator() { return new SphereCollider(); }
     static MStatus initialize() {
-        MStatus status = initializeBaseAttributes(aColliderData, aWorldMatrix, aFriction);
+        MStatus status = initializeBaseAttributes(aColliderData, aParentTransformMatrix, aFriction);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         MFnNumericAttribute nAttr;
@@ -62,8 +62,8 @@ public:
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override
     {
         if (plug != aColliderData) return MS::kUnknownParameter;
-        MDataHandle worldMatrixHandle = dataBlock.inputValue(aWorldMatrix);
-        MMatrix worldMat = worldMatrixHandle.asMatrix();
+        MDataHandle parentTransformMatHandle = dataBlock.inputValue(aParentTransformMatrix);
+        MMatrix worldMat = Utils::getWorldMatrix(thisMObject());
         MDataHandle radiusHandle = dataBlock.inputValue(aRadius);
         float radius = radiusHandle.asFloat();
         MDataHandle frictionHandle = dataBlock.inputValue(aFriction);

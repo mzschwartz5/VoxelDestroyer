@@ -178,4 +178,6 @@ MObject createDGNode(const MString& typeName);
 
 MObject createDagNode(const MString& typeName, const MObject& parent = MObject::kNullObj, const MString& name = "");
 
+MMatrix getWorldMatrix(const MObject& node);
+
 } // namespace Utils
