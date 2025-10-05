@@ -82,7 +82,7 @@ protected:
 
     static MStatus initializeBaseAttributes(
         MObject& aColliderData,
-        MObject& aWorldMatrix,
+        MObject& aParentTransformMatrix,
         MObject& aFriction
     ) {
         MStatus status;
@@ -96,12 +96,12 @@ protected:
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         MFnMatrixAttribute mAttr;
-        aWorldMatrix = mAttr.create(worldMatrixAttrName, "wmi", MFnMatrixAttribute::kDouble);
+        aParentTransformMatrix = mAttr.create(worldMatrixAttrName, "wmi", MFnMatrixAttribute::kDouble);
         mAttr.setStorable(false);
         mAttr.setReadable(false);
         mAttr.setWritable(true);
 
-        status = addAttribute(aWorldMatrix);
+        status = addAttribute(aParentTransformMatrix);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         MFnNumericAttribute nAttr;
@@ -115,7 +115,7 @@ protected:
         status = addAttribute(aFriction);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
-        status = attributeAffects(aWorldMatrix, aColliderData);
+        status = attributeAffects(aParentTransformMatrix, aColliderData);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         status = attributeAffects(aFriction, aColliderData);
         CHECK_MSTATUS_AND_RETURN_IT(status);
