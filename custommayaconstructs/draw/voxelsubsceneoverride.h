@@ -94,6 +94,8 @@ private:
         ShowAll,
         ShowSelected
     } showHideStateChange = ShowHideStateChange::None;
+
+    using RenderItemVoxelMap = std::unordered_map<MString, std::vector<uint>, Utils::MStringHash, Utils::MStringEq>;
     
     bool shouldUpdate = true;
     bool selectionChanged = false;
@@ -101,11 +103,10 @@ private:
     MCallbackIdArray callbackIds;
     MMatrixArray selectedVoxelMatrices;
     MMatrixArray hoveredVoxelMatrices; // Will only ever have 0 or 1 matrix in it.
-    MMatrixArray visibleVoxelMatrices; // When hiding pieces of the mesh, also need to hide the selected voxels.
-    MObjectArray visibleVoxelFaceComponents; 
     std::unordered_set<uint> voxelsToHide;
-    std::unordered_map<MString, std::vector<uint>, Utils::MStringHash, Utils::MStringEq> hiddenIndices;         // hidden face indices per render item
-    std::unordered_map<MString, std::vector<uint>, Utils::MStringHash, Utils::MStringEq> recentlyHiddenIndices; // the most recent faces to be hidden (again mapped by render item)
+    std::vector<uint> visibleVoxelIdToGlobalId; // maps visible voxel instance IDs to global voxel IDs (including hidden ones)
+    RenderItemVoxelMap hiddenVoxels;            // hidden face indices per render item
+    RenderItemVoxelMap recentlyHiddenVoxels;    // the most recent faces to be hidden (again mapped by render item)
 
     inline static const MString voxelSelectedHighlightItemName = "VoxelSelectedHighlightItem";
     inline static const MString voxelPreviewSelectionHighlightItemName = "VoxelPreviewSelectionHighlightItem";
@@ -151,7 +152,8 @@ private:
         
         // Collect the voxel instances that are selected
         const MObjectArray& activeComponents = subscene->voxelShape->activeComponents();
-        const MMatrixArray& voxelMatrices = subscene->visibleVoxelMatrices;
+        const MMatrixArray& voxelMatrices = subscene->voxelShape->getVoxels().get()->modelMatrices;
+        const std::vector<uint>& visibleVoxelIdToGlobalId = subscene->visibleVoxelIdToGlobalId;
         subscene->selectedVoxelMatrices.clear();
         subscene->hoveredVoxelMatrices.clear();
 
@@ -159,15 +161,16 @@ private:
             MFnSingleIndexedComponent fnComp(comp);
             for (int i = 0; i < fnComp.elementCount(); ++i) {
                 int voxelInstanceId = fnComp.element(i);
-                subscene->selectedVoxelMatrices.append(voxelMatrices[voxelInstanceId]);
+                const MMatrix& voxelMatrix = voxelMatrices[visibleVoxelIdToGlobalId[voxelInstanceId]];
+                subscene->selectedVoxelMatrices.append(voxelMatrix);
             }
         }
 
         subscene->shouldUpdate = true;
         subscene->selectionChanged = true;
         // changing selection invalidates toggling hidden faces
-        subscene->hiddenIndices.merge(subscene->recentlyHiddenIndices);
-        subscene->recentlyHiddenIndices.clear();
+        subscene->hiddenVoxels.merge(subscene->recentlyHiddenVoxels);
+        subscene->recentlyHiddenVoxels.clear();
     }
 
     /**
@@ -184,8 +187,6 @@ private:
         if (!toggleHideCommand && !hideCommand && !showHiddenCommand) return;
         
         VoxelSubSceneOverride* subscene = static_cast<VoxelSubSceneOverride*>(clientData);
-        const MObjectArray& activeComponents = subscene->voxelShape->activeComponents();
-        int numSelectedVoxels = activeComponents.length();
         subscene->shouldUpdate = true;
 
         if (hideCommand) {
@@ -195,28 +196,33 @@ private:
             subscene->showHideStateChange = ShowHideStateChange::ShowAll;
         }
         else if (toggleHideCommand) {
-            subscene->showHideStateChange = (subscene->recentlyHiddenIndices.size() > 0) ? ShowHideStateChange::ShowSelected : ShowHideStateChange::HideSelected;
+            subscene->showHideStateChange = (subscene->recentlyHiddenVoxels.size() > 0) ? ShowHideStateChange::ShowSelected : ShowHideStateChange::HideSelected;
         }
 
         if (subscene->showHideStateChange != ShowHideStateChange::HideSelected) return;
-        subscene->hiddenIndices.merge(subscene->recentlyHiddenIndices);
-        subscene->recentlyHiddenIndices.clear();
+        subscene->hiddenVoxels.merge(subscene->recentlyHiddenVoxels);
+        subscene->recentlyHiddenVoxels.clear();
+        const MObjectArray& activeComponents = subscene->voxelShape->activeComponents();
+        const std::vector<uint>& visibleVoxelIdToGlobalId = subscene->visibleVoxelIdToGlobalId;
 
         for (const MObject& comp : activeComponents) {
             MFnSingleIndexedComponent voxelComponent(comp);
             for (int i = 0; i < voxelComponent.elementCount(); ++i) {
                 int voxelInstanceId = voxelComponent.element(i);
 
-                subscene->voxelsToHide.insert(voxelInstanceId);
+                // The voxel instance ID reported by the intersection is an ID into the list of visible voxels.
+                // We need to convert that to an ID into the global list of voxels (which includes hidden ones).
+                subscene->voxelsToHide.insert(visibleVoxelIdToGlobalId[voxelInstanceId]);
             }
         }
     }
 
     void onHoveredVoxelChange(int hoveredVoxelInstanceId) {
         hoveredVoxelMatrices.clear();
-        if (hoveredVoxelInstanceId < 0 || hoveredVoxelInstanceId >= (int)visibleVoxelMatrices.length()) return;
+        const MMatrixArray& voxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
+        if (hoveredVoxelInstanceId < 0 || hoveredVoxelInstanceId >= (int)voxelMatrices.length()) return;
 
-        hoveredVoxelMatrices.append(visibleVoxelMatrices[hoveredVoxelInstanceId]);
+        hoveredVoxelMatrices.append(voxelMatrices[hoveredVoxelInstanceId]);
 
         shouldUpdate = true;
         hoveredVoxelChanged = true;
@@ -231,19 +237,20 @@ private:
         it->reset();
         MRenderItem* item = nullptr;
 
-        // Convert voxelsToHide to a set of face indices to hide
-        std::unordered_set<uint> indicesToHide;
+        // Convert voxelsToHide to a map of face indices to hide (where key is face index and value is voxel instance ID)
+        std::unordered_map<uint, uint> indicesToHide;
         MFnSingleIndexedComponent faceComponent;
+        const MObjectArray& voxelFaceComponents = voxelShape->getVoxels().get()->faceComponents;
 
         for (uint voxelInstanceId : voxelsToHide) {
-            faceComponent.setObject(visibleVoxelFaceComponents[voxelInstanceId]);
+            faceComponent.setObject(voxelFaceComponents[voxelInstanceId]);
 
             for (int j = 0; j < faceComponent.elementCount(); ++j) {
                 int faceIdx = faceComponent.element(j);
     
-                indicesToHide.insert(allMeshIndices[faceIdx * 3 + 0]);
-                indicesToHide.insert(allMeshIndices[faceIdx * 3 + 1]);
-                indicesToHide.insert(allMeshIndices[faceIdx * 3 + 2]);
+                indicesToHide.insert({allMeshIndices[faceIdx * 3 + 0], voxelInstanceId});
+                indicesToHide.insert({allMeshIndices[faceIdx * 3 + 1], voxelInstanceId});
+                indicesToHide.insert({allMeshIndices[faceIdx * 3 + 2], voxelInstanceId});
             }
         }
 
@@ -263,7 +270,7 @@ private:
                     continue;
                 };
 
-                recentlyHiddenIndices[itemName].push_back(indices[i]);
+                recentlyHiddenVoxels[itemName].push_back(indicesToHide[indices[i]]);
             }
             
             indexBuffer->unmap();
@@ -280,22 +287,28 @@ private:
      * Create new instanced transform arrays for the voxel render items, excluding any hidden voxels.
      */
     void hideSelectedVoxels(MSubSceneContainer& container) {
-        MMatrixArray oldVisibleVoxelMatrices = visibleVoxelMatrices;
-        MObjectArray oldVisibleVoxelFaceComponents = visibleVoxelFaceComponents;
-        visibleVoxelMatrices.clear();
-        visibleVoxelFaceComponents.clear();
+        MMatrixArray visibleVoxelMatrices;
+        MObjectArray visibleVoxelFaceComponents;
 
         // First of all, the selection highlight render items should show 0 voxels now, so use the cleared array.
         updateVoxelRenderItem(container, voxelSelectedHighlightItemName, visibleVoxelMatrices);
         updateVoxelRenderItem(container, voxelPreviewSelectionHighlightItemName, visibleVoxelMatrices);
 
         // Filter the voxel matrices array and voxel face components to exclude any hidden voxels.
-        for (uint i = 0; i < oldVisibleVoxelMatrices.length(); ++i) {
+        const MMatrixArray& allVoxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
+        const MObjectArray& allVoxelFaceComponents = voxelShape->getVoxels().get()->faceComponents;
+        std::vector<uint> newVisibleVoxelIdToGlobalId;
+
+        for (uint i = 0; i < allVoxelMatrices.length(); ++i) {
             if (voxelsToHide.find(i) != voxelsToHide.end()) continue;
             
-            visibleVoxelMatrices.append(oldVisibleVoxelMatrices[i]);
-            visibleVoxelFaceComponents.append(oldVisibleVoxelFaceComponents[i]);
+            visibleVoxelMatrices.append(allVoxelMatrices[i]);
+            visibleVoxelFaceComponents.append(allVoxelFaceComponents[i]);
+            newVisibleVoxelIdToGlobalId.push_back(i);
         }
+
+        std::sort(newVisibleVoxelIdToGlobalId.begin(), newVisibleVoxelIdToGlobalId.end());
+        visibleVoxelIdToGlobalId = std::move(newVisibleVoxelIdToGlobalId);
 
         updateVoxelRenderItem(container, voxelWireframeRenderItemName, visibleVoxelMatrices);
         updateVoxelRenderItem(container, voxelSelectionRenderItemName, visibleVoxelMatrices);
@@ -728,8 +741,10 @@ public:
         if (!voxelShape) return;
         
         if (container.count() <= 0) {
-            visibleVoxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
-            visibleVoxelFaceComponents = voxelShape->getVoxels().get()->faceComponents;
+            // Initialize the visibleVoxelIdToGlobalId map to a 1:1 mapping, which will then be updated as voxels get (un)hidden.
+            int numVoxels = voxelShape->getVoxels().get()->numOccupied;
+            visibleVoxelIdToGlobalId.resize(numVoxels);
+            std::iota(visibleVoxelIdToGlobalId.begin(), visibleVoxelIdToGlobalId.end(), 0);
 
             // The render items for the actual, voxelized mesh.
             createMeshRenderItems(container);
