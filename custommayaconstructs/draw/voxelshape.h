@@ -153,6 +153,22 @@ public:
         return MSelectionMask::kSelectMeshFaces;
     }
 
+    // This is only implemented so that hiding faces doesn't flash an error, but it's a dummy implementation.
+    MatchResult matchComponent(
+        const MSelectionList& item, 
+        const MAttributeSpecArray& spec, 
+        MSelectionList& list) override {
+        
+        MDagPath path;
+        item.getDagPath( 0, path );
+        MFnSingleIndexedComponent fnComp;
+        MObject objComp = fnComp.create( MFn::kMeshPolygonComponent );
+
+        fnComp.addElement(0);
+        list.add(path, objComp);
+        return kMatchOk;
+    }
+
     /**
      * Invoked by the subscene override after it has created geometry buffers to fulfill shader requirements.
      * In addition to the GPU resources it passes in, we need to pull CPU-side data from this nodes connected plugs and
