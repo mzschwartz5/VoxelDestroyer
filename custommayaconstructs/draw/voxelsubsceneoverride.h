@@ -95,7 +95,7 @@ private:
         ShowSelected
     } showHideStateChange = ShowHideStateChange::None;
 
-    using RenderItemVoxelMap = std::unordered_map<MString, std::vector<uint>, Utils::MStringHash, Utils::MStringEq>;
+    using RenderItemFaceIdxMap = std::unordered_map<MString, std::vector<uint32_t>, Utils::MStringHash, Utils::MStringEq>;
     
     bool shouldUpdate = true;
     bool selectionChanged = false;
@@ -104,9 +104,11 @@ private:
     MMatrixArray selectedVoxelMatrices;
     MMatrixArray hoveredVoxelMatrices; // Will only ever have 0 or 1 matrix in it.
     std::unordered_set<uint> voxelsToHide;
-    std::vector<uint> visibleVoxelIdToGlobalId; // maps visible voxel instance IDs to global voxel IDs (including hidden ones)
-    RenderItemVoxelMap hiddenVoxels;            // hidden face indices per render item
-    RenderItemVoxelMap recentlyHiddenVoxels;    // the most recent faces to be hidden (again mapped by render item)
+    std::vector<uint> visibleVoxelIdToGlobalId;  // maps visible voxel instance IDs to global voxel IDs (including hidden ones)
+    RenderItemFaceIdxMap hiddenFaces;            // hidden face indices per render item
+    RenderItemFaceIdxMap recentlyHiddenFaces;    // the most recent faces to be hidden (again mapped by render item)
+    std::unordered_set<uint> hiddenVoxels;              // global voxel IDs that are currently hidden
+    std::unordered_set<uint> recentlyHiddenVoxels;      // the most recent global voxel IDs to be hidden
 
     inline static const MString voxelSelectedHighlightItemName = "VoxelSelectedHighlightItem";
     inline static const MString voxelPreviewSelectionHighlightItemName = "VoxelPreviewSelectionHighlightItem";
@@ -128,7 +130,7 @@ private:
 
     // These are just stored to persist the buffers. Subscene owns any geometry buffers it creates.
     std::vector<unique_ptr<MVertexBuffer>> meshVertexBuffers;
-    std::vector<unique_ptr<MIndexBuffer>> meshIndexBuffers;
+    std::unordered_map<MString, unique_ptr<MIndexBuffer>, Utils::MStringHash, Utils::MStringEq> meshIndexBuffers; // Stored by render item name, so we can update them easily.
     std::vector<uint> allMeshIndices; // Mesh vertex indices, _not_ split per render item but rather for the entire mesh.
     std::unordered_set<MUint64> meshRenderItemIDs;
 
@@ -168,9 +170,7 @@ private:
 
         subscene->shouldUpdate = true;
         subscene->selectionChanged = true;
-        // changing selection invalidates toggling hidden faces
-        subscene->hiddenVoxels.merge(subscene->recentlyHiddenVoxels);
-        subscene->recentlyHiddenVoxels.clear();
+        invalidateRecentlyHidden(subscene);
     }
 
     /**
@@ -185,7 +185,7 @@ private:
         bool hideCommand = (procName.indexW("hide") != -1);
         bool showHiddenCommand = (procName.indexW("showHidden") != -1);
         if (!toggleHideCommand && !hideCommand && !showHiddenCommand) return;
-        
+
         VoxelSubSceneOverride* subscene = static_cast<VoxelSubSceneOverride*>(clientData);
         subscene->shouldUpdate = true;
 
@@ -199,9 +199,12 @@ private:
             subscene->showHideStateChange = (subscene->recentlyHiddenVoxels.size() > 0) ? ShowHideStateChange::ShowSelected : ShowHideStateChange::HideSelected;
         }
 
+        // Force a subscene update to occur by refreshing the viewport.
+        // This won't necessarily happen on its own, because Maya doesn't consider a custom shape's components to be valid for hiding/showing,
+        // (which is why we have to implement the behavior ourselves), so it thinks nothing has changed and will not refresh immediately.
+	    MGlobal::executeCommandOnIdle("refresh");
+
         if (subscene->showHideStateChange != ShowHideStateChange::HideSelected) return;
-        subscene->hiddenVoxels.merge(subscene->recentlyHiddenVoxels);
-        subscene->recentlyHiddenVoxels.clear();
         const MObjectArray& activeComponents = subscene->voxelShape->activeComponents();
         const std::vector<uint>& visibleVoxelIdToGlobalId = subscene->visibleVoxelIdToGlobalId;
 
@@ -215,6 +218,31 @@ private:
                 subscene->voxelsToHide.insert(visibleVoxelIdToGlobalId[voxelInstanceId]);
             }
         }
+    }
+
+    /**
+     * Merge the recentlyHidden* data into the central hidden* data. E.g. clearing the cache of what was last hidden.
+     * This operation happens, for instance, when the user clears their selection or toggles hide to show what was last hidden. (To be consistent with Maya's own hide/show behaviour). 
+     */
+    static void invalidateRecentlyHidden(VoxelSubSceneOverride* const subscene) {
+        RenderItemFaceIdxMap& recentlyHiddenFaces = subscene->recentlyHiddenFaces;
+        RenderItemFaceIdxMap& hiddenFaces = subscene->hiddenFaces;
+        std::unordered_set<uint>& recentlyHiddenVoxels = subscene->recentlyHiddenVoxels;
+        std::unordered_set<uint>& hiddenVoxels = subscene->hiddenVoxels;
+
+        for (auto& [itemName, faceIdxs] : recentlyHiddenFaces) {
+            auto it = hiddenFaces.find(itemName);
+            if (it == hiddenFaces.end()) {
+                hiddenFaces[itemName] = std::move(faceIdxs);
+                continue;
+            }
+
+            it->second.insert(it->second.end(), faceIdxs.begin(), faceIdxs.end());
+        }
+        recentlyHiddenFaces.clear();
+
+        hiddenVoxels.insert(recentlyHiddenVoxels.begin(), recentlyHiddenVoxels.end());
+        recentlyHiddenVoxels.clear();
     }
 
     void onHoveredVoxelChange(int hoveredVoxelInstanceId) {
@@ -259,28 +287,75 @@ private:
             if (meshRenderItemIDs.find(item->InternalObjectId()) == meshRenderItemIDs.end()) continue;
             const MString& itemName = item->name();
 
-            MIndexBuffer* indexBuffer = item->geometry()->indexBuffer(0);
+            // Note: do not get the index buffer from the render item's MGeometry; it seems to be stale / hold an old view of the buffer.
+            MIndexBuffer* indexBuffer = meshIndexBuffers[itemName].get();
             uint32_t* indices = static_cast<uint32_t*>(indexBuffer->map());
-            std::vector<uint32_t> newIndices(indexBuffer->size(), 0);
+            std::vector<uint32_t> newIndices;
+            newIndices.reserve(indexBuffer->size());
             
             for (unsigned int i = 0; i < indexBuffer->size(); ++i) {
                 // Didn't find this index in the set of indices to hide, so keep it.
                 if (indicesToHide.find(indices[i]) == indicesToHide.end()) {
-                    newIndices[i] = indices[i];
+                    newIndices.push_back(indices[i]);
                     continue;
                 };
 
-                recentlyHiddenVoxels[itemName].push_back(indicesToHide[indices[i]]);
+                recentlyHiddenVoxels.insert(indicesToHide[indices[i]]);
+                recentlyHiddenFaces[itemName].push_back(indices[i]);
             }
             
             indexBuffer->unmap();
-
-            if (newIndices.size() > 0) {
-                indexBuffer->update(newIndices.data(), 0, static_cast<unsigned int>(newIndices.size()), false);
-            }
+            indexBuffer->update(newIndices.data(), 0, static_cast<unsigned int>(newIndices.size()), true /* truncateIfSmaller */);
+            updateRenderItemIndexBuffer(item, indexBuffer);
         }
         
         it->destroy();
+    }
+
+    /**
+     * When recreating an index buffer, or even changing the size of an existing one, it's not sufficient to call the index buffer's update method.
+     * We must also re-call setGeometryForRenderItem. This method retrieves the existing buffers from a render item and re-sets them.
+     */
+    void updateRenderItemIndexBuffer(MRenderItem* const item, const MIndexBuffer* const newIndexBuffer) {
+        MVertexBufferArray vertexBuffers;
+        const MBoundingBox& bbox = item->boundingBox();
+        
+        for (int i = 0; i < item->geometry()->vertexBufferCount(); ++i) {
+            MVertexBuffer* vb = item->geometry()->vertexBuffer(i);
+            vertexBuffers.addBuffer(vb->descriptor().name(), vb);
+        }
+        setGeometryForRenderItem(*item, vertexBuffers, *newIndexBuffer, &bbox);
+    }
+
+    /**
+     * Add the hidden (selected) face indices back into the relevant render items' index buffers (by creating a new merged index buffer).
+     */
+    void showSelectedMeshFaces(MSubSceneContainer& container, RenderItemFaceIdxMap& selectedRenderItemFaces) {
+
+        for (const auto& [itemName, hiddenFaceIdxs] : selectedRenderItemFaces) {
+            MRenderItem* item = container.find(itemName);
+            if (!item) continue;
+            if (hiddenFaceIdxs.size() == 0) continue;
+
+            // Note: do not get the index buffer from the render item's MGeometry; it seems to be stale / hold an old view of the buffer.
+            MIndexBuffer* indexBuffer = meshIndexBuffers[itemName].get();
+            auto newIndexBuffer = make_unique<MIndexBuffer>(MGeometry::kUnsignedInt32);
+
+            const unsigned int oldCount = indexBuffer->size();
+            const unsigned int addCount = static_cast<unsigned int>(hiddenFaceIdxs.size());
+            uint32_t* merged = static_cast<uint32_t*>(newIndexBuffer->acquire(oldCount + addCount, true));
+
+            uint32_t* oldData = static_cast<uint32_t*>(indexBuffer->map());
+            std::copy(oldData, oldData + oldCount, merged);
+            indexBuffer->unmap();
+            std::copy(hiddenFaceIdxs.begin(), hiddenFaceIdxs.end(), merged + oldCount);
+            newIndexBuffer->commit(merged);
+            
+            meshIndexBuffers[itemName] = std::move(newIndexBuffer);
+            updateRenderItemIndexBuffer(item, meshIndexBuffers[itemName].get());
+        }
+
+        selectedRenderItemFaces.clear();
     }
 
     /**
@@ -288,22 +363,21 @@ private:
      */
     void hideSelectedVoxels(MSubSceneContainer& container) {
         MMatrixArray visibleVoxelMatrices;
-        MObjectArray visibleVoxelFaceComponents;
 
         // First of all, the selection highlight render items should show 0 voxels now, so use the cleared array.
         updateVoxelRenderItem(container, voxelSelectedHighlightItemName, visibleVoxelMatrices);
         updateVoxelRenderItem(container, voxelPreviewSelectionHighlightItemName, visibleVoxelMatrices);
 
-        // Filter the voxel matrices array and voxel face components to exclude any hidden voxels.
+        // Filter the voxel matrices array to exclude any hidden voxels.
         const MMatrixArray& allVoxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
-        const MObjectArray& allVoxelFaceComponents = voxelShape->getVoxels().get()->faceComponents;
         std::vector<uint> newVisibleVoxelIdToGlobalId;
+        std::unordered_set<uint> visibleVoxels(visibleVoxelIdToGlobalId.begin(), visibleVoxelIdToGlobalId.end());
 
         for (uint i = 0; i < allVoxelMatrices.length(); ++i) {
             if (voxelsToHide.find(i) != voxelsToHide.end()) continue;
+            if (visibleVoxels.find(i) == visibleVoxels.end()) continue;
             
             visibleVoxelMatrices.append(allVoxelMatrices[i]);
-            visibleVoxelFaceComponents.append(allVoxelFaceComponents[i]);
             newVisibleVoxelIdToGlobalId.push_back(i);
         }
 
@@ -312,6 +386,36 @@ private:
 
         updateVoxelRenderItem(container, voxelWireframeRenderItemName, visibleVoxelMatrices);
         updateVoxelRenderItem(container, voxelSelectionRenderItemName, visibleVoxelMatrices);
+
+        voxelsToHide.clear();
+    }
+
+    /**
+     * Create new instanced transform arrays for the voxel render items, including currently visible voxels
+     * plus any selected hidden ones.
+     */
+    void showSelectedVoxels(MSubSceneContainer& container, std::unordered_set<uint>& selectedVoxels) {
+        MMatrixArray visibleVoxelMatrices;
+        MMatrixArray selectedVoxelMatrices;
+
+        const MMatrixArray& allVoxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
+
+        for (uint voxelId : selectedVoxels) {
+            selectedVoxelMatrices.append(allVoxelMatrices[voxelId]);
+            visibleVoxelIdToGlobalId.push_back(voxelId);
+        }
+
+        std::sort(visibleVoxelIdToGlobalId.begin(), visibleVoxelIdToGlobalId.end());
+
+        for (uint globalVoxelId : visibleVoxelIdToGlobalId) {
+            visibleVoxelMatrices.append(allVoxelMatrices[globalVoxelId]);
+        }
+
+        updateVoxelRenderItem(container, voxelSelectedHighlightItemName, selectedVoxelMatrices);
+        updateVoxelRenderItem(container, voxelWireframeRenderItemName, visibleVoxelMatrices);
+        updateVoxelRenderItem(container, voxelSelectionRenderItemName, visibleVoxelMatrices);
+
+        selectedVoxels.clear();
     }
 
     void updateVoxelRenderItem(MSubSceneContainer& container, const MString& itemName, const MMatrixArray& voxelMatrices) {
@@ -464,7 +568,7 @@ private:
         indexBuffer->commit(indexData);
 
         MIndexBuffer* rawIndexBuffer = indexBuffer.get();
-        meshIndexBuffers.push_back(std::move(indexBuffer));
+        meshIndexBuffers[itemInfo.renderItemName] = std::move(indexBuffer);
         
         return rawIndexBuffer;
     }
@@ -775,13 +879,18 @@ public:
         case ShowHideStateChange::None:
             break;
         case ShowHideStateChange::ShowAll:
+            invalidateRecentlyHidden(this);
+            showSelectedMeshFaces(container, hiddenFaces);
+            showSelectedVoxels(container, hiddenVoxels);
             break;
         case ShowHideStateChange::ShowSelected:
+            showSelectedMeshFaces(container, recentlyHiddenFaces);
+            showSelectedVoxels(container, recentlyHiddenVoxels);
             break;
         case ShowHideStateChange::HideSelected:
+            invalidateRecentlyHidden(this);
             hideSelectedMeshFaces(container);
             hideSelectedVoxels(container);
-            voxelsToHide.clear();
             break;
         }
 
