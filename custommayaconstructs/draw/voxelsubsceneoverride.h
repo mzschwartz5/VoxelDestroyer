@@ -394,14 +394,14 @@ private:
      * Create new instanced transform arrays for the voxel render items, including currently visible voxels
      * plus any selected hidden ones.
      */
-    void showSelectedVoxels(MSubSceneContainer& container, std::unordered_set<uint>& selectedVoxels) {
+    void showSelectedVoxels(MSubSceneContainer& container, std::unordered_set<uint>& selectedVoxels, bool highlightSelected = true) {
         MMatrixArray visibleVoxelMatrices;
         MMatrixArray selectedVoxelMatrices;
 
         const MMatrixArray& allVoxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
 
         for (uint voxelId : selectedVoxels) {
-            selectedVoxelMatrices.append(allVoxelMatrices[voxelId]);
+            if (highlightSelected) selectedVoxelMatrices.append(allVoxelMatrices[voxelId]);
             visibleVoxelIdToGlobalId.push_back(voxelId);
         }
 
@@ -881,7 +881,7 @@ public:
         case ShowHideStateChange::ShowAll:
             invalidateRecentlyHidden(this);
             showSelectedMeshFaces(container, hiddenFaces);
-            showSelectedVoxels(container, hiddenVoxels);
+            showSelectedVoxels(container, hiddenVoxels, false);
             break;
         case ShowHideStateChange::ShowSelected:
             showSelectedMeshFaces(container, recentlyHiddenFaces);
