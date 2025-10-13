@@ -195,6 +195,7 @@
     <ClInclude Include="custommayaconstructs\data\d3d11data.h" />
     <ClInclude Include="custommayaconstructs\data\colliderdata.h" />
     <ClInclude Include="custommayaconstructs\draw\voxelrendereroverride.h" />
+    <ClInclude Include="custommayaconstructs\draw\voxelpaintrenderoperation.h" />
     <ClInclude Include="custommayaconstructs\draw\voxelshape.h" />
     <ClInclude Include="custommayaconstructs\draw\voxelsubsceneoverride.h" />
     <ClInclude Include="custommayaconstructs\draw\colliderdrawoverride.h" />
