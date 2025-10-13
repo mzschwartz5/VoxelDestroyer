@@ -186,6 +186,8 @@
     <ClInclude Include="globalsolver.h" />
     <ClInclude Include="custommayaconstructs\tools\voxeldragcontext.h" />
     <ClInclude Include="custommayaconstructs\tools\voxeldragcontextcommand.h" />
+    <ClInclude Include="custommayaconstructs\tools\voxelpaintcontext.h" />
+    <ClInclude Include="custommayaconstructs\tools\voxelpaintcontextcommand.h" />
     <ClInclude Include="custommayaconstructs\data\voxeldata.h" />
     <ClInclude Include="custommayaconstructs\data\particledata.h" />
     <ClInclude Include="custommayaconstructs\data\functionaldata.h" />

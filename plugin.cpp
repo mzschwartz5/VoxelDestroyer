@@ -3,6 +3,7 @@
 #include <maya/MFnMessageAttribute.h>
 #include <windows.h>
 #include "custommayaconstructs/tools/voxeldragcontextcommand.h"
+#include "custommayaconstructs/tools/voxelpaintcontextcommand.h"
 #include <maya/MAnimControl.h>
 #include <maya/MProgressWindow.h>
 #include "custommayaconstructs/data/voxeldata.h"
@@ -420,6 +421,13 @@ EXPORT MStatus initializePlugin(MObject obj)
 		return status;
 	}
 
+	// Paint Context command
+	status = plugin.registerContextCommand("voxelPaintContextCommand", VoxelPaintContextCommand::creator);
+	if (!status) {
+		MGlobal::displayError("Failed to register VoxelPaintContextCommand");
+		return status;
+	}
+
 	// Renderer Override
 	plugin::voxelRendererOverride = new VoxelRendererOverride("VoxelRendererOverride");
 	status = MRenderer::theRenderer()->registerOverride(plugin::voxelRendererOverride);
@@ -492,6 +500,11 @@ EXPORT MStatus uninitializePlugin(MObject obj)
     status = plugin.deregisterContextCommand("voxelDragContextCommand");
     if (!status)
         MGlobal::displayError("deregisterContextCommand failed on VoxelDragContextCommand: " + status.errorString());
+
+	// Voxel Paint Context command
+	 status = plugin.deregisterContextCommand("voxelPaintContextCommand");
+	 if (!status)
+		 MGlobal::displayError("deregisterContextCommand failed on VoxelPaintContextCommand: " + status.errorString());
 
 	status = plugin.deregisterData(VoxelData::id);
 	if (!status)
