@@ -33,6 +33,11 @@ public:
         unsubscribeFromPaintStateChange = VoxelPaintContext::subscribeToDragStateChange([this](const DragState& state) {
             isPainting = state.isDragging;
         });
+
+        MRenderer::theRenderer()->getStandardViewportOperations(mOperations);
+        // Maya manages the memory / lifetime of the operation passed in
+        mOperations.insertBefore(MRenderOperation::kStandardPresentName, new VoxelPaintRenderOperation(paintOpName));
+        paintOpIndex = mOperations.indexOf(paintOpName);
     }
 
     ~VoxelRendererOverride() override {
@@ -40,6 +45,9 @@ public:
         unsubscribeFromPaintStateChange();
     }
 
+    /**
+     * Runs at the beginning of every frame.
+     */
     MStatus setup(const MString& destination) override {
         const MFrameContext* mFrameContext = getFrameContext();
         const MRenderTarget* depthTarget = mFrameContext->getCurrentDepthRenderTarget();
@@ -54,13 +62,7 @@ public:
         depthTargetChangedEvent.notify(depthTarget->resourceHandle());
         cameraInfoChangedEvent.notify({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), viewMatrix, projMatrix, invViewProjMatrix });
 
-        mOperations.clear();
-        MRenderer::theRenderer()->getStandardViewportOperations(mOperations);
-        if (isPainting) {
-            // The operation list owns (manages the lifetime of) the operations
-            mOperations.insertBefore(MRenderOperation::kStandardPresentName, new VoxelPaintRenderOperation("Voxel Paint Operation"));
-        }
-
+        mOperations[paintOpIndex]->setEnabled(isPainting);
         return MStatus::kSuccess;
     }
 
@@ -83,8 +85,10 @@ public:
 private:
     inline static Event<void*> depthTargetChangedEvent;
     inline static Event<CameraMatrices> cameraInfoChangedEvent;
+    inline static MString paintOpName = "Voxel Paint Operation";
     EventBase::Unsubscribe unsubscribeFromPaintMove;
     EventBase::Unsubscribe unsubscribeFromPaintStateChange;
     bool isPainting{ false };
     MString name;
+    int paintOpIndex = 0;
 };
