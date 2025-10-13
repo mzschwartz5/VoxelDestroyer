@@ -4,6 +4,8 @@
 #include <maya/MGlobal.h>
 #include <maya/MMatrix.h>
 #include "../../event.h"
+#include "voxelPaintrenderoperation.h"
+#include "../tools/voxelpaintcontext.h"
 using namespace MHWRender;
 
 struct CameraMatrices
@@ -24,7 +26,19 @@ struct CameraMatrices
  */
 class VoxelRendererOverride : public MRenderOverride {
 public:
-    VoxelRendererOverride(const MString& name) : MRenderOverride(name), name(name) {}
+    VoxelRendererOverride(const MString& name) : MRenderOverride(name), name(name) {
+        unsubscribeFromPaintMove = VoxelPaintContext::subscribeToMousePositionChange([this](const MousePosition& mousePos) {
+        });
+
+        unsubscribeFromPaintStateChange = VoxelPaintContext::subscribeToDragStateChange([this](const DragState& state) {
+            isPainting = state.isDragging;
+        });
+    }
+
+    ~VoxelRendererOverride() override {
+        unsubscribeFromPaintMove();
+        unsubscribeFromPaintStateChange();
+    }
 
     MStatus setup(const MString& destination) override {
         const MFrameContext* mFrameContext = getFrameContext();
@@ -39,6 +53,13 @@ public:
 
         depthTargetChangedEvent.notify(depthTarget->resourceHandle());
         cameraInfoChangedEvent.notify({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), viewMatrix, projMatrix, invViewProjMatrix });
+
+        mOperations.clear();
+        MRenderer::theRenderer()->getStandardViewportOperations(mOperations);
+        if (isPainting) {
+            // The operation list owns (manages the lifetime of) the operations
+            mOperations.insertBefore(MRenderOperation::kStandardPresentName, new VoxelPaintRenderOperation("Voxel Paint Operation"));
+        }
 
         return MStatus::kSuccess;
     }
@@ -58,10 +79,12 @@ public:
     static Event<CameraMatrices>::Unsubscribe subscribeToCameraInfoChange(Event<CameraMatrices>::Listener listener) {
         return cameraInfoChangedEvent.subscribe(listener);
     }
-    
 
 private:
     inline static Event<void*> depthTargetChangedEvent;
     inline static Event<CameraMatrices> cameraInfoChangedEvent;
+    EventBase::Unsubscribe unsubscribeFromPaintMove;
+    EventBase::Unsubscribe unsubscribeFromPaintStateChange;
+    bool isPainting{ false };
     MString name;
 };

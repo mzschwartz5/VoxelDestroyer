@@ -1,5 +1,5 @@
 #pragma once
-#include <maya/MPxContext.h>
+#include "voxelcontextbase.h"
 #include <maya/MEvent.h>
 
 class VoxelPaintContext : public VoxelContextBase<VoxelPaintContext> {
@@ -21,5 +21,10 @@ public:
         VoxelContextBase::toolOffCleanup();
     }
 
+    MStatus doDrag(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
+        // Maya doesn't automatically refresh the viewport during a drag operation - force it.
+        MGlobal::executeCommand("refresh");
+        return VoxelContextBase::doDrag(event, drawMgr, context);
+    }
 
 };
