@@ -99,6 +99,7 @@ private:
     
     bool shouldUpdate = true;
     bool selectionChanged = false;
+    bool hideAllowed = true;
     bool hoveredVoxelChanged = false;
     MCallbackIdArray callbackIds;
     MMatrixArray selectedVoxelMatrices;
@@ -163,6 +164,8 @@ private:
             MFnSingleIndexedComponent fnComp(comp);
             for (int i = 0; i < fnComp.elementCount(); ++i) {
                 int voxelInstanceId = fnComp.element(i);
+                if (voxelInstanceId >= (int)visibleVoxelIdToGlobalId.size()) continue;
+
                 const MMatrix& voxelMatrix = voxelMatrices[visibleVoxelIdToGlobalId[voxelInstanceId]];
                 subscene->selectedVoxelMatrices.append(voxelMatrix);
             }
@@ -182,7 +185,7 @@ private:
         if (!isProcEntry) return;
         
         bool toggleHideCommand = (procName.indexW("toggleVisibilityAndKeepSelection") != -1);
-        bool hideCommand = (procName.indexW("hide") != -1);
+        bool hideCommand = (procName == "hide");
         bool showHiddenCommand = (procName.indexW("showHidden") != -1);
         if (!toggleHideCommand && !hideCommand && !showHiddenCommand) return;
 
@@ -190,13 +193,16 @@ private:
         subscene->shouldUpdate = true;
 
         if (hideCommand) {
-            subscene->showHideStateChange = ShowHideStateChange::HideSelected;
+            // To match Maya behavior, the plain hide command only works once until something invalidates the hidden selection
+            subscene->showHideStateChange = (subscene->hideAllowed) ? ShowHideStateChange::HideSelected : ShowHideStateChange::None;
         }
         else if (showHiddenCommand) {
             subscene->showHideStateChange = ShowHideStateChange::ShowAll;
         }
         else if (toggleHideCommand) {
-            subscene->showHideStateChange = (subscene->recentlyHiddenVoxels.size() > 0) ? ShowHideStateChange::ShowSelected : ShowHideStateChange::HideSelected;
+            subscene->showHideStateChange = (subscene->recentlyHiddenVoxels.size() > 0) ? ShowHideStateChange::ShowSelected : 
+                                            (subscene->voxelShape->hasActiveComponents()) ? ShowHideStateChange::HideSelected : 
+                                                                                            ShowHideStateChange::ShowAll;
         }
 
         // Force a subscene update to occur by refreshing the viewport.
@@ -205,6 +211,8 @@ private:
 	    MGlobal::executeCommandOnIdle("refresh");
 
         if (subscene->showHideStateChange != ShowHideStateChange::HideSelected) return;
+        subscene->hideAllowed = false;
+
         const MObjectArray& activeComponents = subscene->voxelShape->activeComponents();
         const std::vector<uint>& visibleVoxelIdToGlobalId = subscene->visibleVoxelIdToGlobalId;
 
@@ -243,6 +251,8 @@ private:
 
         hiddenVoxels.insert(recentlyHiddenVoxels.begin(), recentlyHiddenVoxels.end());
         recentlyHiddenVoxels.clear();
+
+        subscene->hideAllowed = true;
     }
 
     void onHoveredVoxelChange(int hoveredVoxelInstanceId) {
@@ -647,7 +657,7 @@ private:
         selMask.addMask(MSelectionMask::kSelectMeshFaces);
         selMask.addMask(MSelectionMask::kSelectMeshes);
 
-        renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kSelectionOnly));
+        renderItem->setDrawMode(MGeometry::kSelectionOnly);
         renderItem->setSelectionMask(selMask);
         renderItem->depthPriority(MRenderItem::sSelectionDepthPriority);
         renderItem->setWantConsolidation(true);
@@ -886,9 +896,9 @@ public:
         case ShowHideStateChange::ShowSelected:
             showSelectedMeshFaces(container, recentlyHiddenFaces);
             showSelectedVoxels(container, recentlyHiddenVoxels);
+            invalidateRecentlyHidden(this);
             break;
         case ShowHideStateChange::HideSelected:
-            invalidateRecentlyHidden(this);
             hideSelectedMeshFaces(container);
             hideSelectedVoxels(container);
             break;
