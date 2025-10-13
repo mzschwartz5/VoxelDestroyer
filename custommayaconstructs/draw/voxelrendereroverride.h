@@ -43,6 +43,9 @@ public:
     ~VoxelRendererOverride() override {
         unsubscribeFromPaintMove();
         unsubscribeFromPaintStateChange();
+
+        VoxelPaintRenderOperation* paintOp = static_cast<VoxelPaintRenderOperation*>(mOperations[paintOpIndex]);
+        paintOp->clearRenderTargets();
     }
 
     /**
@@ -56,8 +59,8 @@ public:
         const MMatrix& projMatrix = mFrameContext->getMatrix(MFrameContext::kProjectionMtx);
         const MMatrix& invViewProjMatrix = mFrameContext->getMatrix(MFrameContext::kViewProjInverseMtx);
 
-        int viewportWidth, viewportHeight, viewportOriginX, viewportOriginY;
-        mFrameContext->getViewportDimensions(viewportOriginX, viewportOriginY, viewportWidth, viewportHeight);
+        unsigned int viewportWidth, viewportHeight;
+        MRenderer::theRenderer()->outputTargetSize(viewportWidth, viewportHeight);
 
         depthTargetChangedEvent.notify(depthTarget->resourceHandle());
         cameraInfoChangedEvent.notify({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), viewMatrix, projMatrix, invViewProjMatrix });
@@ -91,4 +94,5 @@ private:
     bool isPainting{ false };
     MString name;
     int paintOpIndex = 0;
+    MRenderTarget* paintRenderTarget;
 };
