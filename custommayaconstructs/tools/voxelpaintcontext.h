@@ -1,26 +1,25 @@
 #pragma once
-#include <maya/MGlobal.h>
-#include <maya/MpxContext.h>
+#include <maya/MPxContext.h>
+#include <maya/MEvent.h>
 
-class VoxelPaintContext : public MpxContext {
+class VoxelPaintContext : public VoxelContextBase<VoxelPaintContext> {
 
 public:
-    VoxelPaintContext() : MpxContext() {
+    VoxelPaintContext() : VoxelContextBase() {
         setTitleString("Voxel Paint Tool");
     }
     
     ~VoxelPaintContext() override {}
 
     void toolOnSetup(MEvent &event) override {
-        MpxContext::toolOnSetup(event);
+        VoxelContextBase::toolOnSetup(event);
 
         setImage("cMuscle_skin_paint.png", MPxContext::kImage1);
     }
 
     void toolOffCleanup() override {
-        MpxContext::toolOffCleanup();
+        VoxelContextBase::toolOffCleanup();
     }
 
-private:
 
 };

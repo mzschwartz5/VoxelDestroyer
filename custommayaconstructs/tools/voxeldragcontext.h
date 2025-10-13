@@ -1,14 +1,10 @@
 #pragma once
+#include "voxelcontextbase.h"
 #include <maya/MGlobal.h>
-#include <maya/MPxContext.h>
-#include <maya/MViewport2Renderer.h>
-#include <maya/M3dView.h>
-#include <algorithm>
 #include <maya/MAnimControl.h>
 #include <maya/MTimerMessage.h>
 #include <maya/MEventMessage.h>
 #include <maya/MConditionMessage.h>
-#include "../../event.h"
 
 // Maya API does not expose a playback direction enum, nor a way to get the current playback direction,
 // so we define and track it ourselves.
@@ -18,19 +14,6 @@ enum PlaybackDirection {
     BACKWARD = -1
 };
 
-struct MousePosition
-{   
-    int x{ 0 };
-    int y{ 0 };
-};
-
-struct DragState
-{
-    bool isDragging{ false };
-    float selectRadius{ 50.0f };
-    MousePosition mousePosition;
-};
-
 /**
  * This class implements a custom mouse context tool for dragging voxel simulation objects interactively during animation playback.
  * While dragging, state change events are fired to listeners. (E.g. this is how the PBD drag shader responds to mouse movements.)
@@ -38,10 +21,10 @@ struct DragState
  * In order to work around Maya limitations regarding interactive playback, this tool also hacks together manually-driven playback control. It's not ideal,
  * but it's the best we can do with the current Maya API. See below for more details.
  */
-class VoxelDragContext : public MPxContext
+class VoxelDragContext : public VoxelContextBase<VoxelDragContext>
 {
 public:
-    VoxelDragContext() : MPxContext() {
+    VoxelDragContext() : VoxelContextBase() {
         setTitleString("Voxel Simulation Tool");
     }
     
@@ -49,120 +32,45 @@ public:
         MTimerMessage::removeCallback(timerCallbackId);
         MEventMessage::removeCallback(timeChangedCallbackId);
     }
-
-    static EventBase::Unsubscribe subscribeToDragStateChange(
-        const Event<const DragState&>::Listener& listener) 
-    {
-        return dragStateChangedEvent.subscribe(listener);
-    }
-
-    static EventBase::Unsubscribe subscribeToMousePositionChange(
-        const Event<const MousePosition&>::Listener& listener) 
-    {
-        return mousePositionChangedEvent.subscribe(listener);
-    }
     
 private:
     inline static double lastTimeValue = MAnimControl::currentTime().value();
     inline static double playbackStartTime = MAnimControl::currentTime().value();
     inline static int playbackDirection = PlaybackDirection::UNSET;
-    inline static Event<const DragState&> dragStateChangedEvent;
-    inline static Event<const MousePosition&> mousePositionChangedEvent;
 
-    int viewportWidth;
-    bool isDragging = false;
-    short mouseX, mouseY;
-    short screenDragStartX, screenDragStartY;
-    float selectRadius = 50.0f;
     MCallbackId timerCallbackId = 0;
     MCallbackId timeChangedCallbackId = 0;
     MCallbackId playbackChangeCallbackId = 0;
     MStatus status;
 
-    virtual void toolOnSetup(MEvent &event) override {
-        MPxContext::toolOnSetup(event);
+    void toolOnSetup(MEvent &event) override {
+        VoxelContextBase::toolOnSetup(event);
 
         setImage("TypeSeparateMaterials_200.png", MPxContext::kImage1);
 
-        M3dView view = M3dView::active3dView();
-        viewportWidth = view.portWidth();
         timeChangedCallbackId = MEventMessage::addEventCallback("timeChanged", VoxelDragContext::onTimeChanged, NULL, &status);
         playbackChangeCallbackId = MConditionMessage::addConditionCallback("playingBack", VoxelDragContext::onPlaybackChange);
     }
 
-    virtual void toolOffCleanup() override {
-        MPxContext::toolOffCleanup();
+    void toolOffCleanup() override {
+        VoxelContextBase::toolOffCleanup();
         MEventMessage::removeCallback(timeChangedCallbackId);
         MConditionMessage::removeCallback(playbackChangeCallbackId);
     }
 
-    virtual MStatus doPress(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
+    MStatus doPress(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
         lastTimeValue = MAnimControl::currentTime().value();
         timerCallbackId = MTimerMessage::addTimerCallback(VoxelDragContext::timerRate(), VoxelDragContext::onTimer, NULL, &status);
-
-        event.getPosition(mouseX, mouseY);
-        screenDragStartX = mouseX;
-        screenDragStartY = mouseY;
-                
-        isDragging = true;
-        dragStateChangedEvent.notify({ isDragging, selectRadius, { mouseX, mouseY } });
-        return MS::kSuccess;
+        return VoxelContextBase::doPress(event, drawMgr, context);
     }
 
-    virtual MStatus doDrag(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
-        // To grow/shrink the circle radius, but not move the drawn circle while doing so, we need separate variables for the drag position and the draw position
-        short dragX, dragY;
-        event.getPosition(dragX, dragY);
-        short distX = dragX - screenDragStartX;
-        if (event.mouseButton() == MEvent::kMiddleMouse) {
-            selectRadius = std::clamp(selectRadius + ((static_cast<float>(distX) / viewportWidth) * 40.0f), 5.0f, 400.0f);
-            return MS::kSuccess;
-        }
-
-        mousePositionChangedEvent.notify({ mouseX, mouseY });
-
-        // Only update the circle position if we're not resizing it.
-        mouseX = dragX;
-        mouseY = dragY;
-        return MS::kSuccess;
-    }
-
-    virtual MStatus doRelease(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
+    MStatus doRelease(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
         MTimerMessage::removeCallback(timerCallbackId);
         // Sync Maya's playback state with this class's internal playback state.
         if (MAnimControl::isPlaying()) {
             (playbackDirection == PlaybackDirection::FORWARD) ? MAnimControl::playForward() : MAnimControl::playBackward();
         }
-        
-        event.getPosition(mouseX, mouseY);
-
-        isDragging = false;
-        dragStateChangedEvent.notify({ isDragging, selectRadius, { mouseX, mouseY } });
-        return MS::kSuccess;
-    }
-
-    virtual MStatus doPtrMoved(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
-        event.getPosition(mouseX, mouseY);
-        return MS::kSuccess;
-    }
-
-    virtual MStatus drawFeedback(MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& frameContext) override {
-        MPoint mousePoint2D(mouseX, mouseY, 0.0);
-        
-        drawMgr.beginDrawable();
-    
-        // Set color and line width
-        isDragging ? drawMgr.setColor(MColor(0.5f, 1.0f, 0.5f)) : drawMgr.setColor(MColor(0.5f, 0.5f, 0.5f));
-        isDragging ? drawMgr.setLineStyle(MHWRender::MUIDrawManager::kSolid) : drawMgr.setLineStyle(MHWRender::MUIDrawManager::kShortDashed);
-        drawMgr.setLineWidth(2.0f);
-    
-        // Draw a circle at the mouse position
-        const unsigned int segments = 40;
-        drawMgr.circle2d(mousePoint2D, selectRadius, segments, false);  // false = not filled
-    
-        drawMgr.endDrawable();
-
-        return MS::kSuccess;
+        return VoxelContextBase::doRelease(event, drawMgr, context);
     }
 
     /**

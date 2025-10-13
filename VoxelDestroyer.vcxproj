@@ -184,6 +184,7 @@
     <ClInclude Include="constants.h" />
     <ClInclude Include="cube.h" />
     <ClInclude Include="globalsolver.h" />
+    <ClInclude Include="custommayaconstructs\tools\voxelcontextbase.h" />
     <ClInclude Include="custommayaconstructs\tools\voxeldragcontext.h" />
     <ClInclude Include="custommayaconstructs\tools\voxeldragcontextcommand.h" />
     <ClInclude Include="custommayaconstructs\tools\voxelpaintcontext.h" />
