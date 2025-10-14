@@ -6,13 +6,33 @@
 class VoxelPaintRenderOperation : public MUserRenderOperation {
 public:
     VoxelPaintRenderOperation(const MString& name) : MUserRenderOperation(name) {
-        mOperationType = MRenderOperation::kUserDefined;
+        mOperationType = kUserDefined;
+        // Below, we override this input target to be an offscreen target, separate from the standard scene's depth target.
+        mInputTargetNames.append(kDepthTargetName);
     }
 
     ~VoxelPaintRenderOperation() override = default;
 
     MStatus execute(const MDrawContext& drawContext) override {
         return MStatus::kSuccess;
+    }
+
+    /**
+     * Tell Maya to override the standard depth target with our own offscreen depth target.
+     */
+    bool getInputTargetDescription(const MString& name, MRenderTargetDescription& description) override {
+        if (name != kDepthTargetName) return false;
+        
+        MRenderer::theRenderer()->outputTargetSize(currentOutputWidth, currentOutputHeight);
+        description.setName(paintDepthRenderTargetName);
+        description.setWidth(currentOutputWidth);
+        description.setHeight(currentOutputHeight);
+        description.setMultiSampleCount(1);
+        description.setRasterFormat(MHWRender::kD32_FLOAT);
+        description.setArraySliceCount(1);
+        description.setIsCubeMap(false);
+
+        return true;
     }
 
     MRenderTarget* const* targetOverrideList(unsigned int &listSize) override {
@@ -61,6 +81,7 @@ public:
 
 private:
     inline static const MString paintOutputRenderTargetName = "voxelPaintOutputTarget";
+    inline static const MString paintDepthRenderTargetName = "voxelPaintDepthTarget";
     MRenderTarget* paintOutputRenderTarget = nullptr;
     unsigned int currentOutputWidth = 0;
     unsigned int currentOutputHeight = 0;
