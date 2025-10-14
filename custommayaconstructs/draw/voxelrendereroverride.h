@@ -43,9 +43,6 @@ public:
     ~VoxelRendererOverride() override {
         unsubscribeFromPaintMove();
         unsubscribeFromPaintStateChange();
-
-        VoxelPaintRenderOperation* paintOp = static_cast<VoxelPaintRenderOperation*>(mOperations[paintOpIndex]);
-        paintOp->clearRenderTargets();
     }
 
     /**

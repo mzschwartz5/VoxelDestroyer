@@ -7,8 +7,19 @@ class VoxelPaintRenderOperation : public MUserRenderOperation {
 public:
     VoxelPaintRenderOperation(const MString& name) : MUserRenderOperation(name) {
         mOperationType = kUserDefined;
-        // Below, we override this input target to be an offscreen target, separate from the standard scene's depth target.
-        mInputTargetNames.append(kDepthTargetName);
+        mInputTargetNames.append(paintDepthRenderTargetName);
+        mInputTargetNames.append(paintOutputRenderTargetName);
+        mOutputTargetNames.append(paintDepthRenderTargetName);
+        mOutputTargetNames.append(paintOutputRenderTargetName);
+
+        MRenderTargetDescription desc;
+        desc.setName(paintOutputRenderTargetName);
+        desc.setRasterFormat(MHWRender::kR32_UINT);
+        renderTargetDescriptions[0] = desc;
+
+        desc.setName(paintDepthRenderTargetName);
+        desc.setRasterFormat(MHWRender::kD32_FLOAT);
+        renderTargetDescriptions[1] = desc;
     }
 
     ~VoxelPaintRenderOperation() override = default;
@@ -18,71 +29,32 @@ public:
     }
 
     /**
-     * Tell Maya to override the standard depth target with our own offscreen depth target.
+     * Tell Maya to override the standard depth and color targets with our own offscreen depth target.
+     * It will allocate and manage them for us.
      */
     bool getInputTargetDescription(const MString& name, MRenderTargetDescription& description) override {
-        if (name != kDepthTargetName) return false;
-        
-        MRenderer::theRenderer()->outputTargetSize(currentOutputWidth, currentOutputHeight);
-        description.setName(paintDepthRenderTargetName);
-        description.setWidth(currentOutputWidth);
-        description.setHeight(currentOutputHeight);
-        description.setMultiSampleCount(1);
-        description.setRasterFormat(MHWRender::kD32_FLOAT);
-        description.setArraySliceCount(1);
-        description.setIsCubeMap(false);
+        unsigned int width, height;
+        MRenderer::theRenderer()->outputTargetSize(width, height);
 
-        return true;
-    }
-
-    MRenderTarget* const* targetOverrideList(unsigned int &listSize) override {
-        unsigned int viewportWidth, viewportHeight;
-        MRenderer::theRenderer()->outputTargetSize(viewportWidth, viewportHeight);
-        createOrUpdateRenderTargets(viewportWidth, viewportHeight);
-
-        listSize = 1;
-        return &paintOutputRenderTarget;
-    }
-
-    void createOrUpdateRenderTargets(unsigned int targetWidth, unsigned int targetHeight) {
-        MRenderer* renderer = MRenderer::theRenderer();
-        if (!renderer) return;
-
-        const MRenderTargetManager* targetManager = renderer->getRenderTargetManager();
-        if (!targetManager) return;
-        if (targetWidth == currentOutputWidth && targetHeight == currentOutputHeight) return;
-
-        currentOutputWidth = targetWidth;
-        currentOutputHeight = targetHeight;
-
-        MRenderTargetDescription desc(
-            paintOutputRenderTargetName,
-            currentOutputWidth, currentOutputHeight,
-            1, // number of samples
-            MHWRender::kR32_UINT, // format
-            1, // array slices
-            false // is cube map
-        );
-
-        if (paintOutputRenderTarget) {
-            paintOutputRenderTarget->updateDescription(desc);
-            return;
+        if (name == paintDepthRenderTargetName) {
+            description = renderTargetDescriptions[1];
+            description.setWidth(width);
+            description.setHeight(height);
+            return true;
         }
 
-        paintOutputRenderTarget = targetManager->acquireRenderTarget(desc);
-    }
-
-    void clearRenderTargets() {
-        if (paintOutputRenderTarget) {
-            MRenderer::theRenderer()->getRenderTargetManager()->releaseRenderTarget(paintOutputRenderTarget);
-            paintOutputRenderTarget = nullptr;
+        if (name == paintOutputRenderTargetName) {
+            description = renderTargetDescriptions[0];
+            description.setWidth(width);
+            description.setHeight(height);
+            return true;
         }
+
+        return false;
     }
 
 private:
     inline static const MString paintOutputRenderTargetName = "voxelPaintOutputTarget";
     inline static const MString paintDepthRenderTargetName = "voxelPaintDepthTarget";
-    MRenderTarget* paintOutputRenderTarget = nullptr;
-    unsigned int currentOutputWidth = 0;
-    unsigned int currentOutputHeight = 0;
+    MRenderTargetDescription renderTargetDescriptions[2];
 };
