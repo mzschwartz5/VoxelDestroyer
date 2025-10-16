@@ -429,7 +429,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 	}
 
 	// Renderer Override
-	plugin::voxelRendererOverride = new VoxelRendererOverride("VoxelRendererOverride");
+	plugin::voxelRendererOverride = new VoxelRendererOverride(VoxelRendererOverride::voxelRendererOverrideName);
 	status = MRenderer::theRenderer()->registerOverride(plugin::voxelRendererOverride);
 	if (!status) {
 		MGlobal::displayError("Failed to register VoxelRendererOverride: " + status.errorString());
@@ -470,7 +470,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 
 	// TODO: potentially make this more robust / only allow in perspective panel?
 	MString activeModelPanel = plugin::getActiveModelPanel();
-	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 VoxelRendererOverride " + activeModelPanel));
+	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 " + VoxelRendererOverride::voxelRendererOverrideName + " " + activeModelPanel));
 
 	plugin::loadVoxelizerMenu();
 	plugin::loadColliderNodeAETemplate();

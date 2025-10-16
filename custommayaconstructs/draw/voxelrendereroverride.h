@@ -4,7 +4,7 @@
 #include <maya/MGlobal.h>
 #include <maya/MMatrix.h>
 #include "../../event.h"
-#include "voxelPaintrenderoperation.h"
+#include "voxelpaintrenderoperation.h"
 #include "../tools/voxelpaintcontext.h"
 using namespace MHWRender;
 
@@ -26,6 +26,8 @@ struct CameraMatrices
  */
 class VoxelRendererOverride : public MRenderOverride {
 public:
+    inline static const MString voxelRendererOverrideName = "VoxelRendererOverride";
+
     VoxelRendererOverride(const MString& name) : MRenderOverride(name), name(name) {
         unsubscribeFromPaintMove = VoxelPaintContext::subscribeToMousePositionChange([this](const MousePosition& mousePos) {
         });
@@ -36,8 +38,15 @@ public:
 
         MRenderer::theRenderer()->getStandardViewportOperations(mOperations);
         // Maya manages the memory / lifetime of the operation passed in
+        MClearOperation* clearVoxelPaintOp = new MClearOperation(paintClearOpName);
+        clearVoxelPaintOp->setMask(MClearOperation::kClearColor | MClearOperation::kClearDepth);
+        clearVoxelPaintOp->renameOutputTarget(MRenderOperation::kColorTargetName, VoxelPaintRenderOperation::paintOutputRenderTargetName);
+        clearVoxelPaintOp->renameOutputTarget(MRenderOperation::kDepthTargetName, VoxelPaintRenderOperation::paintDepthRenderTargetName);
+        
         mOperations.insertBefore(MRenderOperation::kStandardPresentName, new VoxelPaintRenderOperation(paintOpName));
+        mOperations.insertBefore(paintOpName, clearVoxelPaintOp);
         paintOpIndex = mOperations.indexOf(paintOpName);
+        paintClearOpIndex = mOperations.indexOf(paintClearOpName);
     }
 
     ~VoxelRendererOverride() override {
@@ -62,7 +71,9 @@ public:
         depthTargetChangedEvent.notify(depthTarget->resourceHandle());
         cameraInfoChangedEvent.notify({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), viewMatrix, projMatrix, invViewProjMatrix });
 
-        mOperations[paintOpIndex]->setEnabled(isPainting);
+        // TODO: enable conditionally based on whether we're painting or not
+        mOperations[paintOpIndex]->setEnabled(true);
+        mOperations[paintClearOpIndex]->setEnabled(true);
         return MStatus::kSuccess;
     }
 
@@ -74,6 +85,11 @@ public:
         return kDirectX11;
     }
 
+    void setPaintTransformArray(const MMatrixArray& voxelInstanceTransforms) {
+        static_cast<VoxelPaintRenderOperation*>(mOperations[paintOpIndex])->createInstanceTransformArray(voxelInstanceTransforms);
+    }
+
+    // TODO: these do not have to be static - consumers can use MRenderer to get the active render override instance.
     static Event<void*>::Unsubscribe subscribeToDepthTargetChange(Event<void*>::Listener listener) {
         return depthTargetChangedEvent.subscribe(listener);
     }
@@ -86,10 +102,12 @@ private:
     inline static Event<void*> depthTargetChangedEvent;
     inline static Event<CameraMatrices> cameraInfoChangedEvent;
     inline static MString paintOpName = "Voxel Paint Operation";
+    inline static MString paintClearOpName = "Voxel Paint Clear Operation";
     EventBase::Unsubscribe unsubscribeFromPaintMove;
     EventBase::Unsubscribe unsubscribeFromPaintStateChange;
     bool isPainting{ false };
     MString name;
     int paintOpIndex = 0;
+    int paintClearOpIndex = 0;
     MRenderTarget* paintRenderTarget;
 };
