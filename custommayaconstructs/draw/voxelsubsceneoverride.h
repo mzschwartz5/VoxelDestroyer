@@ -115,6 +115,7 @@ private:
     inline static const MString voxelPreviewSelectionHighlightItemName = "VoxelPreviewSelectionHighlightItem";
     inline static const MString voxelWireframeRenderItemName = "VoxelWireframeRenderItem";
     inline static const MString voxelSelectionRenderItemName = "VoxelSelectionItem";
+    inline static const MString voxelPaintSelectionItemName = "VoxelPaintSelectionItem";
 
     ComPtr<ID3D11Buffer> positionsBuffer;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
@@ -396,6 +397,7 @@ private:
 
         updateVoxelRenderItem(container, voxelWireframeRenderItemName, visibleVoxelMatrices);
         updateVoxelRenderItem(container, voxelSelectionRenderItemName, visibleVoxelMatrices);
+        updateVoxelRenderItem(container, voxelPaintSelectionItemName, visibleVoxelMatrices);
 
         voxelsToHide.clear();
     }
@@ -424,6 +426,7 @@ private:
         updateVoxelRenderItem(container, voxelSelectedHighlightItemName, selectedVoxelMatrices);
         updateVoxelRenderItem(container, voxelWireframeRenderItemName, visibleVoxelMatrices);
         updateVoxelRenderItem(container, voxelSelectionRenderItemName, visibleVoxelMatrices);
+        updateVoxelRenderItem(container, voxelPaintSelectionItemName, visibleVoxelMatrices);
 
         selectedVoxels.clear();
     }
@@ -688,6 +691,38 @@ private:
         setVoxelGeometryForRenderItem(*renderItem, MGeometry::kTriangles);
     }
 
+    void createVoxelPaintSelectionRenderItem(MSubSceneContainer& container, const MString& renderItemName) {
+        // TODO: use custom shader for painting
+        MRenderItem* renderItem = MRenderItem::Create(renderItemName, MRenderItem::DecorationItem, MGeometry::kTriangles);
+        MShaderInstance* shader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dSolidShader);
+
+        renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kWireframe | MGeometry::kShaded | MGeometry::kTextured));
+        renderItem->depthPriority(MRenderItem::sSelectionDepthPriority);
+        renderItem->setWantConsolidation(false);
+        renderItem->setHideOnPlayback(true);
+        renderItem->setShader(shader);
+        renderItem->enable(false);
+        container.add(renderItem);
+
+        setVoxelGeometryForRenderItem(*renderItem, MGeometry::kTriangles);
+
+        const MMatrixArray& voxelInstanceTransforms = voxelShape->getVoxels().get()->modelMatrices;
+        setInstanceTransformArray(*renderItem, voxelInstanceTransforms);
+        // TODO: this needs to happen on activating paint selection, not on render item creation
+        setPaintTransformArrayOnRenderer(voxelInstanceTransforms);
+    }
+
+    void setPaintTransformArrayOnRenderer(const MMatrixArray& voxelInstanceTransforms) {
+        MRenderer* renderer = MRenderer::theRenderer();
+        if (!renderer) return;
+
+        const VoxelRendererOverride* voxelRendererOverrideConst = static_cast<const VoxelRendererOverride*>(renderer->findRenderOverride(VoxelRendererOverride::voxelRendererOverrideName));
+        VoxelRendererOverride* voxelRendererOverride = const_cast<VoxelRendererOverride*>(voxelRendererOverrideConst);
+        if (!voxelRendererOverride) return;
+
+        voxelRendererOverride->setPaintTransformArray(voxelInstanceTransforms);
+    }
+
     void createVoxelGeometryBuffers() {
         MVertexBufferDescriptor posDesc("", MGeometry::kPosition, MGeometry::kFloat, 3);
         auto posVB = make_unique<MVertexBuffer>(posDesc);
@@ -872,6 +907,8 @@ public:
             createVoxelSelectedHighlightRenderItem(container, voxelSelectedHighlightItemName, {0.0f, 1.0f, 0.25f, 0.5f});
             // Shows highlight for hovered voxel
             createVoxelSelectedHighlightRenderItem(container, voxelPreviewSelectionHighlightItemName, {1.0f, 1.0f, 0.0f, 0.5f});
+            // Shows painted weights on voxels (also used by custom render operation to detect paint selection)
+            createVoxelPaintSelectionRenderItem(container, voxelPaintSelectionItemName);
         }
         
         if (selectionChanged) {
