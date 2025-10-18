@@ -695,13 +695,14 @@ private:
         // TODO: use custom shader for painting
         MRenderItem* renderItem = MRenderItem::Create(renderItemName, MRenderItem::DecorationItem, MGeometry::kTriangles);
         MShaderInstance* shader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dSolidShader);
+        const float solidColor[] = {0.0f, 0.0f, 0.0f, 0.0f};
+        shader->setParameter("solidColor", solidColor);
 
         renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kWireframe | MGeometry::kShaded | MGeometry::kTextured));
         renderItem->depthPriority(MRenderItem::sSelectionDepthPriority);
         renderItem->setWantConsolidation(false);
         renderItem->setHideOnPlayback(true);
         renderItem->setShader(shader);
-        renderItem->enable(false);
         container.add(renderItem);
 
         setVoxelGeometryForRenderItem(*renderItem, MGeometry::kTriangles);
