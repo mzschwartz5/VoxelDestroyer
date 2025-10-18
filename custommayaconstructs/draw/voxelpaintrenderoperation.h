@@ -45,7 +45,6 @@ public:
             shaderData, size, PAINT_SELECTION_TECHNIQUE_NAME, macros, 1
         );
 
-
         std::vector<float> cubeVertices(cubeCornersFlattened.begin(), cubeCornersFlattened.end());
         cubeVb = DirectX::createReadOnlyBuffer<float>(cubeVertices, D3D11_BIND_VERTEX_BUFFER, true);
 
@@ -68,12 +67,16 @@ public:
         return renderTargets;
     }
 
+    /**
+     * Draw the voxel cage to an offscreen render target, using the paint brush as a scissor.
+     * Voxels will write their instance IDs to the color target to be read back later / indicate selection.
+     */
     MStatus execute(const MDrawContext& drawContext) override {
         if (!paintSelectionShader || !instanceTransformSRV || instanceCount == 0) {
             return MStatus::kSuccess;
         }
 
-        // No need to set render targets; maya has done it for us (by virtue of the virtual methods we overrode)
+        // No need to set render targets; maya has done it for us (by virtue of the virtual methods this class overrides)
         paintSelectionShader->bind(drawContext);
         paintSelectionShader->updateParameters(drawContext);
         paintSelectionShader->activatePass(drawContext, 0);
