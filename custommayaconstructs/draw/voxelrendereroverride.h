@@ -29,13 +29,6 @@ public:
     inline static const MString voxelRendererOverrideName = "VoxelRendererOverride";
 
     VoxelRendererOverride(const MString& name) : MRenderOverride(name), name(name) {
-        unsubscribeFromPaintMove = VoxelPaintContext::subscribeToMousePositionChange([this](const MousePosition& mousePos) {
-        });
-
-        unsubscribeFromPaintStateChange = VoxelPaintContext::subscribeToDragStateChange([this](const DragState& state) {
-            isPainting = state.isDragging;
-        });
-
         MRenderer::theRenderer()->getStandardViewportOperations(mOperations);
         // Maya manages the memory / lifetime of the operation passed in
         MClearOperation* clearVoxelPaintOp = new MClearOperation(paintClearOpName);
@@ -47,6 +40,15 @@ public:
         mOperations.insertBefore(paintOpName, clearVoxelPaintOp);
         paintOpIndex = mOperations.indexOf(paintOpName);
         paintClearOpIndex = mOperations.indexOf(paintClearOpName);
+
+        unsubscribeFromPaintMove = VoxelPaintContext::subscribeToMousePositionChange([this](const MousePosition& mousePos) {
+            static_cast<VoxelPaintRenderOperation*>(mOperations[paintOpIndex])->updatePaintToolPos(mousePos.x, mousePos.y);
+        });
+
+        unsubscribeFromPaintStateChange = VoxelPaintContext::subscribeToDragStateChange([this](const DragState& state) {
+            static_cast<VoxelPaintRenderOperation*>(mOperations[paintOpIndex])->updatePaintToolRadius(state.selectRadius);
+            isPainting = state.isDragging;
+        });
     }
 
     ~VoxelRendererOverride() override {
@@ -72,8 +74,8 @@ public:
         cameraInfoChangedEvent.notify({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), viewMatrix, projMatrix, invViewProjMatrix });
 
         // TODO: enable conditionally based on whether we're painting or not
-        mOperations[paintOpIndex]->setEnabled(true);
         mOperations[paintClearOpIndex]->setEnabled(true);
+        mOperations[paintOpIndex]->setEnabled(true);
         return MStatus::kSuccess;
     }
 

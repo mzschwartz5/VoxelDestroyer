@@ -12,6 +12,7 @@
 #include "../../constants.h"
 #include "../../resource.h"
 #include <maya/MMatrixArray.h>
+#include <algorithm>
 using namespace MHWRender;
 using std::unique_ptr;
 using std::make_unique;
@@ -37,12 +38,21 @@ public:
         desc.setRasterFormat(MHWRender::kD32_FLOAT);
         renderTargetDescriptions[1] = desc;
 
+        MRasterizerStateDesc rasterDesc;
+        rasterDesc.setDefaults();
+        rasterDesc.scissorEnable = true;
+        scissorRasterState = MStateManager::acquireRasterizerState(rasterDesc);
+
         void* shaderData = nullptr;
         DWORD size = Utils::loadResourceFile(DirectX::getPluginInstance(), IDR_SHADER15, L"SHADER", &shaderData);
 
-        MShaderCompileMacro macros[] = {{"PAINT_SELECTION_TECHNIQUE_NAME", PAINT_SELECTION_TECHNIQUE_NAME}};
+        MShaderCompileMacro macros[] = {
+            {"PAINT_SELECTION_TECHNIQUE_NAME", PAINT_SELECTION_TECHNIQUE_NAME},
+            {"PAINT_POSITION", PAINT_POSITION},
+            {"PAINT_RADIUS", PAINT_RADIUS}
+        };
         paintSelectionShader = MRenderer::theRenderer()->getShaderManager()->getEffectsBufferShader(
-            shaderData, size, PAINT_SELECTION_TECHNIQUE_NAME, macros, 1
+            shaderData, size, PAINT_SELECTION_TECHNIQUE_NAME, macros, 3
         );
 
         std::vector<float> cubeVertices(cubeCornersFlattened.begin(), cubeCornersFlattened.end());
@@ -57,6 +67,12 @@ public:
         {
             MRenderer::theRenderer()->getShaderManager()->releaseShader(paintSelectionShader);
             paintSelectionShader = nullptr;
+        }
+
+        if (scissorRasterState)
+        {
+            MStateManager::releaseRasterizerState(scissorRasterState);
+            scissorRasterState = nullptr;
         }
     };
 
@@ -76,14 +92,29 @@ public:
             return MStatus::kSuccess;
         }
 
+        // Store off the current scissor rects and rasterizer state, so we can change and restore them later
+        ID3D11DeviceContext* context = DirectX::getContext();
+        MStateManager* stateManager = drawContext.getStateManager();
+        const MRasterizerState* prevRS = stateManager->getRasterizerState();
+        UINT prevRectCount = 0;
+        context->RSGetScissorRects(&prevRectCount, nullptr);
+        std::vector<D3D11_RECT> prevScissorRects(prevRectCount);
+        if (prevRectCount) context->RSGetScissorRects(&prevRectCount, prevScissorRects.data());
+
+        // Set our scissor rect and rasterizer state
+        context->RSSetScissorRects(1, &scissor);
+        stateManager->setRasterizerState(scissorRasterState);
+
         // No need to set render targets; maya has done it for us (by virtue of the virtual methods this class overrides)
         paintSelectionShader->bind(drawContext);
+        float paintPos[2] = { static_cast<float>(paintPosX), static_cast<float>(paintPosY) };
+        paintSelectionShader->setParameter(PAINT_POSITION, paintPos);
+        paintSelectionShader->setParameter(PAINT_RADIUS, paintRadius);
         paintSelectionShader->updateParameters(drawContext);
         paintSelectionShader->activatePass(drawContext, 0);
 
         UINT stride = sizeof(float) * 3;
         UINT offset = 0;
-        ID3D11DeviceContext* context = DirectX::getContext();
         context->IASetVertexBuffers(0, 1, cubeVb.GetAddressOf(), &stride, &offset);
         context->IASetIndexBuffer(cubeIb.Get(), DXGI_FORMAT_R32_UINT, 0);
         context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -91,10 +122,12 @@ public:
 
         context->DrawIndexedInstanced(static_cast<UINT>(cubeFacesFlattened.size()), instanceCount, 0, 0, 0);
 
-        // Unbind resources
+        // Unbind resources / restore rasterizer state
         ID3D11ShaderResourceView* nullSRV[1] = { nullptr };
         context->VSSetShaderResources(0, 1, nullSRV);
         paintSelectionShader->unbind(drawContext);
+        stateManager->setRasterizerState(prevRS);
+        context->RSSetScissorRects(prevRectCount, prevScissorRects.data());
 
         return MStatus::kSuccess;
     }
@@ -104,20 +137,19 @@ public:
      * It will allocate and manage them for us.
      */
     bool getInputTargetDescription(const MString& name, MRenderTargetDescription& description) override {
-        unsigned int width, height;
-        MRenderer::theRenderer()->outputTargetSize(width, height);
+        MRenderer::theRenderer()->outputTargetSize(outputTargetWidth, outputTargetHeight);
 
         if (name == paintDepthRenderTargetName) {
             description = renderTargetDescriptions[1];
-            description.setWidth(width);
-            description.setHeight(height);
+            description.setWidth(outputTargetWidth);
+            description.setHeight(outputTargetHeight);
             return true;
         }
 
         if (name == paintOutputRenderTargetName) {
             description = renderTargetDescriptions[0];
-            description.setWidth(width);
-            description.setHeight(height);
+            description.setWidth(outputTargetWidth);
+            description.setHeight(outputTargetHeight);
             return true;
         }
 
@@ -149,14 +181,38 @@ public:
         instanceTransformSRV = DirectX::createSRV(instanceTransformBuffer, false, instanceCount);
     }
 
-    // TODO: necessary?
-    bool requiresResetDeviceStates() const override { return true; }
+    void updatePaintToolPos(int mouseX, int mouseY) {
+        paintPosX = mouseX;
+        paintPosY = static_cast<int>(outputTargetHeight) - 1 - mouseY;
+
+        int left = static_cast<int>(std::floor(paintPosX - paintRadius));
+        int right = static_cast<int>(std::ceil(paintPosX + paintRadius));
+        int top = static_cast<int>(std::floor(paintPosY - paintRadius));
+        int bottom = static_cast<int>(std::ceil(paintPosY + paintRadius));
+
+        scissor.left = std::max(0, left);
+        scissor.right = std::min(static_cast<int>(outputTargetWidth), right);
+        scissor.top = std::max(0, top);
+        scissor.bottom = std::min(static_cast<int>(outputTargetHeight), bottom);
+    }
+
+    void updatePaintToolRadius(float newPaintRadius) {
+        paintRadius = newPaintRadius;
+    }
 
 private:
 
     MRenderTargetDescription renderTargetDescriptions[2];
     MRenderTarget* renderTargets[2] = { nullptr, nullptr };
     MShaderInstance* paintSelectionShader = nullptr;
+    const MRasterizerState* scissorRasterState = nullptr;
+    D3D11_RECT scissor;
+    float paintRadius;
+    int paintPosX;;
+    int paintPosY;
+    unsigned int outputTargetWidth = 0;
+    unsigned int outputTargetHeight = 0;
+
     ComPtr<ID3D11Buffer> instanceTransformBuffer;
     ComPtr<ID3D11ShaderResourceView> instanceTransformSRV;
 

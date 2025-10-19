@@ -21,10 +21,10 @@ public:
         VoxelContextBase::toolOffCleanup();
     }
 
-    MStatus doDrag(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
-        // Maya doesn't automatically refresh the viewport during a drag operation - force it.
+    MStatus doPtrMoved(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
+        // Maya doesn't automatically refresh the viewport when the mouse moves. Without a manual refresh, there can be draw artifacts from the tool UI layer.
         MGlobal::executeCommand("refresh");
-        return VoxelContextBase::doDrag(event, drawMgr, context);
+        return VoxelContextBase::doRelease(event, drawMgr, context);
     }
 
 };

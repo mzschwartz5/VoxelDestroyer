@@ -6,3 +6,5 @@
 #define PREFIX_SCAN_THREADS 512  // This MUST be a power of two (many assumptions in the scan code rely on this).
 #define MAX_COLLIDERS 256
 #define PAINT_SELECTION_TECHNIQUE_NAME "PaintSelection"
+#define PAINT_POSITION "paintPosition"
+#define PAINT_RADIUS "paintRadius"
