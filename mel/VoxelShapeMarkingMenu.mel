@@ -1,0 +1,7 @@
+// Note: the name of the procedure must match the shape node name + "DagMenuProc"
+global proc VoxelShapeDagMenuProc( string $parent, string $child ) {
+    setParent -m $parent;
+    string $cmd = ""; // TODO
+    menuItem -l "Paint face-to-face constraints" -rp "NE" -c $cmd;
+    menuItem -l "Paint particle weights" -rp "NW" -c $cmd;
+}

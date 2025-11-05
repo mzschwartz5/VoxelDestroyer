@@ -1,3 +1,7 @@
+// Note: typically, AE Templates have to be named according to the node type. That's only if you put the file in a path and want
+// Maya to detect it automatically. We load this file manually, so naming isn't strict. This has the advantage of allowing us to
+// put all the collider templates in the same file and reuse functionality.
+
 global proc AEBoxColliderTemplate(string $nodeName)
 {
     editorTemplate -beginScrollLayout;

@@ -56,8 +56,6 @@ public:
 	bool isBoundingBoxOverlappingVoxelGrid(const MBoundingBox& bbox, const MPoint& voxelGridCenter, double voxelGridSize);
 	void maybeCreateGroundCollider();
 
-	static void loadVoxelizerMenu();
-	static void loadColliderNodeAETemplate();
 	static MString getActiveModelPanel();
 	static VoxelRendererOverride* voxelRendererOverride;
 	

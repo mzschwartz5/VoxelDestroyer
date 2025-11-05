@@ -18,6 +18,7 @@ namespace Utils {
 uint32_t toMortonCode(uint32_t x, uint32_t y, uint32_t z);
 void fromMortonCode(uint32_t mortonCode, uint32_t& x, uint32_t& y, uint32_t& z);
 DWORD loadResourceFile(HINSTANCE pluginInstance, int id, const wchar_t* type, void** resourceData);
+void loadMELScriptByResourceID(int resourceID);
 std::string HResultToString(const HRESULT& hr);
 
 inline int divideRoundUp(int numerator, int denominator) {

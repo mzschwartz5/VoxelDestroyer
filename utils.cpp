@@ -78,6 +78,23 @@ DWORD loadResourceFile(HINSTANCE pluginInstance, int id, const wchar_t* type, vo
     return resourceSize;
 }
 
+void loadMELScriptByResourceID(int resourceID) {
+	void* data = nullptr;
+	DWORD size = loadResourceFile(MhInstPlugin, resourceID, L"MEL", &data);
+	if (size == 0) {
+		MGlobal::displayError("Failed to load MEL script resource.");
+		return;
+	}
+
+	MString melScript(static_cast<char*>(data), size);
+
+	// Execute the MEL script to load it into memory
+	MStatus status = MGlobal::executeCommand(melScript);
+	if (status != MS::kSuccess) {
+		MGlobal::displayError("Failed to execute MEL script: " + status.errorString());
+	}
+}
+
 std::string HResultToString(const HRESULT& hr) {
     std::string result;
     char* msgBuf = nullptr;
