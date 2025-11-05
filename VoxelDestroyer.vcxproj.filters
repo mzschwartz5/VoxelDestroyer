@@ -73,7 +73,6 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="AEVoxelSimulationNodeTemplate.mel" />
     <None Include="VoxelizerMenu.mel" />
   </ItemGroup>
 </Project>
