@@ -236,7 +236,6 @@
     <ResourceCompile Include="resources.rc" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="mel\AEVoxelSimulationNodeTemplate.mel" />
     <None Include="mel\VoxelizerMenu.mel" />
     <None Include="mel\AEColliderTemplate.mel" />
   </ItemGroup>
