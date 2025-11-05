@@ -258,45 +258,6 @@ bool plugin::isBoundingBoxOverlappingVoxelGrid(const MBoundingBox& objectBoundin
 	);
 }
 
-void plugin::loadVoxelizerMenu() {
-	void* data = nullptr;
-	DWORD size = Utils::loadResourceFile(MhInstPlugin, IDR_MEL2, L"MEL", &data);
-	if (size == 0) {
-		MGlobal::displayError("Failed to load Voxelizer menu resource.");
-		return;
-	}
-
-	MString melScript(static_cast<char*>(data), size);
-
-	// Execute the MEL script to load the Voxelizer menu into memory
-	MStatus status = MGlobal::executeCommand(melScript);
-	if (status != MS::kSuccess) {
-		MGlobal::displayError("Failed to execute Voxelizer menu MEL script: " + status.errorString());
-	}
-}
-
-/**
- * Note: typically, AE Template's have to be named according to the node type. That's only if you put the file in a path and want
- * Maya to detect it automatically. Here, we are loading it manually, so naming isn't strict. This has the advantage of allowing us to
- * put all the collider templates in the same file and reuse functionality.
- */
-void plugin::loadColliderNodeAETemplate() {
-	void* data = nullptr;
-	DWORD size = Utils::loadResourceFile(MhInstPlugin, IDR_MEL3, L"MEL", &data);
-	if (size == 0) {
-		MGlobal::displayError("Failed to load AEColliderTemplate resource.");
-		return;
-	}
-
-	MString melScript(static_cast<char*>(data), size);
-
-	// Execute the MEL script to load the AEColliderTemplate into memory
-	MStatus status = MGlobal::executeCommand(melScript);
-	if (status != MS::kSuccess) {
-		MGlobal::displayError("Failed to execute AEColliderTemplate MEL script: " + status.errorString());
-	}
-}
-
 MString plugin::getActiveModelPanel() {
 	MString result;
 	MGlobal::executeCommand("playblast -ae", result);
@@ -472,8 +433,12 @@ EXPORT MStatus initializePlugin(MObject obj)
 	MString activeModelPanel = plugin::getActiveModelPanel();
 	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 " + VoxelRendererOverride::voxelRendererOverrideName + " " + activeModelPanel));
 
-	plugin::loadVoxelizerMenu();
-	plugin::loadColliderNodeAETemplate();
+	// VoxelShapeMarkingMenu
+	Utils::loadMELScriptByResourceID(IDR_MEL1);
+	// VoxelizerMenu
+	Utils::loadMELScriptByResourceID(IDR_MEL2);
+	// AEColliderTemplate
+	Utils::loadMELScriptByResourceID(IDR_MEL3);
 
 	MGlobal::executeCommand("VoxelizerMenu_addToShelf");
 

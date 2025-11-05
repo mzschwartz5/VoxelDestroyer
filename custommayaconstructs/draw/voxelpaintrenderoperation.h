@@ -135,34 +135,6 @@ public:
     }
 
     /**
-     * Read back the pixels of the color render target back to the CPU to determine which voxels were painted this frame.
-     */
-    void readBackRenderTarget() {
-        MRenderTarget* paintRenderTarget = getInputTarget(paintOutputRenderTargetName);
-        if (!paintRenderTarget) return;
-
-        int rowPitch = 0;
-        size_t slicePitch = 0;
-        uint8_t* data = static_cast<uint8_t*>(paintRenderTarget->rawData(rowPitch, slicePitch));
-        if (!data) return;
-
-        lastFramePaintedVoxelIDs.clear();
-        for (int y = scissor.top; y < scissor.bottom; ++y) {
-            const uint32_t* rowData = reinterpret_cast<const uint32_t*>(data + y * rowPitch);
-            for (int x = scissor.left; x < scissor.right; ++x) {
-                uint32_t voxelID = rowData[x];
-                // Sentinel value for no voxel painted
-                if (voxelID == 0u) continue;
-
-                // We added 1 in the paint shader to reserve 0 as "no voxel"
-                lastFramePaintedVoxelIDs.insert(voxelID - 1);
-            }
-        }
-
-        paintRenderTarget->freeRawData(data);
-    }
-
-    /**
      * Tell Maya to override the standard depth and color targets with our own offscreen depth target.
      * It will allocate and manage them for us.
      */
@@ -230,6 +202,10 @@ public:
         paintRadius = newPaintRadius;
     }
 
+    const std::set<unsigned int>& getPaintedVoxelIDs() const {
+        return lastFramePaintedVoxelIDs;
+    }
+
 private:
 
     std::set<unsigned int> lastFramePaintedVoxelIDs;
@@ -237,7 +213,7 @@ private:
     MRenderTarget* renderTargets[2] = { nullptr, nullptr };
     MShaderInstance* paintSelectionShader = nullptr;
     const MRasterizerState* scissorRasterState = nullptr;
-    D3D11_RECT scissor;
+    D3D11_RECT scissor = { 0, 0, 0, 0 };
     float paintRadius;
     int paintPosX;;
     int paintPosY;
@@ -252,4 +228,33 @@ private:
     ComPtr<ID3D11Buffer> cubeIb;
 
     unsigned int instanceCount = 0;
+
+
+    /**
+     * Read back the pixels of the color render target back to the CPU to determine which voxels were painted this frame.
+     */
+    void readBackRenderTarget() {
+        MRenderTarget* paintRenderTarget = getInputTarget(paintOutputRenderTargetName);
+        if (!paintRenderTarget) return;
+
+        int rowPitch = 0;
+        size_t slicePitch = 0;
+        uint8_t* data = static_cast<uint8_t*>(paintRenderTarget->rawData(rowPitch, slicePitch));
+        if (!data) return;
+
+        lastFramePaintedVoxelIDs.clear();
+        for (int y = scissor.top; y < scissor.bottom; ++y) {
+            const uint32_t* rowData = reinterpret_cast<const uint32_t*>(data + y * rowPitch);
+            for (int x = scissor.left; x < scissor.right; ++x) {
+                uint32_t voxelID = rowData[x];
+                // Sentinel value for no voxel painted
+                if (voxelID == 0u) continue;
+
+                // We added 1 in the paint shader to reserve 0 as "no voxel"
+                lastFramePaintedVoxelIDs.insert(voxelID - 1);
+            }
+        }
+
+        paintRenderTarget->freeRawData(data);
+    }
 };
