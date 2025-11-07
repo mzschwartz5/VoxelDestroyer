@@ -6,6 +6,7 @@
 #include <maya/MDGModifier.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MItDependencyNodes.h>
+#include <maya/MFnDagNode.h>
 #include "custommayaconstructs/tools/voxeldragcontext.h"
 #include "custommayaconstructs/usernodes/colliderlocator.h"
 
