@@ -14,6 +14,7 @@
 #include <maya/MMatrixArray.h>
 #include <algorithm>
 #include <set>
+#include <array>
 using namespace MHWRender;
 using std::unique_ptr;
 using std::make_unique;
@@ -53,7 +54,7 @@ public:
             {"PAINT_RADIUS", PAINT_RADIUS}
         };
         paintSelectionShader = MRenderer::theRenderer()->getShaderManager()->getEffectsBufferShader(
-            shaderData, size, PAINT_SELECTION_TECHNIQUE_NAME, macros, 3
+            shaderData, size, PAINT_SELECTION_TECHNIQUE_NAME, macros, ARRAYSIZE(macros)
         );
 
         std::vector<float> cubeVertices(cubeCornersFlattened.begin(), cubeCornersFlattened.end());
@@ -159,7 +160,6 @@ public:
     }
 
     void createInstanceTransformArray(const MMatrixArray& voxelInstanceTransforms) {
-        struct Float4x4 { float m[16]; };
         instanceCount = static_cast<unsigned int>(voxelInstanceTransforms.length());
 
         if (instanceCount == 0) {
@@ -169,17 +169,17 @@ public:
         }
 
         // Flatten MMatrixArray into a std::vector of Float4x4
-        std::vector<Float4x4> gpuMats(instanceCount);
+        std::vector<std::array<float, 16>> gpuMats(instanceCount);
         for (unsigned int i = 0; i < instanceCount; ++i) {
             const MMatrix& M = voxelInstanceTransforms[i];
             for (int r = 0; r < 4; ++r) {
                 for (int c = 0; c < 4; ++c) {
-                    gpuMats[i].m[c * 4 + r] = static_cast<float>(M(r, c));
+                    gpuMats[i][c * 4 + r] = static_cast<float>(M(r, c));
                 }
             }
         }
 
-        instanceTransformBuffer = DirectX::createReadOnlyBuffer<Float4x4>(gpuMats);
+        instanceTransformBuffer = DirectX::createReadOnlyBuffer<std::array<float, 16>>(gpuMats);
         instanceTransformSRV = DirectX::createSRV(instanceTransformBuffer, false, instanceCount);
     }
 
