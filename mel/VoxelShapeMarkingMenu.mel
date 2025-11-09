@@ -1,7 +1,28 @@
 // Note: the name of the procedure must match the shape node name + "DagMenuProc"
-global proc VoxelShapeDagMenuProc( string $parent, string $child ) {
-    setParent -m $parent;
-    string $cmd = ""; // TODO
-    menuItem -l "Paint face-to-face constraints" -rp "NE" -c $cmd;
-    menuItem -l "Paint particle weights" -rp "NW" -c $cmd;
+global proc VoxelShapeDagMenuProc( string $menu, string $child ) {
+    setParent -m $menu;
+    // Get the first shape node child that is not an intermediate object
+    string $shapes[] = `listRelatives -s $child`;
+    string $target = $child;
+    for ($s in $shapes) {
+        int $isIntermediate = (`attributeExists "intermediateObject" $s`) ? `getAttr ($s + ".intermediateObject")` : 0;
+        if (!$isIntermediate) { $target = $s; break; }
+    }
+    string $childFlag = ( " -n \"" + $target + "\"");
+
+    // Face mode (Paint face-to-face constraints)
+    string $cmd = "changeVoxelEditMode -m 1" + $childFlag + "; select -r " + $target + "; SelectFacetMask";
+    menuItem -l "Paint Face-to-Face Constraints" -rp "SE" -c $cmd;
+
+    // Vertex mode (Paint particle weights)
+    $cmd = "changeVoxelEditMode -m 2" + $childFlag + "; select -r " + $target + "; SelectVertexMask";
+    menuItem -l "Paint Particle Weights" -rp "SW" -c $cmd;
+
+    // Face mode (Voxel selection mode)
+    $cmd = "changeVoxelEditMode -m 0" + $childFlag + "; select -r " + $target + "; SelectFacetMask";
+    menuItem -l "Voxel Selection Mode" -rp "NE" -c $cmd;
+
+    // Object mode
+    $cmd = "changeVoxelEditMode -m 3" + $childFlag + "; select -r " + $target + "; SelectToggleMode";
+    menuItem -l "Object Mode" -rp "NW" -c $cmd;
 }

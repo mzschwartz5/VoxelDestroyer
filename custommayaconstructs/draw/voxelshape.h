@@ -150,7 +150,10 @@ public:
     }
 
     MSelectionMask getComponentSelectionMask() const override {
-        return MSelectionMask::kSelectMeshFaces;
+        MSelectionMask mask;
+        mask.addMask(MSelectionMask::kSelectMeshFaces);
+        mask.addMask(MSelectionMask::kSelectMeshVerts);
+        return mask;
     }
 
     /**

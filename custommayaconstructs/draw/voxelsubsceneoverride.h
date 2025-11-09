@@ -6,6 +6,8 @@
 #include <maya/MShaderManager.h>
 #include "voxelshape.h"
 #include "../../cube.h"
+#include "../commands/changevoxeleditmodecommand.h"
+#include "../../event.h"
 #include <maya/MGeometryRequirements.h>
 #include <maya/MGeometryExtractor.h>
 #include <maya/MPxComponentConverter.h>
@@ -65,7 +67,10 @@ public:
     }
 
     MSelectionMask selectionMask() const override {
-        return MSelectionMask::kSelectMeshFaces;
+        MSelectionMask mask;
+        mask.addMask(MSelectionMask::kSelectMeshFaces);
+        mask.addMask(MSelectionMask::kSelectMeshVerts);
+        return mask;
     }
 
     void initialize(const MRenderItem& renderItem) override {
@@ -99,8 +104,10 @@ private:
     
     bool shouldUpdate = true;
     bool selectionChanged = false;
+    bool editModeChanged = true;
     bool hideAllowed = true;
     bool hoveredVoxelChanged = false;
+    EventBase::Unsubscribe unsubscribeFromVoxelEditModeChanges;
     MCallbackIdArray callbackIds;
     MMatrixArray selectedVoxelMatrices;
     MMatrixArray hoveredVoxelMatrices; // Will only ever have 0 or 1 matrix in it.
@@ -111,11 +118,22 @@ private:
     std::unordered_set<uint> hiddenVoxels;              // global voxel IDs that are currently hidden
     std::unordered_set<uint> recentlyHiddenVoxels;      // the most recent global voxel IDs to be hidden
 
+    // Must be static because addProcCallback is special and only allows one registered callback at a time
+    inline static MCallbackId showHideCallbackId = 0;
+
     inline static const MString voxelSelectedHighlightItemName = "VoxelSelectedHighlightItem";
     inline static const MString voxelPreviewSelectionHighlightItemName = "VoxelPreviewSelectionHighlightItem";
     inline static const MString voxelWireframeRenderItemName = "VoxelWireframeRenderItem";
     inline static const MString voxelSelectionRenderItemName = "VoxelSelectionItem";
     inline static const MString voxelPaintSelectionItemName = "VoxelPaintSelectionItem";
+    // Enabled state of the voxel decoration render items. (Note: actual state may be more restricted; i.e. if instance transform array is empty)
+    std::unordered_map<MString, bool, Utils::MStringHash, Utils::MStringEq> voxelRenderItemsEnabledState = {
+        { voxelSelectedHighlightItemName, false },
+        { voxelPreviewSelectionHighlightItemName, false },
+        { voxelWireframeRenderItemName, false },
+        { voxelSelectionRenderItemName, false },
+        { voxelPaintSelectionItemName, false }
+    };
 
     ComPtr<ID3D11Buffer> positionsBuffer;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
@@ -144,16 +162,16 @@ private:
         MFnDependencyNode dn(obj);
         voxelShape = static_cast<VoxelShape*>(dn.userNode());
 
-        MCallbackId callbackId = MEventMessage::addEventCallback("SelectionChanged", onSelectionChanged, this, nullptr);
+        MCallbackId callbackId = MEventMessage::addEventCallback("SelectionChanged", onSelectionChanged, this);
         callbackIds.append(callbackId);
 
-        callbackId = MCommandMessage::addProcCallback(onShowHideStateChange, this, nullptr);
-        callbackIds.append(callbackId);
+        unsubscribeFromVoxelEditModeChanges = ChangeVoxelEditModeCommand::subscribe([this](const EditModeChangedEventArgs& args) {
+            this->onEditModeChange(args.newMode, args.shapeName);
+        });
     }
 
     static void onSelectionChanged(void* clientData) {
         VoxelSubSceneOverride* subscene = static_cast<VoxelSubSceneOverride*>(clientData);
-        
         // Collect the voxel instances that are selected
         const MObjectArray& activeComponents = subscene->voxelShape->activeComponents();
         const MMatrixArray& voxelMatrices = subscene->voxelShape->getVoxels().get()->modelMatrices;
@@ -227,6 +245,37 @@ private:
                 subscene->voxelsToHide.insert(visibleVoxelIdToGlobalId[voxelInstanceId]);
             }
         }
+    }
+
+    /**
+     * Invoked whenever the voxel edit mode changes on any voxel shape in the scene. 
+     * Depending on whether the shapeName corresponds to this shape, and the mode, mark 
+     * the voxel edit render items for enable/disable in the next update.
+     */
+    void onEditModeChange(VoxelEditMode newMode, const MString& shapeName) {
+        bool isThisShape = (shapeName == voxelShape->name());
+        bool isObjectMode = (newMode == VoxelEditMode::Object);
+        bool isFacePaintMode = (newMode == VoxelEditMode::FacePaint);
+        bool isSelectionMode = (newMode == VoxelEditMode::Selection);
+
+        voxelRenderItemsEnabledState[voxelSelectedHighlightItemName] = !(isObjectMode || isFacePaintMode);
+        voxelRenderItemsEnabledState[voxelPreviewSelectionHighlightItemName] = !(isObjectMode || isFacePaintMode);
+        voxelRenderItemsEnabledState[voxelSelectionRenderItemName] = !(isObjectMode || isFacePaintMode);
+        voxelRenderItemsEnabledState[voxelWireframeRenderItemName] = !isObjectMode;
+        voxelRenderItemsEnabledState[voxelPaintSelectionItemName] = isFacePaintMode;
+
+        // If this event is for a different shape, disable everything.
+        for (auto& [itemName, enabled] : voxelRenderItemsEnabledState) {
+            voxelRenderItemsEnabledState[itemName] = (enabled && isThisShape);
+        }
+                
+        if (isSelectionMode && isThisShape) {
+            MCommandMessage::removeCallback(showHideCallbackId);
+            showHideCallbackId = MCommandMessage::addProcCallback(onShowHideStateChange, this, nullptr);
+        }
+
+        shouldUpdate = true;
+        editModeChanged = true;
     }
 
     /**
@@ -433,8 +482,11 @@ private:
 
     void updateVoxelRenderItem(MSubSceneContainer& container, const MString& itemName, const MMatrixArray& voxelMatrices) {
         MRenderItem* item = container.find(itemName);
+        bool enabled = voxelRenderItemsEnabledState[itemName] && voxelMatrices.length() > 0;
+        item->enable(enabled);
+
+        if (voxelMatrices.length() == 0) return; // Maya doesn't like setting empty instance arrays.
         setInstanceTransformArray(*item, voxelMatrices);
-        item->enable(voxelMatrices.length() > 0);
     }
 
     MShaderInstance* getVertexBufferDescriptorsForShader(const MObject& shaderNode, const MDagPath& geomDagPath, MVertexBufferDescriptorList& vertexBufferDescriptors) {
@@ -627,6 +679,7 @@ private:
 		const MDagPath& path,
 		MSelectionContext& selectionContext) 
     {
+        // TODO: possibly change based on edit mode
         selectionContext.setSelectionLevel(MHWRender::MSelectionContext::kComponent);    
     }
 
@@ -658,6 +711,7 @@ private:
 
         MSelectionMask selMask;
         selMask.addMask(MSelectionMask::kSelectMeshFaces);
+        selMask.addMask(MSelectionMask::kSelectMeshVerts);
         selMask.addMask(MSelectionMask::kSelectMeshes);
 
         renderItem->setDrawMode(MGeometry::kSelectionOnly);
@@ -681,11 +735,10 @@ private:
         shader->setParameter("solidColor", color.data());
 
         renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kWireframe | MGeometry::kShaded | MGeometry::kTextured));
-        renderItem->depthPriority(MRenderItem::sSelectionDepthPriority);
+        renderItem->depthPriority(MRenderItem::sActivePointDepthPriority);
         renderItem->setWantConsolidation(false);
         renderItem->setHideOnPlayback(true);
         renderItem->setShader(shader);
-        renderItem->enable(false);
         container.add(renderItem);
 
         setVoxelGeometryForRenderItem(*renderItem, MGeometry::kTriangles);
@@ -699,7 +752,7 @@ private:
         shader->setParameter("solidColor", solidColor);
 
         renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kWireframe | MGeometry::kShaded | MGeometry::kTextured));
-        renderItem->depthPriority(MRenderItem::sSelectionDepthPriority);
+        renderItem->depthPriority(MRenderItem::sDormantFilledDepthPriority);
         renderItem->setWantConsolidation(false);
         renderItem->setHideOnPlayback(true);
         renderItem->setShader(shader);
@@ -868,6 +921,10 @@ public:
         }
 
         MEventMessage::removeCallbacks(callbackIds);
+        unsubscribeFromVoxelEditModeChanges();
+
+        MCommandMessage::removeCallback(showHideCallbackId);
+        showHideCallbackId = 0;
     }
     
     DrawAPI supportedDrawAPIs() const override {
@@ -911,6 +968,17 @@ public:
             // Shows painted weights on voxels (also used by custom render operation to detect paint selection)
             createVoxelPaintSelectionRenderItem(container, voxelPaintSelectionItemName);
         }
+
+        if (editModeChanged) {
+            for (const auto& [itemName, enabled] : voxelRenderItemsEnabledState) {
+                MRenderItem* item = container.find(itemName);
+                item->enable(enabled);
+            }
+
+            // Special case: the edit mode may dictate that the preview highlight is enabled, but there may be no hovered voxel, so give the change to re-disable it.
+            updateVoxelRenderItem(container, voxelPreviewSelectionHighlightItemName, hoveredVoxelMatrices);
+            editModeChanged = false;
+        }
         
         if (selectionChanged) {
             updateVoxelRenderItem(container, voxelSelectedHighlightItemName, selectedVoxelMatrices);
@@ -941,7 +1009,6 @@ public:
             hideSelectedVoxels(container);
             break;
         }
-
         showHideStateChange = ShowHideStateChange::None;
 
         shouldUpdate = false;

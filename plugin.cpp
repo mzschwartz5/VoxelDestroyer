@@ -22,6 +22,7 @@
 #include "custommayaconstructs/usernodes/cylindercollider.h"
 #include "custommayaconstructs/usernodes/planecollider.h"
 #include "custommayaconstructs/commands/createcollidercommand.h"
+#include "custommayaconstructs/commands/changevoxeleditmodecommand.h"
 #include <maya/MDrawRegistry.h>
 #include <maya/MItDependencyNodes.h>
 #include "directx/compute/computeshader.h"
@@ -300,6 +301,10 @@ EXPORT MStatus initializePlugin(MObject obj)
 	if (!status)
 		status.perror("registerCommand failed");
 
+	status = plugin.registerCommand(ChangeVoxelEditModeCommand::commandName, ChangeVoxelEditModeCommand::creator, ChangeVoxelEditModeCommand::syntax);
+	if (!status)
+		status.perror("registerCommand failed");
+
 	// Voxel Data (custom node attribute data type that holds voxel info)
 	status = plugin.registerData(VoxelData::fullName, VoxelData::id, VoxelData::creator);
 	if (!status) {
@@ -457,9 +462,13 @@ EXPORT MStatus uninitializePlugin(MObject obj)
     if (!status)
         MGlobal::displayError("deregisterCommand failed on VoxelDestroyer: " + status.errorString());
 
-	status = plugin.deregisterCommand("createCollider");
+	status = plugin.deregisterCommand(CreateColliderCommand::commandName);
 	if (!status)
 		MGlobal::displayError("deregisterCommand failed on createCollider: " + status.errorString());
+
+	status = plugin.deregisterCommand(ChangeVoxelEditModeCommand::commandName);
+	if (!status)
+		MGlobal::displayError("deregisterCommand failed on changeVoxelEditMode: " + status.errorString());
 
     // Deregister the custom maya constructs (nodes, contexts, render overrides, etc.)
     // Voxel Drag Context command
