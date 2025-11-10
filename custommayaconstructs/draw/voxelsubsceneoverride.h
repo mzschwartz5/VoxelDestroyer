@@ -125,14 +125,12 @@ private:
     inline static const MString voxelPreviewSelectionHighlightItemName = "VoxelPreviewSelectionHighlightItem";
     inline static const MString voxelWireframeRenderItemName = "VoxelWireframeRenderItem";
     inline static const MString voxelSelectionRenderItemName = "VoxelSelectionItem";
-    inline static const MString voxelPaintSelectionItemName = "VoxelPaintSelectionItem";
     // Enabled state of the voxel decoration render items. (Note: actual state may be more restricted; i.e. if instance transform array is empty)
     std::unordered_map<MString, bool, Utils::MStringHash, Utils::MStringEq> voxelRenderItemsEnabledState = {
         { voxelSelectedHighlightItemName, false },
         { voxelPreviewSelectionHighlightItemName, false },
         { voxelWireframeRenderItemName, false },
-        { voxelSelectionRenderItemName, false },
-        { voxelPaintSelectionItemName, false }
+        { voxelSelectionRenderItemName, false }
     };
 
     ComPtr<ID3D11Buffer> positionsBuffer;
@@ -262,7 +260,6 @@ private:
         voxelRenderItemsEnabledState[voxelPreviewSelectionHighlightItemName] = !(isObjectMode || isFacePaintMode);
         voxelRenderItemsEnabledState[voxelSelectionRenderItemName] = !(isObjectMode || isFacePaintMode);
         voxelRenderItemsEnabledState[voxelWireframeRenderItemName] = !isObjectMode;
-        voxelRenderItemsEnabledState[voxelPaintSelectionItemName] = isFacePaintMode;
 
         // If this event is for a different shape, disable everything.
         for (auto& [itemName, enabled] : voxelRenderItemsEnabledState) {
@@ -272,6 +269,10 @@ private:
         if (isSelectionMode && isThisShape) {
             MCommandMessage::removeCallback(showHideCallbackId);
             showHideCallbackId = MCommandMessage::addProcCallback(onShowHideStateChange, this, nullptr);
+        }
+
+        if (isFacePaintMode && isThisShape) {
+            setPaintTransformArrayOnRenderer();
         }
 
         shouldUpdate = true;
@@ -446,7 +447,6 @@ private:
 
         updateVoxelRenderItem(container, voxelWireframeRenderItemName, visibleVoxelMatrices);
         updateVoxelRenderItem(container, voxelSelectionRenderItemName, visibleVoxelMatrices);
-        updateVoxelRenderItem(container, voxelPaintSelectionItemName, visibleVoxelMatrices);
 
         voxelsToHide.clear();
     }
@@ -475,7 +475,6 @@ private:
         updateVoxelRenderItem(container, voxelSelectedHighlightItemName, selectedVoxelMatrices);
         updateVoxelRenderItem(container, voxelWireframeRenderItemName, visibleVoxelMatrices);
         updateVoxelRenderItem(container, voxelSelectionRenderItemName, visibleVoxelMatrices);
-        updateVoxelRenderItem(container, voxelPaintSelectionItemName, visibleVoxelMatrices);
 
         selectedVoxels.clear();
     }
@@ -744,35 +743,15 @@ private:
         setVoxelGeometryForRenderItem(*renderItem, MGeometry::kTriangles);
     }
 
-    void createVoxelPaintSelectionRenderItem(MSubSceneContainer& container, const MString& renderItemName) {
-        // TODO: use custom shader for painting
-        MRenderItem* renderItem = MRenderItem::Create(renderItemName, MRenderItem::DecorationItem, MGeometry::kTriangles);
-        MShaderInstance* shader = MRenderer::theRenderer()->getShaderManager()->getStockShader(MShaderManager::k3dSolidShader);
-        const float solidColor[] = {0.0f, 0.0f, 0.0f, 0.0f};
-        shader->setParameter("solidColor", solidColor);
-
-        renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kWireframe | MGeometry::kShaded | MGeometry::kTextured));
-        renderItem->depthPriority(MRenderItem::sDormantFilledDepthPriority);
-        renderItem->setWantConsolidation(false);
-        renderItem->setHideOnPlayback(true);
-        renderItem->setShader(shader);
-        container.add(renderItem);
-
-        setVoxelGeometryForRenderItem(*renderItem, MGeometry::kTriangles);
-
-        const MMatrixArray& voxelInstanceTransforms = voxelShape->getVoxels().get()->modelMatrices;
-        setInstanceTransformArray(*renderItem, voxelInstanceTransforms);
-        // TODO: this needs to happen on activating paint selection, not on render item creation
-        setPaintTransformArrayOnRenderer(voxelInstanceTransforms);
-    }
-
-    void setPaintTransformArrayOnRenderer(const MMatrixArray& voxelInstanceTransforms) {
-        MRenderer* renderer = MRenderer::theRenderer();
-        if (!renderer) return;
-
-        const VoxelRendererOverride* voxelRendererOverrideConst = static_cast<const VoxelRendererOverride*>(renderer->findRenderOverride(VoxelRendererOverride::voxelRendererOverrideName));
-        VoxelRendererOverride* voxelRendererOverride = const_cast<VoxelRendererOverride*>(voxelRendererOverrideConst);
+    void setPaintTransformArrayOnRenderer() {
+        VoxelRendererOverride* voxelRendererOverride = VoxelRendererOverride::instance();
         if (!voxelRendererOverride) return;
+        const MMatrixArray& voxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
+        MMatrixArray voxelInstanceTransforms;
+
+        for (uint globalVoxelId : visibleVoxelIdToGlobalId) {
+            voxelInstanceTransforms.append(voxelMatrices[globalVoxelId]);
+        }
 
         voxelRendererOverride->setPaintTransformArray(voxelInstanceTransforms);
     }
@@ -920,9 +899,8 @@ public:
             originalNormalsBuffer.Reset();
         }
 
-        MEventMessage::removeCallbacks(callbackIds);
         unsubscribeFromVoxelEditModeChanges();
-
+        MEventMessage::removeCallbacks(callbackIds);
         MCommandMessage::removeCallback(showHideCallbackId);
         showHideCallbackId = 0;
     }
@@ -965,8 +943,6 @@ public:
             createVoxelSelectedHighlightRenderItem(container, voxelSelectedHighlightItemName, {0.0f, 1.0f, 0.25f, 0.5f});
             // Shows highlight for hovered voxel
             createVoxelSelectedHighlightRenderItem(container, voxelPreviewSelectionHighlightItemName, {1.0f, 1.0f, 0.0f, 0.5f});
-            // Shows painted weights on voxels (also used by custom render operation to detect paint selection)
-            createVoxelPaintSelectionRenderItem(container, voxelPaintSelectionItemName);
         }
 
         if (editModeChanged) {

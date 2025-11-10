@@ -196,7 +196,6 @@ public:
     
     static void onVoxelDataConnected(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
         // Only respond to changes to the voxel data attribute
-        // Only respond to attribute value changes
         if (plug != aVoxelDataIn || !(msg & MNodeMessage::kConnectionMade)) {
             return;
         }

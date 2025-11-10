@@ -14,7 +14,7 @@ VSOut VSMain(VSIn i, uint instanceID : SV_InstanceID) {
     o.pos = mul(float4(i.pos, 1.0f), instanceTransform);
     o.pos = mul(o.pos, ViewProjection);
     // 0 reserved for "no hit"
-    // Note: this means when reading back the selection results, we need to subtract 1 to get the original instance ID
+    // Note: this means when using the selection results, we need to subtract 1 to get the original instance ID
     o.instanceID = instanceID + 1; 
     return o;
 }

@@ -87,6 +87,15 @@ public:
         return kDirectX11;
     }
 
+    static VoxelRendererOverride* instance() {
+        MRenderer* renderer = MRenderer::theRenderer();
+        if (!renderer) return nullptr;
+
+        const VoxelRendererOverride* voxelRendererOverrideConst = static_cast<const VoxelRendererOverride*>(renderer->findRenderOverride(VoxelRendererOverride::voxelRendererOverrideName));
+        VoxelRendererOverride* voxelRendererOverride = const_cast<VoxelRendererOverride*>(voxelRendererOverrideConst);
+        return voxelRendererOverride;
+    }
+
     void setPaintTransformArray(const MMatrixArray& voxelInstanceTransforms) {
         static_cast<VoxelPaintRenderOperation*>(mOperations[paintOpIndex])->createInstanceTransformArray(voxelInstanceTransforms);
     }
