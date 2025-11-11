@@ -4,7 +4,14 @@ global proc VoxelPaintContextValues(string $toolName) {
     string $parent = (`toolPropertyWindow -q -location`);
     setParent $parent;
 
-    // Called by Maya to sync the Tool Settings with the active context
+    // Override the default title and buttons of the tool property window
+    string $field = `toolPropertyWindow -q -field`;
+    string $helpBtn  = `toolPropertyWindow -q -helpButton`;
+    string $resetBtn = `toolPropertyWindow -q -resetButton`;
+    text -e -label "Voxel Paint Tool" $field;
+    button -e -c "VoxelPaintContext_Help()" $helpBtn;
+    button -e -c "VoxelPaintContext_Reset()" $resetBtn;
+
     string $ctx = `currentCtx`;
     if (!`gmatch $ctx "voxelPaintContextCommand*"` )
         return;
@@ -19,4 +26,22 @@ global proc VoxelPaintContextValues(string $toolName) {
         optionMenuGrp -e -sl ($mode + 1) VoxelPaintModeControl;
 
     toolPropertySelect "VoxelPaintContext";
+}
+
+global proc VoxelPaintContext_Reset()
+{
+    // reset UI controls to defaults
+    floatSliderGrp -e -v 50.0 VoxelPaintRadiusControl;
+    optionMenuGrp -e -sl 1 VoxelPaintModeControl;
+
+    // push defaults into the active context (if active)
+    string $ctx = `currentCtx`;
+    catchQuiet(`voxelPaintContextCommand -e -radius 50 $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -mode 0 $ctx`);
+}
+
+global proc VoxelPaintContext_Help()
+{
+    // TODO: better URL?
+    showHelp -a "http://github.com/mzschwartz5/VoxelDestroyer";
 }
