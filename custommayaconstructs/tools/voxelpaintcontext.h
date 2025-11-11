@@ -20,7 +20,7 @@ public:
     void toolOnSetup(MEvent &event) override {
         VoxelContextBase::toolOnSetup(event);
 
-        setImage("cMuscle_skin_paint.png", MPxContext::kImage1);
+        setImage("VoxelPaint.png", MPxContext::kImage1);
         MGlobal::executeCommand(
             "if (`exists VoxelPaintContextProperties`) VoxelPaintContextProperties();",
             false

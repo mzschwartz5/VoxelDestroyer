@@ -259,20 +259,20 @@ global proc VoxelizerMenu_addToShelf() {
         shelfButton -parent "VoxelDestroyer"
             -label "VoxelDestroyer"
             -annotation "Run VoxelDestroyer Plugin"
-            -image1 "TypeSeparateMaterials_200.png"
+            -image1 "Voxelize.png"
             -command "VoxelizerMenu();";
         
         // Also add a button for the live-interaction tool
         shelfButton -parent "VoxelDestroyer"
             -label "VoxelDragTool"
             -annotation "Interactively drag voxels in the viewport while previewing an animation"
-            -image1 "out_colorComposite_200.png"
+            -image1 "VoxelDrag.png"
             -command "string $ctx = `voxelDragContextCommand`; setToolTo $ctx;";
 
         shelfButton -parent "VoxelDestroyer"
             -label "VoxelCollider"
             -annotation "Add a collider primitive to the simulation"
-            -image1 "fx_animWires_200.png"
+            -image1 "VoxelCollider.png"
             -command "createCollider -n PlaneCollider;"
             -menuItem "Plane Collider" "createCollider -n PlaneCollider;"
             -menuItem "Sphere Collider" "createCollider -n SphereCollider;"
@@ -283,7 +283,7 @@ global proc VoxelizerMenu_addToShelf() {
         shelfButton -parent "VoxelDestroyer"
             -label "VoxelPaintTool"
             -annotation "Paint simulation weights onto voxels"
-            -image1 "cMuscle_skin_paint.png"
+            -image1 "VoxelPaint.png"
             -command "string $ctx = `voxelPaintContextCommand`; setToolTo $ctx; VoxelPaint_OpenDock();";
     }
 

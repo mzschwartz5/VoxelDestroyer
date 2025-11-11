@@ -78,9 +78,9 @@ DWORD loadResourceFile(HINSTANCE pluginInstance, int id, const wchar_t* type, vo
     return resourceSize;
 }
 
-void loadMELScriptByResourceID(int resourceID) {
+void loadMELScriptByResourceID(HINSTANCE pluginInstance, int resourceID) {
 	void* data = nullptr;
-	DWORD size = loadResourceFile(MhInstPlugin, resourceID, L"MEL", &data);
+	DWORD size = loadResourceFile(pluginInstance, resourceID, L"MEL", &data);
 	if (size == 0) {
 		MGlobal::displayError("Failed to load MEL script resource.");
 		return;
@@ -93,6 +93,39 @@ void loadMELScriptByResourceID(int resourceID) {
 	if (status != MS::kSuccess) {
 		MGlobal::displayError("Failed to execute MEL script: " + status.errorString());
 	}
+}
+
+/**
+ * Extracts a resource from the plugin .mll file (which contains windows resource files), and writes it to the specified output file path.
+ * This allows us to put files in the plugin and extract them to disk at runtime, e.g. icon files.
+ */
+bool extractResourceToFile(HINSTANCE pluginInstance, int resourceID, const wchar_t* type, const MString& outputFilePath) {
+    void* data = nullptr;
+    DWORD size = Utils::loadResourceFile(pluginInstance, resourceID, type, &data);
+    if (size == 0) return false;
+
+    // Ensure folder exists
+    std::wstring wpath = std::wstring(outputFilePath.asWChar());
+    size_t lastSlash = wpath.find_last_of(L"/\\");
+    if (lastSlash != std::wstring::npos) {
+        std::wstring dir = wpath.substr(0, lastSlash);
+        CreateDirectoryW(dir.c_str(), nullptr); // OK if already exists
+    }
+
+    HANDLE hFile = CreateFileW(wpath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        MGlobal::displayError("Failed to create icon file: " + outputFilePath);
+        return false;
+    }
+
+    DWORD written = 0;
+    BOOL ok = WriteFile(hFile, data, size, &written, nullptr);
+    CloseHandle(hFile);
+    if (!ok || written != size) {
+        MGlobal::displayError("Failed to write icon file completely: " + outputFilePath);
+        return false;
+    }
+    return true;
 }
 
 std::string HResultToString(const HRESULT& hr) {
