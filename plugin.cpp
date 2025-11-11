@@ -440,16 +440,24 @@ EXPORT MStatus initializePlugin(MObject obj)
 	MGlobal::executeCommand(MString("setRendererAndOverrideInModelPanel $gViewport2 " + VoxelRendererOverride::voxelRendererOverrideName + " " + activeModelPanel));
 
 	// VoxelShapeMarkingMenu
-	Utils::loadMELScriptByResourceID(IDR_MEL1);
+	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL1);
 	// VoxelizerMenu
-	Utils::loadMELScriptByResourceID(IDR_MEL2);
+	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL2);
 	// AEColliderTemplate
-	Utils::loadMELScriptByResourceID(IDR_MEL3);
+	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL3);
 	// VoxelPaintToolSettings
-	Utils::loadMELScriptByResourceID(IDR_MEL4);
+	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL4);
+
+	// Write icon files to user pref's directory
+	MString prefsDir;
+    MGlobal::executeCommand("internalVar -userPrefDir", prefsDir);
+	MString iconsDir = prefsDir + "icons/";
+    Utils::extractResourceToFile(MhInstPlugin, IDR_PNG_VOXELIZER, L"PNG", iconsDir + "Voxelize.png");
+    Utils::extractResourceToFile(MhInstPlugin, IDR_PNG_VOXELDRAG, L"PNG", iconsDir + "VoxelDrag.png");
+    Utils::extractResourceToFile(MhInstPlugin, IDR_PNG_VOXELCOLLIDER, L"PNG", iconsDir + "VoxelCollider.png");
+    Utils::extractResourceToFile(MhInstPlugin, IDR_PNG_VOXELPAINT, L"PNG", iconsDir + "VoxelPaint.png");
 
 	MGlobal::executeCommand("VoxelizerMenu_addToShelf");
-
 	return status;
 }
 

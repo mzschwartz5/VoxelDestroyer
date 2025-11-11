@@ -46,7 +46,7 @@ private:
     void toolOnSetup(MEvent &event) override {
         VoxelContextBase::toolOnSetup(event);
 
-        setImage("TypeSeparateMaterials_200.png", MPxContext::kImage1);
+        setImage("VoxelDrag.png", MPxContext::kImage1);
 
         timeChangedCallbackId = MEventMessage::addEventCallback("timeChanged", VoxelDragContext::onTimeChanged, NULL, &status);
         playbackChangeCallbackId = MConditionMessage::addConditionCallback("playingBack", VoxelDragContext::onPlaybackChange);
