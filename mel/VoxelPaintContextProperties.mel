@@ -1,17 +1,11 @@
+// This procedure has to have this specific name to be recognized by Maya
+// See docs here: https://help.autodesk.com/view/MAYAUL/2022/ENU/?guid=Maya_SDK_Command_plug_ins_Tool_property_sheets_html
 global proc VoxelPaintContextProperties() {
     // Required: parent into the Tool Settings property sheet
     string $parent = `toolPropertyWindow -q -location`;
 
     if (`control -exists $parent`)
         setParent $parent;
-
-    // Override the default title and buttons of the tool property window
-    string $field = `toolPropertyWindow -q -field`;
-    string $helpBtn  = `toolPropertyWindow -q -helpButton`;
-    string $resetBtn = `toolPropertyWindow -q -resetButton`;
-    text -e -label "Voxel Paint Tool" $field;
-    button -e -c "VoxelPaintContext_Help()" $helpBtn;
-    button -e -c "VoxelPaintContext_Reset()" $resetBtn;
 
     setUITemplate -pushTemplate ToolOptionBoxTemplate;
 
@@ -60,21 +54,4 @@ global proc VoxelPaintContext_ApplyFromUI() {
 
     catchQuiet(`voxelPaintContextCommand -e -radius $radius $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -mode $modeIdx $ctx`);
-}
-
-global proc VoxelPaintContext_Reset()
-{
-    // reset UI controls to defaults
-    floatSliderGrp -e -v 50.0 VoxelPaintRadiusControl;
-    optionMenuGrp -e -sl 1 VoxelPaintModeControl;
-
-    // push defaults into the active context (if active)
-    string $ctx = `currentCtx`;
-    catchQuiet(`voxelPaintContextCommand -e -radius 50 $ctx`);
-    catchQuiet(`voxelPaintContextCommand -e -mode 0 $ctx`);
-}
-
-global proc VoxelPaintContext_Help()
-{
-    system("cmd /c start \"\" \"http://github.com/mzschwartz5/VoxelDestroyer\"");
 }
