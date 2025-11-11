@@ -1,6 +1,7 @@
 #pragma once
 #include "voxelcontextbase.h"
 #include <maya/MEvent.h>
+#include <maya/MToolsInfo.h>
 
 enum class BrushMode {
     ADD,
@@ -21,10 +22,7 @@ public:
         VoxelContextBase::toolOnSetup(event);
 
         setImage("VoxelPaint.png", MPxContext::kImage1);
-        MGlobal::executeCommand(
-            "if (`exists VoxelPaintContextProperties`) VoxelPaintContextProperties();",
-            false
-        );
+        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
     }
 
     void toolOffCleanup() override {
@@ -43,8 +41,7 @@ public:
 
     void setSelectRadius(float radius) override {
         VoxelContextBase::setSelectRadius(radius);
-        // Update the tool settings UI
-        MGlobal::executeCommandOnIdle("if (`exists VoxelPaintContextValues`) VoxelPaintContextValues();", false);
+        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
     }
 
     float getSelectRadius() const override {
@@ -53,8 +50,7 @@ public:
 
     void setBrushMode(BrushMode mode) {
         brushMode = mode;
-        // Update the tool settings UI
-        MGlobal::executeCommandOnIdle("if (`exists VoxelPaintContextValues`) VoxelPaintContextValues();", false);
+        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
     }
 
     BrushMode getBrushMode() const {

@@ -445,8 +445,13 @@ EXPORT MStatus initializePlugin(MObject obj)
 	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL2);
 	// AEColliderTemplate
 	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL3);
-	// VoxelPaintToolSettings
-	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL4);
+
+	// Unlike other MEL scripts, these two can't be loaded into memory, but have to be copied (into the user scripts directory)
+	// Maya specifically looks for these files by name when setting up a tool's property sheet.
+	MString scriptsDir;
+	MGlobal::executeCommand("internalVar -usd", scriptsDir);
+	Utils::extractResourceToFile(MhInstPlugin, IDR_MEL4, L"MEL", scriptsDir + "VoxelPaintContextProperties.mel");
+	Utils::extractResourceToFile(MhInstPlugin, IDR_MEL5, L"MEL", scriptsDir + "VoxelPaintContextValues.mel");
 
 	// Write icon files to user pref's directory
 	MString prefsDir;

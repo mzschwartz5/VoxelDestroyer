@@ -1,0 +1,22 @@
+// This procedure has to have this specific name to be recognized by Maya
+// See docs here: https://help.autodesk.com/view/MAYAUL/2022/ENU/?guid=Maya_SDK_Command_plug_ins_Tool_property_sheets_html
+global proc VoxelPaintContextValues(string $toolName) {
+    string $parent = (`toolPropertyWindow -q -location`);
+    setParent $parent;
+
+    // Called by Maya to sync the Tool Settings with the active context
+    string $ctx = `currentCtx`;
+    if (!`gmatch $ctx "voxelPaintContextCommand*"` )
+        return;
+
+    float $radius = `voxelPaintContextCommand -q -radius $ctx`;
+    int   $mode   = `voxelPaintContextCommand -q -mode $ctx`; // 0=Add,1=Subtract,2=Set
+
+    if (`control -exists VoxelPaintRadiusControl`)
+        floatSliderGrp -e -v $radius VoxelPaintRadiusControl;
+
+    if (`control -exists VoxelPaintModeControl`)
+        optionMenuGrp -e -sl ($mode + 1) VoxelPaintModeControl;
+
+    toolPropertySelect "VoxelPaintContext";
+}
