@@ -1,0 +1,80 @@
+global proc VoxelPaintContextProperties() {
+    // Required: parent into the Tool Settings property sheet
+    string $parent = `toolPropertyWindow -q -location`;
+
+    if (`control -exists $parent`)
+        setParent $parent;
+
+    // Override the default title and buttons of the tool property window
+    string $field = `toolPropertyWindow -q -field`;
+    string $helpBtn  = `toolPropertyWindow -q -helpButton`;
+    string $resetBtn = `toolPropertyWindow -q -resetButton`;
+    text -e -label "Voxel Paint Tool" $field;
+    button -e -c "VoxelPaintContext_Help()" $helpBtn;
+    button -e -c "VoxelPaintContext_Reset()" $resetBtn;
+
+    setUITemplate -pushTemplate ToolOptionBoxTemplate;
+
+    columnLayout VoxelPaintContext;
+
+        frameLayout -collapsable false -label "Voxel Paint Settings";
+            columnLayout;
+
+                separator -style "none";
+
+                floatSliderGrp -label "Radius"
+                    -field true
+                    -minValue 0.001
+                    -maxValue 200.0
+                    -fieldMinValue 0.001
+                    -fieldMaxValue 1000.0
+                    -value 50.0
+                    -adjustableColumn 3
+                    -cc "VoxelPaintContext_ApplyFromUI()"
+                    VoxelPaintRadiusControl;
+
+                optionMenuGrp -label "Mode"
+                    -adjustableColumn 2
+                    -cc "VoxelPaintContext_ApplyFromUI()"
+                    VoxelPaintModeControl;
+
+                    menuItem -label "Add";
+                    menuItem -label "Subtract";
+                    menuItem -label "Set";
+
+            setParent ..;
+        setParent ..;
+
+    setParent ..;
+
+    setUITemplate -popTemplate;
+}
+
+global proc VoxelPaintContext_ApplyFromUI() {
+    string $ctx = `currentCtx`;
+    if (!`gmatch $ctx "voxelPaintContextCommand*"`)
+        return;
+
+    float $radius  = `floatSliderGrp -q -v VoxelPaintRadiusControl`;
+    int   $modeIdx = `optionMenuGrp -q -sl VoxelPaintModeControl` - 1;
+
+    catchQuiet(`voxelPaintContextCommand -e -radius $radius $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -mode $modeIdx $ctx`);
+}
+
+global proc VoxelPaintContext_Reset()
+{
+    // reset UI controls to defaults
+    floatSliderGrp -e -v 50.0 VoxelPaintRadiusControl;
+    optionMenuGrp -e -sl 1 VoxelPaintModeControl;
+
+    // push defaults into the active context (if active)
+    string $ctx = `currentCtx`;
+    catchQuiet(`voxelPaintContextCommand -e -radius 50 $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -mode 0 $ctx`);
+}
+
+global proc VoxelPaintContext_Help()
+{
+    system("cmd /c start \"\" \"http://github.com/mzschwartz5/VoxelDestroyer\"");
+}
