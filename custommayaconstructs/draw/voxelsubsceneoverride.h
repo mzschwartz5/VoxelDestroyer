@@ -309,6 +309,7 @@ private:
     void onHoveredVoxelChange(int hoveredVoxelInstanceId) {
         // Already called this frame (likely because we did a drag-select and this gets called for each intersection)
         if (hoveredVoxelChanged) return;
+        MGlobal::executeCommandOnIdle("refresh"); 
         
         hoveredVoxelMatrices.clear();
         const MMatrixArray& voxelMatrices = voxelShape->getVoxels().get()->modelMatrices;

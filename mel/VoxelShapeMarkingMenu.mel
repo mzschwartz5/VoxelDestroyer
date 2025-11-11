@@ -19,7 +19,7 @@ global proc VoxelShapeDagMenuProc( string $menu, string $child ) {
     menuItem -l "Paint Particle Weights" -rp "SW" -c $cmd;
 
     // Face mode (Voxel selection mode)
-    $cmd = "changeVoxelEditMode -m 0" + $childFlag + "; select -r " + $target + "; SelectFacetMask";
+    $cmd = "changeVoxelEditMode -m 0" + $childFlag + "; select -r " + $target + "; SelectFacetMask; setToolTo selectSuperContext";
     menuItem -l "Voxel Selection Mode" -rp "NE" -c $cmd;
 
     // Object mode
