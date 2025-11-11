@@ -3,10 +3,26 @@
 #include <maya/MSyntax.h>
 #include <maya/MArgParser.h>
 #include "voxelpaintcontext.h"
+#include "../commands/changevoxeleditmodecommand.h"
 
 class VoxelPaintContextCommand : public MPxContextCommand {
 public:
     static void* creator() { return new VoxelPaintContextCommand(); }
+
+    VoxelPaintContextCommand() {
+        unsubscribeEditModeChange = ChangeVoxelEditModeCommand::subscribe(
+            [this](const EditModeChangedEventArgs& args) {
+                bool isPaintEditMode = (args.newMode == VoxelEditMode::FacePaint || args.newMode == VoxelEditMode::VertexPaint);
+                if (isPaintEditMode) {
+                    MGlobal::executeCommandOnIdle("string $ctx = `voxelPaintContextCommand`; setToolTo $ctx; toolPropertyWindow;");
+                }
+            }
+        );
+    }
+
+    ~VoxelPaintContextCommand() override {
+        unsubscribeEditModeChange();
+    }
 
     MPxContext* makeObj() override {
         fCtx = new VoxelPaintContext();
@@ -44,4 +60,5 @@ public:
 
 private:
     VoxelPaintContext* fCtx = nullptr;
+    EventBase::Unsubscribe unsubscribeEditModeChange;
 };
