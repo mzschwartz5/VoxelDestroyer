@@ -1,0 +1,97 @@
+// Note: Maya has a concept of "Tool Property Sheets" (aka the Tool Settings menus). Docs here: https://help.autodesk.com/view/MAYAUL/2022/ENU/?guid=Maya_SDK_Command_plug_ins_Tool_property_sheets_html
+// To make one, you need two MEL files: <yourContextName>Properties.mel and <yourContextName>Values.mel
+// However, since we're loading these procs as strings instead of as files, Maya doesn't detec them. Thus, instead of using a tool settings menu, we just create our own workspace control window,
+// and trigger it to open when the tool is activated.
+
+global string $gVoxelPaint_radiusCtrl;
+global string $gVoxelPaint_modeCtrl;
+global string $gVoxelPaint_rootCtrl;
+
+global proc VoxelPaintContextProperties() {
+    global string $gVoxelPaint_radiusCtrl;
+    global string $gVoxelPaint_modeCtrl;
+    columnLayout;
+
+    text -l "Voxel Paint Settings" -align left;
+    separator -style "in";
+
+    $gVoxelPaint_radiusCtrl = `floatSliderGrp -label "Radius"
+        -field true -minValue 0.001 -maxValue 200.0 -fieldMinValue 0.001 -fieldMaxValue 1000.0
+        -value 50.0
+        -columnWidth3 55 55 300
+        -adjustableColumn 3 
+        -cc "VoxelPaintContext_ApplyFromUI()"`;
+
+    // 0 = Add, 1 = Subtract, 2 = Set
+    $gVoxelPaint_modeCtrl = `optionMenuGrp 
+        -label "Mode" 
+        -adjustableColumn 2 
+        -columnWidth2 55 180
+        -cc "VoxelPaintContext_ApplyFromUI()"`;
+    menuItem -label "Add";
+    menuItem -label "Subtract";
+    menuItem -label "Set";
+
+    // Initialize values from the context
+    evalDeferred("VoxelPaintContextValues()");
+}
+
+global proc VoxelPaintContext_ApplyFromUI() {
+    global string $gVoxelPaint_radiusCtrl;
+    global string $gVoxelPaint_modeCtrl;
+
+    string $ctx = `currentCtx`;
+    if (!`gmatch $ctx "voxelPaintContextCommand*"` )
+        return;
+
+    float $radius  = `floatSliderGrp -q -v $gVoxelPaint_radiusCtrl`;
+    int   $modeIdx = `optionMenuGrp -q -sl $gVoxelPaint_modeCtrl` - 1; // 0-based
+
+    catchQuiet(`voxelPaintContextCommand -e -radius $radius $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -mode $modeIdx $ctx`);
+}
+
+global proc VoxelPaintContextValues() {
+    global string $gVoxelPaint_radiusCtrl;
+    global string $gVoxelPaint_modeCtrl;
+
+    // Called by Maya to sync the Tool Settings with the active context
+    string $ctx = `currentCtx`;
+    if (!`gmatch $ctx "voxelPaintContextCommand*"` )
+        return;
+
+    float $radius = `voxelPaintContextCommand -q -radius $ctx`;
+    int   $mode   = `voxelPaintContextCommand -q -mode $ctx`; // 0=Add,1=Subtract,2=Set
+
+    if (`control -exists $gVoxelPaint_radiusCtrl`)
+        floatSliderGrp -e -v $radius $gVoxelPaint_radiusCtrl;
+
+    if (`control -exists $gVoxelPaint_modeCtrl`)
+        optionMenuGrp -e -sl ($mode + 1) $gVoxelPaint_modeCtrl;
+}
+
+global proc VoxelPaint_PopulateDock() {
+    global string $gVoxelPaint_rootCtrl;
+    setParent "VoxelPaintSettingsWorkspace";
+    columnLayout -adj true -rowSpacing 6;
+    $gVoxelPaint_rootCtrl = `columnLayout -adj true -rowSpacing 6`;
+    VoxelPaintContextProperties();
+}
+
+// Called from VoxelizerMenu.mel when the Voxel Paint tool is activated
+global proc VoxelPaint_OpenDock() {
+    global string $gVoxelPaint_rootCtrl;
+    string $wc = "VoxelPaintSettingsWorkspace";
+    if (`workspaceControl -exists $wc`) {
+        workspaceControl -e -restore $wc;
+        // If plugin was loaded after Maya restored an empty workspace, repopulate now.
+        if (!`control -exists $gVoxelPaint_rootCtrl`) {
+            evalDeferred "VoxelPaint_PopulateDock()";
+        }
+    } else {
+        workspaceControl -label "Voxel Paint" -tabToControl "Outliner" -1 -uiScript "VoxelPaint_PopulateDock();" -retain true $wc;
+        evalDeferred "if (!`control -exists $gVoxelPaint_rootCtrl`) catchQuiet(VoxelPaint_PopulateDock());";
+    }
+
+    evalDeferred -lp ( "if (`control -exists \"" + $gVoxelPaint_rootCtrl + "\"`) setFocus \"" + $gVoxelPaint_rootCtrl + "\";" );
+}

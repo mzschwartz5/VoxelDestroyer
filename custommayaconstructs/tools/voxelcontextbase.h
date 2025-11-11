@@ -81,7 +81,7 @@ protected:
         event.getPosition(dragX, dragY);
         short distX = dragX - screenDragStartX;
         if (event.mouseButton() == MEvent::kMiddleMouse) {
-            selectRadius = std::clamp(selectRadius + ((static_cast<float>(distX) / viewportWidth) * 40.0f), 5.0f, 400.0f);
+            setSelectRadius(std::clamp(getSelectRadius() + ((static_cast<float>(distX) / viewportWidth) * 40.0f), 5.0f, 400.0f));
             return MS::kSuccess;
         }
 
@@ -123,5 +123,13 @@ protected:
         drawMgr.endDrawable();
 
         return MS::kSuccess;
+    }
+
+    virtual void setSelectRadius(float radius) {
+        selectRadius = radius;
+    }
+
+    virtual float getSelectRadius() const {
+        return selectRadius;
     }
 };

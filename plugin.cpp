@@ -445,6 +445,8 @@ EXPORT MStatus initializePlugin(MObject obj)
 	Utils::loadMELScriptByResourceID(IDR_MEL2);
 	// AEColliderTemplate
 	Utils::loadMELScriptByResourceID(IDR_MEL3);
+	// VoxelPaintToolSettings
+	Utils::loadMELScriptByResourceID(IDR_MEL4);
 
 	MGlobal::executeCommand("VoxelizerMenu_addToShelf");
 
