@@ -284,7 +284,7 @@ global proc VoxelizerMenu_addToShelf() {
             -label "VoxelPaintTool"
             -annotation "Paint simulation weights onto voxels"
             -image1 "cMuscle_skin_paint.png"
-            -command "string $ctx = `voxelPaintContextCommand`; setToolTo $ctx;";
+            -command "string $ctx = `voxelPaintContextCommand`; setToolTo $ctx; VoxelPaint_OpenDock();";
     }
 
     shelfTabLayout -edit -selectTab "VoxelDestroyer" $gShelfTopLevel;

@@ -241,6 +241,7 @@
     <None Include="mel\VoxelizerMenu.mel" />
     <None Include="mel\AEColliderTemplate.mel" />
     <None Include="mel\VoxelShapeMarkingMenu.mel" />
+    <None Include="mel\VoxelPaintToolSettings.mel" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
