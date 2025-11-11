@@ -309,9 +309,9 @@ private:
     void onHoveredVoxelChange(int hoveredVoxelInstanceId) {
         hoveredVoxelMatrices.clear();
         const MMatrixArray& voxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
-        if (hoveredVoxelInstanceId < 0 || hoveredVoxelInstanceId >= (int)voxelMatrices.length()) return;
-
-        hoveredVoxelMatrices.append(voxelMatrices[hoveredVoxelInstanceId]);
+        
+        int globalVoxelId = visibleVoxelIdToGlobalId[hoveredVoxelInstanceId];
+        hoveredVoxelMatrices.append(voxelMatrices[globalVoxelId]);
 
         shouldUpdate = true;
         hoveredVoxelChanged = true;
@@ -432,17 +432,16 @@ private:
         // Filter the voxel matrices array to exclude any hidden voxels.
         const MMatrixArray& allVoxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
         std::vector<uint> newVisibleVoxelIdToGlobalId;
-        std::unordered_set<uint> visibleVoxels(visibleVoxelIdToGlobalId.begin(), visibleVoxelIdToGlobalId.end());
+        newVisibleVoxelIdToGlobalId.reserve(visibleVoxelIdToGlobalId.size() - voxelsToHide.size());
 
-        for (uint i = 0; i < allVoxelMatrices.length(); ++i) {
-            if (voxelsToHide.find(i) != voxelsToHide.end()) continue;
-            if (visibleVoxels.find(i) == visibleVoxels.end()) continue;
-            
-            visibleVoxelMatrices.append(allVoxelMatrices[i]);
-            newVisibleVoxelIdToGlobalId.push_back(i);
+        for (size_t i = 0; i < visibleVoxelIdToGlobalId.size(); ++i) {
+            uint globalVoxelId = visibleVoxelIdToGlobalId[i];
+            if (voxelsToHide.find(globalVoxelId) != voxelsToHide.end()) continue;
+
+            visibleVoxelMatrices.append(allVoxelMatrices[globalVoxelId]);
+            newVisibleVoxelIdToGlobalId.push_back(globalVoxelId);
         }
 
-        std::sort(newVisibleVoxelIdToGlobalId.begin(), newVisibleVoxelIdToGlobalId.end());
         visibleVoxelIdToGlobalId = std::move(newVisibleVoxelIdToGlobalId);
 
         updateVoxelRenderItem(container, voxelWireframeRenderItemName, visibleVoxelMatrices);
