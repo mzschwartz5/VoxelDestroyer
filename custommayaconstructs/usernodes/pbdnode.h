@@ -251,11 +251,11 @@ private:
         int numberParticles = pbd.numParticles();
         int voxelOffset = particleBufferOffset / 8;
         int numVoxels = numberParticles / 8;
-        ComPtr<ID3D11UnorderedAccessView> particleUAV = DirectX::createUAV(GlobalSolver::getBuffer(GlobalSolver::BufferType::PARTICLE), false, numberParticles, particleBufferOffset);
-        ComPtr<ID3D11UnorderedAccessView> oldParticlesUAV = DirectX::createUAV(GlobalSolver::getBuffer(GlobalSolver::BufferType::OLDPARTICLE), false, numberParticles, particleBufferOffset);
-        ComPtr<ID3D11ShaderResourceView> particleSRV = DirectX::createSRV(GlobalSolver::getBuffer(GlobalSolver::BufferType::PARTICLE), false, numberParticles, particleBufferOffset);
-        ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV = DirectX::createUAV(GlobalSolver::getBuffer(GlobalSolver::BufferType::SURFACE), false, numVoxels, voxelOffset);
-        ComPtr<ID3D11ShaderResourceView> isDraggingSRV = DirectX::createSRV(GlobalSolver::getBuffer(GlobalSolver::BufferType::DRAGGING), false, numVoxels, voxelOffset);
+        ComPtr<ID3D11UnorderedAccessView> particleUAV = DirectX::createUAV(GlobalSolver::getBuffer(GlobalSolver::BufferType::PARTICLE), numberParticles, particleBufferOffset);
+        ComPtr<ID3D11UnorderedAccessView> oldParticlesUAV = DirectX::createUAV(GlobalSolver::getBuffer(GlobalSolver::BufferType::OLDPARTICLE), numberParticles, particleBufferOffset);
+        ComPtr<ID3D11ShaderResourceView> particleSRV = DirectX::createSRV(GlobalSolver::getBuffer(GlobalSolver::BufferType::PARTICLE), numberParticles, particleBufferOffset);
+        ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV = DirectX::createUAV(GlobalSolver::getBuffer(GlobalSolver::BufferType::SURFACE), numVoxels, voxelOffset);
+        ComPtr<ID3D11ShaderResourceView> isDraggingSRV = DirectX::createSRV(GlobalSolver::getBuffer(GlobalSolver::BufferType::DRAGGING), numVoxels, voxelOffset);
 
         pbd.setGPUResourceHandles(particleUAV, oldParticlesUAV, isSurfaceUAV, isDraggingSRV);
 

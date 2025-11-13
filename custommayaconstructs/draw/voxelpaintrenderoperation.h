@@ -57,10 +57,10 @@ public:
         );
 
         std::vector<float> cubeVertices(cubeCornersFlattened.begin(), cubeCornersFlattened.end());
-        cubeVb = DirectX::createReadOnlyBuffer<float>(cubeVertices, D3D11_BIND_VERTEX_BUFFER, true);
+        cubeVb = DirectX::createReadOnlyBuffer<float>(cubeVertices, D3D11_BIND_VERTEX_BUFFER, DirectX::BufferFormat::RAW);
 
         std::vector<unsigned int> cubeIndices(cubeFacesFlattened.begin(), cubeFacesFlattened.end());
-        cubeIb = DirectX::createReadOnlyBuffer<unsigned int>(cubeIndices, D3D11_BIND_INDEX_BUFFER, true);
+        cubeIb = DirectX::createReadOnlyBuffer<unsigned int>(cubeIndices, D3D11_BIND_INDEX_BUFFER, DirectX::BufferFormat::RAW);
     }
 
     ~VoxelPaintRenderOperation() override {
@@ -178,7 +178,7 @@ public:
         }
 
         instanceTransformBuffer = DirectX::createReadOnlyBuffer<std::array<float, 16>>(gpuMats);
-        instanceTransformSRV = DirectX::createSRV(instanceTransformBuffer, false, instanceCount);
+        instanceTransformSRV = DirectX::createSRV(instanceTransformBuffer);
     }
 
     void updatePaintToolPos(int mouseX, int mouseY) {

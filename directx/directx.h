@@ -14,6 +14,12 @@ public:
     DirectX() = delete;
     ~DirectX() = delete;
 
+    enum class BufferFormat {
+        STRUCTURED,
+        RAW,
+        TYPED
+    };
+
     static void initialize(HINSTANCE pluginInstance);
     
     static ID3D11Device* getDevice();
@@ -24,7 +30,7 @@ public:
     static ComPtr<ID3D11Buffer> createReadOnlyBuffer(
         const std::vector<T>& data,
         UINT additionalBindFlags = 0,
-        bool rawBuffer = false,
+        BufferFormat format = BufferFormat::STRUCTURED,
         UINT stride = 0
     ) {
         D3D11_BUFFER_DESC bufferDesc = {};
@@ -33,10 +39,11 @@ public:
         bufferDesc.ByteWidth = static_cast<UINT>(sizeof(T) * data.size());
         bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | additionalBindFlags;
         bufferDesc.CPUAccessFlags = 0;
-        if (rawBuffer) {
+        
+        if (format == BufferFormat::RAW) {
             bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
         }
-        else {
+        else if (format == BufferFormat::STRUCTURED) {
             bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
             bufferDesc.StructureByteStride = (stride > 0) ? stride : sizeof(T);
         }
@@ -54,7 +61,7 @@ public:
     static ComPtr<ID3D11Buffer> createReadWriteBuffer(
         const std::vector<T>& data,
         UINT additionalBindFlags = 0,
-        bool rawBuffer = false
+        BufferFormat format = BufferFormat::STRUCTURED
     ) {
         D3D11_BUFFER_DESC bufferDesc = {};
 
@@ -63,10 +70,10 @@ public:
         bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS | additionalBindFlags;
         bufferDesc.CPUAccessFlags = 0;
 
-        if (rawBuffer) {
+        if (format == BufferFormat::RAW) {
             bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
-        }
-        else {
+        } 
+        else if (format == BufferFormat::STRUCTURED) {
             bufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
             bufferDesc.StructureByteStride = sizeof(T);
         }
@@ -100,16 +107,18 @@ public:
 
     static ComPtr<ID3D11ShaderResourceView> createSRV(
         const ComPtr<ID3D11Buffer>& buffer,
-        bool rawBuffer = false,
         UINT elementCount = 0,
-        UINT offset = 0
+        UINT offset = 0,
+        BufferFormat bufferFormat = BufferFormat::STRUCTURED,
+        DXGI_FORMAT viewFormat = DXGI_FORMAT_UNKNOWN
     );
 
     static ComPtr<ID3D11UnorderedAccessView> createUAV(
         const ComPtr<ID3D11Buffer>& buffer,
-        bool rawBuffer = false,
         UINT elementCount = 0,
-        UINT offset = 0
+        UINT offset = 0,
+        BufferFormat bufferFormat = BufferFormat::STRUCTURED,
+        DXGI_FORMAT viewFormat = DXGI_FORMAT_UNKNOWN
     );
 
     /**
@@ -118,6 +127,7 @@ public:
     template<typename T>
     static void addToBuffer(ComPtr<ID3D11Buffer>& buffer, std::vector<T>& addedData) {
         // Default to a read/write buffer if buffer doesn't exist yet. (Reasonable default since adding to a buffer implies it's writeable)
+        // Also assumes structured buffer format.
         if (!buffer) {
             buffer = createReadWriteBuffer<T>(addedData);
             return;
@@ -237,10 +247,10 @@ private:
     ) {
         D3D11_BUFFER_DESC desc;
         existingBuffer->GetDesc(&desc);
-        bool isRawBuffer = (desc.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS) != 0;
+        bool isStructuredBuffer = (desc.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_STRUCTURED) != 0;
 
         desc.ByteWidth = static_cast<UINT>(sizeof(T) * data.size());
-        if (!isRawBuffer) desc.StructureByteStride = sizeof(T);
+        if (!isStructuredBuffer) desc.StructureByteStride = sizeof(T);
 
         D3D11_SUBRESOURCE_DATA initData = {};
         initData.pSysMem = data.data();
