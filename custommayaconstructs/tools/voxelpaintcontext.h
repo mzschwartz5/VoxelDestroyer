@@ -2,6 +2,7 @@
 #include "voxelcontextbase.h"
 #include <maya/MEvent.h>
 #include <maya/MToolsInfo.h>
+#include <maya/MTimerMessage.h>
 
 enum class BrushMode {
     ADD,
@@ -51,7 +52,24 @@ public:
         return brushMode;
     }
 
+    // Maya doesn't refresh while the mouse is held down, so force it to do so.
+    // However, we don't want to refresh on EVERY mouse event, just at 60FPS. Use a timer for this.
+    MStatus doPress(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
+        timerCallbackId = MTimerMessage::addTimerCallback(1.0f / 60.0f, &VoxelPaintContext::timerCallbackFunc);
+        return VoxelContextBase::doPress(event, drawMgr, context);
+    }
+
+    MStatus doRelease(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
+        MTimerMessage::removeCallback(timerCallbackId);
+        return VoxelContextBase::doRelease(event, drawMgr, context);
+    }
+
+    static void timerCallbackFunc(float, float, void*) {
+        MGlobal::executeCommand("refresh");
+    }
+
 private:
     BrushMode brushMode = BrushMode::SET;
+    MCallbackId timerCallbackId;
 
 };
