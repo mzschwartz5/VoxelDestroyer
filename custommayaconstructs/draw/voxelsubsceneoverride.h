@@ -272,7 +272,7 @@ private:
         }
 
         if (isFacePaintMode && isThisShape) {
-            setPaintTransformArrayOnRenderer();
+            sendVoxelInfoToPaintRenderOp();
         }
 
         shouldUpdate = true;
@@ -746,17 +746,15 @@ private:
         setVoxelGeometryForRenderItem(*renderItem, MGeometry::kTriangles);
     }
 
-    void setPaintTransformArrayOnRenderer() {
+    void sendVoxelInfoToPaintRenderOp() {
         VoxelRendererOverride* voxelRendererOverride = VoxelRendererOverride::instance();
         if (!voxelRendererOverride) return;
+
         const MMatrixArray& voxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
-        MMatrixArray voxelInstanceTransforms;
+        const ComPtr<ID3D11UnorderedAccessView>& voxelPaintUAV = voxelShape->getVoxelPaintUAV();
+        const ComPtr<ID3D11ShaderResourceView>& voxelPaintSRV = voxelShape->getVoxelPaintSRV();
 
-        for (uint globalVoxelId : visibleVoxelIdToGlobalId) {
-            voxelInstanceTransforms.append(voxelMatrices[globalVoxelId]);
-        }
-
-        voxelRendererOverride->setPaintTransformArray(voxelInstanceTransforms);
+        voxelRendererOverride->sendVoxelInfoToPaintRenderOp(voxelMatrices, visibleVoxelIdToGlobalId, voxelPaintUAV, voxelPaintSRV);
     }
 
     void createVoxelGeometryBuffers() {
