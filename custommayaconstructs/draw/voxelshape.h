@@ -158,7 +158,7 @@ public:
 
     /**
      * Invoked by the subscene override after it has created geometry buffers to fulfill shader requirements.
-     * In addition to the GPU resources it passes in, we need to pull CPU-side data from this nodes connected plugs and
+     * In addition to the GPU resources it passes in, we need to pull CPU-side data from this node's connected plugs and
      * upload them to the GPU (done in the constructor of DeformVerticesCompute).
      */
     void initializeDeformVerticesCompute(
@@ -193,11 +193,29 @@ public:
         isInitialized = true;
     }
 
+    const ComPtr<ID3D11ShaderResourceView>& getVoxelPaintSRV() {
+        if (!voxelPaintSRV) {
+            allocatePaintResources();
+        }
+        return voxelPaintSRV;
+    }
+
+    const ComPtr<ID3D11UnorderedAccessView>& getVoxelPaintUAV() {
+        if (!voxelPaintUAV) {
+            allocatePaintResources();
+        }
+        return voxelPaintUAV;
+    }
+
 private:
     bool isInitialized = false;
     bool isParticleSRVPlugDirty = false;
     MCallbackIdArray callbackIds;
     DeformVerticesCompute deformVerticesCompute;
+    // Holds the painted values of each voxel, for use with the Voxel Paint tool.
+    ComPtr<ID3D11Buffer> voxelPaintBuffer; 
+    ComPtr<ID3D11ShaderResourceView> voxelPaintSRV;
+    ComPtr<ID3D11UnorderedAccessView> voxelPaintUAV;
     
     VoxelShape() = default;
     ~VoxelShape() override = default;
@@ -289,6 +307,20 @@ private:
         }
 
         return vertexVoxelIds;
+    }
+
+    void allocatePaintResources() {
+        MSharedPtr<Voxels> voxels = getVoxels();
+        if (!voxels) return;
+
+        const int numVoxels = voxels->numOccupied;
+        
+        // Paint values start at 0. Use uint16_t to get the size right, but it will really be half-floats in the shader.
+        // Need to use a typed buffer to get half-float support.
+        const std::vector<uint16_t> emptyPaintData(numVoxels, 0);
+        voxelPaintBuffer = DirectX::createReadWriteBuffer(emptyPaintData, 0, DirectX::BufferFormat::TYPED);
+        voxelPaintSRV = DirectX::createSRV(voxelPaintBuffer, numVoxels, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT);
+        voxelPaintUAV = DirectX::createUAV(voxelPaintBuffer, numVoxels, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT);
     }
 
 };

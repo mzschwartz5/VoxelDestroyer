@@ -33,7 +33,7 @@ public:
         // Maya manages the memory / lifetime of the operation passed in
         MClearOperation* clearVoxelPaintOp = new MClearOperation(paintClearOpName);
         clearVoxelPaintOp->setMask(MClearOperation::kClearColor | MClearOperation::kClearDepth);
-        clearVoxelPaintOp->renameOutputTarget(MRenderOperation::kColorTargetName, VoxelPaintRenderOperation::paintOutputRenderTargetName);
+        clearVoxelPaintOp->renameOutputTarget(MRenderOperation::kColorTargetName, VoxelPaintRenderOperation::paintColorRenderTargetName);
         clearVoxelPaintOp->renameOutputTarget(MRenderOperation::kDepthTargetName, VoxelPaintRenderOperation::paintDepthRenderTargetName);
         
         mOperations.insertBefore(MRenderOperation::kStandardPresentName, new VoxelPaintRenderOperation(paintOpName));
@@ -96,8 +96,14 @@ public:
         return voxelRendererOverride;
     }
 
-    void setPaintTransformArray(const MMatrixArray& voxelInstanceTransforms) {
-        static_cast<VoxelPaintRenderOperation*>(mOperations[paintOpIndex])->createInstanceTransformArray(voxelInstanceTransforms);
+    void sendVoxelInfoToPaintRenderOp(
+        const MMatrixArray& allVoxelMatrices, 
+        const std::vector<uint32_t>& visibleVoxelIdToGlobalId,
+        const ComPtr<ID3D11UnorderedAccessView>& voxelPaintUAV,
+        const ComPtr<ID3D11ShaderResourceView>& voxelPaintSRV
+    ) {
+        VoxelPaintRenderOperation* paintOp = static_cast<VoxelPaintRenderOperation*>(mOperations[paintOpIndex]);
+        paintOp->prepareToPaint(allVoxelMatrices, visibleVoxelIdToGlobalId, voxelPaintUAV, voxelPaintSRV);
     }
 
     // TODO: these do not have to be static - consumers can use MRenderer to get the active render override instance.

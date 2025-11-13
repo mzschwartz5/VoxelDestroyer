@@ -205,7 +205,7 @@ public:
     template<typename T>
     static ComPtr<ID3D11Buffer> createBufferFromBufferTemplate(
         const ComPtr<ID3D11Buffer>& existingBuffer,
-        std::vector<T>& data
+        const std::vector<T>& data
     ) {
         D3D11_BUFFER_DESC desc;
         existingBuffer->GetDesc(&desc);
@@ -224,29 +224,16 @@ public:
     }
 
     /**
-     * Similar to above, but uses an existing UAV to get the buffer description.
+     * Create a buffer using an existing SRV or UAV as the template. The view
+     * type can be ID3D11ShaderResourceView or ID3D11UnorderedAccessView 
      */
-    template<typename T>
-    static ComPtr<ID3D11Buffer> createBufferFromUAVTemplate(
-        const ComPtr<ID3D11UnorderedAccessView>& existingUAV,
-        std::vector<T>& data
+    template<typename T, typename View>
+    static ComPtr<ID3D11Buffer> createBufferFromViewTemplate(
+        const ComPtr<View>& existingView,
+        const std::vector<T>& data
     ) {
         ComPtr<ID3D11Resource> resource;
-        existingUAV->GetResource(resource.GetAddressOf());
-
-        ComPtr<ID3D11Buffer> existingBuffer;
-        resource.As(&existingBuffer);
-
-        return createBufferFromBufferTemplate<T>(existingBuffer, data);
-    }
-
-    template<typename T>
-    static ComPtr<ID3D11Buffer> createBufferFromSRVTemplate(
-        const ComPtr<ID3D11ShaderResourceView>& existingSRV,
-        std::vector<T>& data
-    ) {
-        ComPtr<ID3D11Resource> resource;
-        existingSRV->GetResource(resource.GetAddressOf());
+        existingView->GetResource(resource.GetAddressOf());
 
         ComPtr<ID3D11Buffer> existingBuffer;
         resource.As(&existingBuffer);
