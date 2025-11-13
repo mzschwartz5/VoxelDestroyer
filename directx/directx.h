@@ -137,7 +137,7 @@ public:
         uint numExistingElements = getNumElementsInBuffer(buffer);
 
         addedData.resize(numExistingElements + numNewElements);
-        ComPtr<ID3D11Buffer> newBuffer = createBufferFromExisting<T>(buffer, addedData);
+        ComPtr<ID3D11Buffer> newBuffer = createBufferFromBufferTemplate<T>(buffer, addedData);
         addedData.resize(numNewElements); // resize back to original size (so .size() is accurate, and we don't waste memory)
 
         copyBufferSubregion<T>(
@@ -156,7 +156,7 @@ public:
         // Create a new buffer sized for the data minus the deleted elements
         uint numExistingElements = getNumElementsInBuffer(buffer);
         std::vector<T> newData(numExistingElements - numRemovedElements);
-        ComPtr<ID3D11Buffer> newBuffer = createBufferFromExisting<T>(buffer, newData);
+        ComPtr<ID3D11Buffer> newBuffer = createBufferFromBufferTemplate<T>(buffer, newData);
 
         // Combine the old data into the new buffer in (up to) two copies: 
         // the elements before those being removed, and those after.
@@ -198,6 +198,75 @@ public:
         }
     }
 
+    /**
+     * Uses the existingBuffer to create a new buffer with the same flags, but with the provided data.
+     * In other words, the existingBuffer is a template for the new buffer.
+     */
+    template<typename T>
+    static ComPtr<ID3D11Buffer> createBufferFromBufferTemplate(
+        const ComPtr<ID3D11Buffer>& existingBuffer,
+        std::vector<T>& data
+    ) {
+        D3D11_BUFFER_DESC desc;
+        existingBuffer->GetDesc(&desc);
+        bool isStructuredBuffer = (desc.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_STRUCTURED) != 0;
+
+        desc.ByteWidth = static_cast<UINT>(sizeof(T) * data.size());
+        if (!isStructuredBuffer) desc.StructureByteStride = sizeof(T);
+
+        D3D11_SUBRESOURCE_DATA initData = {};
+        initData.pSysMem = data.data();
+
+        ComPtr<ID3D11Buffer> buffer;
+        HRESULT hr = dxDevice->CreateBuffer(&desc, &initData, buffer.GetAddressOf());
+        notifyMayaOfMemoryUsage(buffer, true);
+        return buffer;
+    }
+
+    /**
+     * Similar to above, but uses an existing UAV to get the buffer description.
+     */
+    template<typename T>
+    static ComPtr<ID3D11Buffer> createBufferFromUAVTemplate(
+        const ComPtr<ID3D11UnorderedAccessView>& existingUAV,
+        std::vector<T>& data
+    ) {
+        ComPtr<ID3D11Resource> resource;
+        existingUAV->GetResource(resource.GetAddressOf());
+
+        ComPtr<ID3D11Buffer> existingBuffer;
+        resource.As(&existingBuffer);
+
+        return createBufferFromBufferTemplate<T>(existingBuffer, data);
+    }
+
+    template<typename T>
+    static ComPtr<ID3D11Buffer> createBufferFromSRVTemplate(
+        const ComPtr<ID3D11ShaderResourceView>& existingSRV,
+        std::vector<T>& data
+    ) {
+        ComPtr<ID3D11Resource> resource;
+        existingSRV->GetResource(resource.GetAddressOf());
+
+        ComPtr<ID3D11Buffer> existingBuffer;
+        resource.As(&existingBuffer);
+
+        return createBufferFromBufferTemplate<T>(existingBuffer, data);
+    }
+
+    /**
+     * Uses an existing UAV as a template (copies its description) to create a new UAV for a different buffer.
+     */
+    static ComPtr<ID3D11UnorderedAccessView> createUAVFromTemplate(
+        const ComPtr<ID3D11UnorderedAccessView>& existingUAV,
+        const ComPtr<ID3D11Buffer>& newBuffer
+    );
+
+    static ComPtr<ID3D11ShaderResourceView> createSRVFromTemplate(
+        const ComPtr<ID3D11ShaderResourceView>& existingSRV,
+        const ComPtr<ID3D11Buffer>& newBuffer
+    );
+
     /*
     * Clears a UINT buffer with the value 0.
     */
@@ -234,30 +303,5 @@ private:
             0, 
             &srcBox
         );
-    }
-
-    /**
-     * Uses the existingBuffer to create a new buffer with the same flags, but with the provided data.
-     * In other words, the existingBuffer is a template for the new buffer.
-     */
-    template<typename T>
-    static ComPtr<ID3D11Buffer> createBufferFromExisting(
-        const ComPtr<ID3D11Buffer>& existingBuffer,
-        std::vector<T>& data
-    ) {
-        D3D11_BUFFER_DESC desc;
-        existingBuffer->GetDesc(&desc);
-        bool isStructuredBuffer = (desc.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_STRUCTURED) != 0;
-
-        desc.ByteWidth = static_cast<UINT>(sizeof(T) * data.size());
-        if (!isStructuredBuffer) desc.StructureByteStride = sizeof(T);
-
-        D3D11_SUBRESOURCE_DATA initData = {};
-        initData.pSysMem = data.data();
-
-        ComPtr<ID3D11Buffer> buffer;
-        HRESULT hr = dxDevice->CreateBuffer(&desc, &initData, buffer.GetAddressOf());
-        notifyMayaOfMemoryUsage(buffer, true);
-        return buffer;
     }
 };
