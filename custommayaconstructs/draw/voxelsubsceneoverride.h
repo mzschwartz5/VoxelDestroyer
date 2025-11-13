@@ -601,15 +601,15 @@ private:
             // for binding as vertex buffers.
             std::vector<float> data(vertexCount * vbDesc.dimension(), 0.0f);
             extractor.populateVertexBuffer(data.data(), vertexCount, vbDesc);
-            buffer = DirectX::createReadWriteBuffer(data, D3D11_BIND_VERTEX_BUFFER, true);
+            buffer = DirectX::createReadWriteBuffer(data, D3D11_BIND_VERTEX_BUFFER, DirectX::BufferFormat::RAW);
             vertexBuffer->resourceHandle(buffer.Get(), data.size());
 
             ComPtr<ID3D11UnorderedAccessView>& uav = (semantic == MGeometry::kPosition) ? positionsUAV : normalsUAV;
-            uav = DirectX::createUAV(buffer, true);
+            uav = DirectX::createUAV(buffer, 0, 0, DirectX::BufferFormat::RAW);
 
             // Also need to create a buffer with the original positions/normals for the deform shader to read from
             ComPtr<ID3D11Buffer>& originalBuffer = (semantic == MGeometry::kPosition) ? originalPositionsBuffer : originalNormalsBuffer;
-            originalBuffer = DirectX::createReadOnlyBuffer(data, 0, false, sizeof(float) * vbDesc.dimension());
+            originalBuffer = DirectX::createReadOnlyBuffer(data, 0, DirectX::BufferFormat::STRUCTURED, sizeof(float) * vbDesc.dimension());
             
             ComPtr<ID3D11ShaderResourceView>& originalSRV = (semantic == MGeometry::kPosition) ? originalPositionsSRV : originalNormalsSRV;
             originalSRV = DirectX::createSRV(originalBuffer);

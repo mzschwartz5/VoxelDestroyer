@@ -51,9 +51,10 @@ HINSTANCE DirectX::getPluginInstance()
 
 ComPtr<ID3D11ShaderResourceView> DirectX::createSRV(
     const ComPtr<ID3D11Buffer>& buffer,
-    bool rawBuffer,
     UINT elementCount,
-    UINT offset
+    UINT offset,
+    BufferFormat bufferFormat,
+    DXGI_FORMAT viewFormat
 ) {
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     D3D11_BUFFER_DESC bufferDesc = {};
@@ -62,7 +63,7 @@ ComPtr<ID3D11ShaderResourceView> DirectX::createSRV(
     srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
     srvDesc.Buffer.FirstElement = offset;
     srvDesc.Buffer.NumElements = numElements;
-    srvDesc.Format = rawBuffer ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_UNKNOWN;
+    srvDesc.Format = (bufferFormat == BufferFormat::RAW) ? DXGI_FORMAT_R32_TYPELESS : viewFormat;
 
     ComPtr<ID3D11ShaderResourceView> srv;
     HRESULT hr = dxDevice->CreateShaderResourceView(buffer.Get(), &srvDesc, srv.GetAddressOf());
@@ -72,9 +73,10 @@ ComPtr<ID3D11ShaderResourceView> DirectX::createSRV(
 
 ComPtr<ID3D11UnorderedAccessView> DirectX::createUAV(
     const ComPtr<ID3D11Buffer>& buffer,
-    bool rawBuffer,
     UINT elementCount,
-    UINT offset
+    UINT offset,
+    BufferFormat bufferFormat,
+    DXGI_FORMAT viewFormat
 ) {
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
     D3D11_BUFFER_DESC bufferDesc = {};
@@ -83,11 +85,11 @@ ComPtr<ID3D11UnorderedAccessView> DirectX::createUAV(
     uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
     uavDesc.Buffer.FirstElement = offset;
     uavDesc.Buffer.NumElements = numElements;
-    if (rawBuffer) {
+    if (bufferFormat == BufferFormat::RAW) {
         uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
         uavDesc.Buffer.Flags = D3D11_BUFFER_UAV_FLAG_RAW;
     } else {
-        uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+        uavDesc.Format = viewFormat;
     }
 
     ComPtr<ID3D11UnorderedAccessView> uav;
@@ -112,6 +114,10 @@ void DirectX::notifyMayaOfMemoryUsage(const ComPtr<ID3D11Buffer>& buffer, bool a
     }
 }
 
+/**
+ * Note: This only works for structured and raw buffers. For typed buffers, the element size
+ * would need to be derived from the DXGI_FORMAT.
+ */
 int DirectX::getNumElementsInBuffer(const ComPtr<ID3D11Buffer>& buffer) {
     if (!buffer) return 0;
 
