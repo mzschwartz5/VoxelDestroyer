@@ -19,10 +19,14 @@ StructuredBuffer<uint> visibleToGlobalVoxelIdMap : register(t1);
 
 // PS-only resources
 // A bitmask of voxels painted this pass
-// // TODO: re-enable once we have non-camera-based painting
-// RWStructuredBuffer<uint> paintedVoxelIDs : register(u0);
+// Used in either the ID pass or the paint pass, depending on whether camera-based painting is enabled
+RWStructuredBuffer<uint> paintedVoxelIDs : register(u1); // UAV registers live in the same namespace as outputs, must start at u1.
+StructuredBuffer<uint> previousPaintedVoxelIDs : register(t2);
+Texture2D<uint4> idRenderTarget : register(t3);
+RWBuffer<float> voxelPaintValue : register(u2); // NOT structured so that we can store half-precision floats.
+Buffer<float> previousVoxelPaintValue : register(t4);
 
-VSOut VS_IDPass(VSIn i, uint instanceID : SV_InstanceID) {
+VSOut VS_Main(VSIn i, uint instanceID : SV_InstanceID) {
     VSOut o;
     float4x4 instanceTransform = instanceTransforms[instanceID];
     o.pos = mul(float4(i.pos, 1.0f), instanceTransform);
@@ -34,24 +38,54 @@ VSOut VS_IDPass(VSIn i, uint instanceID : SV_InstanceID) {
 uint4 PS_IDPass(VSOut psInput) : SV_Target {
     float2 delta = psInput.pos.xy - PAINT_POSITION;
     if (dot(delta, delta) > PAINT_RADIUS * PAINT_RADIUS) {
-        // Return clear color rather than use discard (which disables early-z optimizations)
-        // (Clear color is 0 so we can identify unselected pixels easily)
-        // (Note that this doesn't prevent the depth from being written outside the brush, but that's acceptable)
-        return uint4(0, 0, 0, 1);
+        // We already lose early-z optimizations by writing to a UAV, so no issue using discard.
+        discard;
     }
 
-    // // TODO: only if camera-based painting is disabled
     uint globalVoxelID = psInput.globalVoxelID;
-    // paintedVoxelIDs[globalVoxelID] = 1;
+    // Note: this captures everything under the brush, even if it ultimately gets occluded (and thus not painted)
+    // But we need to know that info before next pass so we can that pixels *near* the brush - belonging to voxels _under_ the brush - 
+    // update their paint values correctly.
+    paintedVoxelIDs[globalVoxelID] = 1; 
 
-    // 0 reserved for "no hit"
+    // 0 reserved for "no hit" (same as clear color)
     // Note: this means when using the selection results, we need to subtract 1 to get the original instance ID
-    return uint4(globalVoxelID - 1, 0, 0, 1);
+    // Note: paintedVoxelIds already tells us which voxels are painted, but this output ends up telling us which painted voxels are on TOP.
+    return uint4(globalVoxelID + 1, 0, 0, 1);
+}
+
+float4 PS_PaintPass(VSOut psInput) : SV_Target {
+    uint2 pixel = uint2(psInput.pos.xy);
+    uint topVoxelId = idRenderTarget.Load(int3(pixel, 0)).x;
+    bool underBrush = (topVoxelId != 0); // 0 indicates not under brush
+    topVoxelId = topVoxelId - 1; // -1 to undo +1 in ID pass (careful of underflow)
+    uint globalVoxelID = psInput.globalVoxelID;
+    
+    // This means we're drawing a pixel that is ultimately going to be occluded (as determined by the first pass).
+    // This can happen as we've disabled early-z optimizations by writing to UAVs. We can simply discard the pixel, 
+    // but this only works for pixels under the brush (we don't have the IDPass info for pixels outside the brush).
+    if (underBrush && (topVoxelId != globalVoxelID)) {
+        voxelPaintValue[globalVoxelID] = previousVoxelPaintValue[globalVoxelID]; // Make sure we still persist the voxel's previous paint value
+        return float4(0.0f, 0.0f, 0.0f, 0.0f); // Effectively discard, while preserving UAV write
+    }
+
+    // It's not enough to be under the brush - pixels near the brush may be painted too, if they belong to voxels that were under the brush.
+    // But only if they weren't just painted recently.
+    bool shouldPaint = (paintedVoxelIDs[globalVoxelID] != 0) && (previousPaintedVoxelIDs[globalVoxelID] == 0);
+    float previousPaintValue = previousVoxelPaintValue[globalVoxelID];
+    float newPaintValue = shouldPaint ? 1.0f : previousPaintValue; // TODO: use paint brush mode (e.g., add, subtract, set) and strength
+    voxelPaintValue[globalVoxelID] = newPaintValue;
+    
+    return float4(1.0f, 0.0f, 0.0f, newPaintValue);
 }
 
 technique11 PAINT_SELECTION_TECHNIQUE_NAME {
     pass IDPass{
-        SetVertexShader( CompileShader(vs_5_0, VS_IDPass()) );
+        SetVertexShader( CompileShader(vs_5_0, VS_Main()) );
         SetPixelShader(  CompileShader(ps_5_0, PS_IDPass()) );
+    }
+    pass PaintPass {
+        SetVertexShader( CompileShader(vs_5_0, VS_Main()) );
+        SetPixelShader(  CompileShader(ps_5_0, PS_PaintPass()) );
     }
 }
