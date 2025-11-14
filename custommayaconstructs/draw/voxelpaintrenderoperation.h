@@ -109,33 +109,47 @@ public:
             return MStatus::kSuccess;
         }
 
-        // Store off the current scissor rects and rasterizer/blend state, so we can change and restore them later
-        ID3D11DeviceContext* context = DirectX::getContext();
-        MStateManager* stateManager = drawContext.getStateManager();
-        const MRasterizerState* prevRS = stateManager->getRasterizerState();
-        const MBlendState* prevBlendState = stateManager->getBlendState();
-        UINT prevRectCount = 0;
-        context->RSGetScissorRects(&prevRectCount, nullptr);
-        std::vector<D3D11_RECT> prevScissorRects(prevRectCount);
-        if (prevRectCount) context->RSGetScissorRects(&prevRectCount, prevScissorRects.data());
+        prepareShader(drawContext);
+        executeIDPass(drawContext);
+        executePaintPass(drawContext);
+        unbindResources(drawContext);
 
-        // Set our scissor rect and rasterizer state
-        context->RSSetScissorRects(1, &scissor);
-        stateManager->setRasterizerState(scissorRasterState);
+        // Finally, swap the ping-pong buffers for next time
+        voxelPaintViews.swap();
+        voxelIDViews.swap(&DirectX::clearUintBuffer);
+        return MStatus::kSuccess;
+    }
 
+    void prepareShader(const MDrawContext& drawContext) {
         paintSelectionShader->bind(drawContext);
         float paintPos[2] = { static_cast<float>(paintPosX), static_cast<float>(paintPosY) };
         paintSelectionShader->setParameter(PAINT_POSITION, paintPos);
         paintSelectionShader->setParameter(PAINT_RADIUS, paintRadius);
         paintSelectionShader->updateParameters(drawContext);
+    }
+
+    void executeIDPass(const MDrawContext& drawContext) {
         paintSelectionShader->activatePass(drawContext, 0);
+
+        // Store off the current scissor rects and rasterizer/blend state, so we can change and restore them later
+        ID3D11DeviceContext* dxContext = DirectX::getContext();
+        MStateManager* stateManager = drawContext.getStateManager();
+        const MRasterizerState* prevRS = stateManager->getRasterizerState();
+        UINT prevRectCount = 0;
+        dxContext->RSGetScissorRects(&prevRectCount, nullptr);
+        std::vector<D3D11_RECT> prevScissorRects(prevRectCount);
+        if (prevRectCount) dxContext->RSGetScissorRects(&prevRectCount, prevScissorRects.data());
+
+        // Set our scissor rect and rasterizer state
+        dxContext->RSSetScissorRects(1, &scissor);
+        stateManager->setRasterizerState(scissorRasterState);
         
         // Bind the offscreen ID targets
         const MRenderTarget* paintColorTarget = getInputTarget(paintColorRenderTargetName);
         const MRenderTarget* paintDepthTarget = getInputTarget(paintDepthRenderTargetName);
         ID3D11RenderTargetView* paintColorRTV = static_cast<ID3D11RenderTargetView*>(paintColorTarget->resourceHandle());
         ID3D11DepthStencilView* paintDepthDSV = static_cast<ID3D11DepthStencilView*>(paintDepthTarget->resourceHandle());
-        context->OMSetRenderTargetsAndUnorderedAccessViews(
+        dxContext->OMSetRenderTargetsAndUnorderedAccessViews(
             1, // NumRTVs
             &paintColorRTV, 
             paintDepthDSV,
@@ -151,20 +165,28 @@ public:
             instanceTransformSRV.Get(),
             visibleToGlobalVoxelSRV.Get()
         };
-        context->IASetVertexBuffers(0, 1, cubeVb.GetAddressOf(), &stride, &offset);
-        context->IASetIndexBuffer(cubeIb.Get(), DXGI_FORMAT_R32_UINT, 0);
-        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        context->VSSetShaderResources(0, ARRAYSIZE(vs_srvs), vs_srvs);
+        dxContext->IASetVertexBuffers(0, 1, cubeVb.GetAddressOf(), &stride, &offset);
+        dxContext->IASetIndexBuffer(cubeIb.Get(), DXGI_FORMAT_R32_UINT, 0);
+        dxContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        dxContext->VSSetShaderResources(0, ARRAYSIZE(vs_srvs), vs_srvs);
 
-        context->DrawIndexedInstanced(static_cast<UINT>(cubeFacesFlattened.size()), instanceCount, 0, 0, 0);
+        dxContext->DrawIndexedInstanced(static_cast<UINT>(cubeFacesFlattened.size()), instanceCount, 0, 0, 0);
         updateRenderTargetSRV(paintColorRTV); // The target from the first pass will be read as an SRV in the second pass
 
-        // ID pass is done now, restore scissor and rasterizer state, enable alpha blending, and draw again to the main targets with the paint pass.
-        stateManager->setBlendState(alphaEnabledBlendState);
-        context->RSSetScissorRects(prevRectCount, prevScissorRects.data());
+        // Restore scissor and rasterizer state
+        dxContext->RSSetScissorRects(prevRectCount, prevScissorRects.data());
         stateManager->setRasterizerState(prevRS);
+    }
 
+    void executePaintPass(const MDrawContext& drawContext) {
         paintSelectionShader->activatePass(drawContext, 1);
+
+        MStateManager* stateManager = drawContext.getStateManager();
+        ID3D11DeviceContext* dxContext = DirectX::getContext();
+        const MRasterizerState* prevRS = stateManager->getRasterizerState();
+        const MBlendState* prevBlendState = stateManager->getBlendState();
+        stateManager->setBlendState(alphaEnabledBlendState);
+
         const MRenderTarget* mainColorTarget = getInputTarget(kColorTargetName);
         const MRenderTarget* mainDepthTarget = getInputTarget(kDepthTargetName);
         ID3D11RenderTargetView* mainColorRTV = static_cast<ID3D11RenderTargetView*>(mainColorTarget->resourceHandle());
@@ -175,7 +197,7 @@ public:
         };
         
         // Bind the onscreen, main render and depth targets.
-        context->OMSetRenderTargetsAndUnorderedAccessViews(
+        dxContext->OMSetRenderTargetsAndUnorderedAccessViews(
             1, // NumRTVs
             &mainColorRTV,
             mainDepthDSV,
@@ -185,36 +207,45 @@ public:
             nullptr
         );
 
+        ID3D11ShaderResourceView* vs_srvs[] = {
+            instanceTransformSRV.Get(),
+            visibleToGlobalVoxelSRV.Get()
+        };
+
         ID3D11ShaderResourceView* ps_srvs[] = {
             voxelPaintViews.SRV().Get(),
             renderTargetSRV.Get(),
             voxelIDViews.SRV().Get()
         };
 
-        context->VSSetShaderResources(0, ARRAYSIZE(vs_srvs), vs_srvs);
-        context->PSSetShaderResources(2, ARRAYSIZE(ps_srvs), ps_srvs); // Starts at slot 2 because slots 0 and 1 are for VS shader resources
-        context->DrawIndexedInstanced(static_cast<UINT>(cubeFacesFlattened.size()), instanceCount, 0, 0, 0);
+        dxContext->VSSetShaderResources(0, ARRAYSIZE(vs_srvs), vs_srvs);
+        dxContext->PSSetShaderResources(2, ARRAYSIZE(ps_srvs), ps_srvs); // Starts at slot 2 because slots 0 and 1 are for VS shader resources
+        dxContext->DrawIndexedInstanced(static_cast<UINT>(cubeFacesFlattened.size()), instanceCount, 0, 0, 0);
 
-        // Unbind resources / restore state
+        // Restore state
+        stateManager->setBlendState(prevBlendState);
+        stateManager->setRasterizerState(prevRS);
+    }
+
+    void unbindResources(const MDrawContext& drawContext) {
+        ID3D11DeviceContext* dxContext = DirectX::getContext();
+        const MRenderTarget* mainColorTarget = getInputTarget(kColorTargetName);
+        const MRenderTarget* mainDepthTarget = getInputTarget(kDepthTargetName);
+        ID3D11RenderTargetView* mainColorRTV = static_cast<ID3D11RenderTargetView*>(mainColorTarget->resourceHandle());
+        ID3D11DepthStencilView* mainDepthDSV = static_cast<ID3D11DepthStencilView*>(mainDepthTarget->resourceHandle());
+
         ID3D11ShaderResourceView* nullVSSRV[] = { nullptr, nullptr };
         ID3D11ShaderResourceView* nullPSSRV[] = { nullptr, nullptr, nullptr };
         ID3D11UnorderedAccessView* nullUAVs[] = { nullptr, nullptr };
-        context->VSSetShaderResources(0, ARRAYSIZE(nullVSSRV), nullVSSRV);
-        context->PSSetShaderResources(2, ARRAYSIZE(nullPSSRV), nullPSSRV);
-        context->OMSetRenderTargetsAndUnorderedAccessViews(
+        dxContext->VSSetShaderResources(0, ARRAYSIZE(nullVSSRV), nullVSSRV);
+        dxContext->PSSetShaderResources(2, ARRAYSIZE(nullPSSRV), nullPSSRV);
+        dxContext->OMSetRenderTargetsAndUnorderedAccessViews(
             1, &mainColorRTV, mainDepthDSV,
             1, ARRAYSIZE(nullUAVs),
             nullUAVs,
             nullptr
         );
         paintSelectionShader->unbind(drawContext);
-        stateManager->setBlendState(prevBlendState);
-        stateManager->setRasterizerState(prevRS);
-
-        // Finally, swap the ping-pong buffers for next time
-        voxelPaintViews.swap();
-        voxelIDViews.swap(&DirectX::clearUintBuffer);
-        return MStatus::kSuccess;
     }
 
     /**
@@ -358,7 +389,9 @@ private:
 
     unsigned int instanceCount = 0;
 
-    ComPtr<ID3D11ShaderResourceView> updateRenderTargetSRV(ID3D11RenderTargetView* rtv) {
+    void updateRenderTargetSRV(ID3D11RenderTargetView* rtv) {
+        if (!rtv) return;
+
         ComPtr<ID3D11Resource> oldResource;
         if (renderTargetSRV) renderTargetSRV->GetResource(&oldResource);
 
@@ -366,9 +399,7 @@ private:
         rtv->GetResource(&newResource);
 
         // No updates
-        if (newResource.Get() == oldResource.Get()) {
-            return renderTargetSRV;
-        }
+        if (newResource.Get() == oldResource.Get()) return;
 
         // When you pass in nullptr for the second parameter, it infers the format from the resource.
         HRESULT hr = DirectX::getDevice()->CreateShaderResourceView(newResource.Get(), nullptr, renderTargetSRV.GetAddressOf());
@@ -376,6 +407,5 @@ private:
             MGlobal::displayError(MString("Failed to create shader resource view for render target. ") + Utils::HResultToString(hr).c_str());
         }
 
-        return renderTargetSRV;
     }
 };
