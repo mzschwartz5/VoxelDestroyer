@@ -22,7 +22,7 @@ StructuredBuffer<uint> visibleToGlobalVoxelIdMap : register(t1);
 // Used in either the ID pass or the paint pass, depending on whether camera-based painting is enabled
 RWStructuredBuffer<uint> paintedVoxelIDs : register(u1); // UAV registers live in the same namespace as outputs, must start at u1.
 StructuredBuffer<uint> previousPaintedVoxelIDs : register(t2);
-Texture2D<uint4> idRenderTarget : register(t3);
+Texture2D<uint> idRenderTarget : register(t3);
 RWBuffer<float> voxelPaintValue : register(u2); // NOT structured so that we can store half-precision floats.
 Buffer<float> previousVoxelPaintValue : register(t4);
 
@@ -35,7 +35,7 @@ VSOut VS_Main(VSIn i, uint instanceID : SV_InstanceID) {
     return o;
 }
 
-uint4 PS_IDPass(VSOut psInput) : SV_Target {
+uint PS_IDPass(VSOut psInput) : SV_Target {
     float2 delta = psInput.pos.xy - PAINT_POSITION;
     if (dot(delta, delta) > PAINT_RADIUS * PAINT_RADIUS) {
         // We already lose early-z optimizations by writing to a UAV, so no issue using discard.
@@ -51,12 +51,12 @@ uint4 PS_IDPass(VSOut psInput) : SV_Target {
     // 0 reserved for "no hit" (same as clear color)
     // Note: this means when using the selection results, we need to subtract 1 to get the original instance ID
     // Note: paintedVoxelIds already tells us which voxels are painted, but this output ends up telling us which painted voxels are on TOP.
-    return uint4(globalVoxelID + 1, 0, 0, 1);
+    return globalVoxelID + 1;
 }
 
 float4 PS_PaintPass(VSOut psInput) : SV_Target {
     uint2 pixel = uint2(psInput.pos.xy);
-    uint topVoxelId = idRenderTarget.Load(int3(pixel, 0)).x;
+    uint topVoxelId = idRenderTarget.Load(int3(pixel, 0));
     bool underBrush = (topVoxelId != 0); // 0 indicates not under brush
     topVoxelId = topVoxelId - 1; // -1 to undo +1 in ID pass (careful of underflow)
     uint globalVoxelID = psInput.globalVoxelID;

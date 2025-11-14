@@ -73,7 +73,7 @@ public:
         depthTargetChangedEvent.notify(depthTarget->resourceHandle());
         cameraInfoChangedEvent.notify({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), viewMatrix, projMatrix, invViewProjMatrix });
 
-        // TODO: enable conditionally based on whether we're painting or not
+        // TODO: enable conditionally based on whether we're in paint mode. (Move isPainting to the render op to determine which path to take in execute)
         mOperations[paintClearOpIndex]->setEnabled(true);
         mOperations[paintOpIndex]->setEnabled(true);
         return MStatus::kSuccess;
