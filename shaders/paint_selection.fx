@@ -44,16 +44,17 @@ uint PS_IDPass(VSOut psInput) : SV_Target {
 
     uint globalVoxelID = psInput.globalVoxelID;
     // Note: this captures everything under the brush, even if it ultimately gets occluded (and thus not painted)
-    // But we need to know that info before next pass so we can that pixels *near* the brush - belonging to voxels _under_ the brush - 
-    // update their paint values correctly.
+    // But we need to know that info before next pass so we can identify pixels *near* the brush - belonging to voxels *under* the brush - 
+    // and update their paint values correctly.
     paintedVoxelIDs[globalVoxelID] = 1; 
 
     // 0 reserved for "no hit" (same as clear color)
     // Note: this means when using the selection results, we need to subtract 1 to get the original instance ID
-    // Note: paintedVoxelIds already tells us which voxels are painted, but this output ends up telling us which painted voxels are on TOP.
+    // Note: paintedVoxelIds already tells us which voxels are painted, but this output ends up telling us which painted voxels are on TOP (thanks to depth testing).
     return globalVoxelID + 1;
 }
 
+// Updates paint values based on ID pass, and also renders all paint values to screen
 float4 PS_PaintPass(VSOut psInput) : SV_Target {
     uint2 pixel = uint2(psInput.pos.xy);
     uint topVoxelId = idRenderTarget.Load(int3(pixel, 0));
@@ -79,6 +80,12 @@ float4 PS_PaintPass(VSOut psInput) : SV_Target {
     return float4(1.0f, 0.0f, 0.0f, newPaintValue);
 }
 
+// Simple render pass for when paint mode is active but the user is not actively painting
+// We still need to render the existing paint values of the voxels, we just don't need to ID or update them.
+float4 PS_RenderPass(VSOut psInput) : SV_Target {
+    return float4(1.0f, 0.0f, 0.0f, voxelPaintValue[psInput.globalVoxelID]);
+}
+
 technique11 PAINT_SELECTION_TECHNIQUE_NAME {
     pass IDPass{
         SetVertexShader( CompileShader(vs_5_0, VS_Main()) );
@@ -87,5 +94,9 @@ technique11 PAINT_SELECTION_TECHNIQUE_NAME {
     pass PaintPass {
         SetVertexShader( CompileShader(vs_5_0, VS_Main()) );
         SetPixelShader(  CompileShader(ps_5_0, PS_PaintPass()) );
+    }
+    pass RenderPass {
+        SetVertexShader( CompileShader(vs_5_0, VS_Main()) );
+        SetPixelShader(  CompileShader(ps_5_0, PS_RenderPass()) );
     }
 }
