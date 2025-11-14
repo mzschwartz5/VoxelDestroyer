@@ -53,6 +53,9 @@ public:
         targetDesc.sourceBlend = MBlendState::kSourceAlpha;
         targetDesc.destinationBlend = MBlendState::kInvSourceAlpha;
         targetDesc.blendOperation = MBlendState::kAdd;
+        targetDesc.alphaSourceBlend = MBlendState::kOne;
+        targetDesc.alphaDestinationBlend = MBlendState::kInvSourceAlpha;
+        targetDesc.alphaBlendOperation = MBlendState::kAdd;
         alphaEnabledBlendState = MStateManager::acquireBlendState(blendDesc);
 
         void* shaderData = nullptr;
@@ -156,9 +159,10 @@ public:
         context->DrawIndexedInstanced(static_cast<UINT>(cubeFacesFlattened.size()), instanceCount, 0, 0, 0);
         updateRenderTargetSRV(paintColorRTV); // The target from the first pass will be read as an SRV in the second pass
 
-        // ID pass is done now, restore the scissor, enable alpha blending, and draw again to the main targets with the paint pass.
+        // ID pass is done now, restore scissor and rasterizer state, enable alpha blending, and draw again to the main targets with the paint pass.
         stateManager->setBlendState(alphaEnabledBlendState);
         context->RSSetScissorRects(prevRectCount, prevScissorRects.data());
+        stateManager->setRasterizerState(prevRS);
 
         paintSelectionShader->activatePass(drawContext, 1);
         const MRenderTarget* mainColorTarget = getInputTarget(kColorTargetName);
@@ -188,7 +192,7 @@ public:
         };
 
         context->VSSetShaderResources(0, ARRAYSIZE(vs_srvs), vs_srvs);
-        context->PSSetShaderResources(0, ARRAYSIZE(ps_srvs), ps_srvs);
+        context->PSSetShaderResources(2, ARRAYSIZE(ps_srvs), ps_srvs); // Starts at slot 2 because slots 0 and 1 are for VS shader resources
         context->DrawIndexedInstanced(static_cast<UINT>(cubeFacesFlattened.size()), instanceCount, 0, 0, 0);
 
         // Unbind resources / restore state
@@ -196,7 +200,7 @@ public:
         ID3D11ShaderResourceView* nullPSSRV[] = { nullptr, nullptr, nullptr };
         ID3D11UnorderedAccessView* nullUAVs[] = { nullptr, nullptr };
         context->VSSetShaderResources(0, ARRAYSIZE(nullVSSRV), nullVSSRV);
-        context->PSSetShaderResources(0, ARRAYSIZE(nullPSSRV), nullPSSRV);
+        context->PSSetShaderResources(2, ARRAYSIZE(nullPSSRV), nullPSSRV);
         context->OMSetRenderTargetsAndUnorderedAccessViews(
             1, &mainColorRTV, mainDepthDSV,
             1, ARRAYSIZE(nullUAVs),
@@ -204,8 +208,8 @@ public:
             nullptr
         );
         paintSelectionShader->unbind(drawContext);
-        stateManager->setRasterizerState(prevRS);
         stateManager->setBlendState(prevBlendState);
+        stateManager->setRasterizerState(prevRS);
 
         // Finally, swap the ping-pong buffers for next time
         voxelPaintViews.swap();
