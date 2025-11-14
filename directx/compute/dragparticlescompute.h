@@ -110,6 +110,8 @@ public:
         if (resource.Get() == oldResource.Get()) return;
 
         // Create a Shader Resource View for the depth buffer
+        // Note: the format was determined by querying the DSV's description, but could be fragile without programmatic  
+        // checks + mapping from DSV format to SRV format.
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
