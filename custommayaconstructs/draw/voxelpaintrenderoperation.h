@@ -12,6 +12,7 @@
 #include <maya/MDrawContext.h>
 #include "../../constants.h"
 #include "../../resource.h"
+#include "../tools/voxelpaintcontext.h"
 #include <maya/MMatrixArray.h>
 #include <algorithm>
 #include <array>
@@ -75,6 +76,15 @@ public:
 
         std::vector<unsigned int> cubeIndices(cubeFacesFlattened.begin(), cubeFacesFlattened.end());
         cubeIb = DirectX::createReadOnlyBuffer<unsigned int>(cubeIndices, D3D11_BIND_INDEX_BUFFER, DirectX::BufferFormat::RAW);
+
+        unsubscribeFromPaintMove = VoxelPaintContext::subscribeToMousePositionChange([this](const MousePosition& mousePos) {
+            updatePaintToolPos(mousePos.x, mousePos.y);
+            hasBrushMoved = true;
+        });
+
+        unsubscribeFromPaintStateChange = VoxelPaintContext::subscribeToDragStateChange([this](const DragState& state) {
+            paintRadius = state.selectRadius;
+        });
     }
 
     ~VoxelPaintRenderOperation() override {
@@ -95,6 +105,9 @@ public:
             MStateManager::releaseBlendState(alphaEnabledBlendState);
             alphaEnabledBlendState = nullptr;
         }
+
+        unsubscribeFromPaintMove();
+        unsubscribeFromPaintStateChange();
     };
 
     /**
@@ -110,13 +123,19 @@ public:
         }
 
         prepareShader(drawContext);
-        executeIDPass(drawContext);
-        executePaintPass(drawContext);
-        unbindResources(drawContext);
 
-        // Finally, swap the ping-pong buffers for next time
-        voxelPaintViews.swap();
-        voxelIDViews.swap(&DirectX::clearUintBuffer);
+        if (hasBrushMoved) {
+            voxelPaintViews.swap();
+            voxelIDViews.swap(&DirectX::clearUintBuffer);
+            executeIDPass(drawContext);
+            executePaintPass(drawContext);
+            hasBrushMoved = false;
+        }
+        else {
+            executeRenderPass(drawContext);
+        }
+
+        unbindResources(drawContext);
         return MStatus::kSuccess;
     }
 
@@ -183,7 +202,6 @@ public:
 
         MStateManager* stateManager = drawContext.getStateManager();
         ID3D11DeviceContext* dxContext = DirectX::getContext();
-        const MRasterizerState* prevRS = stateManager->getRasterizerState();
         const MBlendState* prevBlendState = stateManager->getBlendState();
         stateManager->setBlendState(alphaEnabledBlendState);
 
@@ -213,9 +231,9 @@ public:
         };
 
         ID3D11ShaderResourceView* ps_srvs[] = {
-            voxelPaintViews.SRV().Get(),
+            voxelIDViews.SRV().Get(),
             renderTargetSRV.Get(),
-            voxelIDViews.SRV().Get()
+            voxelPaintViews.SRV().Get()
         };
 
         dxContext->VSSetShaderResources(0, ARRAYSIZE(vs_srvs), vs_srvs);
@@ -224,7 +242,48 @@ public:
 
         // Restore state
         stateManager->setBlendState(prevBlendState);
-        stateManager->setRasterizerState(prevRS);
+    }
+
+    // Regular rendering, no ID'ing or painting - just rendering what's already painted when
+    // the user isn't actively dragging the brush.
+    void executeRenderPass(const MDrawContext& drawContext) {
+        paintSelectionShader->activatePass(drawContext, 2);
+        ID3D11DeviceContext* dxContext = DirectX::getContext();
+        MStateManager* stateManager = drawContext.getStateManager();
+        const MBlendState* prevBlendState = stateManager->getBlendState();
+        stateManager->setBlendState(alphaEnabledBlendState);
+
+        const MRenderTarget* mainColorTarget = getInputTarget(kColorTargetName);
+        const MRenderTarget* mainDepthTarget = getInputTarget(kDepthTargetName);
+        ID3D11RenderTargetView* mainColorRTV = static_cast<ID3D11RenderTargetView*>(mainColorTarget->resourceHandle());
+        ID3D11DepthStencilView* mainDepthDSV = static_cast<ID3D11DepthStencilView*>(mainDepthTarget->resourceHandle());
+
+        ID3D11ShaderResourceView* vs_srvs[] = {
+            instanceTransformSRV.Get(),
+            visibleToGlobalVoxelSRV.Get()
+        };
+
+        // Bind the onscreen, main render and depth targets.
+        dxContext->OMSetRenderTargetsAndUnorderedAccessViews(
+            1, // NumRTVs
+            &mainColorRTV,
+            mainDepthDSV,
+            2, // UAVStartSlot
+            1, // NumUAVs
+            voxelPaintViews.UAV().GetAddressOf(),
+            nullptr
+        );
+
+        UINT stride = sizeof(float) * 3;
+        UINT offset = 0;
+        dxContext->IASetVertexBuffers(0, 1, cubeVb.GetAddressOf(), &stride, &offset);
+        dxContext->IASetIndexBuffer(cubeIb.Get(), DXGI_FORMAT_R32_UINT, 0);
+        dxContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        dxContext->VSSetShaderResources(0, ARRAYSIZE(vs_srvs), vs_srvs);
+        dxContext->DrawIndexedInstanced(static_cast<UINT>(cubeFacesFlattened.size()), instanceCount, 0, 0, 0);
+
+        // Restore state
+        stateManager->setBlendState(prevBlendState);
     }
 
     void unbindResources(const MDrawContext& drawContext) {
@@ -320,20 +379,20 @@ public:
         const std::vector<uint16_t> emptyPaintData(numVoxels, 0);
         voxelPaintBufferB = DirectX::createBufferFromViewTemplate(voxelPaintUAV, emptyPaintData);
         voxelPaintViews = PingPongView(
-            voxelPaintSRV,
             DirectX::createSRVFromTemplate(voxelPaintSRV, voxelPaintBufferB), 
-            voxelPaintUAV,
-            DirectX::createUAVFromTemplate(voxelPaintUAV, voxelPaintBufferB)
+            voxelPaintSRV,
+            DirectX::createUAVFromTemplate(voxelPaintUAV, voxelPaintBufferB),
+            voxelPaintUAV
         );
 
         const std::vector<uint32_t> emptyIDData(numVoxels, 0);
         voxelIDBufferA = DirectX::createReadWriteBuffer(emptyIDData);
         voxelIDBufferB = DirectX::createReadWriteBuffer(emptyIDData);
         voxelIDViews = PingPongView(
-            DirectX::createSRV(voxelIDBufferA),
             DirectX::createSRV(voxelIDBufferB),
-            DirectX::createUAV(voxelIDBufferA),
-            DirectX::createUAV(voxelIDBufferB)
+            DirectX::createSRV(voxelIDBufferA),
+            DirectX::createUAV(voxelIDBufferB),
+            DirectX::createUAV(voxelIDBufferA)
         );
     }
 
@@ -352,10 +411,6 @@ public:
         scissor.bottom = std::min(static_cast<int>(outputTargetHeight), bottom);
     }
 
-    void updatePaintToolRadius(float newPaintRadius) {
-        paintRadius = newPaintRadius;
-    }
-
 private:
 
     MRenderTargetDescription renderTargetDescriptions[2];
@@ -364,8 +419,9 @@ private:
     const MRasterizerState* scissorRasterState = nullptr;
     const MBlendState* alphaEnabledBlendState = nullptr;
     D3D11_RECT scissor = { 0, 0, 0, 0 };
+    bool hasBrushMoved = false;
     float paintRadius;
-    int paintPosX;;
+    int paintPosX;
     int paintPosY;
     unsigned int outputTargetWidth = 0;
     unsigned int outputTargetHeight = 0;
@@ -388,6 +444,9 @@ private:
     ComPtr<ID3D11Buffer> cubeIb;
 
     unsigned int instanceCount = 0;
+
+    EventBase::Unsubscribe unsubscribeFromPaintMove;
+    EventBase::Unsubscribe unsubscribeFromPaintStateChange;
 
     void updateRenderTargetSRV(ID3D11RenderTargetView* rtv) {
         if (!rtv) return;

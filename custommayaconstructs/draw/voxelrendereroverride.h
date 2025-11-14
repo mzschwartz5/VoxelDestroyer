@@ -5,7 +5,7 @@
 #include <maya/MMatrix.h>
 #include "../../event.h"
 #include "voxelpaintrenderoperation.h"
-#include "../tools/voxelpaintcontext.h"
+#include "../commands/changevoxeleditmodecommand.h"
 using namespace MHWRender;
 
 struct CameraMatrices
@@ -41,19 +41,13 @@ public:
         paintOpIndex = mOperations.indexOf(paintOpName);
         paintClearOpIndex = mOperations.indexOf(paintClearOpName);
 
-        unsubscribeFromPaintMove = VoxelPaintContext::subscribeToMousePositionChange([this](const MousePosition& mousePos) {
-            static_cast<VoxelPaintRenderOperation*>(mOperations[paintOpIndex])->updatePaintToolPos(mousePos.x, mousePos.y);
-        });
-
-        unsubscribeFromPaintStateChange = VoxelPaintContext::subscribeToDragStateChange([this](const DragState& state) {
-            static_cast<VoxelPaintRenderOperation*>(mOperations[paintOpIndex])->updatePaintToolRadius(state.selectRadius);
-            isPainting = state.isDragging;
+        unsubscribeEditModeChange = ChangeVoxelEditModeCommand::subscribe([this](const EditModeChangedEventArgs& args) {
+            this->isPainting = (args.newMode == VoxelEditMode::FacePaint || args.newMode == VoxelEditMode::VertexPaint);
         });
     }
 
     ~VoxelRendererOverride() override {
-        unsubscribeFromPaintMove();
-        unsubscribeFromPaintStateChange();
+        unsubscribeEditModeChange();
     }
 
     /**
@@ -73,9 +67,8 @@ public:
         depthTargetChangedEvent.notify(depthTarget->resourceHandle());
         cameraInfoChangedEvent.notify({ static_cast<float>(viewportWidth), static_cast<float>(viewportHeight), viewMatrix, projMatrix, invViewProjMatrix });
 
-        // TODO: enable conditionally based on whether we're in paint mode. (Move isPainting to the render op to determine which path to take in execute)
-        mOperations[paintClearOpIndex]->setEnabled(true);
-        mOperations[paintOpIndex]->setEnabled(true);
+        mOperations[paintClearOpIndex]->setEnabled(isPainting);
+        mOperations[paintOpIndex]->setEnabled(isPainting);
         return MStatus::kSuccess;
     }
 
@@ -120,8 +113,7 @@ private:
     inline static Event<CameraMatrices> cameraInfoChangedEvent;
     inline static MString paintOpName = "Voxel Paint Operation";
     inline static MString paintClearOpName = "Voxel Paint Clear Operation";
-    EventBase::Unsubscribe unsubscribeFromPaintMove;
-    EventBase::Unsubscribe unsubscribeFromPaintStateChange;
+    EventBase::Unsubscribe unsubscribeEditModeChange;
     bool isPainting{ false };
     MString name;
     int paintOpIndex = 0;
