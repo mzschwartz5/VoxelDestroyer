@@ -169,15 +169,7 @@ public:
         const MRenderTarget* paintDepthTarget = getInputTarget(paintDepthRenderTargetName);
         ID3D11RenderTargetView* paintColorRTV = static_cast<ID3D11RenderTargetView*>(paintColorTarget->resourceHandle());
         ID3D11DepthStencilView* paintDepthDSV = static_cast<ID3D11DepthStencilView*>(paintDepthTarget->resourceHandle());
-        dxContext->OMSetRenderTargetsAndUnorderedAccessViews(
-            1, // NumRTVs
-            &paintColorRTV, 
-            paintDepthDSV,
-            1, // UAVStartSlot (starts at 1 because 0 is reserved)
-            1, // NumUAVs
-            voxelIDViews.UAV().GetAddressOf(),
-            nullptr
-        );
+        dxContext->OMSetRenderTargets(1, &paintColorRTV, paintDepthDSV);
 
         UINT stride = sizeof(float) * 3;
         UINT offset = 0;
