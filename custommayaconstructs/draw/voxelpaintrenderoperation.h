@@ -84,6 +84,8 @@ public:
 
         unsubscribeFromPaintStateChange = VoxelPaintContext::subscribeToDragStateChange([this](const DragState& state) {
             paintRadius = state.selectRadius;
+            updatePaintToolPos(state.mousePosition.x, state.mousePosition.y);
+            if (state.isDragging) hasBrushMoved = true;
         });
     }
 
