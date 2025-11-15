@@ -72,7 +72,7 @@ float4 PS_PaintPass(VSOut psInput) : SV_Target {
 
     // It's not enough to be under the brush - pixels near the brush may be painted too, if they belong to voxels that were under the brush.
     // But only if they weren't just painted recently.
-    bool shouldPaint = (paintedVoxelIDs[globalVoxelID] != 0) && (previousPaintedVoxelIDs[globalVoxelID] == 0);
+    bool shouldPaint = (paintedVoxelIDs[globalVoxelID] == 1) && (previousPaintedVoxelIDs[globalVoxelID] == 0);
     float previousPaintValue = previousVoxelPaintValue[globalVoxelID];
     float newPaintValue = shouldPaint ? 1.0f : previousPaintValue; // TODO: use paint brush mode (e.g., add, subtract, set) and strength
     voxelPaintValue[globalVoxelID] = newPaintValue;
