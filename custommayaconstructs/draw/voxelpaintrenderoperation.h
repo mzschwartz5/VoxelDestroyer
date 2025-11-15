@@ -79,13 +79,12 @@ public:
 
         unsubscribeFromPaintMove = VoxelPaintContext::subscribeToMousePositionChange([this](const MousePosition& mousePos) {
             updatePaintToolPos(mousePos.x, mousePos.y);
-            hasBrushMoved = true;
         });
 
         unsubscribeFromPaintStateChange = VoxelPaintContext::subscribeToDragStateChange([this](const DragState& state) {
             paintRadius = state.selectRadius;
             updatePaintToolPos(state.mousePosition.x, state.mousePosition.y);
-            if (state.isDragging) hasBrushMoved = true;
+            voxelIDViews.clear(DirectX::clearUintBuffer);
         });
     }
 
@@ -411,6 +410,7 @@ public:
         scissor.right = std::min(static_cast<int>(outputTargetWidth), right);
         scissor.top = std::max(0, top);
         scissor.bottom = std::min(static_cast<int>(outputTargetHeight), bottom);
+        hasBrushMoved = true;
     }
 
 private:

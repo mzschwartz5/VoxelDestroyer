@@ -22,6 +22,10 @@ public:
         clearFunc(uavs[currentIndex]);
     }
 
+    void clear(ClearFunc clearFunc = &PingPongView::noopClear) {
+        clearFunc(uavs[currentIndex]);
+    }
+
     ComPtr<ID3D11ShaderResourceView> SRV() const { return srvs[currentIndex]; }
     ComPtr<ID3D11UnorderedAccessView> UAV() const { return uavs[currentIndex]; }
 
