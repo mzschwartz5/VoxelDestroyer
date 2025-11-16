@@ -47,6 +47,12 @@ public:
         rasterDesc.scissorEnable = true;
         scissorRasterState = MStateManager::acquireRasterizerState(rasterDesc);
 
+        rasterDesc.setDefaults();
+        rasterDesc.depthBiasIsFloat = true;
+        rasterDesc.depthBias = -1e-4f;
+        rasterDesc.slopeScaledDepthBias = -1.0f;
+        depthBiasRasterState = MStateManager::acquireRasterizerState(rasterDesc);
+
         MBlendStateDesc blendDesc;
         blendDesc.setDefaults();
         MTargetBlendDesc& targetDesc = blendDesc.targetBlends[0];
@@ -109,6 +115,12 @@ public:
         {
             MStateManager::releaseRasterizerState(scissorRasterState);
             scissorRasterState = nullptr;
+        }
+
+        if (depthBiasRasterState)
+        {
+            MStateManager::releaseRasterizerState(depthBiasRasterState);
+            depthBiasRasterState = nullptr;
         }
 
         if (alphaEnabledBlendState)
@@ -207,6 +219,8 @@ public:
         MStateManager* stateManager = drawContext.getStateManager();
         ID3D11DeviceContext* dxContext = DirectX::getContext();
         const MBlendState* prevBlendState = stateManager->getBlendState();
+        const MRasterizerState* prevRasterizerState = stateManager->getRasterizerState();
+        stateManager->setRasterizerState(depthBiasRasterState);
         stateManager->setBlendState(alphaEnabledBlendState);
 
         const MRenderTarget* mainColorTarget = getInputTarget(kColorTargetName);
@@ -246,6 +260,7 @@ public:
 
         // Restore state
         stateManager->setBlendState(prevBlendState);
+        stateManager->setRasterizerState(prevRasterizerState);
     }
 
     // Regular rendering, no ID'ing or painting - just rendering what's already painted when
@@ -255,7 +270,9 @@ public:
         ID3D11DeviceContext* dxContext = DirectX::getContext();
         MStateManager* stateManager = drawContext.getStateManager();
         const MBlendState* prevBlendState = stateManager->getBlendState();
+        const MRasterizerState* prevRasterizerState = stateManager->getRasterizerState();
         stateManager->setBlendState(alphaEnabledBlendState);
+        stateManager->setRasterizerState(depthBiasRasterState);
 
         const MRenderTarget* mainColorTarget = getInputTarget(kColorTargetName);
         const MRenderTarget* mainDepthTarget = getInputTarget(kDepthTargetName);
@@ -283,6 +300,7 @@ public:
 
         // Restore state
         stateManager->setBlendState(prevBlendState);
+        stateManager->setRasterizerState(prevRasterizerState);
     }
 
     void setInputAssemblyState() {
@@ -426,6 +444,7 @@ private:
     MRenderTarget* renderTargets[2] = { nullptr, nullptr };
     MShaderInstance* paintSelectionShader = nullptr;
     const MRasterizerState* scissorRasterState = nullptr;
+    const MRasterizerState* depthBiasRasterState = nullptr;
     const MBlendState* alphaEnabledBlendState = nullptr;
     D3D11_RECT scissor = { 0, 0, 0, 0 };
     bool hasBrushMoved = false;
