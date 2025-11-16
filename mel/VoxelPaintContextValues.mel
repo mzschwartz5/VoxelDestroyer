@@ -19,6 +19,7 @@ global proc VoxelPaintContextValues(string $toolName) {
     float $radius = `voxelPaintContextCommand -q -radius $ctx`;
     int   $mode   = `voxelPaintContextCommand -q -mode $ctx`; // 0=Add,1=Subtract,2=Set
     float $value = `voxelPaintContextCommand -q -value $ctx`;
+    int   $cameraBased = `voxelPaintContextCommand -q -cameraBased $ctx`;
 
     if (`control -exists VoxelPaintRadiusControl`)
         floatSliderGrp -e -v $radius VoxelPaintRadiusControl;
@@ -28,6 +29,9 @@ global proc VoxelPaintContextValues(string $toolName) {
 
     if (`control -exists VoxelPaintValueControl`)
         floatSliderGrp -e -v $value VoxelPaintValueControl;
+        
+    if (`control -exists VoxelPaintCameraBasedControl`)
+        checkBoxGrp -e -v1 $cameraBased VoxelPaintCameraBasedControl;
 
     toolPropertySelect "VoxelPaintContext";
 }
@@ -38,12 +42,14 @@ global proc VoxelPaintContext_Reset()
     floatSliderGrp -e -v 50.0 VoxelPaintRadiusControl;
     optionMenuGrp -e -sl 1 VoxelPaintModeControl;
     floatSliderGrp -e -v 0.5 VoxelPaintValueControl;
+    checkBoxGrp -e -v1 1 VoxelPaintCameraBasedControl;
 
     // push defaults into the active context (if active)
     string $ctx = `currentCtx`;
     catchQuiet(`voxelPaintContextCommand -e -radius 50 $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -mode 0 $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -value 0.5 $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -cameraBased 1 $ctx`);
 }
 
 global proc VoxelPaintContext_Help()
