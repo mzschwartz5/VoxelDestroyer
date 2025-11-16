@@ -81,8 +81,10 @@ public:
             updatePaintToolPos(mousePos.x, mousePos.y);
         });
 
-        unsubscribeFromPaintStateChange = VoxelPaintContext::subscribeToDragStateChange([this](const DragState& state) {
+        unsubscribeFromPaintStateChange = VoxelPaintContext::subscribeToPaintDragStateChange([this](const PaintDragState& state) {
             paintRadius = state.selectRadius;
+            brushMode = state.brushMode;
+            brushValue = state.brushValue;
             updatePaintToolPos(state.mousePosition.x, state.mousePosition.y);
             voxelIDViews.clear(DirectX::clearUintBuffer);
         });
@@ -415,6 +417,8 @@ private:
     D3D11_RECT scissor = { 0, 0, 0, 0 };
     bool hasBrushMoved = false;
     float paintRadius;
+    BrushMode brushMode;
+    float brushValue;
     int paintPosX;
     int paintPosY;
     unsigned int outputTargetWidth = 0;

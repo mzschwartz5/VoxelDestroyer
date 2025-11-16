@@ -36,6 +36,17 @@ global proc VoxelPaintContextProperties() {
                     menuItem -label "Subtract";
                     menuItem -label "Set";
 
+                floatSliderGrp -label "Value"
+                    -field true
+                    -minValue 0.000
+                    -maxValue 1.0
+                    -fieldMinValue 0.000
+                    -fieldMaxValue 1.0
+                    -value 0.5
+                    -adjustableColumn 3
+                    -cc "VoxelPaintContext_ApplyFromUI()"
+                    VoxelPaintValueControl;
+
             setParent ..;
         setParent ..;
 
@@ -51,7 +62,9 @@ global proc VoxelPaintContext_ApplyFromUI() {
 
     float $radius  = `floatSliderGrp -q -v VoxelPaintRadiusControl`;
     int   $modeIdx = `optionMenuGrp -q -sl VoxelPaintModeControl` - 1;
+    float $value  = `floatSliderGrp -q -v VoxelPaintValueControl`;
 
     catchQuiet(`voxelPaintContextCommand -e -radius $radius $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -mode $modeIdx $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -value $value $ctx`);
 }
