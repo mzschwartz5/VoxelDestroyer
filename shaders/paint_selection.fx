@@ -11,6 +11,8 @@ struct VSOut { float4 pos : SV_POSITION; nointerpolation uint globalVoxelID : IN
 
 float2 PAINT_POSITION;
 float PAINT_RADIUS;
+float PAINT_VALUE;
+int PAINT_MODE; // 0 = subtract, 1 = set, 2 = add
 float4x4 viewProjection : ViewProjection; // Maya-defined semantic, populated by Maya.
 
 // VS-only resources
@@ -51,19 +53,23 @@ float4 PS_PaintPass(VSOut psInput) : SV_Target {
     uint topVoxelId = idRenderTarget.Load(int3(pixel, 0));
     topVoxelId = topVoxelId - 1; // -1 to undo +1 in ID pass (careful of underflow)
     uint globalVoxelID = psInput.globalVoxelID;
-    float paintValue = previousVoxelPaintValue[globalVoxelID];
+    float prevPaintValue = previousVoxelPaintValue[globalVoxelID];
 
     // Only pixels in the brush area, and nearest the camera, will have their topVoxelId match their globalVoxelID.
     // (Note that, for pixels outside the brush, topVoxelId will be 0u - 1 --> UINT_MAX, so this condition will be false, as expected)    
     if (topVoxelId == globalVoxelID) {
         paintedVoxelIDs[globalVoxelID] = 1;
         if (previousPaintedVoxelIDs[globalVoxelID] == 0) {
-            paintValue = 1.0f; // TODO: use paint brush mode (e.g., add, subtract, set) and strength
-            voxelPaintValue[globalVoxelID] = paintValue;
+            // This branch has no chance of divergence, so there's no real penalty for it.
+            int mode = PAINT_MODE - 1; // remap to -1,0,1
+            if (mode == 0) prevPaintValue = PAINT_VALUE;
+            else prevPaintValue = prevPaintValue + mode * PAINT_VALUE;
+            prevPaintValue = clamp(prevPaintValue, 0.0f, 1.0f);
+            voxelPaintValue[globalVoxelID] = prevPaintValue;
         }
     }
 
-    return float4(1.0f, 0.0f, 0.0f, paintValue);
+    return float4(1.0f, 0.0f, 0.0f, prevPaintValue);
 }
 
 // Simple render pass for when paint mode is active but the user is not actively painting

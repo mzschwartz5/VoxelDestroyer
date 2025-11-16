@@ -8,3 +8,5 @@
 #define PAINT_SELECTION_TECHNIQUE_NAME "PaintSelection"
 #define PAINT_POSITION "paintPosition"
 #define PAINT_RADIUS "paintRadius"
+#define PAINT_VALUE "paintValue"
+#define PAINT_MODE "paintMode"

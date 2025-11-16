@@ -65,7 +65,9 @@ public:
         MShaderCompileMacro macros[] = {
             {"PAINT_SELECTION_TECHNIQUE_NAME", PAINT_SELECTION_TECHNIQUE_NAME},
             {"PAINT_POSITION", PAINT_POSITION},
-            {"PAINT_RADIUS", PAINT_RADIUS}
+            {"PAINT_RADIUS", PAINT_RADIUS},
+            {"PAINT_VALUE", PAINT_VALUE},
+            {"PAINT_MODE", PAINT_MODE}
         };
         paintSelectionShader = MRenderer::theRenderer()->getShaderManager()->getEffectsBufferShader(
             shaderData, size, PAINT_SELECTION_TECHNIQUE_NAME, macros, ARRAYSIZE(macros)
@@ -147,6 +149,8 @@ public:
         float paintPos[2] = { static_cast<float>(paintPosX), static_cast<float>(paintPosY) };
         paintSelectionShader->setParameter(PAINT_POSITION, paintPos);
         paintSelectionShader->setParameter(PAINT_RADIUS, paintRadius);
+        paintSelectionShader->setParameter(PAINT_VALUE, brushValue);
+        paintSelectionShader->setParameter(PAINT_MODE, static_cast<int>(brushMode));
         paintSelectionShader->updateParameters(drawContext);
     }
 
