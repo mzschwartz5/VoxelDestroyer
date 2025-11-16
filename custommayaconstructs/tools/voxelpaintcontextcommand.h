@@ -34,6 +34,7 @@ public:
         syn.addFlag("-r", "-radius", MSyntax::kDouble);
         syn.addFlag("-m", "-mode",   MSyntax::kLong);
         syn.addFlag("-v", "-value",  MSyntax::kDouble);
+        syn.addFlag("-cb", "-cameraBased", MSyntax::kLong);
         return MS::kSuccess;
     }
 
@@ -52,6 +53,10 @@ public:
             double v; ap.getFlagArgument("-v", 0, v);
             fCtx->setBrushValue(v);
         }
+        if (ap.isFlagSet("-cb")) {
+            int v; ap.getFlagArgument("-cb", 0, v);
+            fCtx->setCameraBased(v != 0);
+        }
         return MS::kSuccess;
     }
 
@@ -61,6 +66,7 @@ public:
         if (ap.isFlagSet("-r")) setResult(fCtx->getSelectRadius());
         if (ap.isFlagSet("-m")) setResult((int)fCtx->getBrushMode());
         if (ap.isFlagSet("-v")) setResult(fCtx->getBrushValue());
+        if (ap.isFlagSet("-cb")) setResult(fCtx->isCameraBased() ? 1 : 0);
         return MS::kSuccess;
     }
 

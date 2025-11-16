@@ -87,6 +87,7 @@ public:
             paintRadius = state.selectRadius;
             brushMode = state.brushMode;
             brushValue = state.brushValue;
+            cameraBased = state.cameraBased;
             updatePaintToolPos(state.mousePosition.x, state.mousePosition.y);
             voxelIDViews.clear(DirectX::clearUintBuffer);
         });
@@ -128,6 +129,7 @@ public:
         }
 
         prepareShader(drawContext);
+        setInputAssemblyState();
 
         if (hasBrushMoved) {
             voxelPaintViews.swap(&DirectX::copyBuffer);
@@ -155,6 +157,7 @@ public:
     }
 
     void executeIDPass(const MDrawContext& drawContext) {
+        if (!cameraBased) return; // ID pass only needed for camera-based painting
         paintSelectionShader->activatePass(drawContext, 0);
 
         // Store off the current scissor rects and rasterizer/blend state, so we can change and restore them later
@@ -177,15 +180,10 @@ public:
         ID3D11DepthStencilView* paintDepthDSV = static_cast<ID3D11DepthStencilView*>(paintDepthTarget->resourceHandle());
         dxContext->OMSetRenderTargets(1, &paintColorRTV, paintDepthDSV);
 
-        UINT stride = sizeof(float) * 3;
-        UINT offset = 0;
         ID3D11ShaderResourceView* vs_srvs[] = {
             instanceTransformSRV.Get(),
             visibleToGlobalVoxelSRV.Get()
         };
-        dxContext->IASetVertexBuffers(0, 1, cubeVb.GetAddressOf(), &stride, &offset);
-        dxContext->IASetIndexBuffer(cubeIb.Get(), DXGI_FORMAT_R32_UINT, 0);
-        dxContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         dxContext->VSSetShaderResources(0, ARRAYSIZE(vs_srvs), vs_srvs);
 
         dxContext->DrawIndexedInstanced(static_cast<UINT>(cubeFacesFlattened.size()), instanceCount, 0, 0, 0);
@@ -197,7 +195,8 @@ public:
     }
 
     void executePaintPass(const MDrawContext& drawContext) {
-        paintSelectionShader->activatePass(drawContext, 1);
+        int pass = cameraBased ? 1 : 2;
+        paintSelectionShader->activatePass(drawContext, pass);
 
         MStateManager* stateManager = drawContext.getStateManager();
         ID3D11DeviceContext* dxContext = DirectX::getContext();
@@ -231,8 +230,8 @@ public:
 
         ID3D11ShaderResourceView* ps_srvs[] = {
             voxelIDViews.SRV().Get(),
-            renderTargetSRV.Get(),
-            voxelPaintViews.SRV().Get()
+            voxelPaintViews.SRV().Get(),
+            renderTargetSRV.Get()
         };
 
         dxContext->VSSetShaderResources(0, ARRAYSIZE(vs_srvs), vs_srvs);
@@ -246,7 +245,7 @@ public:
     // Regular rendering, no ID'ing or painting - just rendering what's already painted when
     // the user isn't actively dragging the brush.
     void executeRenderPass(const MDrawContext& drawContext) {
-        paintSelectionShader->activatePass(drawContext, 2);
+        paintSelectionShader->activatePass(drawContext, 3);
         ID3D11DeviceContext* dxContext = DirectX::getContext();
         MStateManager* stateManager = drawContext.getStateManager();
         const MBlendState* prevBlendState = stateManager->getBlendState();
@@ -273,16 +272,20 @@ public:
             nullptr
         );
 
-        UINT stride = sizeof(float) * 3;
-        UINT offset = 0;
-        dxContext->IASetVertexBuffers(0, 1, cubeVb.GetAddressOf(), &stride, &offset);
-        dxContext->IASetIndexBuffer(cubeIb.Get(), DXGI_FORMAT_R32_UINT, 0);
-        dxContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         dxContext->VSSetShaderResources(0, ARRAYSIZE(vs_srvs), vs_srvs);
         dxContext->DrawIndexedInstanced(static_cast<UINT>(cubeFacesFlattened.size()), instanceCount, 0, 0, 0);
 
         // Restore state
         stateManager->setBlendState(prevBlendState);
+    }
+
+    void setInputAssemblyState() {
+        ID3D11DeviceContext* dxContext = DirectX::getContext();
+        UINT stride = sizeof(float) * 3;
+        UINT offset = 0;
+        dxContext->IASetVertexBuffers(0, 1, cubeVb.GetAddressOf(), &stride, &offset);
+        dxContext->IASetIndexBuffer(cubeIb.Get(), DXGI_FORMAT_R32_UINT, 0);
+        dxContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     }
 
     void unbindResources(const MDrawContext& drawContext) {
@@ -423,6 +426,7 @@ private:
     float paintRadius;
     BrushMode brushMode;
     float brushValue;
+    bool cameraBased = true;
     int paintPosX;
     int paintPosY;
     unsigned int outputTargetWidth = 0;

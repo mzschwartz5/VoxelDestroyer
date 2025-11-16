@@ -14,6 +14,7 @@ enum class BrushMode {
 struct PaintDragState : DragState {
     BrushMode brushMode{ BrushMode::SET };
     float brushValue{ 0.0f };
+    bool cameraBased{ true };
 };
 
 class VoxelPaintContext : public VoxelContextBase<VoxelPaintContext> {
@@ -38,7 +39,8 @@ public:
                 baseState.selectRadius,
                 baseState.mousePosition,
                 brushMode,
-                brushValue
+                brushValue,
+                cameraBased
             };
             paintDragStateChangedEvent.notify(paintDragState);
         });
@@ -80,6 +82,15 @@ public:
         MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
     }
 
+    void setCameraBased(bool enabled) {
+        cameraBased = enabled;
+        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
+    }
+
+    bool isCameraBased() const {
+        return cameraBased;
+    }
+
     // Maya doesn't refresh while the mouse is held down, so force it to do so.
     // However, we don't want to refresh on EVERY mouse event, just at 60FPS. Use a timer for this.
     MStatus doPress(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
@@ -107,6 +118,7 @@ private:
     EventBase::Unsubscribe unsubscribeBaseDragStateEvent;
     BrushMode brushMode = BrushMode::SET;
     float brushValue = 0.5f;
+    bool cameraBased = true;
     MCallbackId timerCallbackId;
 
 };
