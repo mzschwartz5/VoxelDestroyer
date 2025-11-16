@@ -16,6 +16,7 @@
 #include <maya/MMatrixArray.h>
 #include <algorithm>
 #include <array>
+#include <maya/MConditionMessage.h>
 using namespace MHWRender;
 
 // Helpful docs: https://help.autodesk.com/view/MAYADEV/2025/ENU/?guid=Maya_DEVHELP_Viewport_2_0_API_Maya_Viewport_2_0_API_Guide_Advanced_Topics_Implement_an_MRenderOverride_html
@@ -91,6 +92,10 @@ public:
             updatePaintToolPos(state.mousePosition.x, state.mousePosition.y);
             voxelIDViews.clear(DirectX::clearUintBuffer);
         });
+
+        playbackCallbackId = MConditionMessage::addConditionCallback("playingBack", [](bool state, void* clientData) {
+            static_cast<VoxelPaintRenderOperation*>(clientData)->isPlayingBack = state;
+        }, this);
     }
 
     ~VoxelPaintRenderOperation() override {
@@ -114,6 +119,7 @@ public:
 
         unsubscribeFromPaintMove();
         unsubscribeFromPaintStateChange();
+        MConditionMessage::removeCallback(playbackCallbackId);
     };
 
     /**
@@ -124,7 +130,7 @@ public:
      * Note: Maya will bind our input render targets for us, but our use case is complex so we just have to do it ourselves.
      */
     MStatus execute(const MDrawContext& drawContext) override {
-        if (!paintSelectionShader || !instanceTransformSRV || instanceCount == 0) {
+        if (isPlayingBack || !paintSelectionShader || !instanceTransformSRV || instanceCount == 0) {
             return MStatus::kSuccess;
         }
 
@@ -431,6 +437,8 @@ private:
     int paintPosY;
     unsigned int outputTargetWidth = 0;
     unsigned int outputTargetHeight = 0;
+    MCallbackId playbackCallbackId = 0;
+    bool isPlayingBack = false;
 
     // Alllll the buffers and views we need for painting
     ComPtr<ID3D11Buffer> instanceTransformBuffer;
