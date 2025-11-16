@@ -263,6 +263,21 @@ public:
         DirectX::getContext()->ClearUnorderedAccessViewUint(uav.Get(), clearValues);
     }
 
+    static void copyBuffer(
+        const ComPtr<ID3D11UnorderedAccessView>& srcUAV,
+        const ComPtr<ID3D11UnorderedAccessView>& dstUAV
+    ) {
+        ComPtr<ID3D11Resource> srcResource;
+        srcUAV->GetResource(srcResource.GetAddressOf());
+        ComPtr<ID3D11Resource> dstResource;
+        dstUAV->GetResource(dstResource.GetAddressOf());
+
+        DirectX::getContext()->CopyResource(
+            dstResource.Get(),
+            srcResource.Get()
+        );
+    }
+
     static void notifyMayaOfMemoryUsage(const ComPtr<ID3D11Buffer>& buffer, bool acquire = false);
     static int getNumElementsInBuffer(const ComPtr<ID3D11Buffer>& buffer);
     
