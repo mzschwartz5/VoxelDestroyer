@@ -32,9 +32,9 @@ global proc VoxelPaintContextProperties() {
                     -cc "VoxelPaintContext_ApplyFromUI()"
                     VoxelPaintModeControl;
 
-                    menuItem -label "Add";
                     menuItem -label "Subtract";
                     menuItem -label "Set";
+                    menuItem -label "Add";
 
                 floatSliderGrp -label "Value"
                     -field true

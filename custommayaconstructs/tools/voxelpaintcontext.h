@@ -5,9 +5,9 @@
 #include <maya/MTimerMessage.h>
 
 enum class BrushMode {
-    ADD,
     SUBTRACT,
-    SET
+    SET,
+    ADD
 };
 
 // Richer payload for paint-tool specific drag state change event
