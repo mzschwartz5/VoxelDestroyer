@@ -19,7 +19,6 @@ StructuredBuffer<uint> instanceToGlobalVoxelIdMap : register(t1);
 
 // PS-only resources
 // A bitmask of voxels painted this pass
-// Used in either the ID pass or the paint pass, depending on whether camera-based painting is enabled
 RWStructuredBuffer<uint> paintedVoxelIDs : register(u1); // UAV registers live in the same namespace as outputs, must start at u1.
 StructuredBuffer<uint> previousPaintedVoxelIDs : register(t2);
 Texture2D<uint> idRenderTarget : register(t3);
@@ -43,7 +42,6 @@ uint PS_IDPass(VSOut psInput) : SV_Target {
 
     // 0 reserved for "no hit" (same as clear color)
     // Note: this means when using the selection results, we need to subtract 1 to get the original instance ID
-    // Note: paintedVoxelIds already tells us which voxels are painted, but this output ends up telling us which painted voxels are on TOP (thanks to depth testing).
     return psInput.globalVoxelID + 1;
 }
 
@@ -54,14 +52,15 @@ float4 PS_PaintPass(VSOut psInput) : SV_Target {
     topVoxelId = topVoxelId - 1; // -1 to undo +1 in ID pass (careful of underflow)
     uint globalVoxelID = psInput.globalVoxelID;
     float paintValue = previousVoxelPaintValue[globalVoxelID];
-    
+
     // Only pixels in the brush area, and nearest the camera, will have their topVoxelId match their globalVoxelID.
     // (Note that, for pixels outside the brush, topVoxelId will be 0u - 1 --> UINT_MAX, so this condition will be false, as expected)    
     if (topVoxelId == globalVoxelID) {
         paintedVoxelIDs[globalVoxelID] = 1;
-        paintValue = (previousPaintedVoxelIDs[globalVoxelID] == 0) ? 1.0f : paintValue; // TODO: use paint brush mode (e.g., add, subtract, set) and strength
-        voxelPaintValue[globalVoxelID] = paintValue;
-        return float4(1.0f, 0.0f, 0.0f, paintValue);
+        if (previousPaintedVoxelIDs[globalVoxelID] == 0) {
+            paintValue = 1.0f; // TODO: use paint brush mode (e.g., add, subtract, set) and strength
+            voxelPaintValue[globalVoxelID] = paintValue;
+        }
     }
 
     return float4(1.0f, 0.0f, 0.0f, paintValue);

@@ -5,7 +5,7 @@
 class PingPongView {
 public:
     using ClearFunc = void(*)(const ComPtr<ID3D11UnorderedAccessView>&);
-    static void noopClear(const ComPtr<ID3D11UnorderedAccessView>&) {}
+    using CopyFunc = void(*)(const ComPtr<ID3D11UnorderedAccessView>&, const ComPtr<ID3D11UnorderedAccessView>&);
 
     PingPongView(
         const ComPtr<ID3D11ShaderResourceView>& srvA,
@@ -17,13 +17,26 @@ public:
 
     PingPongView() = default;
 
-    void swap(ClearFunc clearFunc = &PingPongView::noopClear) {
+    void swap() {
         currentIndex = 1 - currentIndex;
+    }
+
+    void swap(ClearFunc clearFunc) {
+        currentIndex = 1 - currentIndex;
+        clear(clearFunc);
+    }
+
+    void swap(CopyFunc copyFunc) {
+        sync(copyFunc);
+        currentIndex = 1 - currentIndex;
+    }
+
+    void clear(ClearFunc clearFunc) {
         clearFunc(uavs[currentIndex]);
     }
 
-    void clear(ClearFunc clearFunc = &PingPongView::noopClear) {
-        clearFunc(uavs[currentIndex]);
+    void sync(CopyFunc copyFunc) {
+        copyFunc(uavs[currentIndex], uavs[1 - currentIndex]);
     }
 
     ComPtr<ID3D11ShaderResourceView> SRV() const { return srvs[currentIndex]; }

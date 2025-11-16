@@ -126,7 +126,7 @@ public:
         prepareShader(drawContext);
 
         if (hasBrushMoved) {
-            voxelPaintViews.swap();
+            voxelPaintViews.swap(&DirectX::copyBuffer);
             voxelIDViews.swap(&DirectX::clearUintBuffer);
             executeIDPass(drawContext);
             executePaintPass(drawContext);
