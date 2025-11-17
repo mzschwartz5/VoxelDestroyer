@@ -18,6 +18,7 @@ float PAINT_VALUE;
 int PAINT_MODE; // 0 = subtract, 1 = set, 2 = add
 float4 LOW_COLOR;
 float4 HIGH_COLOR;
+int COMPONENT_MASK; // Bitmask specifying which cardinal directions to paint (1 bit per direction, +X,+Y,+Z,-X,-Y,-Z)
 float4x4 viewProjection : ViewProjection; // Maya-defined semantic, populated by Maya.
 
 // VS-only resources
@@ -49,17 +50,21 @@ void unpackVoxelIDs(uint packed, out uint voxelID, out uint componentID) {
     voxelID = (packed >> 3);
 }
 
+bool isComponentEnabled(uint componentID) {
+    return (COMPONENT_MASK & (1 << componentID)) != 0;
+}
+
 // The pass renders the IDs to an offscreen target. It's run with a scissor rect matching the brush area,
 // then further culled to a circle in the pixel shader. Importantly, because of depth testing, only the nearest
 // voxel under the brush will write its ID to each pixel.
 // Note: this pass does not need to be run when doing non-camera-based painting.
 uint PS_IDPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     float2 delta = psInput.pos.xy - PAINT_POSITION;
-    if (dot(delta, delta) > PAINT_RADIUS * PAINT_RADIUS) {
-        return 0;
-    }
+    if (dot(delta, delta) > PAINT_RADIUS * PAINT_RADIUS) return 0;
 
     uint faceID = primID >> 1; // 2 triangles per face. TODO: generalize for vertex painting.
+    if (!isComponentEnabled(faceID)) return 0;
+
     // Add 1 to globalVoxelID so that 0 can represent "no voxel"
     return packVoxelIDs(psInput.globalVoxelID + 1, faceID);
 }
@@ -73,7 +78,7 @@ float applyPaint(uint globalVoxelID, uint componentID, float prevPaintValue) {
     // This branch has no chance of divergence, so there's no real penalty for it.
     int mode = PAINT_MODE - 1; // remap to -1,0,1
     prevPaintValue = (mode == 0) ? PAINT_VALUE : prevPaintValue + mode * PAINT_VALUE;
-    
+
     prevPaintValue = clamp(prevPaintValue, 0.0f, 1.0f);
     voxelPaintValue[idx] = prevPaintValue;
     return prevPaintValue;
@@ -105,12 +110,13 @@ float4 PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     uint2 pixel = uint2(psInput.pos.xy);
     uint globalVoxelID = psInput.globalVoxelID;
     uint faceID = primID >> 1; // 2 triangles per face. TODO: generalize for vertex painting.
+    bool componentEnabled = isComponentEnabled(faceID);
     uint idx = globalVoxelID * 6 + faceID;
     float prevPaintValue = previousVoxelPaintValue[idx];
     float2 delta = psInput.pos.xy - PAINT_POSITION;
 
     // Only pixels in the brush area (whether occluded by other voxels on not) get painted.
-    if (dot(delta, delta) <= PAINT_RADIUS * PAINT_RADIUS) {
+    if (componentEnabled && dot(delta, delta) <= PAINT_RADIUS * PAINT_RADIUS) {
         prevPaintValue = applyPaint(globalVoxelID, faceID, prevPaintValue);
     }
 

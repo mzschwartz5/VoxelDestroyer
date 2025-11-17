@@ -12,3 +12,4 @@
 #define PAINT_MODE "paintMode"
 #define LOW_COLOR "lowColor"
 #define HIGH_COLOR "highColor"
+#define COMPONENT_MASK "componentMask"

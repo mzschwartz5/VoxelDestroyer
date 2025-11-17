@@ -59,7 +59,7 @@ global proc VoxelPaintContextProperties() {
 
                 colorSliderGrp -label "Low Color" 
                     -rgb 1.0 0.0 0.0
-                    -alphaValue 0.25
+                    -alphaValue 0.0
                     -annotation "Color representing low paint values"
                     -cc "VoxelPaintContext_ApplyFromUI()"
                     VoxelPaintLowColorControl;
@@ -70,6 +70,26 @@ global proc VoxelPaintContextProperties() {
                     -annotation "Color representing high paint values"
                     -cc "VoxelPaintContext_ApplyFromUI()"
                     VoxelPaintHighColorControl;
+
+                checkBoxGrp -numberOfCheckBoxes 3
+                    -label "Component Mask"
+                    -columnAlign2 "left" "left"
+                    -label1 "+X" -value1 1
+                    -label2 "+Y" -value2 1
+                    -label3 "+Z" -value3 1
+                    -annotation "Limit painting to specific component orientations"
+                    -cc "VoxelPaintContext_ApplyFromUI()"
+                    VoxelPaintDirsRow1;
+
+                checkBoxGrp -numberOfCheckBoxes 3
+                    -label ""                      // empty label, but reserve the same label-column width
+                    -columnAlign2 "left" "left"
+                    -label1 "-X" -value1 1
+                    -label2 "-Y" -value2 1
+                    -label3 "-Z" -value3 1
+                    -annotation "Limit painting to specific component orientations"
+                    -cc "VoxelPaintContext_ApplyFromUI()"
+                    VoxelPaintDirsRow2;
 
             setParent ..;
         setParent ..;
@@ -92,6 +112,14 @@ global proc VoxelPaintContext_ApplyFromUI() {
     float $highColor[] = `colorSliderGrp -q -rgb VoxelPaintHighColorControl`;
     float $lowAlpha[] = `colorSliderGrp -q -alphaValue VoxelPaintLowColorControl`;
     float $highAlpha[] = `colorSliderGrp -q -alphaValue VoxelPaintHighColorControl`;
+    int $componentMask = 0;
+    if (`checkBoxGrp -q -v1 VoxelPaintDirsRow1`) $componentMask = $componentMask + 1;
+    if (`checkBoxGrp -q -v2 VoxelPaintDirsRow1`) $componentMask = $componentMask + 2;
+    if (`checkBoxGrp -q -v3 VoxelPaintDirsRow1`) $componentMask = $componentMask + 4;
+    if (`checkBoxGrp -q -v1 VoxelPaintDirsRow2`) $componentMask = $componentMask + 8;
+    if (`checkBoxGrp -q -v2 VoxelPaintDirsRow2`) $componentMask = $componentMask + 16;
+    if (`checkBoxGrp -q -v3 VoxelPaintDirsRow2`) $componentMask = $componentMask + 32;
+
 
     catchQuiet(`voxelPaintContextCommand -e -radius $radius $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -mode $modeIdx $ctx`);
@@ -99,4 +127,5 @@ global proc VoxelPaintContext_ApplyFromUI() {
     catchQuiet(`voxelPaintContextCommand -e -cameraBased $cameraBased $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -lowColor $lowColor[0] $lowColor[1] $lowColor[2] $lowAlpha[0] $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -highColor $highColor[0] $highColor[1] $highColor[2] $highAlpha[0] $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -componentMask $componentMask $ctx`);
 }
