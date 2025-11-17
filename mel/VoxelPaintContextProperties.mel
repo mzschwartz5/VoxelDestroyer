@@ -24,11 +24,13 @@ global proc VoxelPaintContextProperties() {
                     -fieldMaxValue 1000.0
                     -value 50.0
                     -adjustableColumn 3
+                    -annotation "Brush size in pixels"
                     -cc "VoxelPaintContext_ApplyFromUI()"
                     VoxelPaintRadiusControl;
 
                 optionMenuGrp -label "Mode"
                     -adjustableColumn 2
+                    -annotation "How a brush stroke affects paint values"
                     -cc "VoxelPaintContext_ApplyFromUI()"
                     VoxelPaintModeControl;
 
@@ -44,14 +46,30 @@ global proc VoxelPaintContextProperties() {
                     -fieldMaxValue 1.0
                     -value 0.5
                     -adjustableColumn 3
+                    -annotation "The weight value applied when painting."
                     -cc "VoxelPaintContext_ApplyFromUI()"
                     VoxelPaintValueControl;
 
                 checkBoxGrp -numberOfCheckBoxes 1
                     -label1 "Camera-based painting"
                     -value1 1
+                    -annotation "When enabled, brush only paints elements visible to the camera."
                     -cc "VoxelPaintContext_ApplyFromUI()"
                     VoxelPaintCameraBasedControl;
+
+                colorSliderGrp -label "Low Color" 
+                    -rgb 1.0 0.0 0.0
+                    -alphaValue 0.25
+                    -annotation "Color representing low paint values"
+                    -cc "VoxelPaintContext_ApplyFromUI()"
+                    VoxelPaintLowColorControl;
+
+                colorSliderGrp -label "High Color" 
+                    -rgb 1.0 0.0 0.0
+                    -alphaValue 1.0
+                    -annotation "Color representing high paint values"
+                    -cc "VoxelPaintContext_ApplyFromUI()"
+                    VoxelPaintHighColorControl;
 
             setParent ..;
         setParent ..;
@@ -70,9 +88,15 @@ global proc VoxelPaintContext_ApplyFromUI() {
     int   $modeIdx = `optionMenuGrp -q -sl VoxelPaintModeControl` - 1;
     float $value  = `floatSliderGrp -q -v VoxelPaintValueControl`;
     int   $cameraBased = `checkBoxGrp -q -v1 VoxelPaintCameraBasedControl`;
+    float $lowColor[] = `colorSliderGrp -q -rgb VoxelPaintLowColorControl`;
+    float $highColor[] = `colorSliderGrp -q -rgb VoxelPaintHighColorControl`;
+    float $lowAlpha[] = `colorSliderGrp -q -alphaValue VoxelPaintLowColorControl`;
+    float $highAlpha[] = `colorSliderGrp -q -alphaValue VoxelPaintHighColorControl`;
 
     catchQuiet(`voxelPaintContextCommand -e -radius $radius $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -mode $modeIdx $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -value $value $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -cameraBased $cameraBased $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -lowColor $lowColor[0] $lowColor[1] $lowColor[2] $lowAlpha[0] $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -highColor $highColor[0] $highColor[1] $highColor[2] $highAlpha[0] $ctx`);
 }

@@ -1,3 +1,14 @@
+proc float[] stringToFloatArray(string $s) {
+    string $delim = " ";
+    string $tokens[];
+    int $count = `tokenize $s $delim $tokens`;
+    float $out[];
+    for ($i = 0; $i < $count; ++$i) {
+        $out[$i] = $tokens[$i];
+    }
+    return $out;
+}
+
 // This procedure has to have this specific name to be recognized by Maya
 // See docs here: https://help.autodesk.com/view/MAYAUL/2022/ENU/?guid=Maya_SDK_Command_plug_ins_Tool_property_sheets_html
 global proc VoxelPaintContextValues(string $toolName) {
@@ -20,6 +31,8 @@ global proc VoxelPaintContextValues(string $toolName) {
     int   $mode   = `voxelPaintContextCommand -q -mode $ctx`; // 0=Add,1=Subtract,2=Set
     float $value = `voxelPaintContextCommand -q -value $ctx`;
     int   $cameraBased = `voxelPaintContextCommand -q -cameraBased $ctx`;
+    float $lowColor[] = stringToFloatArray(`voxelPaintContextCommand -q -lowColor $ctx`);
+    float $highColor[] = stringToFloatArray(`voxelPaintContextCommand -q -highColor $ctx`);
 
     if (`control -exists VoxelPaintRadiusControl`)
         floatSliderGrp -e -v $radius VoxelPaintRadiusControl;
@@ -33,6 +46,12 @@ global proc VoxelPaintContextValues(string $toolName) {
     if (`control -exists VoxelPaintCameraBasedControl`)
         checkBoxGrp -e -v1 $cameraBased VoxelPaintCameraBasedControl;
 
+    if (`control -exists VoxelPaintLowColorControl`)
+        colorSliderGrp -e -rgb $lowColor[0] $lowColor[1] $lowColor[2] -alphaValue $lowColor[3] VoxelPaintLowColorControl;
+
+    if (`control -exists VoxelPaintHighColorControl`)
+        colorSliderGrp -e -rgb $highColor[0] $highColor[1] $highColor[2] -alphaValue $highColor[3] VoxelPaintHighColorControl;
+
     toolPropertySelect "VoxelPaintContext";
 }
 
@@ -43,6 +62,8 @@ global proc VoxelPaintContext_Reset()
     optionMenuGrp -e -sl 1 VoxelPaintModeControl;
     floatSliderGrp -e -v 0.5 VoxelPaintValueControl;
     checkBoxGrp -e -v1 1 VoxelPaintCameraBasedControl;
+    colorSliderGrp -e -rgb 1.0 0.0 0.0 -alphaValue 0.0 VoxelPaintLowColorControl;
+    colorSliderGrp -e -rgb 1.0 0.0 0.0 -alphaValue 1.0 VoxelPaintHighColorControl;
 
     // push defaults into the active context (if active)
     string $ctx = `currentCtx`;
@@ -50,6 +71,8 @@ global proc VoxelPaintContext_Reset()
     catchQuiet(`voxelPaintContextCommand -e -mode 0 $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -value 0.5 $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -cameraBased 1 $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -lowColor 1.0 0.0 0.0 0.0 $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -highColor 1.0 0.0 0.0 1.0 $ctx`);
 }
 
 global proc VoxelPaintContext_Help()

@@ -10,3 +10,5 @@
 #define PAINT_RADIUS "paintRadius"
 #define PAINT_VALUE "paintValue"
 #define PAINT_MODE "paintMode"
+#define LOW_COLOR "lowColor"
+#define HIGH_COLOR "highColor"
