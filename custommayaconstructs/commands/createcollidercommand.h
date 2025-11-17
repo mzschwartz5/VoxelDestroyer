@@ -15,6 +15,9 @@
 class CreateColliderCommand : public MPxCommand {
 public:
     inline static const MString commandName = MString("createCollider");
+    MSelectionList activeSelectionList;
+    MString colliderName;
+    MDagModifier dagModifier;
 
 	static void* creator() {
         return new CreateColliderCommand();
@@ -26,27 +29,40 @@ public:
         return syntax;
     }
 
+    bool isUndoable() const override {
+        return true;
+    }
+
     // Create a collider of a given type (by type name)
 	MStatus doIt(const MArgList& args) override {
-        MString colliderName;
         MArgDatabase argData(syntax(), args);
         argData.getFlagArgument("-n", 0, colliderName);
 
-        // Get the selected object to parent the collider under
-        MSelectionList selection;
-        MGlobal::getActiveSelectionList(selection);
+        return redoIt();
+    }
+
+    MStatus undoIt() override {
+        // Undo twice to remove both shape and transform
+        dagModifier.undoIt();
+        dagModifier.undoIt(); 
+        // Restore what was selected before
+        MGlobal::setActiveSelectionList(activeSelectionList);
+        return MStatus::kSuccess;
+    }
+
+    MStatus redoIt() override {
+        MGlobal::getActiveSelectionList(activeSelectionList);
         MDagPath selectedDagPath;
-        if (!selection.isEmpty()) {
-            selection.getDagPath(0, selectedDagPath);
+        if (!activeSelectionList.isEmpty()) {
+            activeSelectionList.getDagPath(activeSelectionList.length() - 1, selectedDagPath);
         }
 
         // Create a transform under the selected object (or world if nothing selected)
         MObject parentObj = (selectedDagPath.length() > 0) ? selectedDagPath.node() : MObject::kNullObj;
-        MObject colliderParentObj = Utils::createDagNode("transform", parentObj, colliderName + "Transform");
+        MObject colliderParentObj = Utils::createDagNode("transform", parentObj, colliderName + "Transform", &dagModifier);
 
         // Create the collider shape node under the transform
-        MObject colliderNodeObj = Utils::createDagNode(colliderName, colliderParentObj, colliderName + "Shape#");
-
+        MObject colliderNodeObj = Utils::createDagNode(colliderName, colliderParentObj, colliderName + "Shape#", &dagModifier);
         MSelectionList newSelection;
         MDagPath parentDagPath;
         MDagPath::getAPathTo(colliderParentObj, parentDagPath);
@@ -55,6 +71,7 @@ public:
 
         MGlobal::executeCommand("setToolTo moveSuperContext");
         MGlobal::executeCommand(MString("showEditor \"" + MFnDagNode(colliderNodeObj).name() + "\";"));
+
         return MStatus::kSuccess;
     }
 };

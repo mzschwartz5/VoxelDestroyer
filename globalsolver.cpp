@@ -71,7 +71,7 @@ void GlobalSolver::maybeDeleteGlobalSolver() {
     if (Utils::arrayPlugNumElements(globalSolverObj, aColliderData) > 0) return;
 
     // Delete must happen on idle (node cannot delete itself from a callback)
-    MGlobal::executeCommandOnIdle("delete " + MFnDagNode(globalSolverObj).name());
+    MGlobal::executeCommandOnIdle("delete " + MFnDependencyNode(globalSolverObj).name());
 }
 
 void GlobalSolver::tearDown() {
