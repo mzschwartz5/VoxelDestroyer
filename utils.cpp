@@ -272,11 +272,12 @@ MObject createDGNode(const MString& typeName)
     return nodeObj;
 }
 
-MObject createDagNode(const MString& typeName, const MObject& parent, const MString& name) 
+MObject createDagNode(const MString& typeName, const MObject& parent, const MString& name, MDagModifier* dagMod) 
 {
-    MDagModifier dagMod;
-    MObject nodeObj = dagMod.createNode(typeName, parent);
-    dagMod.doIt();
+    MDagModifier localMod;
+    MDagModifier* mod = dagMod ? dagMod : &localMod;
+    MObject nodeObj = mod->createNode(typeName, parent);
+    mod->doIt();
     
     MFnDependencyNode fnNode(nodeObj);
     fnNode.setName(name);
