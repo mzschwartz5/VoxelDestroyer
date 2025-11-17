@@ -76,7 +76,8 @@ public:
             {"PAINT_VALUE", PAINT_VALUE},
             {"PAINT_MODE", PAINT_MODE},
             {"LOW_COLOR", LOW_COLOR},
-            {"HIGH_COLOR", HIGH_COLOR}
+            {"HIGH_COLOR", HIGH_COLOR},
+            {"COMPONENT_MASK", COMPONENT_MASK}
         };
         paintSelectionShader = MRenderer::theRenderer()->getShaderManager()->getEffectsBufferShader(
             shaderData, size, PAINT_SELECTION_TECHNIQUE_NAME, macros, ARRAYSIZE(macros)
@@ -99,6 +100,7 @@ public:
             cameraBased = state.cameraBased;
             lowColor = state.lowColor;
             highColor = state.highColor;
+            componentMask = state.componentMask;
             updatePaintToolPos(state.mousePosition.x, state.mousePosition.y);
             voxelIDViews.clear(DirectX::clearUintBuffer);
         });
@@ -179,6 +181,7 @@ public:
         paintSelectionShader->setParameter(PAINT_MODE, static_cast<int>(brushMode));
         paintSelectionShader->setParameter(LOW_COLOR, lowColorArr);
         paintSelectionShader->setParameter(HIGH_COLOR, highColorArr);
+        paintSelectionShader->setParameter(COMPONENT_MASK, componentMask);
         paintSelectionShader->updateParameters(drawContext);
     }
 
@@ -463,6 +466,7 @@ private:
     bool cameraBased = true;
     MColor lowColor = MColor(1.0f, 0.0f, 0.0f, 0.0f);
     MColor highColor = MColor(1.0f, 0.0f, 0.0f, 1.0f);
+    int componentMask = 0b111111; // All directions enabled by default
     int paintPosX;
     int paintPosY;
     unsigned int outputTargetWidth = 0;

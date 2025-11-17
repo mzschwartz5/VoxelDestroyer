@@ -33,6 +33,16 @@ global proc VoxelPaintContextValues(string $toolName) {
     int   $cameraBased = `voxelPaintContextCommand -q -cameraBased $ctx`;
     float $lowColor[] = stringToFloatArray(`voxelPaintContextCommand -q -lowColor $ctx`);
     float $highColor[] = stringToFloatArray(`voxelPaintContextCommand -q -highColor $ctx`);
+    int $componentMask = `voxelPaintContextCommand -q -componentMask $ctx`;
+    // Not sure if MEL supports bitwise ops so... manual extraction
+    int $v1 = 0; int $v2 = 0; int $v3 = 0;
+    int $v4 = 0; int $v5 = 0; int $v6 = 0;
+    if ($componentMask >= 32) { $v6 = 1; $componentMask -= 32; }
+    if ($componentMask >= 16) { $v5 = 1; $componentMask -= 16; }
+    if ($componentMask >= 8 ) { $v4 = 1; $componentMask -= 8;  }
+    if ($componentMask >= 4 ) { $v3 = 1; $componentMask -= 4;  }
+    if ($componentMask >= 2 ) { $v2 = 1; $componentMask -= 2;  }
+    if ($componentMask >= 1 ) { $v1 = 1; $componentMask -= 1;  }
 
     if (`control -exists VoxelPaintRadiusControl`)
         floatSliderGrp -e -v $radius VoxelPaintRadiusControl;
@@ -52,6 +62,12 @@ global proc VoxelPaintContextValues(string $toolName) {
     if (`control -exists VoxelPaintHighColorControl`)
         colorSliderGrp -e -rgb $highColor[0] $highColor[1] $highColor[2] -alphaValue $highColor[3] VoxelPaintHighColorControl;
 
+    if (`control -exists VoxelPaintDirsRow1`)
+        checkBoxGrp -e -v1 $v1 -v2 $v2 -v3 $v3 VoxelPaintDirsRow1; 
+
+    if (`control -exists VoxelPaintDirsRow2`)
+        checkBoxGrp -e -v1 $v4 -v2 $v5 -v3 $v6 VoxelPaintDirsRow2;
+
     toolPropertySelect "VoxelPaintContext";
 }
 
@@ -64,6 +80,8 @@ global proc VoxelPaintContext_Reset()
     checkBoxGrp -e -v1 1 VoxelPaintCameraBasedControl;
     colorSliderGrp -e -rgb 1.0 0.0 0.0 -alphaValue 0.0 VoxelPaintLowColorControl;
     colorSliderGrp -e -rgb 1.0 0.0 0.0 -alphaValue 1.0 VoxelPaintHighColorControl;
+    checkBoxGrp -e -v1 1 -v2 1 -v3 1 VoxelPaintDirsRow1;
+    checkBoxGrp -e -v1 1 -v2 1 -v3 1 VoxelPaintDirsRow2;
 
     // push defaults into the active context (if active)
     string $ctx = `currentCtx`;
@@ -73,6 +91,7 @@ global proc VoxelPaintContext_Reset()
     catchQuiet(`voxelPaintContextCommand -e -cameraBased 1 $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -lowColor 1.0 0.0 0.0 0.0 $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -highColor 1.0 0.0 0.0 1.0 $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -componentMask 63 $ctx`); // all directions enabled
 }
 
 global proc VoxelPaintContext_Help()

@@ -18,6 +18,7 @@ struct PaintDragState : DragState {
     bool cameraBased{ true };
     MColor lowColor;
     MColor highColor;
+    int componentMask{ 0b111111 }; // All directions enabled by default
 };
 
 class VoxelPaintContext : public VoxelContextBase<VoxelPaintContext> {
@@ -45,7 +46,8 @@ public:
                 brushValue,
                 cameraBased,
                 lowColor,
-                highColor
+                highColor,
+                componentMask
             };
             paintDragStateChangedEvent.notify(paintDragState);
         });
@@ -114,6 +116,15 @@ public:
         return highColor;
     }
 
+    void setComponentMask(uint8_t mask) {
+        componentMask = mask;
+        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
+    }
+
+    int getComponentMask() const {
+        return componentMask;
+    }
+
     // Maya doesn't refresh while the mouse is held down, so force it to do so.
     // However, we don't want to refresh on EVERY mouse event, just at 60FPS. Use a timer for this.
     MStatus doPress(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
@@ -145,5 +156,5 @@ private:
     MCallbackId timerCallbackId;
     MColor lowColor = MColor(1.0f, 0.0f, 0.0f, 0.0f);
     MColor highColor = MColor(1.0f, 0.0f, 0.0f, 1.0f);
-
+    int componentMask = 0b111111; // All directions enabled by default
 };
