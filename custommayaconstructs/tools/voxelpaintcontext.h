@@ -3,6 +3,7 @@
 #include <maya/MEvent.h>
 #include <maya/MToolsInfo.h>
 #include <maya/MTimerMessage.h>
+#include <maya/MColor.h>
 
 enum class BrushMode {
     SUBTRACT,
@@ -15,6 +16,8 @@ struct PaintDragState : DragState {
     BrushMode brushMode{ BrushMode::SET };
     float brushValue{ 0.0f };
     bool cameraBased{ true };
+    MColor lowColor;
+    MColor highColor;
 };
 
 class VoxelPaintContext : public VoxelContextBase<VoxelPaintContext> {
@@ -40,7 +43,9 @@ public:
                 baseState.mousePosition,
                 brushMode,
                 brushValue,
-                cameraBased
+                cameraBased,
+                lowColor,
+                highColor
             };
             paintDragStateChangedEvent.notify(paintDragState);
         });
@@ -91,6 +96,24 @@ public:
         return cameraBased;
     }
 
+    void setLowColor(const MColor& color) {
+        lowColor = color;
+        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
+    }
+
+    void setHighColor(const MColor& color) {
+        highColor = color;
+        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
+    }
+
+    MColor getLowColor() const {
+        return lowColor;
+    }
+
+    MColor getHighColor() const {
+        return highColor;
+    }
+
     // Maya doesn't refresh while the mouse is held down, so force it to do so.
     // However, we don't want to refresh on EVERY mouse event, just at 60FPS. Use a timer for this.
     MStatus doPress(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {
@@ -120,5 +143,7 @@ private:
     float brushValue = 0.5f;
     bool cameraBased = true;
     MCallbackId timerCallbackId;
+    MColor lowColor = MColor(1.0f, 0.0f, 0.0f, 0.0f);
+    MColor highColor = MColor(1.0f, 0.0f, 0.0f, 1.0f);
 
 };

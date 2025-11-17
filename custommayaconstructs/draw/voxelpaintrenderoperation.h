@@ -74,7 +74,9 @@ public:
             {"PAINT_POSITION", PAINT_POSITION},
             {"PAINT_RADIUS", PAINT_RADIUS},
             {"PAINT_VALUE", PAINT_VALUE},
-            {"PAINT_MODE", PAINT_MODE}
+            {"PAINT_MODE", PAINT_MODE},
+            {"LOW_COLOR", LOW_COLOR},
+            {"HIGH_COLOR", HIGH_COLOR}
         };
         paintSelectionShader = MRenderer::theRenderer()->getShaderManager()->getEffectsBufferShader(
             shaderData, size, PAINT_SELECTION_TECHNIQUE_NAME, macros, ARRAYSIZE(macros)
@@ -95,6 +97,8 @@ public:
             brushMode = state.brushMode;
             brushValue = state.brushValue;
             cameraBased = state.cameraBased;
+            lowColor = state.lowColor;
+            highColor = state.highColor;
             updatePaintToolPos(state.mousePosition.x, state.mousePosition.y);
             voxelIDViews.clear(DirectX::clearUintBuffer);
         });
@@ -167,10 +171,14 @@ public:
     void prepareShader(const MDrawContext& drawContext) {
         paintSelectionShader->bind(drawContext);
         float paintPos[2] = { static_cast<float>(paintPosX), static_cast<float>(paintPosY) };
+        float lowColorArr[4] = { lowColor.r, lowColor.g, lowColor.b, lowColor.a };
+        float highColorArr[4] = { highColor.r, highColor.g, highColor.b, highColor.a };
         paintSelectionShader->setParameter(PAINT_POSITION, paintPos);
         paintSelectionShader->setParameter(PAINT_RADIUS, paintRadius);
         paintSelectionShader->setParameter(PAINT_VALUE, brushValue);
         paintSelectionShader->setParameter(PAINT_MODE, static_cast<int>(brushMode));
+        paintSelectionShader->setParameter(LOW_COLOR, lowColorArr);
+        paintSelectionShader->setParameter(HIGH_COLOR, highColorArr);
         paintSelectionShader->updateParameters(drawContext);
     }
 
@@ -449,10 +457,12 @@ private:
     const MBlendState* alphaEnabledBlendState = nullptr;
     D3D11_RECT scissor = { 0, 0, 0, 0 };
     bool hasBrushMoved = false;
-    float paintRadius;
-    BrushMode brushMode;
-    float brushValue;
+    float paintRadius = 50.0f;
+    BrushMode brushMode = BrushMode::SET;
+    float brushValue = 0.5f;
     bool cameraBased = true;
+    MColor lowColor = MColor(1.0f, 0.0f, 0.0f, 0.0f);
+    MColor highColor = MColor(1.0f, 0.0f, 0.0f, 1.0f);
     int paintPosX;
     int paintPosY;
     unsigned int outputTargetWidth = 0;

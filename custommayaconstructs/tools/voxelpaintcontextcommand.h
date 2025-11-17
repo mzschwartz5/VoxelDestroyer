@@ -35,6 +35,8 @@ public:
         syn.addFlag("-m", "-mode",   MSyntax::kLong);
         syn.addFlag("-v", "-value",  MSyntax::kDouble);
         syn.addFlag("-cb", "-cameraBased", MSyntax::kLong);
+        syn.addFlag("-lc", "-lowColor", MSyntax::kDouble, MSyntax::kDouble, MSyntax::kDouble, MSyntax::kDouble);
+        syn.addFlag("-hc", "-highColor", MSyntax::kDouble, MSyntax::kDouble, MSyntax::kDouble, MSyntax::kDouble);
         return MS::kSuccess;
     }
 
@@ -57,6 +59,22 @@ public:
             int v; ap.getFlagArgument("-cb", 0, v);
             fCtx->setCameraBased(v != 0);
         }
+        if (ap.isFlagSet("-lc")) {
+            double r, g, b, a;
+            ap.getFlagArgument("-lc", 0, r);
+            ap.getFlagArgument("-lc", 1, g);
+            ap.getFlagArgument("-lc", 2, b);
+            ap.getFlagArgument("-lc", 3, a);
+            fCtx->setLowColor(MColor(static_cast<float>(r), static_cast<float>(g), static_cast<float>(b), static_cast<float>(a)));
+        }
+        if (ap.isFlagSet("-hc")) {
+            double r, g, b, a;
+            ap.getFlagArgument("-hc", 0, r);
+            ap.getFlagArgument("-hc", 1, g);
+            ap.getFlagArgument("-hc", 2, b);
+            ap.getFlagArgument("-hc", 3, a);
+            fCtx->setHighColor(MColor(static_cast<float>(r), static_cast<float>(g), static_cast<float>(b), static_cast<float>(a)));
+        }
         return MS::kSuccess;
     }
 
@@ -67,6 +85,28 @@ public:
         if (ap.isFlagSet("-m")) setResult((int)fCtx->getBrushMode());
         if (ap.isFlagSet("-v")) setResult(fCtx->getBrushValue());
         if (ap.isFlagSet("-cb")) setResult(fCtx->isCameraBased() ? 1 : 0);
+        if (ap.isFlagSet("-lc")) {
+            MColor c = fCtx->getLowColor();
+            MString result;
+            MStringArray args;
+            args.append(MString() + c.r);
+            args.append(MString() + c.g);
+            args.append(MString() + c.b);
+            args.append(MString() + c.a);
+            result.format("^1s ^2s ^3s ^4s", args);
+            setResult(result);
+        }
+        if (ap.isFlagSet("-hc")) {
+            MColor c = fCtx->getHighColor();
+            MString result;
+            MStringArray args;
+            args.append(MString() + c.r);
+            args.append(MString() + c.g);
+            args.append(MString() + c.b);
+            args.append(MString() + c.a);
+            result.format("^1s ^2s ^3s ^4s", args);
+            setResult(result);
+        }
         return MS::kSuccess;
     }
 

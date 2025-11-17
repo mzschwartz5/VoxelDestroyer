@@ -16,6 +16,8 @@ float2 PAINT_POSITION;
 float PAINT_RADIUS;
 float PAINT_VALUE;
 int PAINT_MODE; // 0 = subtract, 1 = set, 2 = add
+float4 LOW_COLOR;
+float4 HIGH_COLOR;
 float4x4 viewProjection : ViewProjection; // Maya-defined semantic, populated by Maya.
 
 // VS-only resources
@@ -96,7 +98,7 @@ float4 PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : S
         prevPaintValue = applyPaint(globalVoxelID, topComponentId, prevPaintValue);
     }
 
-    return float4(1.0f, 0.0f, 0.0f, prevPaintValue);
+    return lerp(LOW_COLOR, HIGH_COLOR, prevPaintValue);
 }
 
 float4 PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
@@ -112,7 +114,7 @@ float4 PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
         prevPaintValue = applyPaint(globalVoxelID, faceID, prevPaintValue);
     }
 
-    return float4(1.0f, 0.0f, 0.0f, prevPaintValue);
+    return lerp(LOW_COLOR, HIGH_COLOR, prevPaintValue);
 }
 
 // Simple render pass for when paint mode is active but the user is not actively painting
@@ -121,7 +123,7 @@ float4 PS_RenderPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     uint globalVoxelID = psInput.globalVoxelID;
     uint faceID = primID >> 1; // 2 triangles per face. TODO: generalize for vertex painting.
     uint idx = globalVoxelID * 6 + faceID;
-    return float4(1.0f, 0.0f, 0.0f, voxelPaintValue[idx]);
+    return lerp(LOW_COLOR, HIGH_COLOR, voxelPaintValue[idx]);
 }
 
 technique11 PAINT_SELECTION_TECHNIQUE_NAME {
