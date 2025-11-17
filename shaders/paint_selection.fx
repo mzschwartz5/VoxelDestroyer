@@ -7,7 +7,10 @@
 // Maya semantics: https://help.autodesk.com/view/MAYAUL/2022/ENU/?guid=Maya_SDK_Viewport_2_0_API_Shader_semantics_supported_by_html
 
 struct VSIn  { float3 pos : POSITION; };
-struct VSOut { float4 pos : SV_POSITION; nointerpolation uint globalVoxelID : INSTANCEID; };
+struct VSOut { 
+    float4 pos : SV_POSITION; 
+    nointerpolation uint globalVoxelID : INSTANCEID; 
+};
 
 float2 PAINT_POSITION;
 float PAINT_RADIUS;
@@ -23,8 +26,8 @@ StructuredBuffer<uint> instanceToGlobalVoxelIdMap : register(t1);
 // A bitmask of voxels painted this pass
 RWStructuredBuffer<uint> paintedVoxelIDs : register(u1); // UAV registers live in the same namespace as outputs, must start at u1.
 StructuredBuffer<uint> previousPaintedVoxelIDs : register(t2);
-Buffer<float> previousVoxelPaintValue : register(t3);
-RWBuffer<float> voxelPaintValue : register(u2); // NOT structured so that we can store half-precision floats.
+Buffer<float> previousVoxelPaintValue : register(t3); // NOT structured so that we can store half-precision floats.
+RWBuffer<float> voxelPaintValue : register(u2);       // NOT structured so that we can store half-precision floats.
 Texture2D<uint> idRenderTarget : register(t4);
 
 VSOut VS_Main(VSIn i, uint instanceID : SV_InstanceID) {
@@ -36,66 +39,77 @@ VSOut VS_Main(VSIn i, uint instanceID : SV_InstanceID) {
     return o;
 }
 
+uint packVoxelIDs(uint voxelID, uint componentID) {
+    return (voxelID << 3) | (componentID & 7u);
+}
+void unpackVoxelIDs(uint packed, out uint voxelID, out uint componentID) {
+    componentID = packed & 7u;
+    voxelID = (packed >> 3);
+}
+
 // The pass renders the IDs to an offscreen target. It's run with a scissor rect matching the brush area,
 // then further culled to a circle in the pixel shader. Importantly, because of depth testing, only the nearest
 // voxel under the brush will write its ID to each pixel.
 // Note: this pass does not need to be run when doing non-camera-based painting.
-uint PS_IDPass(VSOut psInput) : SV_Target {
+uint PS_IDPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     float2 delta = psInput.pos.xy - PAINT_POSITION;
     if (dot(delta, delta) > PAINT_RADIUS * PAINT_RADIUS) {
         return 0;
     }
 
-    // 0 reserved for "no hit" (same as clear color)
-    // Note: this means when using the selection results, we need to subtract 1 to get the original instance ID
-    return psInput.globalVoxelID + 1;
+    uint faceID = primID >> 1; // 2 triangles per face. TODO: generalize for vertex painting.
+    // Add 1 to globalVoxelID so that 0 can represent "no voxel"
+    return packVoxelIDs(psInput.globalVoxelID + 1, faceID);
 }
 
-float applyPaint(uint globalVoxelID, float prevPaintValue) {
-    paintedVoxelIDs[globalVoxelID] = 1;
+float applyPaint(uint globalVoxelID, uint componentID, float prevPaintValue) {
+    uint idx = globalVoxelID * 6 + componentID; // TODO: generalize so we can paint vertices too
+    paintedVoxelIDs[idx] = 1;
     // Do not paint voxels that have been painted recently (brush has to move away and then back to repaint)
-    if (previousPaintedVoxelIDs[globalVoxelID] == 1) return prevPaintValue;
-    
+    if (previousPaintedVoxelIDs[idx] == 1) return prevPaintValue;
+
     // This branch has no chance of divergence, so there's no real penalty for it.
     int mode = PAINT_MODE - 1; // remap to -1,0,1
-    if (mode == 0) {
-        prevPaintValue = PAINT_VALUE;
-    }
-    else {
-        prevPaintValue = prevPaintValue + mode * PAINT_VALUE;
-    }
+    prevPaintValue = (mode == 0) ? PAINT_VALUE : prevPaintValue + mode * PAINT_VALUE;
     
     prevPaintValue = clamp(prevPaintValue, 0.0f, 1.0f);
-    voxelPaintValue[globalVoxelID] = prevPaintValue;
+    voxelPaintValue[idx] = prevPaintValue;
     return prevPaintValue;
 }
 
 // Updates paint values based on ID pass, and also renders all paint values to screen
-float4 PS_PaintPass_CameraBased(VSOut psInput) : SV_Target {
+float4 PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     uint2 pixel = uint2(psInput.pos.xy);
-    uint topVoxelId = idRenderTarget.Load(int3(pixel, 0));
-    topVoxelId = topVoxelId - 1; // -1 to undo +1 in ID pass (careful of underflow)
-    uint globalVoxelID = psInput.globalVoxelID;
-    float prevPaintValue = previousVoxelPaintValue[globalVoxelID];
+    uint topIDs = idRenderTarget.Load(int3(pixel, 0));
+    uint topVoxelId, topComponentId;
+    unpackVoxelIDs(topIDs, topVoxelId, topComponentId);
+    topVoxelId -= 1; // Remap back to real voxel ID (...careful of underflow)
 
-    // Only pixels in the brush area, and nearest the camera, will have their topVoxelId match their globalVoxelID.
-    // (Note that, for pixels outside the brush, topVoxelId will be 0u - 1 --> UINT_MAX, so this condition will be false, as expected)    
-    if (topVoxelId == globalVoxelID) {
-        prevPaintValue = applyPaint(globalVoxelID, prevPaintValue);
+    uint globalVoxelID = psInput.globalVoxelID;
+    uint faceID = primID >> 1; // 2 triangles per face. TODO: generalize for vertex painting.
+    uint idx = globalVoxelID * 6 + faceID;
+    float prevPaintValue = previousVoxelPaintValue[idx];
+
+    // Only pixels in the brush area, and nearest the camera, will have their topIDs match the current voxel.
+    // (Note that, because an ID of 0 meant "no voxel", subtracting 1 above means voxel IDs outside the brush will underflow and not match any real voxel ID).
+    if (topVoxelId == globalVoxelID && topComponentId == faceID) {
+        prevPaintValue = applyPaint(globalVoxelID, topComponentId, prevPaintValue);
     }
 
     return float4(1.0f, 0.0f, 0.0f, prevPaintValue);
 }
 
-float4 PS_PaintPass(VSOut psInput) : SV_Target {
+float4 PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     uint2 pixel = uint2(psInput.pos.xy);
     uint globalVoxelID = psInput.globalVoxelID;
-    float prevPaintValue = previousVoxelPaintValue[globalVoxelID];
+    uint faceID = primID >> 1; // 2 triangles per face. TODO: generalize for vertex painting.
+    uint idx = globalVoxelID * 6 + faceID;
+    float prevPaintValue = previousVoxelPaintValue[idx];
     float2 delta = psInput.pos.xy - PAINT_POSITION;
 
     // Only pixels in the brush area (whether occluded by other voxels on not) get painted.
     if (dot(delta, delta) <= PAINT_RADIUS * PAINT_RADIUS) {
-        prevPaintValue = applyPaint(globalVoxelID, prevPaintValue);
+        prevPaintValue = applyPaint(globalVoxelID, faceID, prevPaintValue);
     }
 
     return float4(1.0f, 0.0f, 0.0f, prevPaintValue);
@@ -103,8 +117,11 @@ float4 PS_PaintPass(VSOut psInput) : SV_Target {
 
 // Simple render pass for when paint mode is active but the user is not actively painting
 // We still need to render the existing paint values of the voxels, we just don't need to ID or update them.
-float4 PS_RenderPass(VSOut psInput) : SV_Target {
-    return float4(1.0f, 0.0f, 0.0f, voxelPaintValue[psInput.globalVoxelID]);
+float4 PS_RenderPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
+    uint globalVoxelID = psInput.globalVoxelID;
+    uint faceID = primID >> 1; // 2 triangles per face. TODO: generalize for vertex painting.
+    uint idx = globalVoxelID * 6 + faceID;
+    return float4(1.0f, 0.0f, 0.0f, voxelPaintValue[idx]);
 }
 
 technique11 PAINT_SELECTION_TECHNIQUE_NAME {

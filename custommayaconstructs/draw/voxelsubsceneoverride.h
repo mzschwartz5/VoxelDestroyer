@@ -751,10 +751,11 @@ private:
         if (!voxelRendererOverride) return;
 
         const MMatrixArray& voxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
-        const ComPtr<ID3D11UnorderedAccessView>& voxelPaintUAV = voxelShape->getVoxelPaintUAV();
-        const ComPtr<ID3D11ShaderResourceView>& voxelPaintSRV = voxelShape->getVoxelPaintSRV();
+        // TODO: will send all weight sets eventually (tension, compression, particle weights). (Or just the selected set?)
+        const ComPtr<ID3D11UnorderedAccessView>& faceTensionUAV = voxelShape->getFaceTensionPaintUAV();
+        const ComPtr<ID3D11ShaderResourceView>& faceTensionSRV = voxelShape->getFaceTensionPaintSRV();
 
-        voxelRendererOverride->sendVoxelInfoToPaintRenderOp(voxelMatrices, visibleVoxelIdToGlobalId, voxelPaintUAV, voxelPaintSRV);
+        voxelRendererOverride->sendVoxelInfoToPaintRenderOp(voxelMatrices, visibleVoxelIdToGlobalId, faceTensionUAV, faceTensionSRV);
     }
 
     void createVoxelGeometryBuffers() {

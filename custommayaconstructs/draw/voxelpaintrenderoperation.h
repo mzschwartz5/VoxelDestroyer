@@ -402,7 +402,7 @@ public:
 
         // Create a copy of the voxel paint buffer based on its UAV, passing an empty vector so we don't have to first map back data.
         // It's okay that it's empty, we just need the buffer size and flags to match. Also, it's really half-floats, but uint16_t has the same size.
-        const std::vector<uint16_t> emptyPaintData(numVoxels, 0);
+        const std::vector<uint16_t> emptyPaintData(numVoxels * 6, 0); // TODO: number of elements depends on whether painting faces or vertices
         voxelPaintBufferB = DirectX::createBufferFromViewTemplate(voxelPaintUAV, emptyPaintData);
         voxelPaintViews = PingPongView(
             DirectX::createSRVFromTemplate(voxelPaintSRV, voxelPaintBufferB), 
@@ -411,7 +411,8 @@ public:
             voxelPaintUAV
         );
 
-        const std::vector<uint32_t> emptyIDData(numVoxels, 0);
+        // TODO: this can be a vector of uint8_t (it's just 1s and 0s)
+        const std::vector<uint32_t> emptyIDData(numVoxels * 6, 0); // TODO: number of elements depends on whether painting faces or vertices
         voxelIDBufferA = DirectX::createReadWriteBuffer(emptyIDData);
         voxelIDBufferB = DirectX::createReadWriteBuffer(emptyIDData);
         voxelIDViews = PingPongView(

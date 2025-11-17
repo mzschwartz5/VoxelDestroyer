@@ -193,18 +193,18 @@ public:
         isInitialized = true;
     }
 
-    const ComPtr<ID3D11ShaderResourceView>& getVoxelPaintSRV() {
-        if (!voxelPaintSRV) {
+    const ComPtr<ID3D11ShaderResourceView>& getFaceTensionPaintSRV() {
+        if (!faceTensionPaintSRV) {
             allocatePaintResources();
         }
-        return voxelPaintSRV;
+        return faceTensionPaintSRV;
     }
 
-    const ComPtr<ID3D11UnorderedAccessView>& getVoxelPaintUAV() {
-        if (!voxelPaintUAV) {
+    const ComPtr<ID3D11UnorderedAccessView>& getFaceTensionPaintUAV() {
+        if (!faceTensionPaintUAV) {
             allocatePaintResources();
         }
-        return voxelPaintUAV;
+        return faceTensionPaintUAV;
     }
 
 private:
@@ -212,10 +212,10 @@ private:
     bool isParticleSRVPlugDirty = false;
     MCallbackIdArray callbackIds;
     DeformVerticesCompute deformVerticesCompute;
-    // Holds the painted values of each voxel, for use with the Voxel Paint tool.
-    ComPtr<ID3D11Buffer> voxelPaintBuffer; 
-    ComPtr<ID3D11ShaderResourceView> voxelPaintSRV;
-    ComPtr<ID3D11UnorderedAccessView> voxelPaintUAV;
+    // Holds the face-to-face tension weight values of each voxel face, for use with the Voxel Paint tool.
+    ComPtr<ID3D11Buffer> faceTensionPaintBuffer; 
+    ComPtr<ID3D11ShaderResourceView> faceTensionPaintSRV;
+    ComPtr<ID3D11UnorderedAccessView> faceTensionPaintUAV;
     
     VoxelShape() = default;
     ~VoxelShape() override = default;
@@ -315,12 +315,13 @@ private:
 
         const int numVoxels = voxels->numOccupied;
         
-        // Paint values start at 0. Use uint16_t to get the size right, but it will really be half-floats in the shader.
+        // Face tension paint values start at 0. Use uint16_t to get the size right, but it will really be half-floats in the shader.
         // Need to use a typed buffer to get half-float support.
-        const std::vector<uint16_t> emptyPaintData(numVoxels, 0);
-        voxelPaintBuffer = DirectX::createReadWriteBuffer(emptyPaintData, 0, DirectX::BufferFormat::TYPED);
-        voxelPaintSRV = DirectX::createSRV(voxelPaintBuffer, numVoxels, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT);
-        voxelPaintUAV = DirectX::createUAV(voxelPaintBuffer, numVoxels, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT);
+        int elementCount = numVoxels * 6; // 6 faces per voxel
+        const std::vector<uint16_t> emptyFaceTensionData(elementCount, 0); // 6 faces per voxel
+        faceTensionPaintBuffer = DirectX::createReadWriteBuffer(emptyFaceTensionData, 0, DirectX::BufferFormat::TYPED);
+        faceTensionPaintSRV = DirectX::createSRV(faceTensionPaintBuffer, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT);
+        faceTensionPaintUAV = DirectX::createUAV(faceTensionPaintBuffer, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT);
     }
 
 };
