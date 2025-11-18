@@ -292,4 +292,17 @@ MMatrix getWorldMatrix(const MObject& node) {
     return MMatrix::identity;
 }
 
+// Note: this isn't particularly fast (iterates over all nodes), so don't use in performance-critical paths.
+// (A better method may involve selection lists / using Maya's built in name resolution)
+MObject getNodeFromName(const MString& name) {
+    MItDependencyNodes it;
+    for (; !it.isDone(); it.next()) {
+        MFnDependencyNode fnNode(it.thisNode());
+        if (fnNode.name() == name) {
+            return it.thisNode();
+        }
+    }
+    return MObject::kNullObj;
+}
+
 } // namespace Utils

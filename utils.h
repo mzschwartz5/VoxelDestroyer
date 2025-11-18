@@ -129,11 +129,11 @@ struct MStringEq {
 };
 
 // Helper overloads which build MPlug from either attribute name or MObject
-inline MPlug makePlugFromAttr(const MObject& node, const MObject& attr) {
+inline MPlug plugFromAttr(const MObject& node, const MObject& attr) {
     return MPlug(node, attr);
 }
 
-inline MPlug makePlugFromAttr(const MObject& node, const MString& attrName) {
+inline MPlug plugFromAttr(const MObject& node, const MString& attrName) {
     MFnDependencyNode fn(node);
     return fn.findPlug(attrName, false);
 }
@@ -147,8 +147,8 @@ void connectPlugs(
     int srcLogicalIndex = -1,
     int dstLogicalIndex = -1
 ) {
-    MPlug srcPlug = makePlugFromAttr(srcNode, srcAttr);
-    MPlug dstPlug = makePlugFromAttr(dstNode, dstAttr);
+    MPlug srcPlug = plugFromAttr(srcNode, srcAttr);
+    MPlug dstPlug = plugFromAttr(dstNode, dstAttr);
 
     if (srcLogicalIndex != -1) {
         srcPlug = srcPlug.elementByLogicalIndex(srcLogicalIndex);
@@ -181,5 +181,7 @@ MObject createDGNode(const MString& typeName);
 MObject createDagNode(const MString& typeName, const MObject& parent = MObject::kNullObj, const MString& name = "", MDagModifier* dagMod = nullptr);
 
 MMatrix getWorldMatrix(const MObject& node);
+
+MObject getNodeFromName(const MString& name);
 
 } // namespace Utils

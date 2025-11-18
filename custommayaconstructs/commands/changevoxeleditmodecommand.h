@@ -10,8 +10,9 @@
 #include "../../event.h"
 #include "../../utils.h"
 #include <maya/MString.h>
+#include <maya/MUuid.h>
 
-enum class VoxelEditMode {
+enum class VoxelEditMode : int {
     Selection,
     FacePaint,
     VertexPaint,
@@ -30,6 +31,24 @@ struct EditModeChangedEventArgs {
 class ChangeVoxelEditModeCommand : public MPxCommand {
 public:
     inline static const MString commandName = MString("changeVoxelEditMode");
+    inline static const std::unordered_map<VoxelEditMode, MString> modeToContextCommand = {
+        {VoxelEditMode::Selection, "selectSuperContext"},
+        {VoxelEditMode::FacePaint, "`voxelPaintContextCommand`"},
+        {VoxelEditMode::VertexPaint, "`voxelPaintContextCommand`"},
+        {VoxelEditMode::Object, "selectSuperContext"}
+    };
+    inline static const std::unordered_map<VoxelEditMode, MString> modeToComponentMaskCommand = {
+        {VoxelEditMode::Selection, "SelectFacetMask"},
+        {VoxelEditMode::FacePaint, "SelectFacetMask"},
+        {VoxelEditMode::VertexPaint, "SelectVertexMask"},
+        {VoxelEditMode::Object, "selectMode -object"}
+    };
+
+    MString shapeName;
+    MUuid shapeUUID;
+    int newMode = 0;
+    int currentEditMode = 0;
+    MString currentContext;
 
     static EventBase::Unsubscribe subscribe(
         const Event<const EditModeChangedEventArgs&>::Listener& listener) 
@@ -48,22 +67,83 @@ public:
         return syntax;
     }
 
+    bool isUndoable() const override {
+        return true;
+    }
+
     MStatus doIt(const MArgList& args) override {
-        MString shapeName;
-        int mode = 0;
         MArgDatabase argData(syntax(), args);
         argData.getFlagArgument("-n", 0, shapeName);
-        argData.getFlagArgument("-m", 0, mode);
+        argData.getFlagArgument("-m", 0, newMode);
+
+        // Cache current state for undo
+        MObject shapeObj = Utils::getNodeFromName(shapeName);
+        MPlug voxelEditModePlug = Utils::plugFromAttr(shapeObj, "voxelEditMode");
+        shapeUUID = MFnDependencyNode(shapeObj).uuid();
+        currentEditMode = voxelEditModePlug.asInt();
+        MGlobal::executeCommand("currentCtx", currentContext);
+
+        redoIt();
+        return MS::kSuccess;
+    }
+
+    MStatus undoIt() override {
+        setEditModePlug(shapeName, currentEditMode);
+        selectShapeByUUID(shapeUUID);
+
+        VoxelEditMode modeEnum = static_cast<VoxelEditMode>(currentEditMode);
+        MString setComponentCmd = modeToComponentMaskCommand.at(modeEnum);
+        MGlobal::executeCommand(setComponentCmd, false, false);
+        MGlobal::executeCommand("setToolTo " + currentContext, false, false);
 
         voxelEditModeChangedEvent.notify(
             EditModeChangedEventArgs{
-                static_cast<VoxelEditMode>(mode),
+                static_cast<VoxelEditMode>(currentEditMode),
                 shapeName
             }
         );
 
         MGlobal::executeCommandOnIdle("refresh");
         return MS::kSuccess;
+    }
+
+    MStatus redoIt() override {
+        setEditModePlug(shapeName, newMode);
+
+        voxelEditModeChangedEvent.notify(
+            EditModeChangedEventArgs{
+                static_cast<VoxelEditMode>(newMode),
+                shapeName
+            }
+        );
+
+        VoxelEditMode modeEnum = static_cast<VoxelEditMode>(newMode);
+        MString setComponentCmd = modeToComponentMaskCommand.at(modeEnum);
+        MString context = modeToContextCommand.at(modeEnum);
+        
+        selectShapeByUUID(shapeUUID);
+        MGlobal::executeCommand(setComponentCmd, false, false);
+        MGlobal::executeCommand("setToolTo " + context, false, false);
+        MGlobal::executeCommandOnIdle("refresh");
+        return MS::kSuccess;
+    }
+
+    void setEditModePlug(const MString& shapeName, int mode) {
+        MObject shapeObj = Utils::getNodeFromName(shapeName);
+        MPlug voxelEditModePlug = Utils::plugFromAttr(shapeObj, "voxelEditMode");
+        voxelEditModePlug.setInt(mode);
+    }
+
+    // Select by UUID to be robust against name or dag paths changing between undo/redo
+    // For some reason, MGlobal::setActiveSelectionList and MGlobal::selectCommand are not sufficient
+    // to make the following commands work, so we resort to MEL's `select -r`
+    void selectShapeByUUID(const MUuid& uuid) {
+        MSelectionList selectionList;
+        selectionList.add(shapeUUID);
+        MObject depNode;
+        selectionList.getDependNode(0, depNode);
+        MString shapeNodeName = MFnDependencyNode(depNode).name();
+        MGlobal::executeCommand("select -r " + shapeNodeName, true, false);
     }
 
 private:
