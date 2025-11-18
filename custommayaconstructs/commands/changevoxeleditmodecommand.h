@@ -43,6 +43,7 @@ public:
         {VoxelEditMode::VertexPaint, "SelectVertexMask"},
         {VoxelEditMode::Object, "selectMode -object"}
     };
+    inline static int sEditMode = 3; // Object mode
 
     MString shapeName;
     MUuid shapeUUID;
@@ -78,9 +79,9 @@ public:
 
         // Cache current state for undo
         MObject shapeObj = Utils::getNodeFromName(shapeName);
-        MPlug voxelEditModePlug = Utils::plugFromAttr(shapeObj, "voxelEditMode");
+        currentEditMode = sEditMode;
+        sEditMode = newMode;
         shapeUUID = MFnDependencyNode(shapeObj).uuid();
-        currentEditMode = voxelEditModePlug.asInt();
         MGlobal::executeCommand("currentCtx", currentContext);
 
         redoIt();
@@ -88,7 +89,6 @@ public:
     }
 
     MStatus undoIt() override {
-        setEditModePlug(shapeName, currentEditMode);
         selectShapeByUUID(shapeUUID);
 
         VoxelEditMode modeEnum = static_cast<VoxelEditMode>(currentEditMode);
@@ -108,8 +108,6 @@ public:
     }
 
     MStatus redoIt() override {
-        setEditModePlug(shapeName, newMode);
-
         voxelEditModeChangedEvent.notify(
             EditModeChangedEventArgs{
                 static_cast<VoxelEditMode>(newMode),
@@ -126,12 +124,6 @@ public:
         MGlobal::executeCommand("setToolTo " + context, false, false);
         MGlobal::executeCommandOnIdle("refresh");
         return MS::kSuccess;
-    }
-
-    void setEditModePlug(const MString& shapeName, int mode) {
-        MObject shapeObj = Utils::getNodeFromName(shapeName);
-        MPlug voxelEditModePlug = Utils::plugFromAttr(shapeObj, "voxelEditMode");
-        voxelEditModePlug.setInt(mode);
     }
 
     // Select by UUID to be robust against name or dag paths changing between undo/redo

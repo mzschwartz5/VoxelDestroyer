@@ -38,7 +38,6 @@ public:
     inline static MObject aParticleData;
     inline static MObject aVoxelData;
     inline static MObject aTrigger;
-    inline static MObject aVoxelEditMode;
 
     static void* creator() { return new VoxelShape(); }
     
@@ -86,14 +85,6 @@ public:
         nAttr.setWritable(true);
         nAttr.setReadable(false);
         status = addAttribute(aTrigger);
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-
-        aVoxelEditMode = nAttr.create("voxelEditMode", "vem", MFnNumericData::kInt, 3, &status);
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-        nAttr.setStorable(false);
-        nAttr.setWritable(false);
-        nAttr.setReadable(true);
-        status = addAttribute(aVoxelEditMode);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         return MS::kSuccess;
