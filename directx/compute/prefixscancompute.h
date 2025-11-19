@@ -77,15 +77,11 @@ private:
     int scanIdx = 0;
 
     void bind() override {
-        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
-
         ID3D11UnorderedAccessView* uavs[] = { activeUAVForScan.Get(), partialSumsUAVs[scanIdx].Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
     }
 
     void unbind() override {
-        DirectX::getContext()->CSSetShader(nullptr, NULL, 0);
-
         ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
     }

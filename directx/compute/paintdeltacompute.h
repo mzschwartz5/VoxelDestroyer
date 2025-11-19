@@ -36,8 +36,6 @@ public:
     }
 
     void bind() override {
-        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
-
         ID3D11UnorderedAccessView* uavs[] = { deltaUAV.Get(), paintViews->UAV().Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
@@ -46,8 +44,6 @@ public:
     }
 
     void unbind() override {
-        DirectX::getContext()->CSSetShader(nullptr, NULL, 0);
-
         ID3D11UnorderedAccessView* nullUAVs[] = { nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(nullUAVs), nullUAVs, nullptr);
 
