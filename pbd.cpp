@@ -2,12 +2,7 @@
 #include "utils.h"
 #include "cube.h"
 
-std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(
-    const MSharedPtr<Voxels> voxels,
-    float xTension, float xCompression,
-    float yTension, float yCompression,
-    float zTension, float zCompression
-) {
+std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(const MSharedPtr<Voxels> voxels) {
     std::array<std::vector<FaceConstraint>, 3> faceConstraints;
 
     const std::vector<uint32_t>& mortonCodes = voxels->mortonCodes;
@@ -28,8 +23,6 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(
             FaceConstraint newConstraint;
             newConstraint.voxelOneIdx = i;
             newConstraint.voxelTwoIdx = rightNeighborIndex;
-            newConstraint.compressionLimit = xCompression;
-            newConstraint.tensionLimit = xTension;
             faceConstraints[0].push_back(newConstraint);
         }
 
@@ -40,8 +33,6 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(
             FaceConstraint newConstraint;
             newConstraint.voxelOneIdx = i;
             newConstraint.voxelTwoIdx = upNeighborIndex;
-            newConstraint.compressionLimit = yCompression;
-            newConstraint.tensionLimit = yTension;
             faceConstraints[1].push_back(newConstraint);
         }
 
@@ -52,8 +43,6 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(
             FaceConstraint newConstraint;
             newConstraint.voxelOneIdx = i;
             newConstraint.voxelTwoIdx = frontNeighborIndex;
-            newConstraint.compressionLimit = zCompression;
-            newConstraint.tensionLimit = zTension;
             faceConstraints[2].push_back(newConstraint);
         }
     }
@@ -130,15 +119,14 @@ void PBD::setGPUResourceHandles(
     preVGSCompute.setIsDraggingSRV(isDraggingSRV);
 }
 
+void PBD::updateFaceConstraintsWithPaintValues(const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV) {
+    faceConstraintsCompute.updateFaceConstraintsFromPaint(paintDeltaUAV);
+}
 
 void PBD::simulateSubstep() {
     if (!initialized) return;
 
     preVGSCompute.dispatch();
     vgsCompute.dispatch();
-    
-    for (int i = 0; i < 3; i++) {
-        faceConstraintsCompute.updateActiveConstraintAxis(i);
-		faceConstraintsCompute.dispatch();
-    }
+    faceConstraintsCompute.dispatch();
 }

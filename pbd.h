@@ -18,12 +18,7 @@ public:
     PBD() = default;
     ~PBD() = default;
    
-    std::array<std::vector<FaceConstraint>, 3> constructFaceToFaceConstraints(
-        MSharedPtr<Voxels> voxels, 
-        float xTension, float xCompression,
-        float yTension, float yCompression,
-        float zTension, float zCompression
-    );
+    std::array<std::vector<FaceConstraint>, 3> constructFaceToFaceConstraints(MSharedPtr<Voxels> voxels);
 
     ParticleDataContainer createParticles(MSharedPtr<Voxels> voxels);
 
@@ -51,6 +46,8 @@ public:
     int numParticles() const {
         return totalParticles;
     }
+
+    void updateFaceConstraintsWithPaintValues(const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV);
     
     void simulateSubstep();
 

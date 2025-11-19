@@ -217,7 +217,7 @@ public:
         );
         
         std::array<std::vector<FaceConstraint>, 3> faceConstraints 
-            = pbd.constructFaceToFaceConstraints(voxels, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX);
+            = pbd.constructFaceToFaceConstraints(voxels);
         
         pbd.createComputeShaders(voxels, faceConstraints);
 
@@ -241,6 +241,10 @@ public:
 
         // On idle - don't want to delete the node while it's processing graph connection changes.
         MGlobal::executeCommandOnIdle("delete " + pbdNode->name(), false);
+    }
+
+    void updateFaceConstraintsWithPaintValues(const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV) {
+        pbd.updateFaceConstraintsWithPaintValues(paintDeltaUAV);
     }
     
 private:

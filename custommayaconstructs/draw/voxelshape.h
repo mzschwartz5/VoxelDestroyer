@@ -207,6 +207,7 @@ public:
         unsubPaintStateChanges = VoxelPaintContext::subscribeToPaintDragStateChange([this](const PaintDragState& paintState) {
             if (paintState.isDragging) return; // Only apply when a paint stroke stops
             paintDeltaCompute.dispatch();
+            updatePBDConstraints();
 
             // Records the paint delta for undo/redo. On undo/redo, applies the delta back to the paint values.
             // Necessary to invoke as a MEL command to enable journaling. (Could use MPxToolCommand but this is simpler).
@@ -232,6 +233,19 @@ public:
 
         // The compute pass writes into the delta buffer - copy it to the face paint buffer to keep them in sync.
         DirectX::copyBufferToBuffer(paintDeltaUAV, facePaintViews.UAV());
+
+        updatePBDConstraints();
+    }
+
+    /**
+     * Pass the updated paint values to the PBD node to update its face constraints.
+     * This may not be the canonical way to have nodes interact, but it needs to happen at a specific moment,
+     * not whenever the DG is next evaluated. (There still may be a better way but, if it works...)
+     */
+    void updatePBDConstraints() {
+        MPlug triggerPlug(thisMObject(), aTrigger);
+        PBDNode* pbdNode = static_cast<PBDNode*>(Utils::connectedNode(triggerPlug));
+        pbdNode->updateFaceConstraintsWithPaintValues(paintDeltaUAV);
     }
 
 private:
