@@ -209,6 +209,7 @@
     <ClInclude Include="custommayaconstructs\usernodes\planecollider.h" />
     <ClInclude Include="custommayaconstructs\commands\createcollidercommand.h" />
     <ClInclude Include="custommayaconstructs\commands\changevoxeleditmodecommand.h" />
+    <ClInclude Include="custommayaconstructs\commands\applyvoxelpaintcommand.h" />
     <ClInclude Include="directx\directx.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\vgscompute.h" />
@@ -222,6 +223,7 @@
     <ClInclude Include="directx\compute\solvecollisioncompute.h" />
     <ClInclude Include="directx\compute\deformverticescompute.h" />
     <ClInclude Include="directx\compute\solveprimitivecollisionscompute.h" />
+    <ClInclude Include="directx\compute\paintdeltacompute.h" />
     <ClInclude Include="directx\d3dincludehandler.h" />
   </ItemGroup>
   <ItemGroup>

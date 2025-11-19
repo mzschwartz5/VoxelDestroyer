@@ -97,30 +97,6 @@ ComPtr<ID3D11UnorderedAccessView> DirectX::createUAV(
     return uav;
 }
 
-ComPtr<ID3D11UnorderedAccessView> DirectX::createUAVFromTemplate(
-    const ComPtr<ID3D11UnorderedAccessView>& existingUAV,
-    const ComPtr<ID3D11Buffer>& newBuffer
-) {
-    ComPtr<ID3D11UnorderedAccessView> uav;
-    D3D11_UNORDERED_ACCESS_VIEW_DESC existingDesc = {};
-    existingUAV->GetDesc(&existingDesc);
-
-    HRESULT hr = dxDevice->CreateUnorderedAccessView(newBuffer.Get(), &existingDesc, uav.GetAddressOf());
-    return uav;
-}
-
-ComPtr<ID3D11ShaderResourceView> DirectX::createSRVFromTemplate(
-    const ComPtr<ID3D11ShaderResourceView>& existingSRV,
-    const ComPtr<ID3D11Buffer>& newBuffer
-) {
-    ComPtr<ID3D11ShaderResourceView> srv;
-    D3D11_SHADER_RESOURCE_VIEW_DESC existingDesc = {};
-    existingSRV->GetDesc(&existingDesc);
-
-    HRESULT hr = dxDevice->CreateShaderResourceView(newBuffer.Get(), &existingDesc, srv.GetAddressOf());
-    return srv;
-}
-
 /**
  * It's a courtesy to let Maya know how much GPU memory we're using, so it can
  * evict other things if necessary.

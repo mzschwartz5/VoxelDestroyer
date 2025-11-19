@@ -1,17 +1,11 @@
 #pragma once
 #include <maya/MPxSurfaceShape.h>
-#include <maya/MFnMeshData.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnSingleIndexedComponent.h>
 #include <maya/MFnDependencyNode.h>
-#include <maya/MDagModifier.h>
-#include <maya/MDGModifier.h>
 #include <maya/MCallbackIdArray.h>
 #include <maya/MNodeMessage.h>
-#include <maya/MAttributeSpecArray.h>
-#include <maya/MAttributeSpec.h>
-#include <maya/MAttributeIndex.h>
 #include "../../voxelizer.h"
 #include "../usernodes/pbdnode.h"
 #include "../usernodes/voxelizernode.h"
@@ -19,11 +13,13 @@
 #include "../data/d3d11data.h"
 #include "../data/voxeldata.h"
 #include "../../directx/compute/deformverticescompute.h"
+#include "../../directx/compute/paintdeltacompute.h"
 #include <d3d11.h>
 #include <wrl/client.h>
 #include "directx/directx.h"
 #include "../../utils.h"
-#include "../commands/changevoxeleditmodecommand.h"
+#include "../tools/voxelpaintcontext.h"
+#include "../../directx/pingpongview.h"
 using Microsoft::WRL::ComPtr;
 
 class VoxelShape : public MPxSurfaceShape {
@@ -194,29 +190,64 @@ public:
         isInitialized = true;
     }
 
-    const ComPtr<ID3D11ShaderResourceView>& getFaceTensionPaintSRV() {
-        if (!faceTensionPaintSRV) {
+    PingPongView& getFacePaintViews() {
+        if (!facePaintViews.isInitialized()) {
             allocatePaintResources();
         }
-        return faceTensionPaintSRV;
+
+        return facePaintViews;
     }
 
-    const ComPtr<ID3D11UnorderedAccessView>& getFaceTensionPaintUAV() {
-        if (!faceTensionPaintUAV) {
-            allocatePaintResources();
-        }
-        return faceTensionPaintUAV;
+    const ComPtr<ID3D11Buffer>& getPaintDeltaBuffer() {
+        return paintDeltaBuffer;
+    }
+
+    // Invoked by the owning subscene on edit mode changes
+    void subscribeToPaintStateChanges() {
+        unsubPaintStateChanges = VoxelPaintContext::subscribeToPaintDragStateChange([this](const PaintDragState& paintState) {
+            if (paintState.isDragging) return; // Only apply when a paint stroke stops
+            paintDeltaCompute.dispatch();
+
+            // Records the paint delta for undo/redo. On undo/redo, applies the delta back to the paint values.
+            // Necessary to invoke as a MEL command to enable journaling. (Could use MPxToolCommand but this is simpler).
+            MString uuidStr = MFnDependencyNode(thisMObject()).uuid().asString();
+            MString cmd = "applyVoxelPaint -vid \"" + uuidStr + "\"";
+            MGlobal::executeCommand(cmd, false, true);
+
+            // Now that the delta is recorded, copy the after-paint-stroke values into the delta buffer for the next stroke.
+            DirectX::copyBufferToBuffer(facePaintViews.UAV(), paintDeltaUAV);
+        });
+    }
+
+    void unsubscribePaintStateChanges() {
+        unsubPaintStateChanges();
+    }
+
+    void applyPaintDelta(const std::vector<uint16_t>& paintDelta, int direction = 1) {
+        DirectX::getContext()->UpdateSubresource(paintDeltaBuffer.Get(), 0, nullptr, paintDelta.data(), 0, 0);
+        
+        paintDeltaCompute.updateSign(direction);
+        paintDeltaCompute.dispatch();
+        paintDeltaCompute.updateSign(-1); // Reset sign to default (see paintdelta.hlsl)
+
+        // The compute pass writes into the delta buffer - copy it to the face paint buffer to keep them in sync.
+        DirectX::copyBufferToBuffer(paintDeltaUAV, facePaintViews.UAV());
     }
 
 private:
     bool isInitialized = false;
     bool isParticleSRVPlugDirty = false;
     MCallbackIdArray callbackIds;
+    EventBase::Unsubscribe unsubPaintStateChanges;
     DeformVerticesCompute deformVerticesCompute;
+    PaintDeltaCompute paintDeltaCompute;
     // Holds the face-to-face tension weight values of each voxel face, for use with the Voxel Paint tool.
-    ComPtr<ID3D11Buffer> faceTensionPaintBuffer; 
-    ComPtr<ID3D11ShaderResourceView> faceTensionPaintSRV;
-    ComPtr<ID3D11UnorderedAccessView> faceTensionPaintUAV;
+    ComPtr<ID3D11Buffer> faceTensionPaintBufferA;
+    ComPtr<ID3D11Buffer> faceTensionPaintBufferB;
+    ComPtr<ID3D11Buffer> paintDeltaBuffer;
+    PingPongView facePaintViews;
+    ComPtr<ID3D11UnorderedAccessView> paintDeltaUAV;
+
     
     VoxelShape() = default;
     ~VoxelShape() override = default;
@@ -267,6 +298,7 @@ private:
         callbackId = MNodeMessage::addNodePreRemovalCallback(thisMObject(), [](MObject& node, void* clientData) {
             VoxelShape* voxelShape = static_cast<VoxelShape*>(clientData);
             MMessage::removeCallbacks(voxelShape->callbackIds);
+            voxelShape->unsubPaintStateChanges();
         }, this);
         callbackIds.append(callbackId);
     }
@@ -318,11 +350,25 @@ private:
         
         // Face tension paint values start at 0. Use uint16_t to get the size right, but it will really be half-floats in the shader.
         // Need to use a typed buffer to get half-float support.
+        // Need three copies of the buffer: A and B for ping-ponging during paint strokes, and one to hold the "before paint" state for delta calculations.
         int elementCount = numVoxels * 6; // 6 faces per voxel
         const std::vector<uint16_t> emptyFaceTensionData(elementCount, 0); // 6 faces per voxel
-        faceTensionPaintBuffer = DirectX::createReadWriteBuffer(emptyFaceTensionData, 0, DirectX::BufferFormat::TYPED);
-        faceTensionPaintSRV = DirectX::createSRV(faceTensionPaintBuffer, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT);
-        faceTensionPaintUAV = DirectX::createUAV(faceTensionPaintBuffer, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT);
-    }
+        faceTensionPaintBufferA = DirectX::createReadWriteBuffer(emptyFaceTensionData, 0, DirectX::BufferFormat::TYPED);
+        faceTensionPaintBufferB = DirectX::createReadWriteBuffer(emptyFaceTensionData, 0, DirectX::BufferFormat::TYPED);
+        facePaintViews = PingPongView(
+            DirectX::createSRV(faceTensionPaintBufferB, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT),
+            DirectX::createSRV(faceTensionPaintBufferA, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT),
+            DirectX::createUAV(faceTensionPaintBufferB, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT),
+            DirectX::createUAV(faceTensionPaintBufferA, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT)
+        );
 
+        paintDeltaBuffer = DirectX::createReadWriteBuffer(emptyFaceTensionData, 0, DirectX::BufferFormat::TYPED);
+        paintDeltaUAV = DirectX::createUAV(paintDeltaBuffer, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT);
+
+        paintDeltaCompute = PaintDeltaCompute(
+            elementCount,
+            facePaintViews,
+            paintDeltaUAV
+        );
+    }
 };

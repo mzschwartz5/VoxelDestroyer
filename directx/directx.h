@@ -88,10 +88,10 @@ public:
     }
     
     template<typename T>
-    static ComPtr<ID3D11Buffer> createConstantBuffer(const T& data, bool dynamic = true) {
+    static ComPtr<ID3D11Buffer> createConstantBuffer(const T& data) {
         D3D11_BUFFER_DESC bufferDesc = {};
 
-        bufferDesc.Usage = dynamic ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_IMMUTABLE;
+        bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
         bufferDesc.ByteWidth = static_cast<UINT>(sizeof(T));
         bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -224,35 +224,38 @@ public:
     }
 
     /**
-     * Create a buffer using an existing SRV or UAV as the template. The view
-     * type can be ID3D11ShaderResourceView or ID3D11UnorderedAccessView 
+     * Copy back a GPU buffer to a host vector. 
+     * Note: this is for buffers without CPU access flags; we first copy to a staging buffer.
      */
-    template<typename T, typename View>
-    static ComPtr<ID3D11Buffer> createBufferFromViewTemplate(
-        const ComPtr<View>& existingView,
-        const std::vector<T>& data
+    template<typename T>
+    static void copyBufferToVector(
+        const ComPtr<ID3D11Buffer>& buffer,
+        std::vector<T>& outData
     ) {
-        ComPtr<ID3D11Resource> resource;
-        existingView->GetResource(resource.GetAddressOf());
+        D3D11_BUFFER_DESC desc;
+        buffer->GetDesc(&desc);
+        size_t elementCount = desc.ByteWidth / sizeof(T);
+        outData.resize(elementCount);
 
-        ComPtr<ID3D11Buffer> existingBuffer;
-        resource.As(&existingBuffer);
+        // Create a staging buffer (CPU read)
+        D3D11_BUFFER_DESC stagingDesc = {};
+        stagingDesc.Usage = D3D11_USAGE_STAGING;
+        stagingDesc.ByteWidth = desc.ByteWidth;
+        stagingDesc.BindFlags = 0;
+        stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        stagingDesc.MiscFlags = 0;
+        stagingDesc.StructureByteStride = desc.StructureByteStride;
 
-        return createBufferFromBufferTemplate<T>(existingBuffer, data);
+        ComPtr<ID3D11Buffer> staging;
+        HRESULT hr = dxDevice->CreateBuffer(&stagingDesc, nullptr, staging.GetAddressOf());
+
+        // Copy GPU buffer to staging buffer and then map it back to CPU memory
+        dxContext->CopyResource(staging.Get(), buffer.Get());
+        D3D11_MAPPED_SUBRESOURCE mapped = {};
+        hr = dxContext->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped);
+        memcpy(outData.data(), mapped.pData, desc.ByteWidth);
+        dxContext->Unmap(staging.Get(), 0);
     }
-
-    /**
-     * Uses an existing UAV as a template (copies its description) to create a new UAV for a different buffer.
-     */
-    static ComPtr<ID3D11UnorderedAccessView> createUAVFromTemplate(
-        const ComPtr<ID3D11UnorderedAccessView>& existingUAV,
-        const ComPtr<ID3D11Buffer>& newBuffer
-    );
-
-    static ComPtr<ID3D11ShaderResourceView> createSRVFromTemplate(
-        const ComPtr<ID3D11ShaderResourceView>& existingSRV,
-        const ComPtr<ID3D11Buffer>& newBuffer
-    );
 
     /*
     * Clears a UINT buffer with the value 0.
@@ -263,7 +266,7 @@ public:
         DirectX::getContext()->ClearUnorderedAccessViewUint(uav.Get(), clearValues);
     }
 
-    static void copyBuffer(
+    static void copyBufferToBuffer(
         const ComPtr<ID3D11UnorderedAccessView>& srcUAV,
         const ComPtr<ID3D11UnorderedAccessView>& dstUAV
     ) {

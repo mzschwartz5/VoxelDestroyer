@@ -92,11 +92,10 @@ public:
     void sendVoxelInfoToPaintRenderOp(
         const MMatrixArray& allVoxelMatrices, 
         const std::vector<uint32_t>& visibleVoxelIdToGlobalId,
-        const ComPtr<ID3D11UnorderedAccessView>& voxelPaintUAV,
-        const ComPtr<ID3D11ShaderResourceView>& voxelPaintSRV
+        PingPongView& voxelPaintViews
     ) {
         VoxelPaintRenderOperation* paintOp = static_cast<VoxelPaintRenderOperation*>(mOperations[paintOpIndex]);
-        paintOp->prepareToPaint(allVoxelMatrices, visibleVoxelIdToGlobalId, voxelPaintUAV, voxelPaintSRV);
+        paintOp->prepareToPaint(allVoxelMatrices, visibleVoxelIdToGlobalId, voxelPaintViews);
     }
 
     // TODO: these do not have to be static - consumers can use MRenderer to get the active render override instance.

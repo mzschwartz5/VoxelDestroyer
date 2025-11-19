@@ -23,6 +23,7 @@
 #include "custommayaconstructs/usernodes/planecollider.h"
 #include "custommayaconstructs/commands/createcollidercommand.h"
 #include "custommayaconstructs/commands/changevoxeleditmodecommand.h"
+#include "custommayaconstructs/commands/applyvoxelpaintcommand.h"
 #include <maya/MDrawRegistry.h>
 #include <maya/MItDependencyNodes.h>
 #include "directx/compute/computeshader.h"
@@ -305,6 +306,10 @@ EXPORT MStatus initializePlugin(MObject obj)
 	if (!status)
 		status.perror("registerCommand failed");
 
+	status = plugin.registerCommand(ApplyVoxelPaintCommand::commandName, ApplyVoxelPaintCommand::creator, ApplyVoxelPaintCommand::syntax);
+	if (!status)
+		status.perror("registerCommand failed");
+
 	// Voxel Data (custom node attribute data type that holds voxel info)
 	status = plugin.registerData(VoxelData::fullName, VoxelData::id, VoxelData::creator);
 	if (!status) {
@@ -484,6 +489,10 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	status = plugin.deregisterCommand(ChangeVoxelEditModeCommand::commandName);
 	if (!status)
 		MGlobal::displayError("deregisterCommand failed on changeVoxelEditMode: " + status.errorString());
+
+	status = plugin.deregisterCommand(ApplyVoxelPaintCommand::commandName);
+	if (!status)
+		MGlobal::displayError("deregisterCommand failed on applyVoxelPaint: " + status.errorString());
 
     // Deregister the custom maya constructs (nodes, contexts, render overrides, etc.)
     // Voxel Drag Context command

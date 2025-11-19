@@ -271,8 +271,10 @@ private:
             showHideCallbackId = MCommandMessage::addProcCallback(onShowHideStateChange, this, nullptr);
         }
 
+        voxelShape->unsubscribePaintStateChanges();
         if (isFacePaintMode && isThisShape) {
             sendVoxelInfoToPaintRenderOp();
+            voxelShape->subscribeToPaintStateChanges();
         }
 
         shouldUpdate = true;
@@ -752,10 +754,9 @@ private:
 
         const MMatrixArray& voxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
         // TODO: will send all weight sets eventually (tension, compression, particle weights). (Or just the selected set?)
-        const ComPtr<ID3D11UnorderedAccessView>& faceTensionUAV = voxelShape->getFaceTensionPaintUAV();
-        const ComPtr<ID3D11ShaderResourceView>& faceTensionSRV = voxelShape->getFaceTensionPaintSRV();
+        PingPongView& facePaintViews = voxelShape->getFacePaintViews();
 
-        voxelRendererOverride->sendVoxelInfoToPaintRenderOp(voxelMatrices, visibleVoxelIdToGlobalId, faceTensionUAV, faceTensionSRV);
+        voxelRendererOverride->sendVoxelInfoToPaintRenderOp(voxelMatrices, visibleVoxelIdToGlobalId, facePaintViews);
     }
 
     void createVoxelGeometryBuffers() {
