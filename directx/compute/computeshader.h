@@ -9,11 +9,28 @@
 #include "../../utils.h"
 using Microsoft::WRL::ComPtr;
 
+struct ShaderKey {
+    int id;
+    std::string entryPoint;
+
+    bool operator==(const ShaderKey& other) const {
+        return id == other.id && entryPoint == other.entryPoint;
+    }
+};
+
+struct ShaderKeyHash {
+    size_t operator()(ShaderKey const& k) const noexcept {
+        size_t h1 = std::hash<int>{}(k.id);
+        size_t h2 = std::hash<std::string>{}(k.entryPoint);
+        return h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1<<6) + (h1>>2));
+    }
+};
+
 class ComputeShader
 {
 public:
     ComputeShader() = default;
-    ComputeShader(int id) : id(id) {
+    ComputeShader(int id, const std::string& entryPoint = "main") : id(id), entryPoint(entryPoint) {
         load();
     }
     virtual ~ComputeShader() = default;
@@ -38,8 +55,9 @@ protected:
     virtual void unbind() = 0;
 
     void load() {
-        if (shaderCache.find(id) != shaderCache.end()) {
-            shaderPtr = shaderCache.at(id);
+        ShaderKey key{ id, entryPoint };
+        if (shaderCache.find(key) != shaderCache.end()) {
+            shaderPtr = shaderCache.at(key);
             return;
         }
 
@@ -72,7 +90,7 @@ protected:
 
         ID3D10Blob* pPSBuf = NULL;    
         ID3D10Blob* pErrorBlob = NULL;
-        HRESULT hr = D3DCompile(data, size, NULL, SHADER_MACROS, &D3DIncludeHandler::instance(), "main", "cs_5_0", 0, 0, &pPSBuf, &pErrorBlob);
+        HRESULT hr = D3DCompile(data, size, NULL, SHADER_MACROS, &D3DIncludeHandler::instance(), entryPoint.c_str(), "cs_5_0", 0, 0, &pPSBuf, &pErrorBlob);
 
         if (FAILED(hr)) {
             if (pErrorBlob) {
@@ -91,13 +109,14 @@ protected:
             return;
         }
         pPSBuf->Release();
-        shaderCache[id] = shaderPtr;
+
+        shaderCache[key] = shaderPtr;
     }
 
 private:
     // Cache of created shaders to avoid loading and recompiling the same shader multiple times,
-    // as multiple instances of the same shader may be used across different PBD nodes.
-    inline static std::unordered_map<int, ComPtr<ID3D11ComputeShader>> shaderCache;
+    // as multiple instances of the same shader may be used across different nodes.
+    inline static std::unordered_map<ShaderKey, ComPtr<ID3D11ComputeShader>, ShaderKeyHash> shaderCache;
     int id;
-
+    std::string entryPoint;
 };
