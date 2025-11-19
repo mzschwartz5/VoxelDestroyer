@@ -30,15 +30,19 @@ class ComputeShader
 {
 public:
     ComputeShader() = default;
-    ComputeShader(int id, const std::string& entryPoint = "main") : id(id), entryPoint(entryPoint) {
-        load();
+    ComputeShader(int id, const std::string& entryPoint = "main") : id(id) {
+        loadEntryPoint(entryPoint);
     }
     virtual ~ComputeShader() = default;
 
     virtual void dispatch() = 0;
 
-    virtual void dispatch(int threadGroupCount) {
+    virtual void dispatch(int threadGroupCount, const std::string& entryPoint = "main") {
         if (threadGroupCount <= 0) return;
+        
+        ShaderKey key{ id, entryPoint };
+        DirectX::getContext()->CSSetShader(shaderCache[key].Get(), NULL, 0);
+
         bind();
         DirectX::getContext()->Dispatch(threadGroupCount, 1, 1); 
         unbind();
@@ -49,15 +53,12 @@ public:
     }
     
 protected:    
-    ComPtr<ID3D11ComputeShader> shaderPtr;
-
     virtual void bind() = 0;
     virtual void unbind() = 0;
 
-    void load() {
+    void loadEntryPoint(const std::string& entryPoint) {
         ShaderKey key{ id, entryPoint };
         if (shaderCache.find(key) != shaderCache.end()) {
-            shaderPtr = shaderCache.at(key);
             return;
         }
 
@@ -103,7 +104,8 @@ protected:
             return;
         }
 
-        hr = DirectX::getDevice()->CreateComputeShader( pPSBuf->GetBufferPointer(), pPSBuf->GetBufferSize(), NULL, &shaderPtr);
+        ComPtr<ID3D11ComputeShader> shaderPtr;
+        hr = DirectX::getDevice()->CreateComputeShader(pPSBuf->GetBufferPointer(), pPSBuf->GetBufferSize(), NULL, shaderPtr.GetAddressOf());
         if (FAILED(hr)) {
             MGlobal::displayError("Failed to create compute shader");
             return;
@@ -118,5 +120,4 @@ private:
     // as multiple instances of the same shader may be used across different nodes.
     inline static std::unordered_map<ShaderKey, ComPtr<ID3D11ComputeShader>, ShaderKeyHash> shaderCache;
     int id;
-    std::string entryPoint;
 };

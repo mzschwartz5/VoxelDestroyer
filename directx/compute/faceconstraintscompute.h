@@ -67,9 +67,7 @@ private:
 
     void bind() override
     {
-        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
-
-        ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), faceConstraintUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get() };
+        ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), faceConstraintUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get(), facePaintUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
         ID3D11Buffer* cbvs[] = { voxelSimInfoBuffer.Get(), faceConstraintsCBs[activeConstraintAxis].Get() };
@@ -78,8 +76,6 @@ private:
 
     void unbind() override
     {
-        DirectX::getContext()->CSSetShader(nullptr, NULL, 0);
-
         ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 

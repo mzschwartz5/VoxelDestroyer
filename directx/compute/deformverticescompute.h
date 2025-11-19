@@ -70,8 +70,6 @@ private:
         UINT zeroOffsets[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT] = {};
         DirectX::getContext()->IASetVertexBuffers(0, D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT, nullVBs, zeroStrides, zeroOffsets);
 
-        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
-
         ID3D11ShaderResourceView* srvs[] = { originalVertPositionsSRV.Get(), originalNormalsSRV.Get(), originalParticlePositionsSRV.Get(), particlePositionsSRV.Get(), vertexVoxelIdsSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
@@ -84,8 +82,6 @@ private:
 
     void unbind() override
     {
-        DirectX::getContext()->CSSetShader(nullptr, NULL, 0);
-
         ID3D11ShaderResourceView* nullSRVs[] = { nullptr, nullptr, nullptr, nullptr, nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(nullSRVs), nullSRVs);
 

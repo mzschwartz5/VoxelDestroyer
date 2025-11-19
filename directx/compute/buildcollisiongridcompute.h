@@ -61,8 +61,6 @@ private:
     ComPtr<ID3D11ShaderResourceView> isSurfaceSRV;
 
     void bind() override {
-        DirectX::getContext()->CSSetShader(shaderPtr.Get(), NULL, 0);
-
         ID3D11ShaderResourceView* srvs[] = { particlePositionsSRV.Get(), isSurfaceSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
@@ -74,8 +72,6 @@ private:
     }
 
     void unbind() override {
-        DirectX::getContext()->CSSetShader(nullptr, NULL, 0);
-
         ID3D11ShaderResourceView* srvs[] = { nullptr, nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
