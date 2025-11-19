@@ -35,6 +35,8 @@ public:
     inline static const MString pbdNodeName{"PBD"};
     inline static const MTypeId id{0x0013A7B0};
     // Attributes
+    inline static MObject aConstraintLow;
+    inline static MObject aConstraintHigh;
     inline static MObject aMeshOwner;
     // Inputs
     inline static MObject aTriggerIn;
@@ -55,6 +57,27 @@ public:
     static MStatus initialize() {
         MStatus status;
 
+        MFnNumericAttribute nAttr;
+        aConstraintLow = nAttr.create("constraintLow", "cl", MFnNumericData::kFloat, 0.0f, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        nAttr.setStorable(true);
+        nAttr.setReadable(true);
+        nAttr.setWritable(true);
+        nAttr.setMin(0.0f);
+        nAttr.setMax(FLT_MAX);
+        addAttribute(aConstraintLow);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        aConstraintHigh = nAttr.create("constraintHigh", "ch", MFnNumericData::kFloat, 100.0f, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        nAttr.setStorable(true);
+        nAttr.setReadable(true);
+        nAttr.setWritable(true);
+        nAttr.setMin(0.0f);
+        nAttr.setMax(FLT_MAX);
+        status = addAttribute(aConstraintHigh);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
         // Special message attribute for associating a PBD node with a mesh (for lifetime management)
         MFnMessageAttribute mAttr;
         aMeshOwner = mAttr.create("mesh", "msh", &status);
@@ -66,7 +89,6 @@ public:
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         // Input attribute for GlobalSolver to trigger updates
-        MFnNumericAttribute nAttr;
         aTriggerIn = nAttr.create("triggerin", "tgi", MFnNumericData::kBoolean, false, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         nAttr.setStorable(false);
@@ -243,8 +265,11 @@ public:
         MGlobal::executeCommandOnIdle("delete " + pbdNode->name(), false);
     }
 
-    void updateFaceConstraintsWithPaintValues(const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV) {
-        pbd.updateFaceConstraintsWithPaintValues(paintDeltaUAV);
+    void updateFaceConstraintsWithPaintValues(const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV, const ComPtr<ID3D11UnorderedAccessView>& paintValueUAV) {
+        float constraintLow = MPlug(thisMObject(), aConstraintLow).asFloat();
+        float constraintHigh = MPlug(thisMObject(), aConstraintHigh).asFloat();
+
+        pbd.updateFaceConstraintsWithPaintValues(paintDeltaUAV, paintValueUAV, constraintLow, constraintHigh);
     }
     
 private:

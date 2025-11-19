@@ -151,7 +151,7 @@ private:
     inline static Event<const PaintDragState&> paintDragStateChangedEvent;
     EventBase::Unsubscribe unsubscribeBaseDragStateEvent;
     BrushMode brushMode = BrushMode::SET;
-    float brushValue = 0.5f;
+    float brushValue = 50.0f;
     bool cameraBased = true;
     MCallbackId timerCallbackId;
     MColor lowColor = MColor(1.0f, 0.0f, 0.0f, 0.0f);

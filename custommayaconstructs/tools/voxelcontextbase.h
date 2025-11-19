@@ -14,7 +14,7 @@ struct MousePosition
 struct DragState
 {
     bool isDragging{ false };
-    float selectRadius{ 50.0f };
+    float selectRadius{ 25.0f };
     MousePosition mousePosition;
 };
 
@@ -48,7 +48,7 @@ private:
     bool isDragging = false;
     short mouseX, mouseY;
     short screenDragStartX, screenDragStartY;
-    float selectRadius = 50.0f;
+    float selectRadius = 25.0f;
     MStatus status;
 
 protected:

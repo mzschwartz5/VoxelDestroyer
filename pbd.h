@@ -47,7 +47,12 @@ public:
         return totalParticles;
     }
 
-    void updateFaceConstraintsWithPaintValues(const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV);
+    void updateFaceConstraintsWithPaintValues(
+        const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV,
+        const ComPtr<ID3D11UnorderedAccessView>& paintValueUAV,
+        float constraintLow, 
+        float constraintHigh
+    );
     
     void simulateSubstep();
 

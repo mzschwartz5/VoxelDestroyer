@@ -448,7 +448,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL1);
 	// VoxelizerMenu
 	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL2);
-	// AEColliderTemplate
+	// AETemplates
 	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL3);
 
 	// Unlike other MEL scripts, these two can't be loaded into memory, but have to be copied (into the user scripts directory)

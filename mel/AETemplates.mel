@@ -1,0 +1,174 @@
+// Note: typically, attribute editor templates (AE templates) have to be named according to the node type. That's only if you put the file in a path and want
+// Maya to detect it automatically. We load this file manually, so naming isn't strict (naming of the procs IS strict, just not of the file). 
+// This has the advantage of allowing us to put all our templates in the same file and reuse functionality.
+
+global proc AEPBDTemplate(string $nodeName)
+{
+    editorTemplate -beginScrollLayout;
+
+    editorTemplate -beginLayout "PBD Settings" -collapse 0;
+        editorTemplate -callCustom "AE_createConstraintLow" "AE_updateConstraintLow" "constraintLow";
+        editorTemplate -callCustom "AE_createConstraintHigh" "AE_updateConstraintHigh" "constraintHigh";
+    editorTemplate -endLayout;
+
+    string $keep[] = {"constraintLow", "constraintHigh"};
+    suppressAttributesExcept($nodeName, $keep);
+
+    editorTemplate -endScrollLayout;
+}
+
+global proc AE_createConstraintLow(string $attr)
+{
+    string $ctrl = "AE_constraintLow_ctrl";
+    attrFieldSliderGrp -label "Voxel strain limit (low)" -annotation "Breaking point for voxel interfaces in units of voxel-lengths, lower bound" -attribute $attr -sliderMinValue 0 -sliderMaxValue 100 $ctrl;
+}
+
+
+global proc AE_createConstraintHigh(string $attr)
+{
+    string $ctrl = "AE_constraintHigh_ctrl";
+    attrFieldSliderGrp -label "Voxel strain limit (high)" -annotation "Breaking point for voxel interfaces in units of voxel-lengths, upper bound" -attribute $attr -sliderMinValue 0 -sliderMaxValue 100 $ctrl;
+}
+
+global proc AE_updateConstraintLow(string $attr)
+{
+    string $ctrl = "AE_constraintLow_ctrl";
+    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 100 $ctrl;
+
+    // Enforce: if low > high, set high = low
+    string $parts[];
+    tokenize($attr, ".", $parts);
+    if (size($parts) < 2) { return; }
+    string $node = $parts[0];
+
+    string $lowPlug = $node + ".constraintLow";
+    string $highPlug = $node + ".constraintHigh";
+
+    float $lowVal = `getAttr $lowPlug`;
+    float $highVal = `getAttr $highPlug`;
+    if ($lowVal > $highVal) {
+        setAttr $highPlug $lowVal;
+    }
+}
+
+global proc AE_updateConstraintHigh(string $attr)
+{
+    string $ctrl = "AE_constraintHigh_ctrl";
+    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 100 $ctrl;
+
+    // Enforce: if high < low, set low = high
+    string $parts[];
+    tokenize($attr, ".", $parts);
+    if (size($parts) < 2) { return; }
+    string $node = $parts[0];
+
+    string $lowPlug = $node + ".constraintLow";
+    string $highPlug = $node + ".constraintHigh";
+
+    float $lowVal = `getAttr $lowPlug`;
+    float $highVal = `getAttr $highPlug`;
+    if ($highVal < $lowVal) {
+        setAttr $lowPlug $highVal;
+    }
+}
+
+global proc AEBoxColliderTemplate(string $nodeName)
+{
+    editorTemplate -beginScrollLayout;
+
+    editorTemplate -beginLayout "Box Collider" -collapse 0;
+        editorTemplate -label "Width" -addControl "boxWidth";
+        editorTemplate -label "Height" -addControl "boxHeight";
+        editorTemplate -label "Depth" -addControl "boxDepth";
+        editorTemplate -label "Friction" -addControl "friction";
+    editorTemplate -endLayout;
+
+    string $keep[] = {"boxWidth", "boxHeight", "boxDepth", "friction"};
+    suppressAttributesExcept($nodeName, $keep);
+
+    editorTemplate -endScrollLayout;
+}
+
+global proc AESphereColliderTemplate(string $nodeName)
+{
+    editorTemplate -beginScrollLayout;
+
+    editorTemplate -beginLayout "Sphere Collider" -collapse 0;
+        editorTemplate -label "Radius" -addControl "radius";
+        editorTemplate -label "Friction" -addControl "friction";
+    editorTemplate -endLayout;
+
+    string $keep[] = {"radius", "friction"};
+    suppressAttributesExcept($nodeName, $keep);
+
+    editorTemplate -endScrollLayout;
+}
+
+global proc AECapsuleColliderTemplate(string $nodeName)
+{
+    editorTemplate -beginScrollLayout;
+
+    editorTemplate -beginLayout "Capsule Collider" -collapse 0;
+        editorTemplate -label "Radius" -addControl "radius";
+        editorTemplate -label "Height" -addControl "height";
+        editorTemplate -label "Friction" -addControl "friction";
+    editorTemplate -endLayout;
+
+    string $keep[] = {"radius", "height", "friction"};
+    suppressAttributesExcept($nodeName, $keep);
+
+    editorTemplate -endScrollLayout;
+}
+
+global proc AECylinderColliderTemplate(string $nodeName)
+{
+    editorTemplate -beginScrollLayout;
+
+    editorTemplate -beginLayout "Cylinder Collider" -collapse 0;
+        editorTemplate -label "Radius" -addControl "radius";
+        editorTemplate -label "Height" -addControl "height";
+        editorTemplate -label "Friction" -addControl "friction";
+    editorTemplate -endLayout;
+
+    string $keep[] = {"radius", "height", "friction"};
+    suppressAttributesExcept($nodeName, $keep);
+
+    editorTemplate -endScrollLayout;
+}
+
+global proc AEPlaneColliderTemplate(string $nodeName)
+{
+    editorTemplate -beginScrollLayout;
+
+    editorTemplate -beginLayout "Plane Collider" -collapse 0;
+        editorTemplate -label "Width" -addControl "width";
+        editorTemplate -label "Height" -addControl "height";
+        editorTemplate -label "Normal" -addControl "normal";
+        editorTemplate -label "Infinite" -addControl "infinite";
+        editorTemplate -label "Friction" -addControl "friction";
+    editorTemplate -endLayout;
+
+    string $keep[] = {"width", "height", "normal", "infinite", "friction"};
+    suppressAttributesExcept($nodeName, $keep);
+
+    editorTemplate -endScrollLayout;
+}
+
+global proc suppressAttributesExcept(string $nodeName, string $keep[])
+{
+    string $attrs[] = `listAttr $nodeName`;
+    int $i;
+    for ($i = 0; $i < size($attrs); $i = $i + 1) {
+        string $a = $attrs[$i];
+        int $j;
+        int $skip = 0;
+        for ($j = 0; $j < size($keep); $j = $j + 1) {
+            if ($a == $keep[$j]) { $skip = 1; break; }
+        }
+        if (!$skip) {
+            editorTemplate -suppress $a;
+        }
+    }
+
+    editorTemplate -suppress "worldMatrixIn";
+}

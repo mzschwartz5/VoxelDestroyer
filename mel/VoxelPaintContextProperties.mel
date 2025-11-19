@@ -22,7 +22,7 @@ global proc VoxelPaintContextProperties() {
                     -maxValue 200.0
                     -fieldMinValue 0.001
                     -fieldMaxValue 1000.0
-                    -value 50.0
+                    -value 25.0
                     -adjustableColumn 3
                     -annotation "Brush size in pixels"
                     -cc "VoxelPaintContext_ApplyFromUI()"
@@ -38,15 +38,15 @@ global proc VoxelPaintContextProperties() {
                     menuItem -label "Set";
                     menuItem -label "Add";
 
-                floatSliderGrp -label "Value"
+                floatSliderGrp -label "Strength"
                     -field true
                     -minValue 0.000
-                    -maxValue 1.0
+                    -maxValue 100.0
                     -fieldMinValue 0.000
-                    -fieldMaxValue 1.0
-                    -value 0.5
+                    -fieldMaxValue 100.0
+                    -value 50.0
                     -adjustableColumn 3
-                    -annotation "The weight value applied when painting."
+                    -annotation "Brush strength: a percentage of the low-to-high constraint value range set on the PBD node."
                     -cc "VoxelPaintContext_ApplyFromUI()"
                     VoxelPaintValueControl;
 

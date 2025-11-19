@@ -7,6 +7,7 @@
 #include <maya/MFnDependencyNode.h>
 #include <maya/MItDependencyNodes.h>
 #include <maya/MFnDagNode.h>
+#include <maya/MAnimControl.h>
 #include "custommayaconstructs/tools/voxeldragcontext.h"
 #include "custommayaconstructs/usernodes/colliderlocator.h"
 
@@ -32,7 +33,8 @@ const MObject& GlobalSolver::getOrCreateGlobalSolver() {
 
     globalSolverNodeObject = Utils::createDGNode(GlobalSolver::globalSolverNodeName);
     Utils::connectPlugs(Utils::getGlobalTimePlug(), MPlug(globalSolverNodeObject, aTime));
-    
+    lastComputeTime = MAnimControl::currentTime(); // Not safe to read plug value during node creation
+
     return globalSolverNodeObject;
 }
 
@@ -457,7 +459,7 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
         dirtyColliderIndices.clear();
     }
 
-    // Sometimes aTrigger gets triggered even when time has not explicitly changed.
+    // Sometimes aTrigger gets triggered even when time has not explicitly changed (like on initialization)
     // To guard against that, cache off time on each compute and compare to last.
     MTime time = block.inputValue(aTime).asTime();
     if (time == lastComputeTime) {
