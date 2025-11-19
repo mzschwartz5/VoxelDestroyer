@@ -102,11 +102,37 @@ public:
     void setLowColor(const MColor& color) {
         lowColor = color;
         MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
+        // Drag state didn't change, but this tells the paint render operation to change colors
+        paintDragStateChangedEvent.notify(PaintDragState{
+            false,
+            getSelectRadius(),
+            getMousePosition(),
+            brushMode,
+            brushValue,
+            cameraBased,
+            lowColor,
+            highColor,
+            componentMask
+        });
+        M3dView::active3dView().refresh(false, true);
     }
 
     void setHighColor(const MColor& color) {
         highColor = color;
         MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
+        // Drag state didn't change, but this tells the paint render operation to change colors
+        paintDragStateChangedEvent.notify(PaintDragState{
+            false,
+            getSelectRadius(),
+            getMousePosition(),
+            brushMode,
+            brushValue,
+            cameraBased,
+            lowColor,
+            highColor,
+            componentMask
+        });
+        M3dView::active3dView().refresh(false, true);
     }
 
     MColor getLowColor() const {

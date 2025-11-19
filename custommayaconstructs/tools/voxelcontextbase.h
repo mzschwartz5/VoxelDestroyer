@@ -132,4 +132,8 @@ protected:
     virtual float getSelectRadius() const {
         return selectRadius;
     }
+
+    virtual MousePosition getMousePosition() const {
+        return { mouseX, mouseY };
+    }
 };
