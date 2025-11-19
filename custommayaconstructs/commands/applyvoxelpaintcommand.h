@@ -8,6 +8,7 @@
 #include <vector>
 #include "../draw/voxelshape.h"
 #include "../../directx/directx.h"
+#include <maya/M3dView.h>
 #include <d3d11.h>
 #include <wrl/client.h>
 
@@ -50,14 +51,14 @@ public:
     MStatus redoIt() override {
         VoxelShape* voxelShape = getVoxelShapeById(voxelShapeId);
         voxelShape->undoRedoPaint(paintDelta, 1);
-        MGlobal::executeCommand("refresh");
+        M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }
 
     MStatus undoIt() override {
         VoxelShape* voxelShape = getVoxelShapeById(voxelShapeId);
         voxelShape->undoRedoPaint(paintDelta, -1);
-        MGlobal::executeCommand("refresh");
+        M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }
 

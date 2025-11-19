@@ -4,6 +4,7 @@
 #include <maya/MToolsInfo.h>
 #include <maya/MTimerMessage.h>
 #include <maya/MColor.h>
+#include <maya/M3dView.h>
 
 enum class BrushMode {
     SUBTRACT,
@@ -138,7 +139,7 @@ public:
     }
 
     static void timerCallbackFunc(float, float, void*) {
-        MGlobal::executeCommand("refresh");
+        M3dView::active3dView().refresh(false, true);
     }
 
     static EventBase::Unsubscribe subscribeToPaintDragStateChange(

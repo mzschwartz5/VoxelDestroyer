@@ -11,6 +11,7 @@
 #include "../../utils.h"
 #include <maya/MString.h>
 #include <maya/MUuid.h>
+#include <maya/M3dView.h>
 
 enum class VoxelEditMode : int {
     Selection,
@@ -103,7 +104,7 @@ public:
             }
         );
 
-        MGlobal::executeCommandOnIdle("refresh");
+        M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }
 
@@ -122,7 +123,7 @@ public:
         selectShapeByUUID(shapeUUID);
         MGlobal::executeCommand(setComponentCmd, false, false);
         MGlobal::executeCommand("setToolTo " + context, false, false);
-        MGlobal::executeCommandOnIdle("refresh");
+        M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }
 

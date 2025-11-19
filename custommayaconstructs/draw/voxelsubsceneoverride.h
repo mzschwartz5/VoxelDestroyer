@@ -18,6 +18,7 @@
 #include <maya/MCommandMessage.h>
 #include <maya/MCallbackIdArray.h>
 #include <functional>
+#include <maya/M3dView.h>
 
 using namespace MHWRender;
 using std::unique_ptr;
@@ -225,7 +226,7 @@ private:
         // Force a subscene update to occur by refreshing the viewport.
         // This won't necessarily happen on its own, because Maya doesn't consider a custom shape's components to be valid for hiding/showing,
         // (which is why we have to implement the behavior ourselves), so it thinks nothing has changed and will not refresh immediately.
-	    MGlobal::executeCommandOnIdle("refresh");
+	    M3dView::active3dView().scheduleRefresh();
 
         if (subscene->showHideStateChange != ShowHideStateChange::HideSelected) return;
         subscene->hideAllowed = false;
@@ -311,7 +312,7 @@ private:
     void onHoveredVoxelChange(int hoveredVoxelInstanceId) {
         // Already called this frame (likely because we did a drag-select and this gets called for each intersection)
         if (hoveredVoxelChanged) return;
-        MGlobal::executeCommandOnIdle("refresh"); 
+        M3dView::active3dView().scheduleRefresh();
         
         hoveredVoxelMatrices.clear();
         const MMatrixArray& voxelMatrices = voxelShape->getVoxels().get()->modelMatrices;

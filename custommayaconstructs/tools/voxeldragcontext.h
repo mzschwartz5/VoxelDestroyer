@@ -5,6 +5,7 @@
 #include <maya/MTimerMessage.h>
 #include <maya/MEventMessage.h>
 #include <maya/MConditionMessage.h>
+#include <maya/M3dView.h>
 
 // Maya API does not expose a playback direction enum, nor a way to get the current playback direction,
 // so we define and track it ourselves.
@@ -107,7 +108,7 @@ private:
         MAnimControl::setCurrentTime(MTime(std::round(currentTime), MTime::uiUnit()));
         lastTimeValue = MTime(currentTime, MTime::uiUnit()).value();
 
-	    MGlobal::executeCommand("refresh");
+	    M3dView::active3dView().refresh(false, true);
     }
 
     // Match the timer rate to the playback rate
