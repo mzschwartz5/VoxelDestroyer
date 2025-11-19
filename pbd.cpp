@@ -119,8 +119,13 @@ void PBD::setGPUResourceHandles(
     preVGSCompute.setIsDraggingSRV(isDraggingSRV);
 }
 
-void PBD::updateFaceConstraintsWithPaintValues(const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV) {
-    faceConstraintsCompute.updateFaceConstraintsFromPaint(paintDeltaUAV);
+void PBD::updateFaceConstraintsWithPaintValues(
+    const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV, 
+    const ComPtr<ID3D11UnorderedAccessView>& paintValueUAV, 
+    float constraintLow, 
+    float constraintHigh
+) {
+    faceConstraintsCompute.updateFaceConstraintsFromPaint(paintDeltaUAV, paintValueUAV, constraintLow, constraintHigh);
 }
 
 void PBD::simulateSubstep() {

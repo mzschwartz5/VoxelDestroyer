@@ -97,7 +97,7 @@ public:
         unsubscribeFromPaintStateChange = VoxelPaintContext::subscribeToPaintDragStateChange([this](const PaintDragState& state) {
             paintRadius = state.selectRadius;
             brushMode = state.brushMode;
-            brushValue = state.brushValue;
+            brushValue = state.brushValue / 100.0f; // UI provides percentage, shader expects normalized.
             cameraBased = state.cameraBased;
             lowColor = state.lowColor;
             highColor = state.highColor;
@@ -450,7 +450,7 @@ private:
     const MBlendState* alphaEnabledBlendState = nullptr;
     D3D11_RECT scissor = { 0, 0, 0, 0 };
     bool hasBrushMoved = false;
-    float paintRadius = 50.0f;
+    float paintRadius = 25.0f;
     BrushMode brushMode = BrushMode::SET;
     float brushValue = 0.5f;
     bool cameraBased = true;

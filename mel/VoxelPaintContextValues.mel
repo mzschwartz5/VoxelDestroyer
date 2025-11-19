@@ -74,9 +74,9 @@ global proc VoxelPaintContextValues(string $toolName) {
 global proc VoxelPaintContext_Reset()
 {
     // reset UI controls to defaults
-    floatSliderGrp -e -v 50.0 VoxelPaintRadiusControl;
+    floatSliderGrp -e -v 25.0 VoxelPaintRadiusControl;
     optionMenuGrp -e -sl 1 VoxelPaintModeControl;
-    floatSliderGrp -e -v 0.5 VoxelPaintValueControl;
+    floatSliderGrp -e -v 50.0 VoxelPaintValueControl;
     checkBoxGrp -e -v1 1 VoxelPaintCameraBasedControl;
     colorSliderGrp -e -rgb 1.0 0.0 0.0 -alphaValue 0.0 VoxelPaintLowColorControl;
     colorSliderGrp -e -rgb 1.0 0.0 0.0 -alphaValue 1.0 VoxelPaintHighColorControl;
@@ -85,9 +85,9 @@ global proc VoxelPaintContext_Reset()
 
     // push defaults into the active context (if active)
     string $ctx = `currentCtx`;
-    catchQuiet(`voxelPaintContextCommand -e -radius 50 $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -radius 25.0 $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -mode 0 $ctx`);
-    catchQuiet(`voxelPaintContextCommand -e -value 0.5 $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -value 50.0 $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -cameraBased 1 $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -lowColor 1.0 0.0 0.0 0.0 $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -highColor 1.0 0.0 0.0 1.0 $ctx`);

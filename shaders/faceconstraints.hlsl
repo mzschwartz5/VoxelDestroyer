@@ -27,7 +27,11 @@ cbuffer FaceConstraintsCB : register(b1)
     uint numConstraints;
     int faceAId;          // Which face index this constraint corresponds to on voxel A (only used for paint value lookup)
     int faceBId;          // Which face index this constraint corresponds to on voxel B (only used for paint value lookup)
+    float constraintLow;
+    float constraintHigh;
     int padding0;
+    int padding1;
+    int padding2;
 };
 
 RWStructuredBuffer<float4> positions : register(u0);
@@ -109,6 +113,7 @@ void main(
 }
 
 RWBuffer<float> paintDeltas : register(u3);
+RWBuffer<float> paintValues : register(u4);
 
 // This entry point is for updating the face constraints based on paint values.
 // One thread per face constraint (over three dispatches, one per axis - just because that's how the face constraint data is stored).
@@ -133,21 +138,25 @@ void updateFaceConstraintsFromPaint(
     int paintValueBIdx = voxelBIdx * 6 + faceBId;
 
     // In theory, in a given brush stroke, the user can only paint one side of a face constraint. (If camera-based painting is off,
-    // they can get both sides, but they would be the same value). So we take whichever value is non-zero (if either), and set the constraint limits
-    // based on that. And also set the other paint value in the pair to the same value so both sides are visually painted consistent.
+    // they can get both sides, but they would be the same value). So we take the first non-zero value (if either is non-zero), and set the constraint limits
+    // based on that. And also mirror to the other paint value in the pair so both sides are visually painted consistently.
     float paintDeltaA = paintDeltas[paintValueAIdx];
     float paintDeltaB = paintDeltas[paintValueBIdx];
-    if (paintDeltaA < eps && paintDeltaB < eps) return;
+    if (abs(paintDeltaA) < eps && abs(paintDeltaB) < eps) return;
 
     // Branch-free selection of the paint delta to use (pick B if non-zero, else A)
     float useB = abs(sign(paintDeltaB));
     float selectedDelta = paintDeltaA + useB * (paintDeltaB - paintDeltaA);
-    int unselectedIdx = paintValueBIdx + (int)(useB) * (paintValueAIdx - paintValueBIdx);
 
-    paintDeltas[unselectedIdx] = selectedDelta;
+    if (paintDeltaA != paintDeltaB) {
+        int unselectedIdx = paintValueBIdx + (int)(useB) * (paintValueAIdx - paintValueBIdx);
+        paintDeltas[unselectedIdx] = selectedDelta;
+        paintValues[unselectedIdx] += selectedDelta;
+    }
 
-    // For now, same paint value for both limits
-    constraint.tensionLimit = selectedDelta;
-    constraint.compressionLimit = -selectedDelta;
+    // For now, same paint value for both compression and tension
+    float limit = constraintLow + (constraintHigh - constraintLow) * selectedDelta;
+    constraint.tensionLimit = limit;
+    constraint.compressionLimit = -limit;
     faceConstraints[constraintIdx] = constraint;
 }

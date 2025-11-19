@@ -49,14 +49,14 @@ public:
 
     MStatus redoIt() override {
         VoxelShape* voxelShape = getVoxelShapeById(voxelShapeId);
-        voxelShape->applyPaintDelta(paintDelta, 1);
+        voxelShape->undoRedoPaint(paintDelta, 1);
         MGlobal::executeCommand("refresh");
         return MS::kSuccess;
     }
 
     MStatus undoIt() override {
         VoxelShape* voxelShape = getVoxelShapeById(voxelShapeId);
-        voxelShape->applyPaintDelta(paintDelta, -1);
+        voxelShape->undoRedoPaint(paintDelta, -1);
         MGlobal::executeCommand("refresh");
         return MS::kSuccess;
     }

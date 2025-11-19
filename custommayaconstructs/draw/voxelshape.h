@@ -224,9 +224,10 @@ public:
         unsubPaintStateChanges();
     }
 
-    void applyPaintDelta(const std::vector<uint16_t>& paintDelta, int direction = 1) {
+    void undoRedoPaint(const std::vector<uint16_t>& paintDelta, int direction = 1) {
         DirectX::getContext()->UpdateSubresource(paintDeltaBuffer.Get(), 0, nullptr, paintDelta.data(), 0, 0);
         
+        // Using the right sign, we can reuse the paint delta compute shader to _apply_ the delta to the paint values.
         paintDeltaCompute.updateSign(direction);
         paintDeltaCompute.dispatch();
         paintDeltaCompute.updateSign(-1); // Reset sign to default (see paintdelta.hlsl)
@@ -245,7 +246,7 @@ public:
     void updatePBDConstraints() {
         MPlug triggerPlug(thisMObject(), aTrigger);
         PBDNode* pbdNode = static_cast<PBDNode*>(Utils::connectedNode(triggerPlug));
-        pbdNode->updateFaceConstraintsWithPaintValues(paintDeltaUAV);
+        pbdNode->updateFaceConstraintsWithPaintValues(paintDeltaUAV, facePaintViews.UAV());
     }
 
 private:
