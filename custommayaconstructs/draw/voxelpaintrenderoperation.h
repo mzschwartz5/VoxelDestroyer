@@ -91,6 +91,7 @@ public:
 
         unsubscribeFromPaintMove = VoxelPaintContext::subscribeToMousePositionChange([this](const MousePosition& mousePos) {
             updatePaintToolPos(mousePos.x, mousePos.y);
+            hasBrushMoved = true;
         });
 
         unsubscribeFromPaintStateChange = VoxelPaintContext::subscribeToPaintDragStateChange([this](const PaintDragState& state) {
@@ -101,7 +102,7 @@ public:
             lowColor = state.lowColor;
             highColor = state.highColor;
             componentMask = state.componentMask;
-            updatePaintToolPos(state.mousePosition.x, state.mousePosition.y);
+            hasBrushMoved = state.isDragging;
             voxelIDViews.clear(DirectX::clearUintBuffer);
         });
 
@@ -156,7 +157,7 @@ public:
         setInputAssemblyState();
 
         if (hasBrushMoved) {
-            voxelPaintViews.swap(&DirectX::copyBuffer);
+            voxelPaintViews->swap(&DirectX::copyBufferToBuffer);
             voxelIDViews.swap(&DirectX::clearUintBuffer);
             executeIDPass(drawContext);
             executePaintPass(drawContext);
@@ -240,7 +241,7 @@ public:
         ID3D11DepthStencilView* mainDepthDSV = static_cast<ID3D11DepthStencilView*>(mainDepthTarget->resourceHandle());
         ID3D11UnorderedAccessView* uavs[] = {
             voxelIDViews.UAV().Get(),
-            voxelPaintViews.UAV().Get()
+            voxelPaintViews->UAV().Get()
         };
         
         // Bind the onscreen, main render and depth targets.
@@ -261,7 +262,7 @@ public:
 
         ID3D11ShaderResourceView* ps_srvs[] = {
             voxelIDViews.SRV().Get(),
-            voxelPaintViews.SRV().Get(),
+            voxelPaintViews->SRV().Get(),
             renderTargetSRV.Get()
         };
 
@@ -302,7 +303,7 @@ public:
             mainDepthDSV,
             2, // UAVStartSlot
             1, // NumUAVs
-            voxelPaintViews.UAV().GetAddressOf(),
+            voxelPaintViews->UAV().GetAddressOf(),
             nullptr
         );
 
@@ -379,9 +380,9 @@ public:
     void prepareToPaint(
         const MMatrixArray& allVoxelMatrices, 
         const std::vector<uint32_t>& visibleVoxelIdToGlobalId,
-        const ComPtr<ID3D11UnorderedAccessView>& voxelPaintUAV,
-        const ComPtr<ID3D11ShaderResourceView>& voxelPaintSRV
+        PingPongView& paintViews
     ) {
+        voxelPaintViews = &paintViews;
         int numVoxels = static_cast<int>(allVoxelMatrices.length());
         instanceCount = static_cast<unsigned int>(visibleVoxelIdToGlobalId.size());
         if (instanceCount == 0) {
@@ -411,17 +412,6 @@ public:
         visibleToGlobalVoxelBuffer = DirectX::createReadOnlyBuffer<uint32_t>(visibleVoxelIdToGlobalId);
         visibleToGlobalVoxelSRV = DirectX::createSRV(visibleToGlobalVoxelBuffer);
 
-        // Create a copy of the voxel paint buffer based on its UAV, passing an empty vector so we don't have to first map back data.
-        // It's okay that it's empty, we just need the buffer size and flags to match. Also, it's really half-floats, but uint16_t has the same size.
-        const std::vector<uint16_t> emptyPaintData(numVoxels * 6, 0); // TODO: number of elements depends on whether painting faces or vertices
-        voxelPaintBufferB = DirectX::createBufferFromViewTemplate(voxelPaintUAV, emptyPaintData);
-        voxelPaintViews = PingPongView(
-            DirectX::createSRVFromTemplate(voxelPaintSRV, voxelPaintBufferB), 
-            voxelPaintSRV,
-            DirectX::createUAVFromTemplate(voxelPaintUAV, voxelPaintBufferB),
-            voxelPaintUAV
-        );
-
         // TODO: this can be a vector of uint8_t (it's just 1s and 0s)
         const std::vector<uint32_t> emptyIDData(numVoxels * 6, 0); // TODO: number of elements depends on whether painting faces or vertices
         voxelIDBufferA = DirectX::createReadWriteBuffer(emptyIDData);
@@ -447,7 +437,6 @@ public:
         scissor.right = std::min(static_cast<int>(outputTargetWidth), right);
         scissor.top = std::max(0, top);
         scissor.bottom = std::min(static_cast<int>(outputTargetHeight), bottom);
-        hasBrushMoved = true;
     }
 
 private:
@@ -479,8 +468,7 @@ private:
     ComPtr<ID3D11ShaderResourceView> instanceTransformSRV;
     ComPtr<ID3D11Buffer> visibleToGlobalVoxelBuffer;
     ComPtr<ID3D11ShaderResourceView> visibleToGlobalVoxelSRV;
-    ComPtr<ID3D11Buffer> voxelPaintBufferB; // The original is owned by the VoxelShape being painted
-    PingPongView voxelPaintViews;
+    PingPongView* voxelPaintViews;
     ComPtr<ID3D11Buffer> voxelIDBufferA;
     ComPtr<ID3D11Buffer> voxelIDBufferB;
     PingPongView voxelIDViews;
