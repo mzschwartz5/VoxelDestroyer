@@ -104,6 +104,7 @@ public:
             componentMask = state.componentMask;
             hasBrushMoved = state.isDragging;
             voxelIDViews.clear(DirectX::clearUintBuffer);
+            updatePaintToolPos(state.mousePosition.x, state.mousePosition.y);
         });
 
         playbackCallbackId = MConditionMessage::addConditionCallback("playingBack", [](bool state, void* clientData) {
