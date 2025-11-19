@@ -139,7 +139,7 @@ void updateFaceConstraintsFromPaint(
 
     // In theory, in a given brush stroke, the user can only paint one side of a face constraint. (If camera-based painting is off,
     // they can get both sides, but they would be the same value). So we take the first non-zero value (if either is non-zero), and set the constraint limits
-    // based on that. And also mirror to the other paint value in the pair so both sides are visually painted consistently.
+    // based on that. And also mirror to the other paint delta in the pair so both sides are visually painted consistently.
     float paintDeltaA = paintDeltas[paintValueAIdx];
     float paintDeltaB = paintDeltas[paintValueBIdx];
     if (abs(paintDeltaA) < eps && abs(paintDeltaB) < eps) return;
@@ -147,15 +147,18 @@ void updateFaceConstraintsFromPaint(
     // Branch-free selection of the paint delta to use (pick B if non-zero, else A)
     float useB = abs(sign(paintDeltaB));
     float selectedDelta = paintDeltaA + useB * (paintDeltaB - paintDeltaA);
+    int unselectedIdx = paintValueBIdx + (int)(useB) * (paintValueAIdx - paintValueBIdx);
+    float unselectedPaintValue = paintValues[unselectedIdx];
 
     if (paintDeltaA != paintDeltaB) {
-        int unselectedIdx = paintValueBIdx + (int)(useB) * (paintValueAIdx - paintValueBIdx);
+        // Note: on undo/redos, the deltas are always the same because this step was already run before the deltas were first recorded.
+        unselectedPaintValue += selectedDelta;
+        paintValues[unselectedIdx] = unselectedPaintValue;
         paintDeltas[unselectedIdx] = selectedDelta;
-        paintValues[unselectedIdx] += selectedDelta;
     }
 
     // For now, same paint value for both compression and tension
-    float limit = constraintLow + (constraintHigh - constraintLow) * selectedDelta;
+    float limit = constraintLow + (constraintHigh - constraintLow) * unselectedPaintValue;
     constraint.tensionLimit = limit;
     constraint.compressionLimit = -limit;
     faceConstraints[constraintIdx] = constraint;
