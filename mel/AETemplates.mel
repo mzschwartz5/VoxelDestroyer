@@ -20,20 +20,20 @@ global proc AEPBDTemplate(string $nodeName)
 global proc AE_createConstraintLow(string $attr)
 {
     string $ctrl = "AE_constraintLow_ctrl";
-    attrFieldSliderGrp -label "Voxel strain limit (low)" -annotation "Breaking point for voxel interfaces in units of voxel-lengths, lower bound" -attribute $attr -sliderMinValue 0 -sliderMaxValue 100 $ctrl;
+    attrFieldSliderGrp -label "Voxel strain limit (low)" -annotation "Breaking point for voxel interfaces in units of voxel-lengths, lower bound" -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
 }
 
 
 global proc AE_createConstraintHigh(string $attr)
 {
     string $ctrl = "AE_constraintHigh_ctrl";
-    attrFieldSliderGrp -label "Voxel strain limit (high)" -annotation "Breaking point for voxel interfaces in units of voxel-lengths, upper bound" -attribute $attr -sliderMinValue 0 -sliderMaxValue 100 $ctrl;
+    attrFieldSliderGrp -label "Voxel strain limit (high)" -annotation "Breaking point for voxel interfaces in units of voxel-lengths, upper bound" -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
 }
 
 global proc AE_updateConstraintLow(string $attr)
 {
     string $ctrl = "AE_constraintLow_ctrl";
-    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 100 $ctrl;
+    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
 
     // Enforce: if low > high, set high = low
     string $parts[];
@@ -54,7 +54,7 @@ global proc AE_updateConstraintLow(string $attr)
 global proc AE_updateConstraintHigh(string $attr)
 {
     string $ctrl = "AE_constraintHigh_ctrl";
-    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 100 $ctrl;
+    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
 
     // Enforce: if high < low, set low = high
     string $parts[];

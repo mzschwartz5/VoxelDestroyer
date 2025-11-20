@@ -68,7 +68,7 @@ public:
         addAttribute(aConstraintLow);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
-        aConstraintHigh = nAttr.create("constraintHigh", "ch", MFnNumericData::kFloat, 100.0f, &status);
+        aConstraintHigh = nAttr.create("constraintHigh", "ch", MFnNumericData::kFloat, 50.0f, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         nAttr.setStorable(true);
         nAttr.setReadable(true);
