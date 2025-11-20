@@ -47,7 +47,7 @@ global proc VoxelPaintContextProperties() {
                     -value 50.0
                     -adjustableColumn 3
                     -annotation "Brush strength: a percentage of the low-to-high constraint value range set on the PBD node."
-                    -cc "VoxelPaintContext_StrengthChanged()"
+                    -cc "VoxelPaintStrengthChanged()"
                     VoxelPaintValueControl;
 
                 checkBoxGrp -numberOfCheckBoxes 1
