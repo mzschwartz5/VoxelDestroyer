@@ -71,6 +71,16 @@ global proc VoxelPaintContextProperties() {
                     -cc "VoxelPaintContext_ApplyFromUI()"
                     VoxelPaintHighColorControl;
 
+                rowLayout -numberOfColumns 3 -columnWidth 1 130 -columnWidth 2 65 -columnWidth 3 120;
+                    text -label "" -enable false -height 1; // left spacer
+                    columnLayout -adjustableColumn true;
+                        separator -style "none" -height 2; // top padding
+                        button -label "Swap" -width 50 -annotation "Swap low and high colors" -c "VoxelSwapPaintColors()";
+                        separator -style "none" -height 2; // bottom padding
+                    setParent ..;
+                    text -label "" -enable false -height 1; // right spacer
+                setParent ..;
+
                 checkBoxGrp -numberOfCheckBoxes 3
                     -label "Component Mask"
                     -columnAlign2 "left" "left"
@@ -128,4 +138,18 @@ global proc VoxelPaintContext_ApplyFromUI() {
     catchQuiet(`voxelPaintContextCommand -e -lowColor $lowColor[0] $lowColor[1] $lowColor[2] $lowAlpha[0] $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -highColor $highColor[0] $highColor[1] $highColor[2] $highAlpha[0] $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -componentMask $componentMask $ctx`);
+}
+
+global proc VoxelSwapPaintColors() {
+    string $ctx = `currentCtx`;
+    float $lowColor[]  = `colorSliderGrp -q -rgb VoxelPaintLowColorControl`;
+    float $lowAlpha[]    = `colorSliderGrp -q -alphaValue VoxelPaintLowColorControl`;
+    float $highColor[] = `colorSliderGrp -q -rgb VoxelPaintHighColorControl`;
+    float $highAlpha[]   = `colorSliderGrp -q -alphaValue VoxelPaintHighColorControl`;
+
+    colorSliderGrp -e -rgb $highColor[0] $highColor[1] $highColor[2] -alphaValue $highAlpha[0] VoxelPaintLowColorControl;
+    colorSliderGrp -e -rgb $lowColor[0] $lowColor[1] $lowColor[2] -alphaValue $lowAlpha[0] VoxelPaintHighColorControl;
+
+    catchQuiet(`voxelPaintContextCommand -e -lowColor $highColor[0] $highColor[1] $highColor[2] $highAlpha[0] $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -highColor $lowColor[0] $lowColor[1] $lowColor[2] $lowAlpha[0] $ctx`);
 }
