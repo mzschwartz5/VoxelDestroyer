@@ -6,6 +6,7 @@
 #include <maya/MPlugArray.h>
 #include <maya/MDagPath.h> 
 #include <maya/MMatrix.h>
+#include <maya/MSelectionList.h>
 #include <windows.h>
 #include <sstream>
 #include <cstring>
@@ -303,6 +304,33 @@ MObject getNodeFromName(const MString& name) {
         }
     }
     return MObject::kNullObj;
+}
+
+MObject getMostRecentlySelectedObject() {
+    MSelectionList selectionList;
+    MGlobal::getActiveSelectionList(selectionList);
+    if (selectionList.length() == 0) {
+        return MObject::kNullObj;
+    }
+
+    MObject selectedObj;
+    selectionList.getDependNode(selectionList.length() - 1, selectedObj);
+    return selectedObj;
+}
+
+bool tryGetShapePathFromObject(const MObject& object, MDagPath& shapePath) {
+    MStatus status = MDagPath::getAPathTo(object, shapePath);
+    if (status != MS::kSuccess) return false; // Not a DAG object
+    if (shapePath.hasFn(MFn::kTransform)) {
+        shapePath.extendToShape();
+        return shapePath.hasFn(MFn::kShape);
+    }
+
+    if (shapePath.hasFn(MFn::kShape)) {
+        return true;
+    }
+    
+    return false;
 }
 
 } // namespace Utils

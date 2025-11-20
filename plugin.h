@@ -24,6 +24,7 @@
 #include <string>
 #include "custommayaconstructs/draw/voxelrendereroverride.h"
 #include <maya/MViewport2Renderer.h>
+#include <maya/MEventMessage.h>
 using namespace MHWRender;
 
 struct PluginArgs {
@@ -58,6 +59,7 @@ public:
 
 	static MString getActiveModelPanel();
 	static VoxelRendererOverride* voxelRendererOverride;
+	static MCallbackId toolChangedCallbackId;
 	
 private:
 };

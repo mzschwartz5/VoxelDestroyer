@@ -17,7 +17,8 @@ enum class VoxelEditMode : int {
     Selection,
     FacePaint,
     VertexPaint,
-    Object
+    Object,
+    None
 };
 
 struct EditModeChangedEventArgs {
@@ -32,25 +33,6 @@ struct EditModeChangedEventArgs {
 class ChangeVoxelEditModeCommand : public MPxCommand {
 public:
     inline static const MString commandName = MString("changeVoxelEditMode");
-    inline static const std::unordered_map<VoxelEditMode, MString> modeToContextCommand = {
-        {VoxelEditMode::Selection, "selectSuperContext"},
-        {VoxelEditMode::FacePaint, "`voxelPaintContextCommand`"},
-        {VoxelEditMode::VertexPaint, "`voxelPaintContextCommand`"},
-        {VoxelEditMode::Object, "selectSuperContext"}
-    };
-    inline static const std::unordered_map<VoxelEditMode, MString> modeToComponentMaskCommand = {
-        {VoxelEditMode::Selection, "SelectFacetMask"},
-        {VoxelEditMode::FacePaint, "SelectFacetMask"},
-        {VoxelEditMode::VertexPaint, "SelectVertexMask"},
-        {VoxelEditMode::Object, "selectMode -object"}
-    };
-    inline static int sEditMode = 3; // Object mode
-
-    MString shapeName;
-    MUuid shapeUUID;
-    int newMode = 0;
-    int currentEditMode = 0;
-    MString currentContext;
 
     static EventBase::Unsubscribe subscribe(
         const Event<const EditModeChangedEventArgs&>::Listener& listener) 
@@ -80,8 +62,7 @@ public:
 
         // Cache current state for undo
         MObject shapeObj = Utils::getNodeFromName(shapeName);
-        currentEditMode = sEditMode;
-        sEditMode = newMode;
+        currentEditMode = (sEditMode == 4) ? static_cast<int>(VoxelEditMode::Object) : sEditMode; // default to Object mode if none
         shapeUUID = MFnDependencyNode(shapeObj).uuid();
         MGlobal::executeCommand("currentCtx", currentContext);
 
@@ -94,8 +75,8 @@ public:
 
         VoxelEditMode modeEnum = static_cast<VoxelEditMode>(currentEditMode);
         MString setComponentCmd = modeToComponentMaskCommand.at(modeEnum);
-        MGlobal::executeCommand(setComponentCmd, false, false);
-        MGlobal::executeCommand("setToolTo " + currentContext, false, false);
+        MGlobal::executeCommand(setComponentCmd);
+        MGlobal::executeCommand("setToolTo " + currentContext);
 
         voxelEditModeChangedEvent.notify(
             EditModeChangedEventArgs{
@@ -104,6 +85,8 @@ public:
             }
         );
 
+        sEditMode = currentEditMode;
+        sShapeUUID = shapeUUID;
         M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }
@@ -121,25 +104,127 @@ public:
         MString context = modeToContextCommand.at(modeEnum);
         
         selectShapeByUUID(shapeUUID);
-        MGlobal::executeCommand(setComponentCmd, false, false);
-        MGlobal::executeCommand("setToolTo " + context, false, false);
+        MGlobal::executeCommand(setComponentCmd);
+        MGlobal::executeCommand("setToolTo " + context);
+
+        sEditMode = newMode;
+        sShapeUUID = shapeUUID;
         M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }
 
-    // Select by UUID to be robust against name or dag paths changing between undo/redo
-    // For some reason, MGlobal::setActiveSelectionList and MGlobal::selectCommand are not sufficient
-    // to make the following commands work, so we resort to MEL's `select -r`
-    void selectShapeByUUID(const MUuid& uuid) {
-        MSelectionList selectionList;
-        selectionList.add(shapeUUID);
-        MObject depNode;
-        selectionList.getDependNode(0, depNode);
-        MString shapeNodeName = MFnDependencyNode(depNode).name();
-        MGlobal::executeCommand("select -r " + shapeNodeName, true, false);
+    /**
+     * Callback to invoke on tool change event triggered externally (not as a result of this command).
+     * It will update the edit mode of the currently selected voxel shape, or the last edited voxel shape, in that order.
+     */
+    static void onExternalToolChange(void* clientData) {
+        MString currentTool;
+        MGlobal::executeCommand("currentCtx", currentTool);
+        if (currentTool.isEmpty()) return;
+
+        MString currentToolCommandName = modeToContextCommand.at(
+            static_cast<VoxelEditMode>(sEditMode)
+        );
+
+        // We're already in the correct mode
+        if (currentTool.indexW(currentToolCommandName) != -1) return;
+
+        bool foundMatch = false;
+        for (const auto& pair : modeToContextCommand) {
+            MString contextCommand = pair.second;
+            contextCommand.substitute("`", ""); // strip backticks
+            if (currentTool.indexW(contextCommand) == -1) continue;
+
+            sEditMode = static_cast<int>(pair.first);
+            foundMatch = true;
+            break;
+        }
+
+        // The switched-to tool is not one of the voxel edit modes
+        if (!foundMatch) {
+            sEditMode = static_cast<int>(VoxelEditMode::None);
+            return;
+        }
+
+        MString shapeNodeName = getActiveShapeNodeName();
+        if (shapeNodeName.isEmpty()) return;
+
+        VoxelEditMode modeEnum = static_cast<VoxelEditMode>(sEditMode);
+        MString setComponentCmd = modeToComponentMaskCommand.at(modeEnum);
+        MGlobal::executeCommand(setComponentCmd);
+
+        voxelEditModeChangedEvent.notify(
+            EditModeChangedEventArgs{
+                static_cast<VoxelEditMode>(sEditMode),
+                shapeNodeName
+            }
+        );
+
+        M3dView::active3dView().refresh(false, true);
     }
 
 private:
     inline static Event<EditModeChangedEventArgs> voxelEditModeChangedEvent;
+    inline static const std::unordered_map<VoxelEditMode, MString> modeToContextCommand = {
+        {VoxelEditMode::Selection, "selectSuperContext"},
+        {VoxelEditMode::FacePaint, "`voxelPaintContextCommand`"},
+        {VoxelEditMode::VertexPaint, "`voxelPaintContextCommand`"},
+        {VoxelEditMode::Object, "selectSuperContext"},
+        {VoxelEditMode::None, ""}
+    };
+    inline static const std::unordered_map<VoxelEditMode, MString> modeToComponentMaskCommand = {
+        {VoxelEditMode::Selection, "SelectFacetMask"},
+        {VoxelEditMode::FacePaint, "SelectFacetMask"},
+        {VoxelEditMode::VertexPaint, "SelectVertexMask"},
+        {VoxelEditMode::Object, "selectMode -object"},
+        {VoxelEditMode::None, ""}
+    };
+    inline static int sEditMode = 4;
+    inline static MUuid sShapeUUID;
 
+    MString shapeName;
+    MUuid shapeUUID;
+    int newMode = 0;
+    int currentEditMode = 0;
+    MString currentContext;
+
+    // Select by UUID to be robust against name or dag paths changing between undo/redo
+    // For some reason, MGlobal::setActiveSelectionList and MGlobal::selectCommand are not sufficient
+    // to make the following commands work, so we resort to MEL's `select -r`
+    static void selectShapeByUUID(const MUuid& uuid, MString& shapeNodeName = MString()) {
+        MSelectionList selectionList;
+        selectionList.add(uuid);
+        MObject depNode;
+        selectionList.getDependNode(0, depNode);
+        shapeNodeName = MFnDependencyNode(depNode).name();
+        MGlobal::executeCommand("select -r " + shapeNodeName, true, false);
+    }
+
+    static MString getActiveShapeNodeName() {
+        MString shapeNodeName;
+
+        // First try active selection
+        MObject activeObj = Utils::getMostRecentlySelectedObject();
+        MDagPath shapePath;
+        bool hasShape = Utils::tryGetShapePathFromObject(activeObj, shapePath);
+        
+        // TODO: clean up this logic a bit, remove hardcoded dependency on "VoxelShape"
+        if (hasShape) {
+            MObject shapeObj = shapePath.node();
+            MFnDependencyNode shapeDepNode(shapeObj);
+            MString shapeTypeName = shapeDepNode.typeName();
+
+            if (shapeTypeName == "VoxelShape") {
+                shapeNodeName = shapeDepNode.name();
+                sShapeUUID = shapeDepNode.uuid();
+                return shapeNodeName;
+            }
+        }
+        
+        // There's no active shape yet - that's fine, do nothing.
+        if (!sShapeUUID.valid()) return shapeNodeName;
+
+        selectShapeByUUID(sShapeUUID, shapeNodeName);
+        return shapeNodeName;
+    }
 };

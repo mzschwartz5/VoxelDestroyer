@@ -33,6 +33,7 @@
 #define EXPORT __declspec(dllexport)
 
 VoxelRendererOverride* plugin::voxelRendererOverride = nullptr;
+MCallbackId plugin::toolChangedCallbackId;
 
 // Maya Plugin creator function
 void* plugin::creator()
@@ -291,6 +292,7 @@ EXPORT MStatus initializePlugin(MObject obj)
 	// Initialize DirectX
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
 	DirectX::initialize(MhInstPlugin);
+	plugin::toolChangedCallbackId = MEventMessage::addEventCallback("PostToolChanged", ChangeVoxelEditModeCommand::onExternalToolChange, nullptr);
 
 	MStatus status;
 	MFnPlugin plugin(obj, "VoxelDestroyer", "1.0", "Any");
@@ -586,6 +588,8 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 
 	// Any loaded shaders should be cleared to free resources
 	ComputeShader::clearShaderCache();
+
+	MEventMessage::removeCallback(plugin::toolChangedCallbackId);
 
 	return status;
 }

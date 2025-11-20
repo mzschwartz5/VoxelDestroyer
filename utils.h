@@ -184,4 +184,8 @@ MMatrix getWorldMatrix(const MObject& node);
 
 MObject getNodeFromName(const MString& name);
 
+MObject getMostRecentlySelectedObject();
+
+bool tryGetShapePathFromObject(const MObject& object, MDagPath& shapePath);
+
 } // namespace Utils

@@ -15,9 +15,6 @@
 class CreateColliderCommand : public MPxCommand {
 public:
     inline static const MString commandName = MString("createCollider");
-    MSelectionList activeSelectionList;
-    MString colliderName;
-    MDagModifier dagModifier;
 
 	static void* creator() {
         return new CreateColliderCommand();
@@ -74,4 +71,9 @@ public:
 
         return MStatus::kSuccess;
     }
+
+private:
+    MSelectionList activeSelectionList;
+    MString colliderName;
+    MDagModifier dagModifier;
 };
