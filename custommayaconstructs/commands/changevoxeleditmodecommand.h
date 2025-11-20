@@ -71,6 +71,9 @@ public:
     }
 
     MStatus undoIt() override {
+        sEditMode = currentEditMode;
+        sShapeUUID = shapeUUID;
+        
         selectShapeByUUID(shapeUUID);
 
         VoxelEditMode modeEnum = static_cast<VoxelEditMode>(currentEditMode);
@@ -85,13 +88,14 @@ public:
             }
         );
 
-        sEditMode = currentEditMode;
-        sShapeUUID = shapeUUID;
         M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }
 
     MStatus redoIt() override {
+        sEditMode = newMode;
+        sShapeUUID = shapeUUID;
+
         voxelEditModeChangedEvent.notify(
             EditModeChangedEventArgs{
                 static_cast<VoxelEditMode>(newMode),
@@ -107,8 +111,6 @@ public:
         MGlobal::executeCommand(setComponentCmd);
         MGlobal::executeCommand("setToolTo " + context);
 
-        sEditMode = newMode;
-        sShapeUUID = shapeUUID;
         M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }
@@ -127,6 +129,7 @@ public:
         );
 
         // We're already in the correct mode
+        currentToolCommandName.substitute("`", ""); // strip backticks
         if (currentTool.indexW(currentToolCommandName) != -1) return;
 
         bool foundMatch = false;
