@@ -129,13 +129,13 @@ public:
         );
 
         // We're already in the correct mode
-        currentToolCommandName.substitute("`", ""); // strip backticks
+        currentToolCommandName.substitute("$", ""); // strip $
         if (currentTool.indexW(currentToolCommandName) != -1) return;
 
         bool foundMatch = false;
         for (const auto& pair : modeToContextCommand) {
             MString contextCommand = pair.second;
-            contextCommand.substitute("`", ""); // strip backticks
+            contextCommand.substitute("$", ""); // strip $
             if (currentTool.indexW(contextCommand) == -1) continue;
 
             sEditMode = static_cast<int>(pair.first);
@@ -170,8 +170,8 @@ private:
     inline static Event<EditModeChangedEventArgs> voxelEditModeChangedEvent;
     inline static const std::unordered_map<VoxelEditMode, MString> modeToContextCommand = {
         {VoxelEditMode::Selection, "selectSuperContext"},
-        {VoxelEditMode::FacePaint, "`voxelPaintContextCommand`"},
-        {VoxelEditMode::VertexPaint, "`voxelPaintContextCommand`"},
+        {VoxelEditMode::FacePaint, "$voxelPaintContext"},
+        {VoxelEditMode::VertexPaint, "$voxelPaintContext"},
         {VoxelEditMode::Object, "selectSuperContext"},
         {VoxelEditMode::None, ""}
     };

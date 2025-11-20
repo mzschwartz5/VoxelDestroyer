@@ -1,3 +1,6 @@
+// Create a named instance of the voxel paint context command to reuse so it retains user settings
+global string $voxelPaintContext;
+
 global proc VoxelizerMenu() {
     if (`window -exists VoxelizerMenuWindow`) {
         deleteUI VoxelizerMenuWindow;
@@ -236,6 +239,8 @@ global proc VoxelizerMenu_syncScale(string $cubeName, string $scaleField) {
 }
 
 global proc VoxelizerMenu_addToShelf() {
+    global string $voxelPaintContext;
+    $voxelPaintContext = `voxelPaintContextCommand`;
     // Ensure the "VoxelDestroyer" shelf exists
     global string $gShelfTopLevel;
     if (!`shelfLayout -exists "VoxelDestroyer"`) {
@@ -284,8 +289,8 @@ global proc VoxelizerMenu_addToShelf() {
             -label "VoxelPaintTool"
             -annotation "Paint simulation weights onto voxels"
             -image1 "VoxelPaint.png"
-            -command "string $ctx = `voxelPaintContextCommand`; setToolTo $ctx;"
-            -doubleClickCommand "string $ctx = `voxelPaintContextCommand`; setToolTo $ctx; toolPropertyWindow;";
+            -command "setToolTo $voxelPaintContext;"
+            -doubleClickCommand "setToolTo $voxelPaintContext; toolPropertyWindow;";
     }
 
     shelfTabLayout -edit -selectTab "VoxelDestroyer" $gShelfTopLevel;

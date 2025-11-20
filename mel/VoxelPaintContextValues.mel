@@ -24,11 +24,8 @@ global proc VoxelPaintContextValues(string $toolName) {
     button -e -c "VoxelPaintContext_Reset()" $resetBtn;
 
     string $ctx = `currentCtx`;
-    if (!`gmatch $ctx "voxelPaintContextCommand*"` )
-        return;
-
     float $radius = `voxelPaintContextCommand -q -radius $ctx`;
-    int   $mode   = `voxelPaintContextCommand -q -mode $ctx`; // 0=Add,1=Subtract,2=Set
+    int   $mode   = `voxelPaintContextCommand -q -mode $ctx`; // 0=Subtract, 1=Set, 2=Add
     float $value = `voxelPaintContextCommand -q -value $ctx`;
     int   $cameraBased = `voxelPaintContextCommand -q -cameraBased $ctx`;
     float $lowColor[] = stringToFloatArray(`voxelPaintContextCommand -q -lowColor $ctx`);
@@ -44,29 +41,14 @@ global proc VoxelPaintContextValues(string $toolName) {
     if ($componentMask >= 2 ) { $v2 = 1; $componentMask -= 2;  }
     if ($componentMask >= 1 ) { $v1 = 1; $componentMask -= 1;  }
 
-    if (`control -exists VoxelPaintRadiusControl`)
-        floatSliderGrp -e -v $radius VoxelPaintRadiusControl;
-
-    if (`control -exists VoxelPaintModeControl`)
-        optionMenuGrp -e -sl ($mode + 1) VoxelPaintModeControl;
-
-    if (`control -exists VoxelPaintValueControl`)
-        floatSliderGrp -e -v $value VoxelPaintValueControl;
-        
-    if (`control -exists VoxelPaintCameraBasedControl`)
-        checkBoxGrp -e -v1 $cameraBased VoxelPaintCameraBasedControl;
-
-    if (`control -exists VoxelPaintLowColorControl`)
-        colorSliderGrp -e -rgb $lowColor[0] $lowColor[1] $lowColor[2] -alphaValue $lowColor[3] VoxelPaintLowColorControl;
-
-    if (`control -exists VoxelPaintHighColorControl`)
-        colorSliderGrp -e -rgb $highColor[0] $highColor[1] $highColor[2] -alphaValue $highColor[3] VoxelPaintHighColorControl;
-
-    if (`control -exists VoxelPaintDirsRow1`)
-        checkBoxGrp -e -v1 $v1 -v2 $v2 -v3 $v3 VoxelPaintDirsRow1; 
-
-    if (`control -exists VoxelPaintDirsRow2`)
-        checkBoxGrp -e -v1 $v4 -v2 $v5 -v3 $v6 VoxelPaintDirsRow2;
+    floatSliderGrp -e -v $radius VoxelPaintRadiusControl;
+    optionMenuGrp -e -sl ($mode + 1) VoxelPaintModeControl; // UI indices are 1-based
+    floatSliderGrp -e -v $value VoxelPaintValueControl;
+    checkBoxGrp -e -v1 $cameraBased VoxelPaintCameraBasedControl;
+    colorSliderGrp -e -rgb $lowColor[0] $lowColor[1] $lowColor[2] -alphaValue $lowColor[3] VoxelPaintLowColorControl;
+    colorSliderGrp -e -rgb $highColor[0] $highColor[1] $highColor[2] -alphaValue $highColor[3] VoxelPaintHighColorControl;
+    checkBoxGrp -e -v1 $v1 -v2 $v2 -v3 $v3 VoxelPaintDirsRow1; 
+    checkBoxGrp -e -v1 $v4 -v2 $v5 -v3 $v6 VoxelPaintDirsRow2;
 
     toolPropertySelect "VoxelPaintContext";
 }
@@ -75,7 +57,7 @@ global proc VoxelPaintContext_Reset()
 {
     // reset UI controls to defaults
     floatSliderGrp -e -v 25.0 VoxelPaintRadiusControl;
-    optionMenuGrp -e -sl 1 VoxelPaintModeControl;
+    optionMenuGrp -e -sl 2 VoxelPaintModeControl; // UI indices are 1-based, so this is "Set" mode
     floatSliderGrp -e -v 50.0 VoxelPaintValueControl;
     checkBoxGrp -e -v1 1 VoxelPaintCameraBasedControl;
     colorSliderGrp -e -rgb 1.0 0.0 0.0 -alphaValue 0.0 VoxelPaintLowColorControl;
@@ -86,7 +68,7 @@ global proc VoxelPaintContext_Reset()
     // push defaults into the active context (if active)
     string $ctx = `currentCtx`;
     catchQuiet(`voxelPaintContextCommand -e -radius 25.0 $ctx`);
-    catchQuiet(`voxelPaintContextCommand -e -mode 0 $ctx`);
+    catchQuiet(`voxelPaintContextCommand -e -mode 1 $ctx`); // "Set" mode
     catchQuiet(`voxelPaintContextCommand -e -value 50.0 $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -cameraBased 1 $ctx`);
     catchQuiet(`voxelPaintContextCommand -e -lowColor 1.0 0.0 0.0 0.0 $ctx`);
