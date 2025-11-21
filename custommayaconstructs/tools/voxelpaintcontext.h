@@ -27,6 +27,9 @@ class VoxelPaintContext : public VoxelContextBase<VoxelPaintContext> {
 public:
     VoxelPaintContext() : VoxelContextBase() {
         setTitleString("Voxel Paint Tool");
+        setHelpString("Paint various simulation weights onto the voxel grid.");
+        setImage("VoxelPaint.png", MPxContext::kImage1);
+        setCursor(MCursor::crossHairCursor);
     }
     
     ~VoxelPaintContext() override {}
@@ -34,7 +37,6 @@ public:
     void toolOnSetup(MEvent &event) override {
         VoxelContextBase::toolOnSetup(event);
 
-        setImage("VoxelPaint.png", MPxContext::kImage1);
         MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
 
         // Subscribe to and forward base class event with extended payload

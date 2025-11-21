@@ -4,6 +4,7 @@
 #include <maya/M3dView.h>
 #include <algorithm>
 #include "../../event.h"
+#include <maya/MCursor.h>
 
 struct MousePosition
 {   
@@ -58,6 +59,7 @@ protected:
 
     virtual void toolOffCleanup() override {
         MPxContext::toolOffCleanup();
+        setCursor(MCursor::defaultCursor);
     }
 
     virtual MStatus doPress(MEvent &event, MHWRender::MUIDrawManager& drawMgr, const MHWRender::MFrameContext& context) override {

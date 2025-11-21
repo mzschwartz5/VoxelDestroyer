@@ -26,7 +26,10 @@ class VoxelDragContext : public VoxelContextBase<VoxelDragContext>
 {
 public:
     VoxelDragContext() : VoxelContextBase() {
-        setTitleString("Voxel Simulation Tool");
+        setImage("VoxelDrag.png", MPxContext::kImage1);
+        setCursor(MCursor::handCursor);
+        setTitleString("Voxel Interaction Tool");
+        setHelpString("While animation is playing back, click and drag on a simulated voxel mesh to interact with it.");
     }
     
     ~VoxelDragContext() override {
@@ -46,8 +49,6 @@ private:
 
     void toolOnSetup(MEvent &event) override {
         VoxelContextBase::toolOnSetup(event);
-
-        setImage("VoxelDrag.png", MPxContext::kImage1);
 
         timeChangedCallbackId = MEventMessage::addEventCallback("timeChanged", VoxelDragContext::onTimeChanged, NULL, &status);
         playbackChangeCallbackId = MConditionMessage::addConditionCallback("playingBack", VoxelDragContext::onPlaybackChange);

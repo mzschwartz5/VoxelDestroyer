@@ -132,6 +132,7 @@ public:
         currentToolCommandName.substitute("$", ""); // strip $
         if (currentTool.indexW(currentToolCommandName) != -1) return;
 
+        // TODO: this will find the first match... but there could be multiple (e.g. paint tool - vertex or face mode?)
         bool foundMatch = false;
         for (const auto& pair : modeToContextCommand) {
             MString contextCommand = pair.second;
@@ -223,6 +224,7 @@ private:
                 return shapeNodeName;
             }
         }
+        // TODO: if something _else_ (non-voxel object) is selected, maybe we should clear sShapeUUID?
         
         // There's no active shape yet - that's fine, do nothing.
         if (!sShapeUUID.valid()) return shapeNodeName;
