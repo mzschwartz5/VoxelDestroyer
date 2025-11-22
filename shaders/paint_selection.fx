@@ -20,7 +20,6 @@ float4 LOW_COLOR;
 float4 HIGH_COLOR;
 int COMPONENT_MASK; // Bitmask specifying which cardinal directions to paint (1 bit per direction, +X,+Y,+Z,-X,-Y,-Z)
 float4x4 viewProjection : ViewProjection; // Maya-defined semantic, populated by Maya.
-float INF_SENTINEL = -1.0f; // Sentinel value indicating infinite strength painting.
 
 // VS-only resources
 StructuredBuffer<float4x4> instanceTransforms : register(t0);
@@ -78,7 +77,7 @@ float applyPaint(uint globalVoxelID, uint componentID, float prevPaintValue) {
 
     // This branch has no chance of divergence, so there's no real penalty for it.
     int mode = PAINT_MODE - 1; // remap to -1,0,1
-    // The "infinite strength" sentinel value is -1.0, and only works in SET mode. 
+    // The "infinite strength" paint value is -1.0, and is only allowed in SET mode. 
     // In other modes, clamp the value to 0 before adding/subtracting to protect against infinite strength values. (Essentially means infinite values are treated as 0 in these modes).
     prevPaintValue = (mode == 0) ? PAINT_VALUE : saturate(max(prevPaintValue, 0) + mode * PAINT_VALUE);
 
@@ -87,8 +86,8 @@ float applyPaint(uint globalVoxelID, uint componentID, float prevPaintValue) {
 }
 
 float4 colorFromPaintValue(float paintValue) {
-    // Invert the higher value color if the paint value is infinite strength
-    if (paintValue == INF_SENTINEL) {
+    // Invert the higher value color if the paint value is infinite strength (sentinel value < 0)
+    if (paintValue < 0.0f) {
         float3 invRGB = 1.0f - max(LOW_COLOR.rgb, HIGH_COLOR.rgb);
         float alpha = max(LOW_COLOR.a, HIGH_COLOR.a);
         return float4(invRGB, alpha);

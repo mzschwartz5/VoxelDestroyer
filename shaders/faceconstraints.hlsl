@@ -114,6 +114,7 @@ void main(
 
 RWBuffer<float> paintDeltas : register(u3);
 RWBuffer<float> paintValues : register(u4);
+static const float FLT_MAX = asfloat(0x7f7fffff);
 
 // This entry point is for updating the face constraints based on paint values.
 // One thread per face constraint (over three dispatches, one per axis - just because that's how the face constraint data is stored).
@@ -147,18 +148,24 @@ void updateFaceConstraintsFromPaint(
     // Branch-free selection of the paint delta to use (pick B if non-zero, else A)
     float useB = abs(sign(paintDeltaB));
     float selectedDelta = paintDeltaA + useB * (paintDeltaB - paintDeltaA);
-    int unselectedIdx = paintValueBIdx + (int)(useB) * (paintValueAIdx - paintValueBIdx);
-    float unselectedPaintValue = paintValues[unselectedIdx];
+    int selectedIdx = paintValueAIdx + (int)(useB) * (paintValueBIdx - paintValueAIdx);
+    float selectedPaintValue = paintValues[selectedIdx];
 
     if (paintDeltaA != paintDeltaB) {
-        // Note: on undo/redos, the deltas are always the same because this step was already run before the deltas were first recorded.
-        unselectedPaintValue += selectedDelta;
-        paintValues[unselectedIdx] = unselectedPaintValue;
-        paintDeltas[unselectedIdx] = selectedDelta;
+        // Note: on undo/redos, the deltas are always the same because this block was already run before the deltas were first recorded.
+        int nonSelectedIdx = paintValueBIdx + (int)(useB) * (paintValueAIdx - paintValueBIdx);
+        paintValues[nonSelectedIdx] = selectedPaintValue;
+        paintDeltas[nonSelectedIdx] = selectedDelta;
     }
 
     // For now, same paint value for both compression and tension
-    float limit = constraintLow + (constraintHigh - constraintLow) * unselectedPaintValue;
+    float limit;
+    if (selectedPaintValue < 0) {
+        limit = FLT_MAX;
+    } else {
+        limit = lerp(constraintLow, constraintHigh, selectedPaintValue);
+    }
+
     constraint.tensionLimit = limit;
     constraint.compressionLimit = -limit;
     faceConstraints[constraintIdx] = constraint;
