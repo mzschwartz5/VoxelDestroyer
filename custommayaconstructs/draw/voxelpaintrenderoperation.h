@@ -61,9 +61,6 @@ public:
         targetDesc.sourceBlend = MBlendState::kSourceAlpha;
         targetDesc.destinationBlend = MBlendState::kInvSourceAlpha;
         targetDesc.blendOperation = MBlendState::kAdd;
-        targetDesc.alphaSourceBlend = MBlendState::kOne;
-        targetDesc.alphaDestinationBlend = MBlendState::kInvSourceAlpha;
-        targetDesc.alphaBlendOperation = MBlendState::kAdd;
         alphaEnabledBlendState = MStateManager::acquireBlendState(blendDesc);
 
         void* shaderData = nullptr;
