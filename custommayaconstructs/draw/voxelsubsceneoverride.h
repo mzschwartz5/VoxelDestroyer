@@ -600,19 +600,18 @@ private:
         if (semantic == MGeometry::kPosition || semantic == MGeometry::kNormal) {
             ComPtr<ID3D11Buffer>& buffer = (semantic == MGeometry::kPosition) ? positionsBuffer : normalsBuffer;
             
-            // Create the buffer - must be a raw buffer because Maya doesn't seem to accept structured buffers 
-            // for binding as vertex buffers.
+            // Create the buffer (cannot be a structured buffer due to bind flags Maya has set. Also requires R32_FLOAT format for views).
             std::vector<float> data(vertexCount * vbDesc.dimension(), 0.0f);
             extractor.populateVertexBuffer(data.data(), vertexCount, vbDesc);
-            buffer = DirectX::createReadWriteBuffer(data, D3D11_BIND_VERTEX_BUFFER, DirectX::BufferFormat::RAW);
+            buffer = DirectX::createReadWriteBuffer(data, false, D3D11_BIND_VERTEX_BUFFER | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS);
             vertexBuffer->resourceHandle(buffer.Get(), data.size());
 
             ComPtr<ID3D11UnorderedAccessView>& uav = (semantic == MGeometry::kPosition) ? positionsUAV : normalsUAV;
-            uav = DirectX::createUAV(buffer, 0, 0, DirectX::BufferFormat::RAW);
+            uav = DirectX::createUAV(buffer, vertexCount * vbDesc.dimension(), 0, DXGI_FORMAT_R32_FLOAT);
 
             // Also need to create a buffer with the original positions/normals for the deform shader to read from
             ComPtr<ID3D11Buffer>& originalBuffer = (semantic == MGeometry::kPosition) ? originalPositionsBuffer : originalNormalsBuffer;
-            originalBuffer = DirectX::createReadOnlyBuffer(data, 0, DirectX::BufferFormat::STRUCTURED, sizeof(float) * vbDesc.dimension());
+            originalBuffer = DirectX::createReadOnlyBuffer(data, true, 0, sizeof(float) * vbDesc.dimension());
             
             ComPtr<ID3D11ShaderResourceView>& originalSRV = (semantic == MGeometry::kPosition) ? originalPositionsSRV : originalNormalsSRV;
             originalSRV = DirectX::createSRV(originalBuffer);

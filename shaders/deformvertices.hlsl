@@ -6,10 +6,9 @@ StructuredBuffer<float4> originalParticlePositions : register(t2);
 StructuredBuffer<float4> particlePositions : register(t3);
 StructuredBuffer<uint> vertexVoxelIds : register(t4);
 
-// Maya doesn't support structured buffers for these (which get bound to Maya's IA stage).
-// Logically, they store float3s per vertex.
-RWByteAddressBuffer outVertPositions : register(u0);
-RWByteAddressBuffer outVertNormals : register(u1);
+// The bind flags Maya uses prevents us from using structured buffers and requires an R32_FLOAT format for UAVs.
+RWBuffer<float > outVertPositions : register(u0);
+RWBuffer<float> outVertNormals : register(u1);
 
 cbuffer DeformConstants : register(b0)
 {
@@ -83,13 +82,17 @@ void main(uint3 gId : SV_DispatchThreadID)
                                                   + restPosition.y * e1
                                                   + restPosition.z * e2;
 
-    uint outOffset = gId.x * 12; // 3 floats * 4 bytes each
-    outVertPositions.Store3(outOffset, asuint(restPosition));
+    uint outOffset = gId.x * 3;
+    outVertPositions[outOffset + 0] = restPosition.x;
+    outVertPositions[outOffset + 1] = restPosition.y;
+    outVertPositions[outOffset + 2] = restPosition.z;
 
     // Deform normal
     float3x3 deformMatrix = transpose(inverseFromRows(e0, e1, e2));
     float3 normal = originalVertNormals[gId.x];
     normal = normalize(mul(deformMatrix, normal));
 
-    outVertNormals.Store3(outOffset, asuint(normal));
+    outVertNormals[outOffset + 0] = normal.x;
+    outVertNormals[outOffset + 1] = normal.y;
+    outVertNormals[outOffset + 2] = normal.z;
 }
