@@ -13,6 +13,7 @@
 #include "../../constants.h"
 #include "../../resource.h"
 #include "../tools/voxelpaintcontext.h"
+#include "../commands/changevoxeleditmodecommand.h"
 #include <maya/MMatrixArray.h>
 #include <algorithm>
 #include <array>
@@ -387,13 +388,16 @@ public:
      * 4. A double buffer for the IDs of painted voxels (current and previous).
      */
     void prepareToPaint(
+        VoxelEditMode paintMode,
         const MMatrixArray& allVoxelMatrices, 
         const std::vector<uint32_t>& visibleVoxelIdToGlobalId,
         PingPongView& paintViews
     ) {
+        this->paintMode = paintMode;
         voxelPaintViews = &paintViews;
         int numVoxels = static_cast<int>(allVoxelMatrices.length());
         instanceCount = static_cast<unsigned int>(visibleVoxelIdToGlobalId.size());
+
         if (instanceCount == 0) {
             instanceTransformSRV.Reset();
             instanceTransformBuffer.Reset();
@@ -421,7 +425,8 @@ public:
         visibleToGlobalVoxelBuffer = DirectX::createReadOnlyBuffer<uint32_t>(visibleVoxelIdToGlobalId);
         visibleToGlobalVoxelSRV = DirectX::createSRV(visibleToGlobalVoxelBuffer);
 
-        int elementCount = numVoxels * 6; // TODO: number of elements depends on whether painting faces or vertices
+        int componentsPerVoxel = (paintMode == VoxelEditMode::FacePaint) ? 6 : 8; // 6 faces or 8 vertices
+        int elementCount = numVoxels * componentsPerVoxel;
         const std::vector<uint8_t> emptyIDData(elementCount, 0); 
         voxelIDBufferA = DirectX::createReadWriteBuffer(emptyIDData, false);
         voxelIDBufferB = DirectX::createReadWriteBuffer(emptyIDData, false);
@@ -457,6 +462,8 @@ private:
     const MRasterizerState* depthBiasRasterState = nullptr;
     const MBlendState* alphaEnabledBlendState = nullptr;
     D3D11_RECT scissor = { 0, 0, 0, 0 };
+
+    VoxelEditMode paintMode = VoxelEditMode::FacePaint;
     bool hasBrushMoved = false;
     float paintRadius = 25.0f;
     BrushMode brushMode = BrushMode::SET;

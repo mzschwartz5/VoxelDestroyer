@@ -190,12 +190,22 @@ public:
         isInitialized = true;
     }
 
-    PingPongView& getFacePaintViews() {
-        if (!facePaintViews.isInitialized()) {
-            allocatePaintResources();
+    PingPongView& getPaintView(VoxelEditMode paintMode) {
+        if (!paintDeltaBuffer) {
+            allocatePaintDeltaBuffer();
         }
 
-        return facePaintViews;
+        bool facePaintMode = (paintMode == VoxelEditMode::FacePaint);
+        PingPongView& paintViews = facePaintMode ? facePaintViews : vertexPaintViews;
+        if (!paintViews.isInitialized()) {
+            int elementsPerVoxel = facePaintMode ? 6 : 8;
+            ComPtr<ID3D11Buffer>& paintBufferA = facePaintMode ? facePaintBufferA : vertexPaintBufferA;
+            ComPtr<ID3D11Buffer>& paintBufferB = facePaintMode ? facePaintBufferB : vertexPaintBufferB;
+            PaintDeltaCompute& paintDeltaCompute = facePaintMode ? facePaintDeltaCompute : vertexPaintDeltaCompute;
+            allocatePaintBuffers(elementsPerVoxel, paintBufferA, paintBufferB, paintViews, paintDeltaCompute);
+        }
+
+        return paintViews;
     }
 
     const ComPtr<ID3D11Buffer>& getPaintDeltaBuffer() {
@@ -203,20 +213,25 @@ public:
     }
 
     // Invoked by the owning subscene on edit mode changes
-    void subscribeToPaintStateChanges() {
-        unsubPaintStateChanges = VoxelPaintContext::subscribeToPaintDragStateChange([this](const PaintDragState& paintState) {
+    void subscribeToPaintStateChanges(VoxelEditMode paintMode) {
+        bool isFacePaintMode = (paintMode == VoxelEditMode::FacePaint);
+        PaintDeltaCompute* paintDeltaCompute = isFacePaintMode ? &facePaintDeltaCompute : &vertexPaintDeltaCompute;
+        PingPongView* paintViews = isFacePaintMode ? &facePaintViews : &vertexPaintViews;
+
+        unsubPaintStateChanges = VoxelPaintContext::subscribeToPaintDragStateChange([this, paintDeltaCompute, paintViews, paintMode](const PaintDragState& paintState) {
             if (paintState.isDragging) return; // Only apply when a paint stroke stops
-            paintDeltaCompute.dispatch();
+            paintDeltaCompute->dispatch();
             updatePBDConstraints();
 
             // Records the paint delta for undo/redo. On undo/redo, applies the delta back to the paint values.
             // Necessary to invoke as a MEL command to enable journaling. (Could use MPxToolCommand but this is simpler).
             MString uuidStr = MFnDependencyNode(thisMObject()).uuid().asString();
-            MString cmd = "applyVoxelPaint -vid \"" + uuidStr + "\"";
+            MString modeStr = MString() + static_cast<int>(paintMode);
+            MString cmd = "applyVoxelPaint -vid \"" + uuidStr + "\" -mode \"" + modeStr + "\"";
             MGlobal::executeCommand(cmd, false, true);
 
             // Now that the delta is recorded, copy the after-paint-stroke values into the delta buffer for the next stroke.
-            DirectX::copyBufferToBuffer(facePaintViews.UAV(), paintDeltaUAV);
+            DirectX::copyBufferToBuffer(paintViews->UAV(), paintDeltaUAV);
         });
     }
 
@@ -224,7 +239,11 @@ public:
         unsubPaintStateChanges();
     }
 
-    void undoRedoPaint(const std::vector<uint16_t>& paintDelta, int direction = 1) {
+    void undoRedoPaint(const std::vector<uint16_t>& paintDelta, int direction, VoxelEditMode paintMode) {
+        bool isFacePaintMode = (paintMode == VoxelEditMode::FacePaint);
+        PaintDeltaCompute& paintDeltaCompute = isFacePaintMode ? facePaintDeltaCompute : vertexPaintDeltaCompute;
+        PingPongView& paintViews = isFacePaintMode ? facePaintViews : vertexPaintViews;
+
         DirectX::getContext()->UpdateSubresource(paintDeltaBuffer.Get(), 0, nullptr, paintDelta.data(), 0, 0);
         
         // Using the right sign, we can reuse the paint delta compute shader to _apply_ the delta to the paint values.
@@ -233,7 +252,7 @@ public:
         paintDeltaCompute.updateSign(-1); // Reset sign to default (see paintdelta.hlsl)
 
         // The compute pass writes into the delta buffer - copy it to the face paint buffer to keep them in sync.
-        DirectX::copyBufferToBuffer(paintDeltaUAV, facePaintViews.UAV());
+        DirectX::copyBufferToBuffer(paintDeltaUAV, paintViews.UAV());
 
         updatePBDConstraints();
     }
@@ -255,12 +274,16 @@ private:
     MCallbackIdArray callbackIds;
     EventBase::Unsubscribe unsubPaintStateChanges;
     DeformVerticesCompute deformVerticesCompute;
-    PaintDeltaCompute paintDeltaCompute;
-    // Holds the face-to-face tension weight values of each voxel face, for use with the Voxel Paint tool.
-    ComPtr<ID3D11Buffer> faceTensionPaintBufferA;
-    ComPtr<ID3D11Buffer> faceTensionPaintBufferB;
-    ComPtr<ID3D11Buffer> paintDeltaBuffer;
+    PaintDeltaCompute facePaintDeltaCompute;
+    PaintDeltaCompute vertexPaintDeltaCompute;
+    // Holds the weight values of each voxel (face or corner), for use with the Voxel Paint tool.
+    ComPtr<ID3D11Buffer> facePaintBufferA;
+    ComPtr<ID3D11Buffer> facePaintBufferB;
     PingPongView facePaintViews;
+    ComPtr<ID3D11Buffer> vertexPaintBufferA;
+    ComPtr<ID3D11Buffer> vertexPaintBufferB;
+    PingPongView vertexPaintViews;
+    ComPtr<ID3D11Buffer> paintDeltaBuffer;
     ComPtr<ID3D11UnorderedAccessView> paintDeltaUAV;
 
     
@@ -357,33 +380,49 @@ private:
         return vertexVoxelIds;
     }
 
-    void allocatePaintResources() {
+    void allocatePaintBuffers(
+        int elementsPerVoxel,
+        ComPtr<ID3D11Buffer>& paintBufferA,
+        ComPtr<ID3D11Buffer>& paintBufferB,
+        PingPongView& paintViews,
+        PaintDeltaCompute& paintDeltaCompute
+    ) {
         MSharedPtr<Voxels> voxels = getVoxels();
         if (!voxels) return;
 
         const int numVoxels = voxels->numOccupied;
         
-        // Face tension paint values start at 0. Use uint16_t to get the size right, but it will really be half-floats in the shader.
+        // Paint values start at 0. Use uint16_t to get the size right, but it will really be half-floats in the shader.
         // Need to use a typed buffer to get half-float support.
         // Need three copies of the buffer: A and B for ping-ponging during paint strokes, and one to hold the "before paint" state for delta calculations.
-        int elementCount = numVoxels * 6; // 6 faces per voxel
-        const std::vector<uint16_t> emptyFaceTensionData(elementCount, 0); // 6 faces per voxel
-        faceTensionPaintBufferA = DirectX::createReadWriteBuffer(emptyFaceTensionData, false);
-        faceTensionPaintBufferB = DirectX::createReadWriteBuffer(emptyFaceTensionData, false);
-        facePaintViews = PingPongView(
-            DirectX::createSRV(faceTensionPaintBufferB, elementCount, 0, DXGI_FORMAT_R16_FLOAT),
-            DirectX::createSRV(faceTensionPaintBufferA, elementCount, 0, DXGI_FORMAT_R16_FLOAT),
-            DirectX::createUAV(faceTensionPaintBufferB, elementCount, 0, DXGI_FORMAT_R16_FLOAT),
-            DirectX::createUAV(faceTensionPaintBufferA, elementCount, 0, DXGI_FORMAT_R16_FLOAT)
+        int elementCount = numVoxels * elementsPerVoxel;
+        const std::vector<uint16_t> emptyData(elementCount, 0);
+        paintBufferA = DirectX::createReadWriteBuffer(emptyData, false);
+        paintBufferB = DirectX::createReadWriteBuffer(emptyData, false);
+        paintViews = PingPongView(
+            DirectX::createSRV(paintBufferB, elementCount, 0, DXGI_FORMAT_R16_FLOAT),
+            DirectX::createSRV(paintBufferA, elementCount, 0, DXGI_FORMAT_R16_FLOAT),
+            DirectX::createUAV(paintBufferB, elementCount, 0, DXGI_FORMAT_R16_FLOAT),
+            DirectX::createUAV(paintBufferA, elementCount, 0, DXGI_FORMAT_R16_FLOAT)
         );
-
-        paintDeltaBuffer = DirectX::createReadWriteBuffer(emptyFaceTensionData, false);
-        paintDeltaUAV = DirectX::createUAV(paintDeltaBuffer, elementCount, 0, DXGI_FORMAT_R16_FLOAT);
 
         paintDeltaCompute = PaintDeltaCompute(
             elementCount,
-            facePaintViews,
+            paintViews,
             paintDeltaUAV
         );
+    }
+
+    // The paint delta buffer is shared between face and vertex paint modes, and sized according to the larger of the two (vertex mode).
+    void allocatePaintDeltaBuffer() {
+        MSharedPtr<Voxels> voxels = getVoxels();
+        if (!voxels) return;
+
+        const int numVoxels = voxels->numOccupied;
+        int elementCount = numVoxels * 8;
+        const std::vector<uint16_t> emptyData(elementCount, 0);
+
+        paintDeltaBuffer = DirectX::createReadWriteBuffer(emptyData, false);
+        paintDeltaUAV = DirectX::createUAV(paintDeltaBuffer, elementCount, 0, DXGI_FORMAT_R16_FLOAT);
     }
 };
