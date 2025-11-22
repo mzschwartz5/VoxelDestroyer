@@ -254,12 +254,12 @@ private:
     void onEditModeChange(VoxelEditMode newMode, const MString& shapeName) {
         bool isThisShape = (shapeName == voxelShape->name());
         bool isObjectMode = (newMode == VoxelEditMode::Object);
-        bool isFacePaintMode = (newMode == VoxelEditMode::FacePaint);
+        bool isPaintMode = (newMode == VoxelEditMode::FacePaint || newMode == VoxelEditMode::VertexPaint);
         bool isSelectionMode = (newMode == VoxelEditMode::Selection);
 
-        voxelRenderItemsEnabledState[voxelSelectedHighlightItemName] = !(isObjectMode || isFacePaintMode);
-        voxelRenderItemsEnabledState[voxelPreviewSelectionHighlightItemName] = !(isObjectMode || isFacePaintMode);
-        voxelRenderItemsEnabledState[voxelSelectionRenderItemName] = !(isObjectMode || isFacePaintMode);
+        voxelRenderItemsEnabledState[voxelSelectedHighlightItemName] = !(isObjectMode || isPaintMode);
+        voxelRenderItemsEnabledState[voxelPreviewSelectionHighlightItemName] = !(isObjectMode || isPaintMode);
+        voxelRenderItemsEnabledState[voxelSelectionRenderItemName] = !(isObjectMode || isPaintMode);
         voxelRenderItemsEnabledState[voxelWireframeRenderItemName] = !isObjectMode;
 
         // If this event is for a different shape, disable everything.
@@ -273,9 +273,9 @@ private:
         }
 
         voxelShape->unsubscribePaintStateChanges();
-        if (isFacePaintMode && isThisShape) {
-            sendVoxelInfoToPaintRenderOp();
-            voxelShape->subscribeToPaintStateChanges();
+        if (isPaintMode && isThisShape) {
+            sendVoxelInfoToPaintRenderOp(newMode);
+            voxelShape->subscribeToPaintStateChanges(newMode);
         }
 
         shouldUpdate = true;
@@ -748,15 +748,14 @@ private:
         setVoxelGeometryForRenderItem(*renderItem, MGeometry::kTriangles);
     }
 
-    void sendVoxelInfoToPaintRenderOp() {
+    void sendVoxelInfoToPaintRenderOp(VoxelEditMode paintMode) {
         VoxelRendererOverride* voxelRendererOverride = VoxelRendererOverride::instance();
         if (!voxelRendererOverride) return;
 
         const MMatrixArray& voxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
-        // TODO: will send all weight sets eventually (tension, compression, particle weights). (Or just the selected set?)
-        PingPongView& facePaintViews = voxelShape->getFacePaintViews();
+        PingPongView& paintView = voxelShape->getPaintView(paintMode);
 
-        voxelRendererOverride->sendVoxelInfoToPaintRenderOp(voxelMatrices, visibleVoxelIdToGlobalId, facePaintViews);
+        voxelRendererOverride->sendVoxelInfoToPaintRenderOp(paintMode, voxelMatrices, visibleVoxelIdToGlobalId, paintView);
     }
 
     void createVoxelGeometryBuffers() {

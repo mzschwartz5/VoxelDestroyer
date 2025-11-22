@@ -8,6 +8,7 @@
 #include <vector>
 #include "../draw/voxelshape.h"
 #include "../../directx/directx.h"
+#include "changevoxeleditmodecommand.h"
 #include <maya/M3dView.h>
 #include <d3d11.h>
 #include <wrl/client.h>
@@ -20,6 +21,7 @@ public:
     // compute time copying to and from the GPU, but reduces memory pressure on the GPU.
     std::vector<uint16_t> paintDelta;
     MUuid voxelShapeId;
+    VoxelEditMode paintMode;
     
     static void* creator() {
         return new ApplyVoxelPaintCommand();
@@ -28,6 +30,7 @@ public:
     static MSyntax syntax() {
         MSyntax syntax;
         syntax.addFlag("-vid", "-voxelShapeId", MSyntax::kString);
+        syntax.addFlag("-mode", "-paintMode", MSyntax::kLong);
         return syntax;
     }
 
@@ -37,9 +40,15 @@ public:
 
     MStatus doIt(const MArgList& args) override {
         MArgDatabase argData(syntax(), args);
+        
         MString voxelShapeIdStr;
         argData.getFlagArgument("-vid", 0, voxelShapeIdStr);
         voxelShapeId = MUuid(voxelShapeIdStr);
+        
+        int mode;
+        argData.getFlagArgument("-mode", 0, mode);
+        paintMode = static_cast<VoxelEditMode>(mode);
+        
         VoxelShape* voxelShape = getVoxelShapeById(voxelShapeId);
 
         const ComPtr<ID3D11Buffer>& paintDeltaBuffer = voxelShape->getPaintDeltaBuffer();
@@ -50,14 +59,14 @@ public:
 
     MStatus redoIt() override {
         VoxelShape* voxelShape = getVoxelShapeById(voxelShapeId);
-        voxelShape->undoRedoPaint(paintDelta, 1);
+        voxelShape->undoRedoPaint(paintDelta, 1, paintMode);
         M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }
 
     MStatus undoIt() override {
         VoxelShape* voxelShape = getVoxelShapeById(voxelShapeId);
-        voxelShape->undoRedoPaint(paintDelta, -1);
+        voxelShape->undoRedoPaint(paintDelta, -1, paintMode);
         M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }

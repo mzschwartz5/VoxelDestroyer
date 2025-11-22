@@ -261,9 +261,11 @@ public:
         ComPtr<ID3D11Resource> dstResource;
         dstUAV->GetResource(dstResource.GetAddressOf());
 
-        DirectX::getContext()->CopyResource(
+        DirectX::getContext()->CopySubresourceRegion(
             dstResource.Get(),
-            srcResource.Get()
+            0, 0, 0, 0,
+            srcResource.Get(),
+            0, nullptr // Passing nullptr means copy the entire src resource
         );
     }
 
