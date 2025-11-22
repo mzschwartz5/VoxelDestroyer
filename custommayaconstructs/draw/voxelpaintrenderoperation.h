@@ -320,7 +320,7 @@ public:
         UINT stride = sizeof(float) * 3;
         UINT offset = 0;
         dxContext->IASetVertexBuffers(0, 1, cubeVb.GetAddressOf(), &stride, &offset);
-        dxContext->IASetIndexBuffer(cubeIb.Get(), DXGI_FORMAT_R32_UINT, 0);
+        dxContext->IASetIndexBuffer(cubeIb.Get(), DXGI_FORMAT_R8_UINT, 0);
         dxContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     }
 
