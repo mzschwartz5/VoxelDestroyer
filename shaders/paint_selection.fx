@@ -20,6 +20,7 @@ float4 LOW_COLOR;
 float4 HIGH_COLOR;
 int COMPONENT_MASK; // Bitmask specifying which cardinal directions to paint (1 bit per direction, +X,+Y,+Z,-X,-Y,-Z)
 float4x4 viewProjection : ViewProjection; // Maya-defined semantic, populated by Maya.
+float INF_SENTINEL = -1.0f; // Sentinel value indicating infinite strength painting.
 
 // VS-only resources
 StructuredBuffer<float4x4> instanceTransforms : register(t0);
@@ -77,11 +78,23 @@ float applyPaint(uint globalVoxelID, uint componentID, float prevPaintValue) {
 
     // This branch has no chance of divergence, so there's no real penalty for it.
     int mode = PAINT_MODE - 1; // remap to -1,0,1
-    prevPaintValue = (mode == 0) ? PAINT_VALUE : prevPaintValue + mode * PAINT_VALUE;
+    // The "infinite strength" sentinel value is -1.0, and only works in SET mode. 
+    // In other modes, clamp the value to 0 before adding/subtracting to protect against infinite strength values. (Essentially means infinite values are treated as 0 in these modes).
+    prevPaintValue = (mode == 0) ? PAINT_VALUE : saturate(max(prevPaintValue, 0) + mode * PAINT_VALUE);
 
-    prevPaintValue = clamp(prevPaintValue, 0.0f, 1.0f);
     voxelPaintValue[idx] = prevPaintValue;
     return prevPaintValue;
+}
+
+float4 colorFromPaintValue(float paintValue) {
+    // Invert the higher value color if the paint value is infinite strength
+    if (paintValue == INF_SENTINEL) {
+        float3 invRGB = 1.0f - max(LOW_COLOR.rgb, HIGH_COLOR.rgb);
+        float alpha = max(LOW_COLOR.a, HIGH_COLOR.a);
+        return float4(invRGB, alpha);
+    }
+
+    return lerp(LOW_COLOR, HIGH_COLOR, paintValue);
 }
 
 // Updates paint values based on ID pass, and also renders all paint values to screen
@@ -103,7 +116,7 @@ float4 PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : S
         prevPaintValue = applyPaint(globalVoxelID, topComponentId, prevPaintValue);
     }
 
-    return lerp(LOW_COLOR, HIGH_COLOR, prevPaintValue);
+    return colorFromPaintValue(prevPaintValue);
 }
 
 float4 PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
@@ -120,7 +133,7 @@ float4 PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
         prevPaintValue = applyPaint(globalVoxelID, faceID, prevPaintValue);
     }
 
-    return lerp(LOW_COLOR, HIGH_COLOR, prevPaintValue);
+    return colorFromPaintValue(prevPaintValue);
 }
 
 // Simple render pass for when paint mode is active but the user is not actively painting
@@ -129,7 +142,8 @@ float4 PS_RenderPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     uint globalVoxelID = psInput.globalVoxelID;
     uint faceID = primID >> 1; // 2 triangles per face. TODO: generalize for vertex painting.
     uint idx = globalVoxelID * 6 + faceID;
-    return lerp(LOW_COLOR, HIGH_COLOR, voxelPaintValue[idx]);
+
+    return colorFromPaintValue(voxelPaintValue[idx]);
 }
 
 technique11 PAINT_SELECTION_TECHNIQUE_NAME {

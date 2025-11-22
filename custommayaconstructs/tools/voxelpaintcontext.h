@@ -20,6 +20,7 @@ struct PaintDragState : DragState {
     MColor lowColor;
     MColor highColor;
     int componentMask{ 0b111111 }; // All directions enabled by default
+    bool infiniteStrength{ false };
 };
 
 class VoxelPaintContext : public VoxelContextBase<VoxelPaintContext> {
@@ -50,7 +51,8 @@ public:
                 cameraBased,
                 lowColor,
                 highColor,
-                componentMask
+                componentMask,
+                infiniteStrength
             };
             paintDragStateChangedEvent.notify(paintDragState);
         });
@@ -114,7 +116,8 @@ public:
             cameraBased,
             lowColor,
             highColor,
-            componentMask
+            componentMask,
+            infiniteStrength
         });
         M3dView::active3dView().refresh(false, true);
     }
@@ -132,7 +135,8 @@ public:
             cameraBased,
             lowColor,
             highColor,
-            componentMask
+            componentMask,
+            infiniteStrength
         });
         M3dView::active3dView().refresh(false, true);
     }
@@ -152,6 +156,15 @@ public:
 
     int getComponentMask() const {
         return componentMask;
+    }
+
+    void setInfiniteStrength(bool enabled) {
+        infiniteStrength = enabled;
+        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
+    }
+
+    bool isInfiniteStrength() const {
+        return infiniteStrength;
     }
 
     // Maya doesn't refresh while the mouse is held down, so force it to do so.
@@ -186,4 +199,5 @@ private:
     MColor lowColor = MColor(1.0f, 0.0f, 0.0f, 0.0f);
     MColor highColor = MColor(1.0f, 0.0f, 0.0f, 1.0f);
     int componentMask = 0b111111; // All directions enabled by default
+    bool infiniteStrength{ false };
 };

@@ -97,7 +97,9 @@ public:
         unsubscribeFromPaintStateChange = VoxelPaintContext::subscribeToPaintDragStateChange([this](const PaintDragState& state) {
             paintRadius = state.selectRadius;
             brushMode = state.brushMode;
-            brushValue = state.brushValue / 100.0f; // UI provides percentage, shader expects normalized.
+            // If infinite strength is enabled, we use -1.0f as a sentinel value in the shader to indicate full strength
+            // Otherwise, the UI provides percentage, so normalize.
+            brushValue = state.infiniteStrength ? -1.0f : state.brushValue / 100.0f; 
             cameraBased = state.cameraBased;
             lowColor = state.lowColor;
             highColor = state.highColor;

@@ -28,16 +28,6 @@ global proc VoxelPaintContextProperties() {
                     -cc "VoxelPaintRadiusChanged()"
                     VoxelPaintRadiusControl;
 
-                optionMenuGrp -label "Mode"
-                    -adjustableColumn 2
-                    -annotation "How a brush stroke affects paint values"
-                    -cc "VoxelPaintModeChanged()"
-                    VoxelPaintModeControl;
-
-                    menuItem -label "Subtract";
-                    menuItem -label "Set";
-                    menuItem -label "Add";
-
                 floatSliderGrp -label "Strength"
                     -field true
                     -minValue 0.000
@@ -49,6 +39,23 @@ global proc VoxelPaintContextProperties() {
                     -annotation "Brush strength: a percentage of the low-to-high constraint value range set on the PBD node."
                     -cc "VoxelPaintStrengthChanged()"
                     VoxelPaintValueControl;
+
+                checkBoxGrp -numberOfCheckBoxes 1
+                    -label1 "Infinite"
+                    -value1 0
+                    -annotation "When enabled, strength value is infinite"
+                    -cc "VoxelPaintInfiniteStrengthChanged()"
+                    VoxelPaintInfiniteStrengthControl;
+
+                optionMenuGrp -label "Mode"
+                    -adjustableColumn 2
+                    -annotation "How a brush stroke affects paint values"
+                    -cc "VoxelPaintModeChanged()"
+                    VoxelPaintModeControl;
+
+                    menuItem -label "Subtract";
+                    menuItem -label "Set";
+                    menuItem -label "Add";
 
                 checkBoxGrp -numberOfCheckBoxes 1
                     -label1 "Camera-based painting"
@@ -115,16 +122,34 @@ global proc VoxelPaintRadiusChanged() {
     catchQuiet(`voxelPaintContextCommand -e -radius $radius $ctx`);
 }
 
-global proc VoxelPaintModeChanged() {
-    string $ctx = `currentCtx`;
-    int $modeIdx = `optionMenuGrp -q -sl VoxelPaintModeControl` - 1;
-    catchQuiet(`voxelPaintContextCommand -e -mode $modeIdx $ctx`);
-}
-
 global proc VoxelPaintStrengthChanged() {
     string $ctx = `currentCtx`;
     float $val = `floatSliderGrp -q -v VoxelPaintValueControl`;
     catchQuiet(`voxelPaintContextCommand -e -value $val $ctx`);
+}
+
+global proc VoxelPaintInfiniteStrengthChanged() {
+    string $ctx = `currentCtx`;
+    int $infiniteStrength = `checkBoxGrp -q -v1 VoxelPaintInfiniteStrengthControl`;
+    floatSliderGrp -e -enable (! $infiniteStrength) VoxelPaintValueControl;
+    VoxelPaintStrengthChanged();
+    if ($infiniteStrength) {
+        optionMenuGrp -e -sl 2 VoxelPaintModeControl; // force "Set" mode
+        VoxelPaintModeChanged();
+    }
+    catchQuiet(`voxelPaintContextCommand -e -infStrength $infiniteStrength $ctx`);
+}
+
+global proc VoxelPaintModeChanged() {
+    string $ctx = `currentCtx`;
+    int $modeIdx = `optionMenuGrp -q -sl VoxelPaintModeControl` - 1;
+    if ($modeIdx != 1) {
+        checkBoxGrp -e -v1 0 VoxelPaintInfiniteStrengthControl; // disable infinite if not in "Set" mode
+        VoxelPaintInfiniteStrengthChanged();
+        floatSliderGrp -e -enable true VoxelPaintValueControl;  // and re-enable strength control
+        VoxelPaintStrengthChanged();
+    }
+    catchQuiet(`voxelPaintContextCommand -e -mode $modeIdx $ctx`);
 }
 
 global proc VoxelPaintCameraBasedChanged() {
