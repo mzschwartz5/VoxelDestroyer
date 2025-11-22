@@ -74,17 +74,26 @@ public:
             {"PAINT_MODE", PAINT_MODE},
             {"LOW_COLOR", LOW_COLOR},
             {"HIGH_COLOR", HIGH_COLOR},
-            {"COMPONENT_MASK", COMPONENT_MASK}
+            {"COMPONENT_MASK", COMPONENT_MASK},
+            {"VERTEX_MODE", "0"}
         };
         paintSelectionShader = MRenderer::theRenderer()->getShaderManager()->getEffectsBufferShader(
             shaderData, size, PAINT_SELECTION_TECHNIQUE_NAME, macros, ARRAYSIZE(macros)
         );
 
-        std::vector<float> cubeVertices(cubeCornersFlattened.begin(), cubeCornersFlattened.end());
-        cubeVb = DirectX::createReadOnlyBuffer(cubeVertices, false, D3D11_BIND_VERTEX_BUFFER);
+        // For face painting mode
+        std::vector<float> cubeFaceVertices(cubeCornersFlattened.begin(), cubeCornersFlattened.end());
+        cubeFaceVb = DirectX::createReadOnlyBuffer(cubeFaceVertices, false, D3D11_BIND_VERTEX_BUFFER);
 
-        std::vector<unsigned int> cubeIndices(cubeFacesFlattened.begin(), cubeFacesFlattened.end());
-        cubeIb = DirectX::createReadOnlyBuffer(cubeIndices, false, D3D11_BIND_INDEX_BUFFER);
+        std::vector<unsigned int> cubeFaceIndices(cubeFacesFlattened.begin(), cubeFacesFlattened.end());
+        cubeFaceIb = DirectX::createReadOnlyBuffer(cubeFaceIndices, false, D3D11_BIND_INDEX_BUFFER);
+
+        // For vertex painting mode (points are drawn using quads)
+        std::vector<float> cubeVertVertices(cubeQuadVertsFlattened.begin(), cubeQuadVertsFlattened.end());
+        cubeVertVb = DirectX::createReadOnlyBuffer(cubeVertVertices, false, D3D11_BIND_VERTEX_BUFFER);
+
+        std::vector<unsigned int> cubeVertIndices(cubeQuadIndicesFlattened.begin(), cubeQuadIndicesFlattened.end());
+        cubeVertIb = DirectX::createReadOnlyBuffer(cubeVertIndices, false, D3D11_BIND_INDEX_BUFFER);
 
         unsubscribeFromPaintMove = VoxelPaintContext::subscribeToMousePositionChange([this](const MousePosition& mousePos) {
             updatePaintToolPos(mousePos.x, mousePos.y);
@@ -319,8 +328,8 @@ public:
         ID3D11DeviceContext* dxContext = DirectX::getContext();
         UINT stride = sizeof(float) * 3;
         UINT offset = 0;
-        dxContext->IASetVertexBuffers(0, 1, cubeVb.GetAddressOf(), &stride, &offset);
-        dxContext->IASetIndexBuffer(cubeIb.Get(), DXGI_FORMAT_R8_UINT, 0);
+        dxContext->IASetVertexBuffers(0, 1, cubeFaceVb.GetAddressOf(), &stride, &offset);
+        dxContext->IASetIndexBuffer(cubeFaceIb.Get(), DXGI_FORMAT_R8_UINT, 0);
         dxContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     }
 
@@ -476,8 +485,10 @@ private:
     ComPtr<ID3D11ShaderResourceView> renderTargetSRV; 
 
     // Cube geometry resources
-    ComPtr<ID3D11Buffer> cubeVb;
-    ComPtr<ID3D11Buffer> cubeIb;
+    ComPtr<ID3D11Buffer> cubeFaceVb;
+    ComPtr<ID3D11Buffer> cubeFaceIb;
+    ComPtr<ID3D11Buffer> cubeVertVb;
+    ComPtr<ID3D11Buffer> cubeVertIb;
 
     unsigned int instanceCount = 0;
 
