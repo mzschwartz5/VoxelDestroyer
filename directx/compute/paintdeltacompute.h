@@ -22,17 +22,22 @@ public:
     PaintDeltaCompute() = default;
 
     PaintDeltaCompute(
-        int numElements,
-        PingPongView& paintViews,
         const ComPtr<ID3D11UnorderedAccessView>& deltaUAV
-    ) : ComputeShader(IDR_SHADER16), paintViews(&paintViews), deltaUAV(deltaUAV), numElements(numElements)
+    ) : ComputeShader(IDR_SHADER16), deltaUAV(deltaUAV)
     {
-        numWorkgroups = Utils::divideRoundUp(numElements, VGS_THREADS);
-        constantBuffer = DirectX::createConstantBuffer<Constants>({ numElements, -1, 0, 0 });
+        constantBuffer = DirectX::createConstantBuffer<Constants>({ 0, -1, 0, 0 });
     };
 
     void dispatch() override {
         ComputeShader::dispatch(numWorkgroups);
+    }
+
+    void setPaintViews(const PingPongView* paintViews, int numElements) {
+        this->paintViews = paintViews;
+        this->numElements = numElements;
+        numWorkgroups = Utils::divideRoundUp(numElements, VGS_THREADS);
+
+        DirectX::updateConstantBuffer<Constants>(constantBuffer, { numElements, -1, 0, 0 });
     }
 
     void bind() override {

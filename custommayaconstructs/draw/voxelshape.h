@@ -201,8 +201,7 @@ public:
             int elementsPerVoxel = facePaintMode ? 6 : 8;
             ComPtr<ID3D11Buffer>& paintBufferA = facePaintMode ? facePaintBufferA : vertexPaintBufferA;
             ComPtr<ID3D11Buffer>& paintBufferB = facePaintMode ? facePaintBufferB : vertexPaintBufferB;
-            PaintDeltaCompute& paintDeltaCompute = facePaintMode ? facePaintDeltaCompute : vertexPaintDeltaCompute;
-            allocatePaintBuffers(elementsPerVoxel, paintBufferA, paintBufferB, paintViews, paintDeltaCompute);
+            allocatePaintBuffers(elementsPerVoxel, paintBufferA, paintBufferB, paintViews);
         }
 
         return paintViews;
@@ -215,12 +214,13 @@ public:
     // Invoked by the owning subscene on edit mode changes
     void subscribeToPaintStateChanges(VoxelEditMode paintMode) {
         bool isFacePaintMode = (paintMode == VoxelEditMode::FacePaint);
-        PaintDeltaCompute* paintDeltaCompute = isFacePaintMode ? &facePaintDeltaCompute : &vertexPaintDeltaCompute;
         PingPongView* paintViews = isFacePaintMode ? &facePaintViews : &vertexPaintViews;
+        const int numElements = getVoxels()->numOccupied * (isFacePaintMode ? 6 : 8);
+        paintDeltaCompute.setPaintViews(paintViews, numElements);
 
-        unsubPaintStateChanges = VoxelPaintContext::subscribeToPaintDragStateChange([this, paintDeltaCompute, paintViews, paintMode](const PaintDragState& paintState) {
+        unsubPaintStateChanges = VoxelPaintContext::subscribeToPaintDragStateChange([this, paintViews, paintMode](const PaintDragState& paintState) {
             if (paintState.isDragging) return; // Only apply when a paint stroke stops
-            paintDeltaCompute->dispatch();
+            paintDeltaCompute.dispatch();
             updatePBDConstraints();
 
             // Records the paint delta for undo/redo. On undo/redo, applies the delta back to the paint values.
@@ -241,7 +241,6 @@ public:
 
     void undoRedoPaint(const std::vector<uint16_t>& paintDelta, int direction, VoxelEditMode paintMode) {
         bool isFacePaintMode = (paintMode == VoxelEditMode::FacePaint);
-        PaintDeltaCompute& paintDeltaCompute = isFacePaintMode ? facePaintDeltaCompute : vertexPaintDeltaCompute;
         PingPongView& paintViews = isFacePaintMode ? facePaintViews : vertexPaintViews;
 
         DirectX::getContext()->UpdateSubresource(paintDeltaBuffer.Get(), 0, nullptr, paintDelta.data(), 0, 0);
@@ -274,8 +273,7 @@ private:
     MCallbackIdArray callbackIds;
     EventBase::Unsubscribe unsubPaintStateChanges;
     DeformVerticesCompute deformVerticesCompute;
-    PaintDeltaCompute facePaintDeltaCompute;
-    PaintDeltaCompute vertexPaintDeltaCompute;
+    PaintDeltaCompute paintDeltaCompute;
     // Holds the weight values of each voxel (face or corner), for use with the Voxel Paint tool.
     ComPtr<ID3D11Buffer> facePaintBufferA;
     ComPtr<ID3D11Buffer> facePaintBufferB;
@@ -384,8 +382,7 @@ private:
         int elementsPerVoxel,
         ComPtr<ID3D11Buffer>& paintBufferA,
         ComPtr<ID3D11Buffer>& paintBufferB,
-        PingPongView& paintViews,
-        PaintDeltaCompute& paintDeltaCompute
+        PingPongView& paintViews
     ) {
         MSharedPtr<Voxels> voxels = getVoxels();
         if (!voxels) return;
@@ -405,12 +402,6 @@ private:
             DirectX::createUAV(paintBufferB, elementCount, 0, DXGI_FORMAT_R16_FLOAT),
             DirectX::createUAV(paintBufferA, elementCount, 0, DXGI_FORMAT_R16_FLOAT)
         );
-
-        paintDeltaCompute = PaintDeltaCompute(
-            elementCount,
-            paintViews,
-            paintDeltaUAV
-        );
     }
 
     // The paint delta buffer is shared between face and vertex paint modes, and sized according to the larger of the two (vertex mode).
@@ -424,5 +415,7 @@ private:
 
         paintDeltaBuffer = DirectX::createReadWriteBuffer(emptyData, false);
         paintDeltaUAV = DirectX::createUAV(paintDeltaBuffer, elementCount, 0, DXGI_FORMAT_R16_FLOAT);
+
+        paintDeltaCompute = PaintDeltaCompute(paintDeltaUAV);
     }
 };
