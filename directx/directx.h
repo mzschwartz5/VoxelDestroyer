@@ -253,13 +253,13 @@ public:
     }
 
     static void copyBufferToBuffer(
-        const ComPtr<ID3D11UnorderedAccessView>& srcUAV,
-        const ComPtr<ID3D11UnorderedAccessView>& dstUAV
+        const ComPtr<ID3D11View>& srcView,
+        const ComPtr<ID3D11View>& dstView
     ) {
         ComPtr<ID3D11Resource> srcResource;
-        srcUAV->GetResource(srcResource.GetAddressOf());
+        srcView->GetResource(srcResource.GetAddressOf());
         ComPtr<ID3D11Resource> dstResource;
-        dstUAV->GetResource(dstResource.GetAddressOf());
+        dstView->GetResource(dstResource.GetAddressOf());
 
         DirectX::getContext()->CopySubresourceRegion(
             dstResource.Get(),

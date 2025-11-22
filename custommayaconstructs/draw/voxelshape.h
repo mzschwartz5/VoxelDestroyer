@@ -219,7 +219,13 @@ public:
         paintDeltaCompute.setPaintViews(paintViews, numElements);
 
         unsubPaintStateChanges = VoxelPaintContext::subscribeToPaintDragStateChange([this, paintViews, paintMode](const PaintDragState& paintState) {
-            if (paintState.isDragging) return; // Only apply when a paint stroke stops
+            if (paintState.isDragging) {
+                // At the beginning of a paint stroke, copy the pre-paint values into the delta buffer
+                DirectX::copyBufferToBuffer(paintViews->UAV(), paintDeltaUAV);
+                return; 
+            }
+
+            // At the end of a paint stroke, compute the before-after delta and update the PBD constraints
             paintDeltaCompute.dispatch();
             updatePBDConstraints();
 
@@ -229,9 +235,6 @@ public:
             MString modeStr = MString() + static_cast<int>(paintMode);
             MString cmd = "applyVoxelPaint -vid \"" + uuidStr + "\" -mode \"" + modeStr + "\"";
             MGlobal::executeCommand(cmd, false, true);
-
-            // Now that the delta is recorded, copy the after-paint-stroke values into the delta buffer for the next stroke.
-            DirectX::copyBufferToBuffer(paintViews->UAV(), paintDeltaUAV);
         });
     }
 

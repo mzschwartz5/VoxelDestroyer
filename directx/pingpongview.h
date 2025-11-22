@@ -5,7 +5,7 @@
 class PingPongView {
 public:
     using ClearFunc = void(*)(const ComPtr<ID3D11UnorderedAccessView>&);
-    using CopyFunc = void(*)(const ComPtr<ID3D11UnorderedAccessView>&, const ComPtr<ID3D11UnorderedAccessView>&);
+    using CopyFunc = void(*)(const ComPtr<ID3D11View>&, const ComPtr<ID3D11View>&);
 
     PingPongView(
         const ComPtr<ID3D11ShaderResourceView>& srvA,
