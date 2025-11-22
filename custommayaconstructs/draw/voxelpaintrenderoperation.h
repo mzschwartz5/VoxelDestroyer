@@ -81,10 +81,10 @@ public:
         );
 
         std::vector<float> cubeVertices(cubeCornersFlattened.begin(), cubeCornersFlattened.end());
-        cubeVb = DirectX::createReadOnlyBuffer<float>(cubeVertices, D3D11_BIND_VERTEX_BUFFER, DirectX::BufferFormat::RAW);
+        cubeVb = DirectX::createReadOnlyBuffer(cubeVertices, false, D3D11_BIND_VERTEX_BUFFER);
 
         std::vector<unsigned int> cubeIndices(cubeFacesFlattened.begin(), cubeFacesFlattened.end());
-        cubeIb = DirectX::createReadOnlyBuffer<unsigned int>(cubeIndices, D3D11_BIND_INDEX_BUFFER, DirectX::BufferFormat::RAW);
+        cubeIb = DirectX::createReadOnlyBuffer(cubeIndices, false, D3D11_BIND_INDEX_BUFFER);
 
         unsubscribeFromPaintMove = VoxelPaintContext::subscribeToMousePositionChange([this](const MousePosition& mousePos) {
             updatePaintToolPos(mousePos.x, mousePos.y);
@@ -414,13 +414,13 @@ public:
 
         int elementCount = numVoxels * 6; // TODO: number of elements depends on whether painting faces or vertices
         const std::vector<uint8_t> emptyIDData(elementCount, 0); 
-        voxelIDBufferA = DirectX::createReadWriteBuffer(emptyIDData, 0, DirectX::BufferFormat::TYPED);
-        voxelIDBufferB = DirectX::createReadWriteBuffer(emptyIDData, 0, DirectX::BufferFormat::TYPED);
+        voxelIDBufferA = DirectX::createReadWriteBuffer(emptyIDData, false);
+        voxelIDBufferB = DirectX::createReadWriteBuffer(emptyIDData, false);
         voxelIDViews = PingPongView(
-            DirectX::createSRV(voxelIDBufferB, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R8_UINT),
-            DirectX::createSRV(voxelIDBufferA, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R8_UINT),
-            DirectX::createUAV(voxelIDBufferB, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R8_UINT),
-            DirectX::createUAV(voxelIDBufferA, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R8_UINT)
+            DirectX::createSRV(voxelIDBufferB, elementCount, 0, DXGI_FORMAT_R8_UINT),
+            DirectX::createSRV(voxelIDBufferA, elementCount, 0, DXGI_FORMAT_R8_UINT),
+            DirectX::createUAV(voxelIDBufferB, elementCount, 0, DXGI_FORMAT_R8_UINT),
+            DirectX::createUAV(voxelIDBufferA, elementCount, 0, DXGI_FORMAT_R8_UINT)
         );
     }
 

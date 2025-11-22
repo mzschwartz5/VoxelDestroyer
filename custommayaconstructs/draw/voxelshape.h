@@ -368,17 +368,17 @@ private:
         // Need three copies of the buffer: A and B for ping-ponging during paint strokes, and one to hold the "before paint" state for delta calculations.
         int elementCount = numVoxels * 6; // 6 faces per voxel
         const std::vector<uint16_t> emptyFaceTensionData(elementCount, 0); // 6 faces per voxel
-        faceTensionPaintBufferA = DirectX::createReadWriteBuffer(emptyFaceTensionData, 0, DirectX::BufferFormat::TYPED);
-        faceTensionPaintBufferB = DirectX::createReadWriteBuffer(emptyFaceTensionData, 0, DirectX::BufferFormat::TYPED);
+        faceTensionPaintBufferA = DirectX::createReadWriteBuffer(emptyFaceTensionData, false);
+        faceTensionPaintBufferB = DirectX::createReadWriteBuffer(emptyFaceTensionData, false);
         facePaintViews = PingPongView(
-            DirectX::createSRV(faceTensionPaintBufferB, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT),
-            DirectX::createSRV(faceTensionPaintBufferA, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT),
-            DirectX::createUAV(faceTensionPaintBufferB, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT),
-            DirectX::createUAV(faceTensionPaintBufferA, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT)
+            DirectX::createSRV(faceTensionPaintBufferB, elementCount, 0, DXGI_FORMAT_R16_FLOAT),
+            DirectX::createSRV(faceTensionPaintBufferA, elementCount, 0, DXGI_FORMAT_R16_FLOAT),
+            DirectX::createUAV(faceTensionPaintBufferB, elementCount, 0, DXGI_FORMAT_R16_FLOAT),
+            DirectX::createUAV(faceTensionPaintBufferA, elementCount, 0, DXGI_FORMAT_R16_FLOAT)
         );
 
-        paintDeltaBuffer = DirectX::createReadWriteBuffer(emptyFaceTensionData, 0, DirectX::BufferFormat::TYPED);
-        paintDeltaUAV = DirectX::createUAV(paintDeltaBuffer, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R16_FLOAT);
+        paintDeltaBuffer = DirectX::createReadWriteBuffer(emptyFaceTensionData, false);
+        paintDeltaUAV = DirectX::createUAV(paintDeltaBuffer, elementCount, 0, DXGI_FORMAT_R16_FLOAT);
 
         paintDeltaCompute = PaintDeltaCompute(
             elementCount,

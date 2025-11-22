@@ -53,7 +53,6 @@ ComPtr<ID3D11ShaderResourceView> DirectX::createSRV(
     const ComPtr<ID3D11Buffer>& buffer,
     UINT elementCount,
     UINT offset,
-    BufferFormat bufferFormat,
     DXGI_FORMAT viewFormat
 ) {
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -63,7 +62,7 @@ ComPtr<ID3D11ShaderResourceView> DirectX::createSRV(
     srvDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
     srvDesc.Buffer.FirstElement = offset;
     srvDesc.Buffer.NumElements = numElements;
-    srvDesc.Format = (bufferFormat == BufferFormat::RAW) ? DXGI_FORMAT_R32_TYPELESS : viewFormat;
+    srvDesc.Format = viewFormat;
 
     ComPtr<ID3D11ShaderResourceView> srv;
     HRESULT hr = dxDevice->CreateShaderResourceView(buffer.Get(), &srvDesc, srv.GetAddressOf());
@@ -75,7 +74,6 @@ ComPtr<ID3D11UnorderedAccessView> DirectX::createUAV(
     const ComPtr<ID3D11Buffer>& buffer,
     UINT elementCount,
     UINT offset,
-    BufferFormat bufferFormat,
     DXGI_FORMAT viewFormat
 ) {
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -85,12 +83,7 @@ ComPtr<ID3D11UnorderedAccessView> DirectX::createUAV(
     uavDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
     uavDesc.Buffer.FirstElement = offset;
     uavDesc.Buffer.NumElements = numElements;
-    if (bufferFormat == BufferFormat::RAW) {
-        uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-        uavDesc.Buffer.Flags = D3D11_BUFFER_UAV_FLAG_RAW;
-    } else {
-        uavDesc.Format = viewFormat;
-    }
+    uavDesc.Format = viewFormat;
 
     ComPtr<ID3D11UnorderedAccessView> uav;
     HRESULT hr = dxDevice->CreateUnorderedAccessView(buffer.Get(), &uavDesc, uav.GetAddressOf());
@@ -115,18 +108,15 @@ void DirectX::notifyMayaOfMemoryUsage(const ComPtr<ID3D11Buffer>& buffer, bool a
 }
 
 /**
- * Note: This only works for structured and raw buffers. For typed buffers, the element size
- * would need to be derived from the DXGI_FORMAT.
+ * Note: This only works for structured buffers. For typed buffers, the element size
+ * would need to be derived from the DXGI_FORMAT. For raw buffers, elements are 4 bytes.
+ * And for, say, vertex buffers, there is no structure byte stride.
  */
 int DirectX::getNumElementsInBuffer(const ComPtr<ID3D11Buffer>& buffer) {
     if (!buffer) return 0;
 
     D3D11_BUFFER_DESC desc;
     buffer->GetDesc(&desc);
-    
-    if (desc.MiscFlags & D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS) {
-        return desc.ByteWidth / 4; // Raw buffers are treated as arrays of uint32_t
-    }
     
     return desc.ByteWidth / desc.StructureByteStride;
 }
