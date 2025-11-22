@@ -27,8 +27,8 @@ StructuredBuffer<uint> instanceToGlobalVoxelIdMap : register(t1);
 
 // PS-only resources
 // A bitmask of voxels painted this pass
-RWStructuredBuffer<uint> paintedVoxelIDs : register(u1); // UAV registers live in the same namespace as outputs, must start at u1.
-StructuredBuffer<uint> previousPaintedVoxelIDs : register(t2);
+RWBuffer<uint> paintedVoxelIDs : register(u1);        // UAV registers live in the same namespace as outputs, must start at u1.
+Buffer<uint> previousPaintedVoxelIDs : register(t2);
 Buffer<float> previousVoxelPaintValue : register(t3); // NOT structured so that we can store half-precision floats.
 RWBuffer<float> voxelPaintValue : register(u2);       // NOT structured so that we can store half-precision floats.
 Texture2D<uint> idRenderTarget : register(t4);

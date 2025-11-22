@@ -415,15 +415,15 @@ public:
         visibleToGlobalVoxelBuffer = DirectX::createReadOnlyBuffer<uint32_t>(visibleVoxelIdToGlobalId);
         visibleToGlobalVoxelSRV = DirectX::createSRV(visibleToGlobalVoxelBuffer);
 
-        // TODO: this can be a vector of uint8_t (it's just 1s and 0s)
-        const std::vector<uint32_t> emptyIDData(numVoxels * 6, 0); // TODO: number of elements depends on whether painting faces or vertices
-        voxelIDBufferA = DirectX::createReadWriteBuffer(emptyIDData);
-        voxelIDBufferB = DirectX::createReadWriteBuffer(emptyIDData);
+        int elementCount = numVoxels * 6; // TODO: number of elements depends on whether painting faces or vertices
+        const std::vector<uint8_t> emptyIDData(elementCount, 0); 
+        voxelIDBufferA = DirectX::createReadWriteBuffer(emptyIDData, 0, DirectX::BufferFormat::TYPED);
+        voxelIDBufferB = DirectX::createReadWriteBuffer(emptyIDData, 0, DirectX::BufferFormat::TYPED);
         voxelIDViews = PingPongView(
-            DirectX::createSRV(voxelIDBufferB),
-            DirectX::createSRV(voxelIDBufferA),
-            DirectX::createUAV(voxelIDBufferB),
-            DirectX::createUAV(voxelIDBufferA)
+            DirectX::createSRV(voxelIDBufferB, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R8_UINT),
+            DirectX::createSRV(voxelIDBufferA, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R8_UINT),
+            DirectX::createUAV(voxelIDBufferB, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R8_UINT),
+            DirectX::createUAV(voxelIDBufferA, elementCount, 0, DirectX::BufferFormat::TYPED, DXGI_FORMAT_R8_UINT)
         );
     }
 
