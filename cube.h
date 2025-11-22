@@ -64,3 +64,29 @@ inline constexpr std::array<uint32_t, 36> cubeFacesFlattened = {{
     // -Z
     2,3,1, 2,1,0
 }};
+
+/**
+ * This gets used as the vertex buffer for drawing cubes in point primitive mode:
+ * all points are at the center of the cube, and the vertex shader expands them out to the corners.
+ */
+inline constexpr std::array<float, 12> cubeQuadVertsFlattened = { 
+    0.0f, 0.0f, 0.0f,
+    0.0f, 0.0f, 0.0f,
+    0.0f, 0.0f, 0.0f,
+    0.0f, 0.0f, 0.0f
+};
+
+/**
+ * When drawing a cube in point primitive mode, each corner is really a two-triangle quad.
+ * We need six indices per corner to draw the quad, and do the expansion in the vertex shader.
+ */
+inline constexpr std::array<uint32_t, 48> cubeQuadIndicesFlattened = {{
+    0, 1, 2, 0, 2, 3,
+    0, 1, 2, 0, 2, 3,
+    0, 1, 2, 0, 2, 3,
+    0, 1, 2, 0, 2, 3,
+    0, 1, 2, 0, 2, 3,
+    0, 1, 2, 0, 2, 3,
+    0, 1, 2, 0, 2, 3,
+    0, 1, 2, 0, 2, 3
+}};
