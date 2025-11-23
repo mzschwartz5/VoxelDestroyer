@@ -17,6 +17,7 @@ struct VSOut {
     nointerpolation uint globalVoxelID : INSTANCEID; 
 #if VERTEX_MODE
     nointerpolation float2 quadCenter : TEXCOORD0; // In screen space
+    nointerpolation uint instanceID : TEXCOORD1; // Original (not global) voxel instance ID
 #endif
 };
 
@@ -88,6 +89,7 @@ VSOut VS_Main(VSIn vsIn) {
     uint instanceID = vsIn.instanceID;
 #if VERTEX_MODE
     pos = expandVerticesToCorners(instanceID);
+    vsOut.instanceID = instanceID;
     instanceID = instanceID >> 3; // 8 quad instances per voxel instance
 #endif
     float4x4 instanceTransform = instanceTransforms[instanceID];
@@ -132,8 +134,13 @@ bool isComponentEnabled(uint componentID) {
 // Note: this pass does not need to be run when doing non-camera-based painting.
 uint PS_IDPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     if (pixelOutsideRadius(psInput.pos.xy, PAINT_POSITION, PAINT_RADIUS)) return 0;
+#if VERTEX_MODE
+    if (pixelOutsideRadius(psInput.pos.xy, psInput.quadCenter, POINT_RADIUS)) return 0;
+    uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
+#else
+    uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
+#endif
 
-    uint componentId = primID >> 1; // 2 triangles per face (and also two triangles per vertex, since they're quads)
     if (!isComponentEnabled(componentId)) return 0;
 
     // Add 1 to globalVoxelID so that 0 can represent "no voxel"
@@ -171,6 +178,9 @@ float4 PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : S
 #if VERTEX_MODE
     // Return transparent pixel rather than discard to preserve early-z optimizations.
     if (pixelOutsideRadius(psInput.pos.xy, psInput.quadCenter, POINT_RADIUS)) return float4(0,0,0,0); 
+    uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
+#else
+    uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
 #endif
 
     uint2 pixel = uint2(psInput.pos.xy);
@@ -180,7 +190,6 @@ float4 PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : S
     topVoxelId -= 1; // Remap back to real voxel ID (...careful of underflow)
 
     uint globalVoxelID = psInput.globalVoxelID;
-    uint componentId = primID >> 1; // 2 triangles per face (and also two triangles per vertex, since they're quads)
     uint idx = globalVoxelID * COMPONENTS_PER_INSTANCE + componentId;
     float prevPaintValue = previousVoxelPaintValue[idx];
 
@@ -197,11 +206,13 @@ float4 PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
 #if VERTEX_MODE
     // Return transparent pixel rather than discard to preserve early-z optimizations.
     if (pixelOutsideRadius(psInput.pos.xy, psInput.quadCenter, POINT_RADIUS)) return float4(0,0,0,0); 
+    uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
+#else 
+    uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
 #endif
 
     uint2 pixel = uint2(psInput.pos.xy);
     uint globalVoxelID = psInput.globalVoxelID;
-    uint componentId = primID >> 1; // 2 triangles per face (and also two triangles per vertex, since they're quads)
     bool componentEnabled = isComponentEnabled(componentId);
     uint idx = globalVoxelID * COMPONENTS_PER_INSTANCE + componentId;
     float prevPaintValue = previousVoxelPaintValue[idx];
@@ -220,10 +231,12 @@ float4 PS_RenderPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
 #if VERTEX_MODE
     // Return transparent pixel rather than discard to preserve early-z optimizations.
     if (pixelOutsideRadius(psInput.pos.xy, psInput.quadCenter, POINT_RADIUS)) return float4(0,0,0,0); 
+    uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
+#else
+    uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
 #endif
 
     uint globalVoxelID = psInput.globalVoxelID;
-    uint componentId = primID >> 1; // 2 triangles per face (and also two triangles per vertex, since they're quads)
     uint idx = globalVoxelID * COMPONENTS_PER_INSTANCE + componentId;
     return colorFromPaintValue(voxelPaintValue[idx]);
 }
