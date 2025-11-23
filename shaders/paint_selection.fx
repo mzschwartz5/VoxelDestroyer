@@ -132,19 +132,7 @@ void getParticleNormalAndDepth(float3 quadPosVS, float3 particleCenterVS, inout 
     depth = particlePosClip.z / particlePosClip.w;
 }
 
-#else // End particle-mode only functions. Begin face-mode only functions
-
-// This assumes a specific ordering of faces in cube.h
-// Probably no faster than a small lookup table or vertex attribute, but it's a neat trick.
-float3 faceNormalFromID(uint faceID) {
-    int sign = int((faceID & 1u) << 1) - 1; // 0 -> -1, 1 -> +1
-    uint axis = faceID >> 1u;               // 0..2
-    uint mask = 1u << axis;                 // 1,2,4
-    float3 bits = float3(float(mask & 1u), float((mask >> 1) & 1u), float((mask >> 2) & 1u));
-    return float(sign) * bits;
-}
-
-#endif // End face-mode only functions
+#endif // End particle-mode only functions
 
 VSOut VS_Main(VSIn vsIn) {
     VSOut vsOut;
@@ -252,7 +240,6 @@ PSOut PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : SV
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
-    float3 normal = faceNormalFromID(componentId);
 #endif
 
     uint2 pixel = uint2(psInput.pos.xy);
@@ -273,7 +260,9 @@ PSOut PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : SV
 
     if (prevPaintValue < eps) discard;
     psOut.color = colorFromPaintValue(prevPaintValue);
+#if PARTICLE_MODE
     applyLambertianShading(psOut.color, normal);
+#endif
     return psOut;
 }
 
@@ -285,7 +274,6 @@ PSOut PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else 
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
-    float3 normal = faceNormalFromID(componentId);
 #endif
 
     uint2 pixel = uint2(psInput.pos.xy);
@@ -301,7 +289,9 @@ PSOut PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
 
     if (prevPaintValue < eps) discard;
     psOut.color = colorFromPaintValue(prevPaintValue);
+#if PARTICLE_MODE
     applyLambertianShading(psOut.color, normal);
+#endif
     return psOut;
 }
 
@@ -315,7 +305,6 @@ PSOut PS_RenderPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
-    float3 normal = faceNormalFromID(componentId);
 #endif
 
     uint globalVoxelID = psInput.globalVoxelID;
@@ -323,7 +312,9 @@ PSOut PS_RenderPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     float paintValue = voxelPaintValue[idx];
     if (abs(paintValue) < eps) discard;
     psOut.color = colorFromPaintValue(paintValue);
+#if PARTICLE_MODE
     applyLambertianShading(psOut.color, normal);
+#endif
     return psOut;
 }
 
