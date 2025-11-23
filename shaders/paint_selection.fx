@@ -15,7 +15,7 @@ struct VSIn  {
 struct VSOut { 
     float4 pos : SV_POSITION; 
     nointerpolation uint globalVoxelID : INSTANCEID; 
-#if VERTEX_MODE
+#if PARTICLE_MODE
     nointerpolation uint instanceID : TEXCOORD0; // Original (not global) voxel instance ID
     float3 quadPosVS : TEXCOORD1;
     nointerpolation float3 particleCenterVS : TEXCOORD2;
@@ -24,7 +24,7 @@ struct VSOut {
 
 struct PSOut {
     float4 color : SV_Target;
-#if VERTEX_MODE
+#if PARTICLE_MODE
     float depth : SV_Depth;
 #endif
 };
@@ -42,7 +42,7 @@ float4x4 projection : Projection;              // Maya-defined semantic, populat
 float4x4 projectionInverse: ProjectionInverse; // Maya-defined semantic, populated by Maya.
 float2 viewportSize : ViewportPixelSize;       // Maya-defined semantic, populated by Maya.
 
-#if VERTEX_MODE
+#if PARTICLE_MODE
 int COMPONENTS_PER_INSTANCE = 8; // 8 corners per voxel
 #else
 int COMPONENTS_PER_INSTANCE = 6; // 6 faces per voxel
@@ -60,7 +60,7 @@ Buffer<float> previousVoxelPaintValue : register(t3); // NOT structured so that 
 RWBuffer<float> voxelPaintValue : register(u3);       // NOT structured so that we can store half-precision floats.
 Texture2D<uint> idRenderTarget : register(t4);
 
-#if VERTEX_MODE // Begin vertex-mode only functions
+#if PARTICLE_MODE // Begin particle-mode only functions
 // (SS = screen space, VS = view space)
 float particleRadiusInScreenSpace(float4 particleCenterClip, float4 particleCenterVS) {
     particleCenterClip.x /= particleCenterClip.w;
@@ -74,7 +74,7 @@ float particleRadiusInScreenSpace(float4 particleCenterClip, float4 particleCent
     return abs(offsetPos.x - particleCenterSS.x);
 }
 
-// In vertex mode, we draw a quad per voxel corner, with all 4 vertices starting at the origin.
+// In particle mode, we draw a quad per voxel corner, with all 4 vertices starting at the origin.
 // This step expands each group of 4 vertices to a given corner of the voxel.
 float4 expandVerticesToCorners(uint quadInstanceID) {
     uint cornerIdx = quadInstanceID & 7u; // 8 quads per voxel instance, one per corner.
@@ -92,7 +92,7 @@ float4 expandVerticesToCorners(uint quadInstanceID) {
     return float4(cornerBits, 1.0f);
 }
 
-// In vertex mode, we draw a quad per voxel corner, with all 4 vertices starting at the origin.
+// In particle mode, we draw a quad per voxel corner, with all 4 vertices starting at the origin.
 // This step expands each vertex - already at the corner position, and projected to clip space - is expanded to a quad corner.
 float4 expandCornerToQuad(uint vertexID, float4 cornerPosClip, float particleRadiusScreenSpace) {
     float2 quadBits = float2(
@@ -131,13 +131,25 @@ void getParticleNormalAndDepth(float3 quadPosVS, float3 particleCenterVS, inout 
     depth = particlePosClip.z / particlePosClip.w;
 }
 
-#endif // End vertex-mode only functions
+#else // End particle-mode only functions. Begin face-mode only functions
+
+// This assumes a specific ordering of faces in cube.h
+// Probably no faster than a small lookup table or vertex attribute, but it's a neat trick.
+float3 faceNormalFromID(uint faceID) {
+    int sign = int((faceID & 1u) << 1) - 1; // 0 -> -1, 1 -> +1
+    uint axis = faceID >> 1u;               // 0..2
+    uint mask = 1u << axis;                 // 1,2,4
+    float3 bits = float3(float(mask & 1u), float((mask >> 1) & 1u), float((mask >> 2) & 1u));
+    return float(sign) * bits;
+}
+
+#endif // End face-mode only functions
 
 VSOut VS_Main(VSIn vsIn) {
     VSOut vsOut;
     float4 pos = float4(vsIn.pos, 1.0f);
     uint instanceID = vsIn.instanceID;
-#if VERTEX_MODE
+#if PARTICLE_MODE
     pos = expandVerticesToCorners(instanceID);
     vsOut.instanceID = instanceID;
     instanceID = instanceID >> 3; // 8 quad instances per voxel instance
@@ -146,7 +158,7 @@ VSOut VS_Main(VSIn vsIn) {
     pos = mul(pos, instanceTransform);
     float4 posVS = mul(pos, view);
     pos = mul(posVS, projection);
-#if VERTEX_MODE
+#if PARTICLE_MODE
     vsOut.particleCenterVS = posVS.xyz;
     float particleRadiusSS = particleRadiusInScreenSpace(pos, posVS);
     pos = expandCornerToQuad(vsIn.vertexID, pos, particleRadiusSS);
@@ -157,7 +169,7 @@ VSOut VS_Main(VSIn vsIn) {
     return vsOut;
 }
 
-// In vertex mode, we render quads, and cull pixels outside the point size radius
+// In particle mode, we render quads, and cull pixels outside the point size radius
 bool pixelOutsideRadius(float2 pixelCoord, float2 circleCenter, float radius) {
     float2 delta = pixelCoord - circleCenter; 
     if (dot(delta, delta) > radius * radius) {
@@ -176,7 +188,7 @@ void unpackVoxelIDs(uint packed, out uint voxelID, out uint componentID) {
 
 bool isComponentEnabled(uint componentID) {
     // return (COMPONENT_MASK & (1 << componentID)) != 0;
-    return true; // temporarily disabled until vertex mode is complete
+    return true; // temporarily disabled until particle mode is complete
 }
 
 // The pass renders the IDs to an offscreen target. It's run with a scissor rect matching the brush area,
@@ -185,7 +197,7 @@ bool isComponentEnabled(uint componentID) {
 // Note: this pass does not need to be run when doing non-camera-based painting.
 uint PS_IDPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     if (pixelOutsideRadius(psInput.pos.xy, PAINT_POSITION, PAINT_RADIUS)) return 0;
-#if VERTEX_MODE
+#if PARTICLE_MODE
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
@@ -233,13 +245,13 @@ void applyLambertianShading(inout float4 color, float3 normal) {
 // Updates paint values based on ID pass, and also renders all paint values to screen
 PSOut PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     PSOut psOut;
-#if VERTEX_MODE
+#if PARTICLE_MODE
     float3 normal;
     getParticleNormalAndDepth(psInput.quadPosVS, psInput.particleCenterVS, normal, psOut.depth);
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
-    float3 normal = float3(0,0,1); // TODO: get real face normal
+    float3 normal = faceNormalFromID(componentId);
 #endif
 
     uint2 pixel = uint2(psInput.pos.xy);
@@ -265,13 +277,13 @@ PSOut PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : SV
 
 PSOut PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     PSOut psOut;
-#if VERTEX_MODE
+#if PARTICLE_MODE
     float3 normal;
     getParticleNormalAndDepth(psInput.quadPosVS, psInput.particleCenterVS, normal, psOut.depth);
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else 
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
-    float3 normal = float3(0,0,1); // TODO: get real face normal
+    float3 normal = faceNormalFromID(componentId);
 #endif
 
     uint2 pixel = uint2(psInput.pos.xy);
@@ -294,13 +306,13 @@ PSOut PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
 // We still need to render the existing paint values of the voxels, we just don't need to ID or update them.
 PSOut PS_RenderPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     PSOut psOut;
-#if VERTEX_MODE
+#if PARTICLE_MODE
     float3 normal;
     getParticleNormalAndDepth(psInput.quadPosVS, psInput.particleCenterVS, normal, psOut.depth);
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
-    float3 normal = float3(0,0,1); // TODO: get real face normal
+    float3 normal = faceNormalFromID(componentId);
 #endif
 
     uint globalVoxelID = psInput.globalVoxelID;

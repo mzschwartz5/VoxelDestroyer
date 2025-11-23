@@ -196,11 +196,11 @@ public:
         }
 
         bool facePaintMode = (paintMode == VoxelEditMode::FacePaint);
-        PingPongView& paintViews = facePaintMode ? facePaintViews : vertexPaintViews;
+        PingPongView& paintViews = facePaintMode ? facePaintViews : particlePaintViews;
         if (!paintViews.isInitialized()) {
             int elementsPerVoxel = facePaintMode ? 6 : 8;
-            ComPtr<ID3D11Buffer>& paintBufferA = facePaintMode ? facePaintBufferA : vertexPaintBufferA;
-            ComPtr<ID3D11Buffer>& paintBufferB = facePaintMode ? facePaintBufferB : vertexPaintBufferB;
+            ComPtr<ID3D11Buffer>& paintBufferA = facePaintMode ? facePaintBufferA : particlePaintBufferA;
+            ComPtr<ID3D11Buffer>& paintBufferB = facePaintMode ? facePaintBufferB : particlePaintBufferB;
             allocatePaintBuffers(elementsPerVoxel, paintBufferA, paintBufferB, paintViews);
         }
 
@@ -214,7 +214,7 @@ public:
     // Invoked by the owning subscene on edit mode changes
     void subscribeToPaintStateChanges(VoxelEditMode paintMode) {
         bool isFacePaintMode = (paintMode == VoxelEditMode::FacePaint);
-        PingPongView* paintViews = isFacePaintMode ? &facePaintViews : &vertexPaintViews;
+        PingPongView* paintViews = isFacePaintMode ? &facePaintViews : &particlePaintViews;
         const int numElements = getVoxels()->numOccupied * (isFacePaintMode ? 6 : 8);
         paintDeltaCompute.setPaintViews(paintViews, numElements);
 
@@ -244,7 +244,7 @@ public:
 
     void undoRedoPaint(const std::vector<uint16_t>& paintDelta, int direction, VoxelEditMode paintMode) {
         bool isFacePaintMode = (paintMode == VoxelEditMode::FacePaint);
-        PingPongView& paintViews = isFacePaintMode ? facePaintViews : vertexPaintViews;
+        PingPongView& paintViews = isFacePaintMode ? facePaintViews : particlePaintViews;
 
         DirectX::getContext()->UpdateSubresource(paintDeltaBuffer.Get(), 0, nullptr, paintDelta.data(), 0, 0);
         
@@ -281,9 +281,9 @@ private:
     ComPtr<ID3D11Buffer> facePaintBufferA;
     ComPtr<ID3D11Buffer> facePaintBufferB;
     PingPongView facePaintViews;
-    ComPtr<ID3D11Buffer> vertexPaintBufferA;
-    ComPtr<ID3D11Buffer> vertexPaintBufferB;
-    PingPongView vertexPaintViews;
+    ComPtr<ID3D11Buffer> particlePaintBufferA;
+    ComPtr<ID3D11Buffer> particlePaintBufferB;
+    PingPongView particlePaintViews;
     ComPtr<ID3D11Buffer> paintDeltaBuffer;
     ComPtr<ID3D11UnorderedAccessView> paintDeltaUAV;
 
@@ -407,7 +407,7 @@ private:
         );
     }
 
-    // The paint delta buffer is shared between face and vertex paint modes, and sized according to the larger of the two (vertex mode).
+    // The paint delta buffer is shared between face and particle paint modes, and sized according to the larger of the two (particle mode).
     void allocatePaintDeltaBuffer() {
         MSharedPtr<Voxels> voxels = getVoxels();
         if (!voxels) return;

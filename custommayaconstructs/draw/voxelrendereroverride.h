@@ -42,7 +42,7 @@ public:
         paintClearOpIndex = mOperations.indexOf(paintClearOpName);
 
         unsubscribeEditModeChange = ChangeVoxelEditModeCommand::subscribe([this](const EditModeChangedEventArgs& args) {
-            this->isPainting = (args.newMode == VoxelEditMode::FacePaint || args.newMode == VoxelEditMode::VertexPaint);
+            this->isPainting = (args.newMode == VoxelEditMode::FacePaint || args.newMode == VoxelEditMode::ParticlePaint);
         });
     }
 

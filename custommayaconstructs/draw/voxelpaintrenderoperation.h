@@ -73,7 +73,7 @@ public:
         );
 
         macros = shaderMacros(true);
-        vertexPaintSelectionShader = MRenderer::theRenderer()->getShaderManager()->getEffectsBufferShader(
+        particlePaintSelectionShader = MRenderer::theRenderer()->getShaderManager()->getEffectsBufferShader(
             shaderData, size, PAINT_SELECTION_TECHNIQUE_NAME, macros.data(), static_cast<unsigned int>(macros.size())
         );
 
@@ -84,7 +84,7 @@ public:
         std::vector<uint16_t> cubeFaceIndices(cubeFacesFlattened.begin(), cubeFacesFlattened.end());
         cubeFaceIb = DirectX::createReadOnlyBuffer(cubeFaceIndices, false, D3D11_BIND_INDEX_BUFFER);
 
-        // For vertex painting mode (points are drawn using quads)
+        // For particle painting mode (particles are drawn using quads)
         std::vector<float> cubeVertVertices(cubeQuadVertsFlattened.begin(), cubeQuadVertsFlattened.end());
         cubeVertVb = DirectX::createReadOnlyBuffer(cubeVertVertices, false, D3D11_BIND_VERTEX_BUFFER);
 
@@ -123,10 +123,10 @@ public:
             facePaintSelectionShader = nullptr;
         }
 
-        if (vertexPaintSelectionShader)
+        if (particlePaintSelectionShader)
         {
-            MRenderer::theRenderer()->getShaderManager()->releaseShader(vertexPaintSelectionShader);
-            vertexPaintSelectionShader = nullptr;
+            MRenderer::theRenderer()->getShaderManager()->releaseShader(particlePaintSelectionShader);
+            particlePaintSelectionShader = nullptr;
         }
 
         if (scissorRasterState)
@@ -443,10 +443,10 @@ public:
 
         // Point buffer references for drawing based on paint mode
         bool faceMode = (paintMode == VoxelEditMode::FacePaint);
-        instanceCount = faceMode ? voxelInstanceCount : 8 * voxelInstanceCount; // 8 quads per voxel for vertex painting
+        instanceCount = faceMode ? voxelInstanceCount : 8 * voxelInstanceCount; // 8 quads per voxel for particle painting
         cubeVb = faceMode ? cubeFaceVb : cubeVertVb;
         cubeIb = faceMode ? cubeFaceIb : cubeVertIb;
-        paintSelectionShader = faceMode ? facePaintSelectionShader : vertexPaintSelectionShader;
+        paintSelectionShader = faceMode ? facePaintSelectionShader : particlePaintSelectionShader;
         indexCountPerInstance = faceMode ? static_cast<unsigned int>(cubeFacesFlattened.size()) 
                                          : static_cast<unsigned int>(cubeQuadIndicesFlattened.size());
     }
@@ -473,7 +473,7 @@ private:
     const MRasterizerState* scissorRasterState = nullptr;
     const MRasterizerState* depthBiasRasterState = nullptr;
     const MBlendState* alphaEnabledBlendState = nullptr;
-    MShaderInstance* vertexPaintSelectionShader = nullptr;
+    MShaderInstance* particlePaintSelectionShader = nullptr;
     MShaderInstance* facePaintSelectionShader = nullptr;
     D3D11_RECT scissor = { 0, 0, 0, 0 };
 
@@ -542,7 +542,7 @@ private:
 
     }
 
-    std::array<MShaderCompileMacro, 10> shaderMacros(bool vertexMode) {
+    std::array<MShaderCompileMacro, 10> shaderMacros(bool particleMode) {
         return {{
             {"PAINT_SELECTION_TECHNIQUE_NAME", PAINT_SELECTION_TECHNIQUE_NAME},
             {"PAINT_POSITION", PAINT_POSITION},
@@ -553,7 +553,7 @@ private:
             {"HIGH_COLOR", HIGH_COLOR},
             {"COMPONENT_MASK", COMPONENT_MASK},
             {"PARTICLE_RADIUS", PARTICLE_RADIUS},
-            {"VERTEX_MODE", vertexMode ? "1" : "0"}
+            {"PARTICLE_MODE", particleMode ? "1" : "0"}
         }};
     }
 };
