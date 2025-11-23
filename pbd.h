@@ -35,8 +35,8 @@ public:
     );
 
     void setRadiusAndVolumeFromLength(float edge_length) {
-        PARTICLE_RADIUS = edge_length * 0.25f;
-        VOXEL_REST_VOLUME = 8.0f * PARTICLE_RADIUS * PARTICLE_RADIUS * PARTICLE_RADIUS;
+        particleRadius = edge_length * 0.25f;
+        VOXEL_REST_VOLUME = 8.0f * particleRadius * particleRadius * particleRadius;
     }
 
     void setInitialized(bool initialized) {
@@ -68,7 +68,7 @@ private:
     PreVGSCompute preVGSCompute;
 
     float BETA{ 0.0f };
-    float PARTICLE_RADIUS{ 0.25f };
+    float particleRadius{ 0.25f };
 
     float RELAXATION{ 0.5f };
     // This is really the rest volume of the volume between particles, which are offset one particle radius from each corner of the voxel
