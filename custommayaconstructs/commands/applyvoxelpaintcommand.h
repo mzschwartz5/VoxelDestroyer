@@ -30,7 +30,7 @@ public:
     static MSyntax syntax() {
         MSyntax syntax;
         syntax.addFlag("-vid", "-voxelShapeId", MSyntax::kString);
-        syntax.addFlag("-mode", "-paintMode", MSyntax::kLong);
+        syntax.addFlag("-mod", "-paintMode", MSyntax::kLong);
         return syntax;
     }
 
@@ -46,7 +46,7 @@ public:
         voxelShapeId = MUuid(voxelShapeIdStr);
         
         int mode;
-        argData.getFlagArgument("-mode", 0, mode);
+        argData.getFlagArgument("-mod", 0, mode);
         paintMode = static_cast<VoxelEditMode>(mode);
         
         VoxelShape* voxelShape = getVoxelShapeById(voxelShapeId);

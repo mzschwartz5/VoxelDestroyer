@@ -233,7 +233,7 @@ public:
             // Necessary to invoke as a MEL command to enable journaling. (Could use MPxToolCommand but this is simpler).
             MString uuidStr = MFnDependencyNode(thisMObject()).uuid().asString();
             MString modeStr = MString() + static_cast<int>(paintMode);
-            MString cmd = "applyVoxelPaint -vid \"" + uuidStr + "\" -mode \"" + modeStr + "\"";
+            MString cmd = "applyVoxelPaint -vid \"" + uuidStr + "\" -mod " + modeStr;
             MGlobal::executeCommand(cmd, false, true);
         });
     }

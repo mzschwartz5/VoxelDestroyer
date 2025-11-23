@@ -78,15 +78,8 @@ inline constexpr std::array<float, 12> cubeQuadVertsFlattened = {
 
 /**
  * When drawing a cube in point primitive mode, each corner is really a two-triangle quad.
- * We need six indices per corner to draw the quad, and do the expansion in the vertex shader.
+ * We need six indices to draw a quad, and then do the expansion in the vertex shader.
  */
-inline constexpr std::array<uint32_t, 48> cubeQuadIndicesFlattened = {{
-    0, 1, 2, 0, 2, 3,
-    0, 1, 2, 0, 2, 3,
-    0, 1, 2, 0, 2, 3,
-    0, 1, 2, 0, 2, 3,
-    0, 1, 2, 0, 2, 3,
-    0, 1, 2, 0, 2, 3,
-    0, 1, 2, 0, 2, 3,
-    0, 1, 2, 0, 2, 3
+inline constexpr std::array<uint32_t, 6> cubeQuadIndicesFlattened = {{
+    0, 1, 3, 0, 3, 2
 }};
