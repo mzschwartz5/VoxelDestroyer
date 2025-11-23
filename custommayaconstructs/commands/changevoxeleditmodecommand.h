@@ -16,7 +16,7 @@
 enum class VoxelEditMode : int {
     Selection,
     FacePaint,
-    VertexPaint,
+    ParticlePaint,
     Object,
     None
 };
@@ -132,7 +132,7 @@ public:
         currentToolCommandName.substitute("$", ""); // strip $
         if (currentTool.indexW(currentToolCommandName) != -1) return;
 
-        // TODO: this will find the first match... but there could be multiple (e.g. paint tool - vertex or face mode?)
+        // TODO: this will find the first match... but there could be multiple (e.g. paint tool - particle or face mode?)
         bool foundMatch = false;
         for (const auto& pair : modeToContextCommand) {
             MString contextCommand = pair.second;
@@ -172,14 +172,14 @@ private:
     inline static const std::unordered_map<VoxelEditMode, MString> modeToContextCommand = {
         {VoxelEditMode::Selection, "selectSuperContext"},
         {VoxelEditMode::FacePaint, "$voxelPaintContext"},
-        {VoxelEditMode::VertexPaint, "$voxelPaintContext"},
+        {VoxelEditMode::ParticlePaint, "$voxelPaintContext"},
         {VoxelEditMode::Object, "selectSuperContext"},
         {VoxelEditMode::None, ""}
     };
     inline static const std::unordered_map<VoxelEditMode, MString> modeToComponentMaskCommand = {
         {VoxelEditMode::Selection, "SelectFacetMask"},
         {VoxelEditMode::FacePaint, "SelectFacetMask"},
-        {VoxelEditMode::VertexPaint, "SelectVertexMask"},
+        {VoxelEditMode::ParticlePaint, "SelectVertexMask"},
         {VoxelEditMode::Object, "selectMode -object"},
         {VoxelEditMode::None, ""}
     };

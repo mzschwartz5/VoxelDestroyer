@@ -254,7 +254,7 @@ private:
     void onEditModeChange(VoxelEditMode newMode, const MString& shapeName) {
         bool isThisShape = (shapeName == voxelShape->name());
         bool isObjectMode = (newMode == VoxelEditMode::Object);
-        bool isPaintMode = (newMode == VoxelEditMode::FacePaint || newMode == VoxelEditMode::VertexPaint);
+        bool isPaintMode = (newMode == VoxelEditMode::FacePaint || newMode == VoxelEditMode::ParticlePaint);
         bool isSelectionMode = (newMode == VoxelEditMode::Selection);
 
         voxelRenderItemsEnabledState[voxelSelectedHighlightItemName] = !(isObjectMode || isPaintMode);

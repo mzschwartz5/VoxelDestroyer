@@ -23,14 +23,13 @@ inline std::array<std::array<int, 2>, 12> cubeEdges = {{
 }};
 
 inline std::array<std::array<int, 3>, 12> cubeFaces = {
-    // Order faces as: +X, +Y, +Z, -X, -Y, -Z (2 triangles per face)
     // This matches the order expected in the voxel paint shaders.
-    std::array<int,3>{1,3,7}, std::array<int,3>{1,7,5}, // +X
-    std::array<int,3>{6,7,3}, std::array<int,3>{6,3,2}, // +Y
-    std::array<int,3>{4,5,7}, std::array<int,3>{4,7,6}, // +Z
     std::array<int,3>{0,4,6}, std::array<int,3>{0,6,2}, // -X
+    std::array<int,3>{1,3,7}, std::array<int,3>{1,7,5}, // +X
     std::array<int,3>{0,1,5}, std::array<int,3>{0,5,4}, // -Y
-    std::array<int,3>{2,3,1}, std::array<int,3>{2,1,0}  // -Z
+    std::array<int,3>{6,7,3}, std::array<int,3>{6,3,2}, // +Y
+    std::array<int,3>{2,3,1}, std::array<int,3>{2,1,0}, // -Z
+    std::array<int,3>{4,5,7}, std::array<int,3>{4,7,6}  // +Z
 };
 
 inline constexpr std::array<float, 24> cubeCornersFlattened = {{
@@ -51,22 +50,22 @@ inline constexpr std::array<uint32_t, 24> cubeEdgesFlattened = {{
 }};
 
 inline constexpr std::array<uint32_t, 36> cubeFacesFlattened = {{
-    // +X
-    1,3,7, 1,7,5,
-    // +Y
-    6,7,3, 6,3,2,
-    // +Z
-    4,5,7, 4,7,6,
     // -X
     0,4,6, 0,6,2,
+    // +X
+    1,3,7, 1,7,5,
     // -Y
     0,1,5, 0,5,4,
+    // +Y
+    6,7,3, 6,3,2,
     // -Z
-    2,3,1, 2,1,0
+    2,3,1, 2,1,0,
+    // +Z
+    4,5,7, 4,7,6
 }};
 
 /**
- * This gets used as the vertex buffer for drawing cubes in point primitive mode:
+ * This gets used as the vertex buffer for drawing cubes in particle mode:
  * all points are at the center of the cube, and the vertex shader expands them out to the corners.
  */
 inline constexpr std::array<float, 12> cubeQuadVertsFlattened = { 
@@ -77,7 +76,7 @@ inline constexpr std::array<float, 12> cubeQuadVertsFlattened = {
 };
 
 /**
- * When drawing a cube in point primitive mode, each corner is really a two-triangle quad.
+ * When drawing a cube in particle mode, each corner is really a two-triangle quad.
  * We need six indices to draw a quad, and then do the expansion in the vertex shader.
  */
 inline constexpr std::array<uint32_t, 6> cubeQuadIndicesFlattened = {{
