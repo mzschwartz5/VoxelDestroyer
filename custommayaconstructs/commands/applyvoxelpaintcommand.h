@@ -51,6 +51,8 @@ public:
         
         VoxelShape* voxelShape = getVoxelShapeById(voxelShapeId);
 
+        // TODO: could optimize here - in face paint mode, only 3/4 of the delta buffer is used, so we could store less data on each command
+        // by explictly telling copyBufferToVector how many elements to copy.
         const ComPtr<ID3D11Buffer>& paintDeltaBuffer = voxelShape->getPaintDeltaBuffer();
         DirectX::copyBufferToVector<uint16_t>(paintDeltaBuffer, paintDelta);
 
