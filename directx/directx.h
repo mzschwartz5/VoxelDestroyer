@@ -252,6 +252,7 @@ public:
         DirectX::getContext()->ClearUnorderedAccessViewUint(uav.Get(), clearValues);
     }
 
+    // Assumes 1D resources and takes the smaller of the two buffer sizes as the copy size.
     static void copyBufferToBuffer(
         const ComPtr<ID3D11View>& srcView,
         const ComPtr<ID3D11View>& dstView
@@ -261,11 +262,21 @@ public:
         ComPtr<ID3D11Resource> dstResource;
         dstView->GetResource(dstResource.GetAddressOf());
 
+        D3D11_BUFFER_DESC srcDesc{}, dstDesc{};
+        ComPtr<ID3D11Buffer> srcBuffer, dstBuffer;
+        srcResource.As(&srcBuffer);
+        dstResource.As(&dstBuffer);
+        srcBuffer->GetDesc(&srcDesc);
+        dstBuffer->GetDesc(&dstDesc);
+
+        UINT copySize = (srcDesc.ByteWidth < dstDesc.ByteWidth) ? srcDesc.ByteWidth : dstDesc.ByteWidth;
+        D3D11_BOX srcBox = { 0, 0, 0, copySize, 1, 1 };
+
         DirectX::getContext()->CopySubresourceRegion(
             dstResource.Get(),
             0, 0, 0, 0,
             srcResource.Get(),
-            0, nullptr // Passing nullptr means copy the entire src resource
+            0, &srcBox
         );
     }
 
