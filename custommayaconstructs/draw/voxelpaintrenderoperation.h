@@ -67,33 +67,28 @@ public:
         void* shaderData = nullptr;
         DWORD size = Utils::loadResourceFile(DirectX::getPluginInstance(), IDR_SHADER15, L"SHADER", &shaderData);
 
-        MShaderCompileMacro macros[] = {
-            {"PAINT_SELECTION_TECHNIQUE_NAME", PAINT_SELECTION_TECHNIQUE_NAME},
-            {"PAINT_POSITION", PAINT_POSITION},
-            {"PAINT_RADIUS", PAINT_RADIUS},
-            {"PAINT_VALUE", PAINT_VALUE},
-            {"PAINT_MODE", PAINT_MODE},
-            {"LOW_COLOR", LOW_COLOR},
-            {"HIGH_COLOR", HIGH_COLOR},
-            {"COMPONENT_MASK", COMPONENT_MASK},
-            {"VERTEX_MODE", "0"}
-        };
-        paintSelectionShader = MRenderer::theRenderer()->getShaderManager()->getEffectsBufferShader(
-            shaderData, size, PAINT_SELECTION_TECHNIQUE_NAME, macros, ARRAYSIZE(macros)
+        auto macros = shaderMacros(false);
+        facePaintSelectionShader = MRenderer::theRenderer()->getShaderManager()->getEffectsBufferShader(
+            shaderData, size, PAINT_SELECTION_TECHNIQUE_NAME, macros.data(), static_cast<unsigned int>(macros.size())
+        );
+
+        macros = shaderMacros(true);
+        vertexPaintSelectionShader = MRenderer::theRenderer()->getShaderManager()->getEffectsBufferShader(
+            shaderData, size, PAINT_SELECTION_TECHNIQUE_NAME, macros.data(), static_cast<unsigned int>(macros.size())
         );
 
         // For face painting mode
         std::vector<float> cubeFaceVertices(cubeCornersFlattened.begin(), cubeCornersFlattened.end());
         cubeFaceVb = DirectX::createReadOnlyBuffer(cubeFaceVertices, false, D3D11_BIND_VERTEX_BUFFER);
 
-        std::vector<unsigned int> cubeFaceIndices(cubeFacesFlattened.begin(), cubeFacesFlattened.end());
+        std::vector<uint16_t> cubeFaceIndices(cubeFacesFlattened.begin(), cubeFacesFlattened.end());
         cubeFaceIb = DirectX::createReadOnlyBuffer(cubeFaceIndices, false, D3D11_BIND_INDEX_BUFFER);
 
         // For vertex painting mode (points are drawn using quads)
         std::vector<float> cubeVertVertices(cubeQuadVertsFlattened.begin(), cubeQuadVertsFlattened.end());
         cubeVertVb = DirectX::createReadOnlyBuffer(cubeVertVertices, false, D3D11_BIND_VERTEX_BUFFER);
 
-        std::vector<unsigned int> cubeVertIndices(cubeQuadIndicesFlattened.begin(), cubeQuadIndicesFlattened.end());
+        std::vector<uint16_t> cubeVertIndices(cubeQuadIndicesFlattened.begin(), cubeQuadIndicesFlattened.end());
         cubeVertIb = DirectX::createReadOnlyBuffer(cubeVertIndices, false, D3D11_BIND_INDEX_BUFFER);
 
         unsubscribeFromPaintMove = VoxelPaintContext::subscribeToMousePositionChange([this](const MousePosition& mousePos) {
@@ -122,10 +117,16 @@ public:
     }
 
     ~VoxelPaintRenderOperation() override {
-        if (paintSelectionShader)
+        if (facePaintSelectionShader)
         {
-            MRenderer::theRenderer()->getShaderManager()->releaseShader(paintSelectionShader);
-            paintSelectionShader = nullptr;
+            MRenderer::theRenderer()->getShaderManager()->releaseShader(facePaintSelectionShader);
+            facePaintSelectionShader = nullptr;
+        }
+
+        if (vertexPaintSelectionShader)
+        {
+            MRenderer::theRenderer()->getShaderManager()->releaseShader(vertexPaintSelectionShader);
+            vertexPaintSelectionShader = nullptr;
         }
 
         if (scissorRasterState)
@@ -226,7 +227,7 @@ public:
         };
         dxContext->VSSetShaderResources(0, ARRAYSIZE(vs_srvs), vs_srvs);
 
-        dxContext->DrawIndexedInstanced(static_cast<UINT>(cubeFacesFlattened.size()), instanceCount, 0, 0, 0);
+        dxContext->DrawIndexedInstanced(indexCountPerInstance, instanceCount, 0, 0, 0);
         updateRenderTargetSRV(paintColorRTV); // The target from the first pass will be read as an SRV in the second pass
 
         // Restore scissor and rasterizer state
@@ -278,7 +279,7 @@ public:
 
         dxContext->VSSetShaderResources(0, ARRAYSIZE(vs_srvs), vs_srvs);
         dxContext->PSSetShaderResources(2, ARRAYSIZE(ps_srvs), ps_srvs); // Starts at slot 2 because slots 0 and 1 are for VS shader resources
-        dxContext->DrawIndexedInstanced(static_cast<UINT>(cubeFacesFlattened.size()), instanceCount, 0, 0, 0);
+        dxContext->DrawIndexedInstanced(indexCountPerInstance, instanceCount, 0, 0, 0);
 
         // Restore state
         stateManager->setBlendState(prevBlendState);
@@ -318,7 +319,7 @@ public:
         );
 
         dxContext->VSSetShaderResources(0, ARRAYSIZE(vs_srvs), vs_srvs);
-        dxContext->DrawIndexedInstanced(static_cast<UINT>(cubeFacesFlattened.size()), instanceCount, 0, 0, 0);
+        dxContext->DrawIndexedInstanced(indexCountPerInstance, instanceCount, 0, 0, 0);
 
         // Restore state
         stateManager->setBlendState(prevBlendState);
@@ -329,8 +330,8 @@ public:
         ID3D11DeviceContext* dxContext = DirectX::getContext();
         UINT stride = sizeof(float) * 3;
         UINT offset = 0;
-        dxContext->IASetVertexBuffers(0, 1, cubeFaceVb.GetAddressOf(), &stride, &offset);
-        dxContext->IASetIndexBuffer(cubeFaceIb.Get(), DXGI_FORMAT_R8_UINT, 0);
+        dxContext->IASetVertexBuffers(0, 1, cubeVb.GetAddressOf(), &stride, &offset);
+        dxContext->IASetIndexBuffer(cubeIb.Get(), DXGI_FORMAT_R16_UINT, 0);
         dxContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     }
 
@@ -396,9 +397,9 @@ public:
         this->paintMode = paintMode;
         voxelPaintViews = &paintViews;
         int numVoxels = static_cast<int>(allVoxelMatrices.length());
-        instanceCount = static_cast<unsigned int>(visibleVoxelIdToGlobalId.size());
+        unsigned int voxelInstanceCount = static_cast<unsigned int>(visibleVoxelIdToGlobalId.size());
 
-        if (instanceCount == 0) {
+        if (voxelInstanceCount == 0) {
             instanceTransformSRV.Reset();
             instanceTransformBuffer.Reset();
             return;
@@ -410,8 +411,8 @@ public:
         }
 
         // Flatten MMatrixArray into a std::vector of Float4x4
-        std::vector<std::array<float, 16>> gpuMats(instanceCount);
-        for (unsigned int i = 0; i < instanceCount; ++i) {
+        std::vector<std::array<float, 16>> gpuMats(voxelInstanceCount);
+        for (unsigned int i = 0; i < voxelInstanceCount; ++i) {
             const MMatrix& M = voxelInstanceTransforms[i];
             for (int r = 0; r < 4; ++r) {
                 for (int c = 0; c < 4; ++c) {
@@ -436,6 +437,15 @@ public:
             DirectX::createUAV(voxelIDBufferB, elementCount, 0, DXGI_FORMAT_R8_UINT),
             DirectX::createUAV(voxelIDBufferA, elementCount, 0, DXGI_FORMAT_R8_UINT)
         );
+
+        // Point buffer references for drawing based on paint mode
+        bool faceMode = (paintMode == VoxelEditMode::FacePaint);
+        instanceCount = faceMode ? voxelInstanceCount : 8 * voxelInstanceCount; // 8 quads per voxel for vertex painting
+        cubeVb = faceMode ? cubeFaceVb : cubeVertVb;
+        cubeIb = faceMode ? cubeFaceIb : cubeVertIb;
+        paintSelectionShader = faceMode ? facePaintSelectionShader : vertexPaintSelectionShader;
+        indexCountPerInstance = faceMode ? static_cast<unsigned int>(cubeFacesFlattened.size()) 
+                                         : static_cast<unsigned int>(cubeQuadIndicesFlattened.size());
     }
 
     void updatePaintToolPos(int mouseX, int mouseY) {
@@ -457,10 +467,11 @@ private:
 
     MRenderTargetDescription renderTargetDescriptions[2];
     MRenderTarget* renderTargets[2] = { nullptr, nullptr };
-    MShaderInstance* paintSelectionShader = nullptr;
     const MRasterizerState* scissorRasterState = nullptr;
     const MRasterizerState* depthBiasRasterState = nullptr;
     const MBlendState* alphaEnabledBlendState = nullptr;
+    MShaderInstance* vertexPaintSelectionShader = nullptr;
+    MShaderInstance* facePaintSelectionShader = nullptr;
     D3D11_RECT scissor = { 0, 0, 0, 0 };
 
     VoxelEditMode paintMode = VoxelEditMode::FacePaint;
@@ -496,6 +507,11 @@ private:
     ComPtr<ID3D11Buffer> cubeFaceIb;
     ComPtr<ID3D11Buffer> cubeVertVb;
     ComPtr<ID3D11Buffer> cubeVertIb;
+    // The following resources are just used to reference the correct IB/VB based on paint mode
+    MShaderInstance* paintSelectionShader = nullptr;
+    ComPtr<ID3D11Buffer> cubeVb;
+    ComPtr<ID3D11Buffer> cubeIb;
+    unsigned int indexCountPerInstance;
 
     unsigned int instanceCount = 0;
 
@@ -520,5 +536,20 @@ private:
             MGlobal::displayError(MString("Failed to create shader resource view for render target. ") + Utils::HResultToString(hr).c_str());
         }
 
+    }
+
+    std::array<MShaderCompileMacro, 10> shaderMacros(bool vertexMode) {
+        return {{
+            {"PAINT_SELECTION_TECHNIQUE_NAME", PAINT_SELECTION_TECHNIQUE_NAME},
+            {"PAINT_POSITION", PAINT_POSITION},
+            {"PAINT_RADIUS", PAINT_RADIUS},
+            {"PAINT_VALUE", PAINT_VALUE},
+            {"PAINT_MODE", PAINT_MODE},
+            {"LOW_COLOR", LOW_COLOR},
+            {"HIGH_COLOR", HIGH_COLOR},
+            {"COMPONENT_MASK", COMPONENT_MASK},
+            {"POINT_RADIUS", STRINGIFY(POINT_RADIUS)}, // Size of quad points when in vertex paint mode
+            {"VERTEX_MODE", vertexMode ? "1" : "0"}
+        }};
     }
 };

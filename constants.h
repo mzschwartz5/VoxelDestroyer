@@ -13,3 +13,7 @@
 #define LOW_COLOR "lowColor"
 #define HIGH_COLOR "highColor"
 #define COMPONENT_MASK "componentMask"
+#define POINT_RADIUS 5.0f
+
+#define STRINGIFY_HELPER(x) #x
+#define STRINGIFY(x) STRINGIFY_HELPER(x)
