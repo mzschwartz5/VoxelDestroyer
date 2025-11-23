@@ -37,6 +37,7 @@ int PAINT_MODE; // 0 = subtract, 1 = set, 2 = add
 float4 LOW_COLOR;
 float4 HIGH_COLOR;
 int COMPONENT_MASK;   // Bitmask specifying which cardinal directions to paint (1 bit per direction, +X,+Y,+Z,-X,-Y,-Z)
+const static float eps = 1e-5f;
 float4x4 view : View;                          // Maya-defined semantic, populated by Maya.
 float4x4 projection : Projection;              // Maya-defined semantic, populated by Maya.
 float4x4 projectionInverse: ProjectionInverse; // Maya-defined semantic, populated by Maya.
@@ -270,6 +271,7 @@ PSOut PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : SV
         prevPaintValue = applyPaint(idx, prevPaintValue);
     }
 
+    if (prevPaintValue < eps) discard;
     psOut.color = colorFromPaintValue(prevPaintValue);
     applyLambertianShading(psOut.color, normal);
     return psOut;
@@ -297,6 +299,7 @@ PSOut PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
         prevPaintValue = applyPaint(idx, prevPaintValue);
     }
 
+    if (prevPaintValue < eps) discard;
     psOut.color = colorFromPaintValue(prevPaintValue);
     applyLambertianShading(psOut.color, normal);
     return psOut;
@@ -317,7 +320,9 @@ PSOut PS_RenderPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
 
     uint globalVoxelID = psInput.globalVoxelID;
     uint idx = globalVoxelID * COMPONENTS_PER_INSTANCE + componentId;
-    psOut.color = colorFromPaintValue(voxelPaintValue[idx]);
+    float paintValue = voxelPaintValue[idx];
+    if (abs(paintValue) < eps) discard;
+    psOut.color = colorFromPaintValue(paintValue);
     applyLambertianShading(psOut.color, normal);
     return psOut;
 }
