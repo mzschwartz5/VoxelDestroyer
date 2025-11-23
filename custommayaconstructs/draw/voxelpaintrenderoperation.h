@@ -194,6 +194,7 @@ public:
         paintSelectionShader->setParameter(LOW_COLOR, lowColorArr);
         paintSelectionShader->setParameter(HIGH_COLOR, highColorArr);
         paintSelectionShader->setParameter(COMPONENT_MASK, componentMask);
+        paintSelectionShader->setParameter(PARTICLE_RADIUS, particleRadius);
         paintSelectionShader->updateParameters(drawContext);
     }
 
@@ -260,7 +261,7 @@ public:
             1, // NumRTVs
             &mainColorRTV,
             mainDepthDSV,
-            1, // UAVStartSlot (starts at 1 because 0 is reserved)
+            2, // UAVStartSlot (starts at 2 because 0-1 reserved for PS outputs)
             ARRAYSIZE(uavs),
             uavs,
             nullptr
@@ -312,7 +313,7 @@ public:
             1, // NumRTVs
             &mainColorRTV,
             mainDepthDSV,
-            2, // UAVStartSlot
+            3, // UAVStartSlot
             1, // NumUAVs
             voxelPaintViews->UAV().GetAddressOf(),
             nullptr
@@ -349,7 +350,7 @@ public:
         dxContext->PSSetShaderResources(2, ARRAYSIZE(nullPSSRV), nullPSSRV);
         dxContext->OMSetRenderTargetsAndUnorderedAccessViews(
             1, &mainColorRTV, mainDepthDSV,
-            1, ARRAYSIZE(nullUAVs),
+            2, ARRAYSIZE(nullUAVs),
             nullUAVs,
             nullptr
         );
@@ -392,9 +393,11 @@ public:
         VoxelEditMode paintMode,
         const MMatrixArray& allVoxelMatrices, 
         const std::vector<uint32_t>& visibleVoxelIdToGlobalId,
-        PingPongView& paintViews
+        PingPongView& paintViews,
+        float particleRadius
     ) {
         this->paintMode = paintMode;
+        this->particleRadius = particleRadius;
         voxelPaintViews = &paintViews;
         int numVoxels = static_cast<int>(allVoxelMatrices.length());
         unsigned int voxelInstanceCount = static_cast<unsigned int>(visibleVoxelIdToGlobalId.size());
@@ -489,6 +492,7 @@ private:
     unsigned int outputTargetHeight = 0;
     MCallbackId playbackCallbackId = 0;
     bool isPlayingBack = false;
+    float particleRadius = 0.0f;
 
     // Alllll the buffers and views we need for painting
     ComPtr<ID3D11Buffer> instanceTransformBuffer;
@@ -548,7 +552,7 @@ private:
             {"LOW_COLOR", LOW_COLOR},
             {"HIGH_COLOR", HIGH_COLOR},
             {"COMPONENT_MASK", COMPONENT_MASK},
-            {"POINT_RADIUS", STRINGIFY(POINT_RADIUS)}, // Size of quad points when in vertex paint mode
+            {"PARTICLE_RADIUS", PARTICLE_RADIUS},
             {"VERTEX_MODE", vertexMode ? "1" : "0"}
         }};
     }

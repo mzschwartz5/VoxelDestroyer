@@ -93,10 +93,11 @@ public:
         VoxelEditMode paintMode,
         const MMatrixArray& allVoxelMatrices, 
         const std::vector<uint32_t>& visibleVoxelIdToGlobalId,
-        PingPongView& voxelPaintViews
+        PingPongView& voxelPaintViews,
+        float particleRadius
     ) {
         VoxelPaintRenderOperation* paintOp = static_cast<VoxelPaintRenderOperation*>(mOperations[paintOpIndex]);
-        paintOp->prepareToPaint(paintMode, allVoxelMatrices, visibleVoxelIdToGlobalId, voxelPaintViews);
+        paintOp->prepareToPaint(paintMode, allVoxelMatrices, visibleVoxelIdToGlobalId, voxelPaintViews, particleRadius);
     }
 
     // TODO: these do not have to be static - consumers can use MRenderer to get the active render override instance.

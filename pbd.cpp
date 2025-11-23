@@ -69,8 +69,8 @@ ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
             );
 
             // Offset the corner towards the center by the radius of the particle
-            const MFloatPoint position = corner - (PARTICLE_RADIUS * Utils::sign(corner - voxelCenter));
-            float packedRadiusAndW = Utils::packTwoFloatsAsHalfs(PARTICLE_RADIUS, 1.0f); // for now, w is hardcoded to 1.0f
+            const MFloatPoint position = corner - (particleRadius * Utils::sign(corner - voxelCenter));
+            float packedRadiusAndW = Utils::packTwoFloatsAsHalfs(particleRadius, 1.0f); // for now, w is hardcoded to 1.0f
             particles.push_back(MFloatPoint(position.x, position.y, position.z, packedRadiusAndW));
             totalParticles++;
         }
@@ -80,7 +80,7 @@ ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
         totalParticles,
         &particles,
         &voxels->isSurface,
-        PARTICLE_RADIUS
+        particleRadius
     };
 }
 
@@ -90,7 +90,7 @@ void PBD::createComputeShaders(
 ) {
     vgsCompute = VGSCompute(
         numParticles(),
-        VGSConstantBuffer{ RELAXATION, BETA, PARTICLE_RADIUS, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, voxels->size() }
+        VGSConstantBuffer{ RELAXATION, BETA, particleRadius, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, voxels->size() }
     );
 
 	faceConstraintsCompute = FaceConstraintsCompute(

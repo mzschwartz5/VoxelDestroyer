@@ -16,22 +16,31 @@ struct VSOut {
     float4 pos : SV_POSITION; 
     nointerpolation uint globalVoxelID : INSTANCEID; 
 #if VERTEX_MODE
-    nointerpolation float2 quadCenter : TEXCOORD0; // In screen space
-    nointerpolation uint instanceID : TEXCOORD1; // Original (not global) voxel instance ID
-    nointerpolation float particleRadiusScreenSpace : TEXCOORD2;
+    nointerpolation uint instanceID : TEXCOORD0; // Original (not global) voxel instance ID
+    float3 quadPosVS : TEXCOORD1;
+    nointerpolation float3 particleCenterVS : TEXCOORD2;
+#endif
+};
+
+struct PSOut {
+    float4 color : SV_Target;
+#if VERTEX_MODE
+    float depth : SV_Depth;
 #endif
 };
 
 float2 PAINT_POSITION;
 float PAINT_RADIUS;
 float PAINT_VALUE;
+float PARTICLE_RADIUS;
 int PAINT_MODE; // 0 = subtract, 1 = set, 2 = add
 float4 LOW_COLOR;
 float4 HIGH_COLOR;
 int COMPONENT_MASK;   // Bitmask specifying which cardinal directions to paint (1 bit per direction, +X,+Y,+Z,-X,-Y,-Z)
-float4x4 view : View;                       // Maya-defined semantic, populated by Maya.
-float4x4 projection : Projection;           // Maya-defined semantic, populated by Maya.
-float2 viewportSize : ViewportPixelSize;    // Maya-defined semantic, populated by Maya.
+float4x4 view : View;                          // Maya-defined semantic, populated by Maya.
+float4x4 projection : Projection;              // Maya-defined semantic, populated by Maya.
+float4x4 projectionInverse: ProjectionInverse; // Maya-defined semantic, populated by Maya.
+float2 viewportSize : ViewportPixelSize;       // Maya-defined semantic, populated by Maya.
 
 #if VERTEX_MODE
 int COMPONENTS_PER_INSTANCE = 8; // 8 corners per voxel
@@ -45,21 +54,24 @@ StructuredBuffer<uint> instanceToGlobalVoxelIdMap : register(t1);
 
 // PS-only resources
 // A bitmask of voxels painted this pass
-RWBuffer<uint> paintedVoxelIDs : register(u1);        // UAV registers live in the same namespace as outputs, must start at u1.
+RWBuffer<uint> paintedVoxelIDs : register(u2);        // UAV registers live in the same namespace as outputs. Two outputs => start UAVs at u2.
 Buffer<uint> previousPaintedVoxelIDs : register(t2);
 Buffer<float> previousVoxelPaintValue : register(t3); // NOT structured so that we can store half-precision floats.
-RWBuffer<float> voxelPaintValue : register(u2);       // NOT structured so that we can store half-precision floats.
+RWBuffer<float> voxelPaintValue : register(u3);       // NOT structured so that we can store half-precision floats.
 Texture2D<uint> idRenderTarget : register(t4);
 
 #if VERTEX_MODE // Begin vertex-mode only functions
 // (SS = screen space, VS = view space)
-float sphereRadiusInScreenSpace(float2 sphereCenterSS, float4 sphereCenterVS, float radiusWorld) {
-    float4 offsetPos = sphereCenterVS + float4(radiusWorld, 0, 0, 0);
+float particleRadiusInScreenSpace(float4 particleCenterClip, float4 particleCenterVS) {
+    particleCenterClip.x /= particleCenterClip.w;
+    float particleCenterSS = (particleCenterClip.x * 0.5f + 0.5f) * viewportSize.x;
+    
+    float4 offsetPos = particleCenterVS + float4(PARTICLE_RADIUS, 0, 0, 0);
     offsetPos = mul(offsetPos, projection);
     offsetPos.x /= offsetPos.w;
     offsetPos.x = (offsetPos.x * 0.5f + 0.5f) * viewportSize.x;
     
-    return abs(offsetPos.x - sphereCenterSS.x);
+    return abs(offsetPos.x - particleCenterSS.x);
 }
 
 // In vertex mode, we draw a quad per voxel corner, with all 4 vertices starting at the origin.
@@ -97,6 +109,28 @@ float4 expandCornerToQuad(uint vertexID, float4 cornerPosClip, float particleRad
     cornerPosClip.xy += quadOffsetNDC; 
     return cornerPosClip;
 }
+
+float particleIntersect(float3 rayDirection, float3 particleCenter) {
+    // Ray origin will always be (0, 0, 0) since we're in view space
+    float3 rayOriginOffset = -particleCenter.xyz;
+    float b = 2.0 * dot(rayDirection, rayOriginOffset);
+    float c = dot(rayOriginOffset, rayOriginOffset) - PARTICLE_RADIUS * PARTICLE_RADIUS;
+    float discriminant = b * b - 4.0 * c;
+    
+    if (discriminant < 0.0) discard; // no intersection
+    return ((-b - sqrt(discriminant)) / 2.0); // return closer intersection value
+}
+
+void getParticleNormalAndDepth(float3 quadPosVS, float3 particleCenterVS, inout float3 normal, inout float depth) {
+    float3 rayDirection = normalize(quadPosVS);
+    float rayDist = particleIntersect(rayDirection, particleCenterVS);
+    float3 particlePos = rayDirection * rayDist;
+    normal = (particlePos - particleCenterVS) / PARTICLE_RADIUS;
+    
+    float4 particlePosClip = mul(float4(particlePos, 1.0f), projection); // to clip space
+    depth = particlePosClip.z / particlePosClip.w;
+}
+
 #endif // End vertex-mode only functions
 
 VSOut VS_Main(VSIn vsIn) {
@@ -113,12 +147,10 @@ VSOut VS_Main(VSIn vsIn) {
     float4 posVS = mul(pos, view);
     pos = mul(posVS, projection);
 #if VERTEX_MODE
-    float2 ndc = pos.xy / pos.w;
-    float2 uv  = ndc * 0.5f + 0.5f;
-    vsOut.quadCenter = float2(uv.x * viewportSize.x, (1.0f - uv.y) * viewportSize.y);
-    float voxelEdgeLength = length(float3(instanceTransform[0][0], instanceTransform[1][0], instanceTransform[2][0])); // voxels are uniformly scaled
-    vsOut.particleRadiusScreenSpace = sphereRadiusInScreenSpace(vsOut.quadCenter, posVS, voxelEdgeLength * 0.25f);
-    pos = expandCornerToQuad(vsIn.vertexID, pos, vsOut.particleRadiusScreenSpace);
+    vsOut.particleCenterVS = posVS.xyz;
+    float particleRadiusSS = particleRadiusInScreenSpace(pos, posVS);
+    pos = expandCornerToQuad(vsIn.vertexID, pos, particleRadiusSS);
+    vsOut.quadPosVS = mul(pos, projectionInverse).xyz; // TODO: I believe this can be done directly in view space a priori
 #endif
     vsOut.pos = pos;
     vsOut.globalVoxelID = instanceToGlobalVoxelIdMap[instanceID];
@@ -154,7 +186,6 @@ bool isComponentEnabled(uint componentID) {
 uint PS_IDPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     if (pixelOutsideRadius(psInput.pos.xy, PAINT_POSITION, PAINT_RADIUS)) return 0;
 #if VERTEX_MODE
-    if (pixelOutsideRadius(psInput.pos.xy, psInput.quadCenter, psInput.particleRadiusScreenSpace)) return 0;
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
@@ -192,14 +223,23 @@ float4 colorFromPaintValue(float paintValue) {
     return lerp(LOW_COLOR, HIGH_COLOR, paintValue);
 }
 
+void applyLambertianShading(inout float4 color, float3 normal) {
+    // Simple directional light
+    float3 lightDir = float3(0.408f, 0.816f, 0.408f);
+    float NdotL = saturate(dot(normal, lightDir));
+    color.rgb *= (0.2f + 0.8f * NdotL); // ambient + diffuse
+}
+
 // Updates paint values based on ID pass, and also renders all paint values to screen
-float4 PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
+PSOut PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
+    PSOut psOut;
 #if VERTEX_MODE
-    // Return transparent pixel rather than discard to preserve early-z optimizations.
-    if (pixelOutsideRadius(psInput.pos.xy, psInput.quadCenter, psInput.particleRadiusScreenSpace)) return float4(0,0,0,0); 
+    float3 normal;
+    getParticleNormalAndDepth(psInput.quadPosVS, psInput.particleCenterVS, normal, psOut.depth);
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
+    float3 normal = float3(0,0,1); // TODO: get real face normal
 #endif
 
     uint2 pixel = uint2(psInput.pos.xy);
@@ -218,16 +258,20 @@ float4 PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : S
         prevPaintValue = applyPaint(idx, prevPaintValue);
     }
 
-    return colorFromPaintValue(prevPaintValue);
+    psOut.color = colorFromPaintValue(prevPaintValue);
+    applyLambertianShading(psOut.color, normal);
+    return psOut;
 }
 
-float4 PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
+PSOut PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
+    PSOut psOut;
 #if VERTEX_MODE
-    // Return transparent pixel rather than discard to preserve early-z optimizations.
-    if (pixelOutsideRadius(psInput.pos.xy, psInput.quadCenter, psInput.particleRadiusScreenSpace)) return float4(0,0,0,0); 
+    float3 normal;
+    getParticleNormalAndDepth(psInput.quadPosVS, psInput.particleCenterVS, normal, psOut.depth);
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else 
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
+    float3 normal = float3(0,0,1); // TODO: get real face normal
 #endif
 
     uint2 pixel = uint2(psInput.pos.xy);
@@ -241,23 +285,29 @@ float4 PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
         prevPaintValue = applyPaint(idx, prevPaintValue);
     }
 
-    return colorFromPaintValue(prevPaintValue);
+    psOut.color = colorFromPaintValue(prevPaintValue);
+    applyLambertianShading(psOut.color, normal);
+    return psOut;
 }
 
 // Simple render pass for when paint mode is active but the user is not actively painting
 // We still need to render the existing paint values of the voxels, we just don't need to ID or update them.
-float4 PS_RenderPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
+PSOut PS_RenderPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
+    PSOut psOut;
 #if VERTEX_MODE
-    // Return transparent pixel rather than discard to preserve early-z optimizations.
-    if (pixelOutsideRadius(psInput.pos.xy, psInput.quadCenter, psInput.particleRadiusScreenSpace)) return float4(0,0,0,0); 
+    float3 normal;
+    getParticleNormalAndDepth(psInput.quadPosVS, psInput.particleCenterVS, normal, psOut.depth);
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
+    float3 normal = float3(0,0,1); // TODO: get real face normal
 #endif
 
     uint globalVoxelID = psInput.globalVoxelID;
     uint idx = globalVoxelID * COMPONENTS_PER_INSTANCE + componentId;
-    return colorFromPaintValue(voxelPaintValue[idx]);
+    psOut.color = colorFromPaintValue(voxelPaintValue[idx]);
+    applyLambertianShading(psOut.color, normal);
+    return psOut;
 }
 
 technique11 PAINT_SELECTION_TECHNIQUE_NAME {

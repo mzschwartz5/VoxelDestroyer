@@ -754,8 +754,9 @@ private:
 
         const MMatrixArray& voxelMatrices = voxelShape->getVoxels().get()->modelMatrices;
         PingPongView& paintView = voxelShape->getPaintView(paintMode);
+        float particleRadius = voxelShape->getVoxels()->voxelSize * 0.25f;
 
-        voxelRendererOverride->sendVoxelInfoToPaintRenderOp(paintMode, voxelMatrices, visibleVoxelIdToGlobalId, paintView);
+        voxelRendererOverride->sendVoxelInfoToPaintRenderOp(paintMode, voxelMatrices, visibleVoxelIdToGlobalId, paintView, particleRadius);
     }
 
     void createVoxelGeometryBuffers() {
