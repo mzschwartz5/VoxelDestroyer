@@ -220,21 +220,21 @@ public:
 
         unsubPaintStateChanges = VoxelPaintContext::subscribeToPaintDragStateChange([this, paintViews, paintMode](const PaintDragState& paintState) {
             if (paintState.isDragging) {
-                // At the beginning of a paint stroke, copy the pre-paint values into the delta buffer
+                // At the beginning of a paint stroke, copy the before-paint values into the delta buffer
                 DirectX::copyBufferToBuffer(paintViews->UAV(), paintDeltaUAV);
                 return; 
             }
 
             // At the end of a paint stroke, compute the before-after delta and update the PBD constraints
             paintDeltaCompute.dispatch();
-            updatePBDConstraints();
+            updatePBDConstraints(paintMode);
 
             // Records the paint delta for undo/redo. On undo/redo, applies the delta back to the paint values.
             // Necessary to invoke as a MEL command to enable journaling. (Could use MPxToolCommand but this is simpler).
             MString uuidStr = MFnDependencyNode(thisMObject()).uuid().asString();
             MString modeStr = MString() + static_cast<int>(paintMode);
             MString cmd = "applyVoxelPaint -vid \"" + uuidStr + "\" -mod " + modeStr;
-            MGlobal::executeCommand(cmd, false, true);
+            MGlobal::executeCommand(cmd, false, true /* undoable */);
         });
     }
 
@@ -256,7 +256,7 @@ public:
         // The compute pass writes into the delta buffer - copy it to the face paint buffer to keep them in sync.
         DirectX::copyBufferToBuffer(paintDeltaUAV, paintViews.UAV());
 
-        updatePBDConstraints();
+        updatePBDConstraints(paintMode);
     }
 
     /**
@@ -264,10 +264,15 @@ public:
      * This may not be the canonical way to have nodes interact, but it needs to happen at a specific moment,
      * not whenever the DG is next evaluated. (There still may be a better way but, if it works...)
      */
-    void updatePBDConstraints() {
+    void updatePBDConstraints(VoxelEditMode paintMode) {
         MPlug triggerPlug(thisMObject(), aTrigger);
         PBDNode* pbdNode = static_cast<PBDNode*>(Utils::connectedNode(triggerPlug));
-        pbdNode->updateFaceConstraintsWithPaintValues(paintDeltaUAV, facePaintViews.UAV());
+        
+        if (paintMode == VoxelEditMode::FacePaint) {
+            pbdNode->updateFaceConstraintsWithPaintValues(paintDeltaUAV, facePaintViews.UAV());
+        } else {
+            pbdNode->updateParticleMassWithPaintValues(paintDeltaUAV, particlePaintViews.UAV());
+        }
     }
 
 private:

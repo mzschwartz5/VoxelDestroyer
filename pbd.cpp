@@ -128,6 +128,15 @@ void PBD::updateFaceConstraintsWithPaintValues(
     faceConstraintsCompute.updateFaceConstraintsFromPaint(paintDeltaUAV, paintValueUAV, constraintLow, constraintHigh);
 }
 
+void PBD::updateParticleMassWithPaintValues(
+    const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV, 
+    const ComPtr<ID3D11UnorderedAccessView>& paintValueUAV, 
+    float massLow, 
+    float massHigh
+) {
+    preVGSCompute.updateParticleMassFromPaintValues(paintDeltaUAV, paintValueUAV, massLow, massHigh);
+}
+
 void PBD::simulateSubstep() {
     if (!initialized) return;
 

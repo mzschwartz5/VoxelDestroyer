@@ -35,8 +35,10 @@ public:
     inline static const MString pbdNodeName{"PBD"};
     inline static const MTypeId id{0x0013A7B0};
     // Attributes
-    inline static MObject aConstraintLow;
-    inline static MObject aConstraintHigh;
+    inline static MObject aFaceConstraintLow;
+    inline static MObject aFaceConstraintHigh;
+    inline static MObject aParticleMassLow;
+    inline static MObject aParticleMassHigh;
     inline static MObject aMeshOwner;
     // Inputs
     inline static MObject aTriggerIn;
@@ -57,25 +59,46 @@ public:
     static MStatus initialize() {
         MStatus status;
 
+        // TODO: consolidate with functions to create common attributes settings (storable, readable, writable)
         MFnNumericAttribute nAttr;
-        aConstraintLow = nAttr.create("constraintLow", "cl", MFnNumericData::kFloat, 0.0f, &status);
+        aFaceConstraintLow = nAttr.create("faceConstraintLow", "fcl", MFnNumericData::kFloat, 0.0f, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         nAttr.setStorable(true);
         nAttr.setReadable(true);
         nAttr.setWritable(true);
         nAttr.setMin(0.0f);
         nAttr.setMax(FLT_MAX);
-        addAttribute(aConstraintLow);
+        addAttribute(aFaceConstraintLow);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
-        aConstraintHigh = nAttr.create("constraintHigh", "ch", MFnNumericData::kFloat, 50.0f, &status);
+        aFaceConstraintHigh = nAttr.create("faceConstraintHigh", "fch", MFnNumericData::kFloat, 50.0f, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         nAttr.setStorable(true);
         nAttr.setReadable(true);
         nAttr.setWritable(true);
         nAttr.setMin(0.0f);
         nAttr.setMax(FLT_MAX);
-        status = addAttribute(aConstraintHigh);
+        status = addAttribute(aFaceConstraintHigh);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        aParticleMassLow = nAttr.create("particleMassLow", "pcl", MFnNumericData::kFloat, 0.01f, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        nAttr.setStorable(true);
+        nAttr.setReadable(true);
+        nAttr.setWritable(true);
+        nAttr.setMin(0.01f);
+        nAttr.setMax(FLT_MAX);
+        addAttribute(aParticleMassLow);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        aParticleMassHigh = nAttr.create("particleMassHigh", "pch", MFnNumericData::kFloat, 5.0f, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        nAttr.setStorable(true);
+        nAttr.setReadable(true);
+        nAttr.setWritable(true);
+        nAttr.setMin(0.01f);
+        nAttr.setMax(FLT_MAX);
+        status = addAttribute(aParticleMassHigh);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         // Special message attribute for associating a PBD node with a mesh (for lifetime management)
@@ -266,10 +289,17 @@ public:
     }
 
     void updateFaceConstraintsWithPaintValues(const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV, const ComPtr<ID3D11UnorderedAccessView>& paintValueUAV) {
-        float constraintLow = MPlug(thisMObject(), aConstraintLow).asFloat();
-        float constraintHigh = MPlug(thisMObject(), aConstraintHigh).asFloat();
+        float constraintLow = MPlug(thisMObject(), aFaceConstraintLow).asFloat();
+        float constraintHigh = MPlug(thisMObject(), aFaceConstraintHigh).asFloat();
 
         pbd.updateFaceConstraintsWithPaintValues(paintDeltaUAV, paintValueUAV, constraintLow, constraintHigh);
+    }
+
+    void updateParticleMassWithPaintValues(const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV, const ComPtr<ID3D11UnorderedAccessView>& paintValueUAV) {
+        float massLow = MPlug(thisMObject(), aParticleMassLow).asFloat();
+        float massHigh = MPlug(thisMObject(), aParticleMassHigh).asFloat();
+
+        pbd.updateParticleMassWithPaintValues(paintDeltaUAV, paintValueUAV, massLow, massHigh);
     }
     
 private:

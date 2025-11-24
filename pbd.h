@@ -53,6 +53,13 @@ public:
         float constraintLow, 
         float constraintHigh
     );
+
+    void updateParticleMassWithPaintValues(
+        const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV,
+        const ComPtr<ID3D11UnorderedAccessView>& paintValueUAV,
+        float constraintLow, 
+        float constraintHigh
+    );
     
     void simulateSubstep();
 
