@@ -19,7 +19,8 @@ struct PaintDragState : DragState {
     bool cameraBased{ true };
     MColor lowColor;
     MColor highColor;
-    int componentMask{ 0b111111 }; // All directions enabled by default
+    int faceComponentMask{ 0b111111 }; // All directions enabled by default
+    int particleComponentMask{ 0b11111111 }; // All directions enabled by default
     bool infiniteStrength{ false };
 };
 
@@ -51,7 +52,8 @@ public:
                 cameraBased,
                 lowColor,
                 highColor,
-                componentMask,
+                faceComponentMask,
+                particleComponentMask,
                 infiniteStrength
             };
             paintDragStateChangedEvent.notify(paintDragState);
@@ -116,7 +118,7 @@ public:
             cameraBased,
             lowColor,
             highColor,
-            componentMask,
+            faceComponentMask,
             infiniteStrength
         });
         M3dView::active3dView().refresh(false, true);
@@ -135,7 +137,7 @@ public:
             cameraBased,
             lowColor,
             highColor,
-            componentMask,
+            faceComponentMask,
             infiniteStrength
         });
         M3dView::active3dView().refresh(false, true);
@@ -149,13 +151,22 @@ public:
         return highColor;
     }
 
-    void setComponentMask(uint8_t mask) {
-        componentMask = mask;
+    void setFaceComponentMask(uint8_t mask) {
+        faceComponentMask = mask;
         MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
     }
 
-    int getComponentMask() const {
-        return componentMask;
+    int getFaceComponentMask() const {
+        return faceComponentMask;
+    }
+
+    void setParticleComponentMask(uint8_t mask) {
+        particleComponentMask = mask;
+        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
+    }
+
+    int getParticleComponentMask() const {
+        return particleComponentMask;
     }
 
     void setInfiniteStrength(bool enabled) {
@@ -198,6 +209,7 @@ private:
     MCallbackId timerCallbackId;
     MColor lowColor = MColor(1.0f, 0.0f, 0.0f, 0.0f);
     MColor highColor = MColor(1.0f, 0.0f, 0.0f, 1.0f);
-    int componentMask = 0b111111; // All directions enabled by default
+    int faceComponentMask = 0b111111; // All directions enabled by default
+    int particleComponentMask = 0b11111111; // All directions enabled by default
     bool infiniteStrength{ false };
 };

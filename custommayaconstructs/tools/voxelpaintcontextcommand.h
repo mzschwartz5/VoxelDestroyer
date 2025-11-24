@@ -26,7 +26,8 @@ public:
         syn.addFlag("-cb", "-cameraBased", MSyntax::kLong);
         syn.addFlag("-lc", "-lowColor", MSyntax::kDouble, MSyntax::kDouble, MSyntax::kDouble, MSyntax::kDouble);
         syn.addFlag("-hc", "-highColor", MSyntax::kDouble, MSyntax::kDouble, MSyntax::kDouble, MSyntax::kDouble);
-        syn.addFlag("-cm", "-componentMask", MSyntax::kLong);
+        syn.addFlag("-fcm", "-faceComponentMask", MSyntax::kLong);
+        syn.addFlag("-pcm", "-particleComponentMask", MSyntax::kLong);
         return MS::kSuccess;
     }
 
@@ -69,9 +70,13 @@ public:
             ap.getFlagArgument("-hc", 3, a);
             fCtx->setHighColor(MColor(static_cast<float>(r), static_cast<float>(g), static_cast<float>(b), static_cast<float>(a)));
         }
-        if (ap.isFlagSet("-cm")) {
-            int v; ap.getFlagArgument("-cm", 0, v);
-            fCtx->setComponentMask(static_cast<uint8_t>(v));
+        if (ap.isFlagSet("-fcm")) {
+            int v; ap.getFlagArgument("-fcm", 0, v);
+            fCtx->setFaceComponentMask(static_cast<uint8_t>(v));
+        }
+        if (ap.isFlagSet("-pcm")) {
+            int v; ap.getFlagArgument("-pcm", 0, v);
+            fCtx->setParticleComponentMask(static_cast<uint8_t>(v));
         }
         return MS::kSuccess;
     }
@@ -106,8 +111,11 @@ public:
             result.format("^1s ^2s ^3s ^4s", args);
             setResult(result);
         }
-        if (ap.isFlagSet("-cm")) {
-            setResult((int)fCtx->getComponentMask());
+        if (ap.isFlagSet("-fcm")) {
+            setResult((int)fCtx->getFaceComponentMask());
+        }
+        if (ap.isFlagSet("-pcm")) {
+            setResult((int)fCtx->getParticleComponentMask());
         }
         return MS::kSuccess;
     }

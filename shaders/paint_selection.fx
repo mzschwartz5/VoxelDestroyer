@@ -176,8 +176,7 @@ void unpackVoxelIDs(uint packed, out uint voxelID, out uint componentID) {
 }
 
 bool isComponentEnabled(uint componentID) {
-    // return (COMPONENT_MASK & (1 << componentID)) != 0;
-    return true; // temporarily disabled until particle mode is complete
+    return (COMPONENT_MASK & (1 << componentID)) != 0;
 }
 
 // The pass renders the IDs to an offscreen target. It's run with a scissor rect matching the brush area,
