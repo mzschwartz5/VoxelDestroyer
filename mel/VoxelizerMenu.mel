@@ -31,7 +31,7 @@ global proc VoxelizerMenu() {
         - precision 2`;
 
     // Subdivision controls
-    string $subdivField = `intSliderGrp -label "Voxels Per Edge: " -value 1 -field true -minValue 2 -maxValue 32
+    string $subdivField = `intSliderGrp -label "Voxels Per Edge: " -value 1 -field true -minValue 2 -maxValue 32 -fieldMinValue 2 -fieldMaxValue 64
         -cc ("VoxelizerMenu_updateSubdivisions(\"" + $voxelGridDisplayName + "\", #1)") 
         -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50`;
 
