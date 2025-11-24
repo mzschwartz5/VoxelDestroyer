@@ -122,14 +122,14 @@ float particleIntersect(float3 rayDirection, float3 particleCenter) {
     return ((-b - sqrt(discriminant)) / 2.0); // return closer intersection value
 }
 
-void getParticleNormalAndDepth(float3 quadPosVS, float3 particleCenterVS, inout float3 normal, inout float depth) {
+float getParticleDepth(float3 quadPosVS, float3 particleCenterVS, inout float3 normal) {
     float3 rayDirection = normalize(quadPosVS);
     float rayDist = particleIntersect(rayDirection, particleCenterVS);
     float3 particlePos = rayDirection * rayDist;
     normal = (particlePos - particleCenterVS) / PARTICLE_RADIUS;
     
     float4 particlePosClip = mul(float4(particlePos, 1.0f), projection); // to clip space
-    depth = particlePosClip.z / particlePosClip.w;
+    return particlePosClip.z / particlePosClip.w;
 }
 
 #endif // End particle-mode only functions
@@ -232,11 +232,11 @@ void applyLambertianShading(inout float4 color, float3 normal) {
 }
 
 // Updates paint values based on ID pass, and also renders all paint values to screen
-PSOut PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
+PSOut PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) {
     PSOut psOut;
 #if PARTICLE_MODE
     float3 normal;
-    getParticleNormalAndDepth(psInput.quadPosVS, psInput.particleCenterVS, normal, psOut.depth);
+    psOut.depth = getParticleDepth(psInput.quadPosVS, psInput.particleCenterVS, normal);
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
@@ -266,11 +266,11 @@ PSOut PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : SV
     return psOut;
 }
 
-PSOut PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
+PSOut PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) {
     PSOut psOut;
 #if PARTICLE_MODE
     float3 normal;
-    getParticleNormalAndDepth(psInput.quadPosVS, psInput.particleCenterVS, normal, psOut.depth);
+    psOut.depth = getParticleDepth(psInput.quadPosVS, psInput.particleCenterVS, normal);
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else 
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
@@ -297,11 +297,11 @@ PSOut PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
 
 // Simple render pass for when paint mode is active but the user is not actively painting
 // We still need to render the existing paint values of the voxels, we just don't need to ID or update them.
-PSOut PS_RenderPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
+PSOut PS_RenderPass(VSOut psInput, uint primID : SV_PrimitiveID) {
     PSOut psOut;
 #if PARTICLE_MODE
     float3 normal;
-    getParticleNormalAndDepth(psInput.quadPosVS, psInput.particleCenterVS, normal, psOut.depth);
+    psOut.depth = getParticleDepth(psInput.quadPosVS, psInput.particleCenterVS, normal);
     uint componentId = psInput.instanceID & 7u; // 8 corners per voxel
 #else
     uint componentId = primID >> 1; // 2 triangles per face, and primID ranges (0,11) for 6 faces
