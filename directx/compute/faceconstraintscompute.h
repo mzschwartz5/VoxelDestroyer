@@ -121,9 +121,9 @@ private:
 
         // Order of vertex indices and face IDs corresponds to definitions in cube.h
         faceConstraintsCBData = std::array<FaceConstraintsCB, 3>{
-            FaceConstraintsCB{{1, 3, 5, 7}, {0, 2, 4, 6}, static_cast<uint>(constraints[0].size()), 0, 3, 0, 0, 0, 0, 0},
-            FaceConstraintsCB{{2, 3, 6, 7}, {0, 1, 4, 5}, static_cast<uint>(constraints[1].size()), 1, 4, 0, 0, 0, 0, 0},
-            FaceConstraintsCB{{4, 5, 6, 7}, {0, 1, 2, 3}, static_cast<uint>(constraints[2].size()), 2, 5, 0, 0, 0, 0, 0}
+            FaceConstraintsCB{{1, 3, 5, 7}, {0, 2, 4, 6}, static_cast<uint>(constraints[0].size()), 1, 0, 0, 0, 0, 0, 0},
+            FaceConstraintsCB{{2, 3, 6, 7}, {0, 1, 4, 5}, static_cast<uint>(constraints[1].size()), 3, 2, 0, 0, 0, 0, 0},
+            FaceConstraintsCB{{4, 5, 6, 7}, {0, 1, 2, 3}, static_cast<uint>(constraints[2].size()), 5, 4, 0, 0, 0, 0, 0}
         };    
 
         for (int i = 0; i < 3; i++) {
