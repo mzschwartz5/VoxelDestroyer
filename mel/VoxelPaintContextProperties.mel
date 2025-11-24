@@ -88,25 +88,51 @@ global proc VoxelPaintContextProperties() {
                     text -label "" -enable false -height 1; // right spacer
                 setParent ..;
 
-                checkBoxGrp -numberOfCheckBoxes 3
-                    -label "Component Mask"
-                    -columnAlign2 "left" "left"
-                    -label1 "+X" -value1 1
-                    -label2 "+Y" -value2 1
-                    -label3 "+Z" -value3 1
-                    -annotation "Limit painting to specific component orientations"
-                    -cc "VoxelPaintComponentMaskChanged()"
-                    VoxelPaintDirsRow1;
+                frameLayout -collapsable true -collapse true -label "Advanced";
+                    checkBoxGrp -numberOfCheckBoxes 3
+                        -label "Face Mask"
+                        -columnAlign2 "left" "left"
+                        -label1 "+X" -value1 1
+                        -label2 "+Y" -value2 1
+                        -label3 "+Z" -value3 1
+                        -annotation "Limit painting to specific faces"
+                        -cc "VoxelPaintFaceComponentMaskChanged()"
+                        VoxelPaintFaceMask1;
 
-                checkBoxGrp -numberOfCheckBoxes 3
-                    -label ""                      // empty label, but reserve the same label-column width
-                    -columnAlign2 "left" "left"
-                    -label1 "-X" -value1 1
-                    -label2 "-Y" -value2 1
-                    -label3 "-Z" -value3 1
-                    -annotation "Limit painting to specific component orientations"
-                    -cc "VoxelPaintComponentMaskChanged()"
-                    VoxelPaintDirsRow2;
+                    checkBoxGrp -numberOfCheckBoxes 3
+                        -label ""                      // empty label, but reserve the same label-column width
+                        -columnAlign2 "left" "left"
+                        -label1 "-X" -value1 1
+                        -label2 "-Y" -value2 1
+                        -label3 "-Z" -value3 1
+                        -annotation "Limit painting to specific faces"
+                        -cc "VoxelPaintFaceComponentMaskChanged()"
+                        VoxelPaintFaceMask2;
+
+                    separator -style "in" -height 10;
+
+                    checkBoxGrp -numberOfCheckBoxes 4
+                        -label "Particle Mask"
+                        -columnAlign2 "left" "left"
+                        -label1 "0" -value1 1
+                        -label2 "1" -value2 1
+                        -label3 "2" -value3 1
+                        -label4 "3" -value4 1
+                        -annotation "Limit painting to specific particles"
+                        -cc "VoxelPaintParticleComponentMaskChanged()"
+                        VoxelPaintParticleMask1;
+
+                    checkBoxGrp -numberOfCheckBoxes 4
+                        -label ""                      // empty label, but reserve the same label-column width
+                        -columnAlign2 "left" "left"
+                        -label1 "4" -value1 1
+                        -label2 "5" -value2 1
+                        -label3 "6" -value3 1
+                        -label4 "7" -value4 1
+                        -annotation "Limit painting to specific particles"
+                        -cc "VoxelPaintParticleComponentMaskChanged()"
+                        VoxelPaintParticleMask2;
+                setParent ..;
 
             setParent ..;
         setParent ..;
@@ -172,16 +198,30 @@ global proc VoxelPaintHighColorChanged() {
     catchQuiet(`voxelPaintContextCommand -e -highColor $rgb[0] $rgb[1] $rgb[2] $alpha[0] $ctx`);
 }
 
-global proc VoxelPaintComponentMaskChanged() {
+global proc VoxelPaintFaceComponentMaskChanged() {
     string $ctx = `currentCtx`;
     int $mask = 0;
-    if (`checkBoxGrp -q -v1 VoxelPaintDirsRow1`) $mask += 1;
-    if (`checkBoxGrp -q -v2 VoxelPaintDirsRow1`) $mask += 2;
-    if (`checkBoxGrp -q -v3 VoxelPaintDirsRow1`) $mask += 4;
-    if (`checkBoxGrp -q -v1 VoxelPaintDirsRow2`) $mask += 8;
-    if (`checkBoxGrp -q -v2 VoxelPaintDirsRow2`) $mask += 16;
-    if (`checkBoxGrp -q -v3 VoxelPaintDirsRow2`) $mask += 32;
-    catchQuiet(`voxelPaintContextCommand -e -componentMask $mask $ctx`);
+    if (`checkBoxGrp -q -v1 VoxelPaintFaceMask1`) $mask += 1;
+    if (`checkBoxGrp -q -v2 VoxelPaintFaceMask1`) $mask += 2;
+    if (`checkBoxGrp -q -v3 VoxelPaintFaceMask1`) $mask += 4;
+    if (`checkBoxGrp -q -v1 VoxelPaintFaceMask2`) $mask += 8;
+    if (`checkBoxGrp -q -v2 VoxelPaintFaceMask2`) $mask += 16;
+    if (`checkBoxGrp -q -v3 VoxelPaintFaceMask2`) $mask += 32;
+    catchQuiet(`voxelPaintContextCommand -e -faceComponentMask $mask $ctx`);
+}
+
+global proc VoxelPaintParticleComponentMaskChanged() {
+    string $ctx = `currentCtx`;
+    int $mask = 0;
+    if (`checkBoxGrp -q -v1 VoxelPaintParticleMask1`) $mask += 1;
+    if (`checkBoxGrp -q -v2 VoxelPaintParticleMask1`) $mask += 2;
+    if (`checkBoxGrp -q -v3 VoxelPaintParticleMask1`) $mask += 4;
+    if (`checkBoxGrp -q -v4 VoxelPaintParticleMask1`) $mask += 8;
+    if (`checkBoxGrp -q -v1 VoxelPaintParticleMask2`) $mask += 16;
+    if (`checkBoxGrp -q -v2 VoxelPaintParticleMask2`) $mask += 32;
+    if (`checkBoxGrp -q -v3 VoxelPaintParticleMask2`) $mask += 64;
+    if (`checkBoxGrp -q -v4 VoxelPaintParticleMask2`) $mask += 128;
+    catchQuiet(`voxelPaintContextCommand -e -particleComponentMask $mask $ctx`);
 }
 
 global proc VoxelSwapPaintColors() {

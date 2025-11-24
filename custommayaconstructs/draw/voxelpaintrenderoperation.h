@@ -105,7 +105,7 @@ public:
             cameraBased = state.cameraBased;
             lowColor = state.lowColor;
             highColor = state.highColor;
-            componentMask = state.componentMask;
+            componentMask = paintMode == VoxelEditMode::FacePaint ? state.faceComponentMask : state.particleComponentMask; 
             hasBrushMoved = state.isDragging;
             voxelIDViews.clear(DirectX::clearUintBuffer);
             updatePaintToolPos(state.mousePosition.x, state.mousePosition.y);
