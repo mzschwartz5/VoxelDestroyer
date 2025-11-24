@@ -201,12 +201,12 @@ global proc VoxelPaintHighColorChanged() {
 global proc VoxelPaintFaceComponentMaskChanged() {
     string $ctx = `currentCtx`;
     int $mask = 0;
-    if (`checkBoxGrp -q -v1 VoxelPaintFaceMask1`) $mask += 1;
-    if (`checkBoxGrp -q -v2 VoxelPaintFaceMask1`) $mask += 2;
-    if (`checkBoxGrp -q -v3 VoxelPaintFaceMask1`) $mask += 4;
-    if (`checkBoxGrp -q -v1 VoxelPaintFaceMask2`) $mask += 8;
-    if (`checkBoxGrp -q -v2 VoxelPaintFaceMask2`) $mask += 16;
-    if (`checkBoxGrp -q -v3 VoxelPaintFaceMask2`) $mask += 32;
+    if (`checkBoxGrp -q -v1 VoxelPaintFaceMask2`) $mask += 1;
+    if (`checkBoxGrp -q -v1 VoxelPaintFaceMask1`) $mask += 2;
+    if (`checkBoxGrp -q -v2 VoxelPaintFaceMask2`) $mask += 4;
+    if (`checkBoxGrp -q -v2 VoxelPaintFaceMask1`) $mask += 8;
+    if (`checkBoxGrp -q -v3 VoxelPaintFaceMask2`) $mask += 16;
+    if (`checkBoxGrp -q -v3 VoxelPaintFaceMask1`) $mask += 32;
     catchQuiet(`voxelPaintContextCommand -e -faceComponentMask $mask $ctx`);
 }
 

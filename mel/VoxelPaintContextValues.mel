@@ -19,8 +19,8 @@ global proc VoxelPaintApplyFaceMaskToUI() {
     if ($componentMask >= 4 ) { $v3 = 1; $componentMask -= 4;  }
     if ($componentMask >= 2 ) { $v2 = 1; $componentMask -= 2;  }
     if ($componentMask >= 1 ) { $v1 = 1; $componentMask -= 1;  }
-    checkBoxGrp -e -v1 $v1 -v2 $v2 -v3 $v3 VoxelPaintFaceMask1;
-    checkBoxGrp -e -v1 $v4 -v2 $v5 -v3 $v6 VoxelPaintFaceMask2;
+    checkBoxGrp -e -v1 $v2 -v2 $v4 -v3 $v6 VoxelPaintFaceMask1;
+    checkBoxGrp -e -v1 $v1 -v2 $v3 -v3 $v5 VoxelPaintFaceMask2;
 }
 
 global proc VoxelPaintApplyParticleMaskToUI() {
