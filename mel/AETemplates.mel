@@ -7,67 +7,87 @@ global proc AEPBDTemplate(string $nodeName)
     editorTemplate -beginScrollLayout;
 
     editorTemplate -beginLayout "PBD Settings" -collapse 0;
-        editorTemplate -callCustom "AE_createConstraintLow" "AE_updateConstraintLow" "constraintLow";
-        editorTemplate -callCustom "AE_createConstraintHigh" "AE_updateConstraintHigh" "constraintHigh";
+        editorTemplate -callCustom "AE_createFaceConstraintLow" "AE_updateFaceConstraintLow" "faceConstraintLow";
+        editorTemplate -callCustom "AE_createFaceConstraintHigh" "AE_updateFaceConstraintHigh" "faceConstraintHigh";
+        editorTemplate -callCustom "AE_createParticleMassLow" "AE_updateParticleMassLow" "particleMassLow";
+        editorTemplate -callCustom "AE_createParticleMassHigh" "AE_updateParticleMassHigh" "particleMassHigh";
     editorTemplate -endLayout;
 
-    string $keep[] = {"constraintLow", "constraintHigh"};
+    string $keep[] = {"faceConstraintLow", "faceConstraintHigh"};
     suppressAttributesExcept($nodeName, $keep);
 
     editorTemplate -endScrollLayout;
 }
 
-global proc AE_createConstraintLow(string $attr)
+global proc AE_createFaceConstraintLow(string $attr)
 {
-    string $ctrl = "AE_constraintLow_ctrl";
+    string $ctrl = "AE_faceConstraintLow_ctrl";
     attrFieldSliderGrp -label "Voxel strain limit (low)" -annotation "Breaking point for voxel interfaces in units of voxel-lengths, lower bound" -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
 }
 
-
-global proc AE_createConstraintHigh(string $attr)
+global proc AE_createFaceConstraintHigh(string $attr)
 {
-    string $ctrl = "AE_constraintHigh_ctrl";
+    string $ctrl = "AE_faceConstraintHigh_ctrl";
     attrFieldSliderGrp -label "Voxel strain limit (high)" -annotation "Breaking point for voxel interfaces in units of voxel-lengths, upper bound" -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
 }
 
-global proc AE_updateConstraintLow(string $attr)
+global proc AE_createParticleMassLow(string $attr)
 {
-    string $ctrl = "AE_constraintLow_ctrl";
-    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
+    string $ctrl = "AE_particleMassLow_ctrl";
+    attrFieldSliderGrp -label "Particle mass (low)" -annotation "Mass for particles in this object, lower bound" -attribute $attr -sliderMinValue 0.01 -sliderMaxValue 5 $ctrl;
+}
 
-    // Enforce: if low > high, set high = low
+global proc AE_createParticleMassHigh(string $attr)
+{
+    string $ctrl = "AE_particleMassHigh_ctrl";
+    attrFieldSliderGrp -label "Particle mass (high)" -annotation "Mass for particles in this object, upper bound" -attribute $attr -sliderMinValue 0.01 -sliderMaxValue 5 $ctrl;
+}
+
+global proc AE_updateFaceConstraintLow(string $attr)
+{
+    string $ctrl = "AE_faceConstraintLow_ctrl";
+    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
+    AE_enforceMinMax($attr, "faceConstraintLow", "faceConstraintHigh");
+}
+
+global proc AE_updateFaceConstraintHigh(string $attr)
+{
+    string $ctrl = "AE_faceConstraintHigh_ctrl";
+    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
+    AE_enforceMinMax($attr, "faceConstraintLow", "faceConstraintHigh");
+}
+
+global proc AE_updateParticleMassLow(string $attr)
+{
+    string $ctrl = "AE_particleMassLow_ctrl";
+    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0.01 -sliderMaxValue 5 $ctrl;
+    AE_enforceMinMax($attr, "particleMassLow", "particleMassHigh");
+}
+
+global proc AE_updateParticleMassHigh(string $attr)
+{
+    string $ctrl = "AE_particleMassHigh_ctrl";
+    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0.01 -sliderMaxValue 5 $ctrl;
+    AE_enforceMinMax($attr, "particleMassLow", "particleMassHigh");
+}
+
+global proc AE_enforceMinMax(string $attr, string $lowName, string $highName)
+{
     string $parts[];
     tokenize($attr, ".", $parts);
     if (size($parts) < 2) { return; }
     string $node = $parts[0];
 
-    string $lowPlug = $node + ".constraintLow";
-    string $highPlug = $node + ".constraintHigh";
+    string $lowPlug = $node + "." + $lowName;
+    string $highPlug = $node + "." + $highName;
 
     float $lowVal = `getAttr $lowPlug`;
     float $highVal = `getAttr $highPlug`;
+
     if ($lowVal > $highVal) {
         setAttr $highPlug $lowVal;
     }
-}
-
-global proc AE_updateConstraintHigh(string $attr)
-{
-    string $ctrl = "AE_constraintHigh_ctrl";
-    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
-
-    // Enforce: if high < low, set low = high
-    string $parts[];
-    tokenize($attr, ".", $parts);
-    if (size($parts) < 2) { return; }
-    string $node = $parts[0];
-
-    string $lowPlug = $node + ".constraintLow";
-    string $highPlug = $node + ".constraintHigh";
-
-    float $lowVal = `getAttr $lowPlug`;
-    float $highVal = `getAttr $highPlug`;
-    if ($highVal < $lowVal) {
+    else if ($highVal < $lowVal) {
         setAttr $lowPlug $highVal;
     }
 }

@@ -77,6 +77,7 @@ float particleRadiusInScreenSpace(float4 particleCenterClip, float4 particleCent
 
 // In particle mode, we draw a quad per voxel corner, with all 4 vertices starting at the origin.
 // This step expands each group of 4 vertices to a given corner of the voxel.
+// NOTE: this step implicitly orders the particles in the paint value buffer. It must (and does) match the ordering in cube.h (the cubeCorners array).
 float4 expandVerticesToCorners(uint quadInstanceID) {
     uint cornerIdx = quadInstanceID & 7u; // 8 quads per voxel instance, one per corner.
 
