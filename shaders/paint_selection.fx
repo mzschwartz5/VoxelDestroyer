@@ -258,8 +258,8 @@ PSOut PS_PaintPass_CameraBased(VSOut psInput, uint primID : SV_PrimitiveID) : SV
         prevPaintValue = applyPaint(idx, prevPaintValue);
     }
 
-    if (prevPaintValue < eps) discard;
     psOut.color = colorFromPaintValue(prevPaintValue);
+    if (all(abs(psOut.color.rgb) < eps)) discard;
 #if PARTICLE_MODE
     applyLambertianShading(psOut.color, normal);
 #endif
@@ -287,8 +287,8 @@ PSOut PS_PaintPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
         prevPaintValue = applyPaint(idx, prevPaintValue);
     }
 
-    if (prevPaintValue < eps) discard;
     psOut.color = colorFromPaintValue(prevPaintValue);
+    if (all(abs(psOut.color.rgb) < eps)) discard;
 #if PARTICLE_MODE
     applyLambertianShading(psOut.color, normal);
 #endif
@@ -310,8 +310,8 @@ PSOut PS_RenderPass(VSOut psInput, uint primID : SV_PrimitiveID) : SV_Target {
     uint globalVoxelID = psInput.globalVoxelID;
     uint idx = globalVoxelID * COMPONENTS_PER_INSTANCE + componentId;
     float paintValue = voxelPaintValue[idx];
-    if (abs(paintValue) < eps) discard;
     psOut.color = colorFromPaintValue(paintValue);
+    if (all(abs(psOut.color.rgb) < eps)) discard;
 #if PARTICLE_MODE
     applyLambertianShading(psOut.color, normal);
 #endif
