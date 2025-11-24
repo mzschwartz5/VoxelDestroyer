@@ -486,7 +486,7 @@ private:
     bool cameraBased = true;
     MColor lowColor = MColor(1.0f, 0.0f, 0.0f, 0.0f);
     MColor highColor = MColor(1.0f, 0.0f, 0.0f, 1.0f);
-    int componentMask = 0b111111; // All directions enabled by default
+    int componentMask = 0b11111111; // All directions enabled by default
     int paintPosX;
     int paintPosY;
     unsigned int outputTargetWidth = 0;
