@@ -194,7 +194,8 @@ public:
         paintSelectionShader->setParameter(LOW_COLOR, lowColorArr);
         paintSelectionShader->setParameter(HIGH_COLOR, highColorArr);
         paintSelectionShader->setParameter(COMPONENT_MASK, componentMask);
-        paintSelectionShader->setParameter(PARTICLE_RADIUS, particleRadius);
+        // Scale particle radius up a bit so they poke through voxels (otherwise they're invisible and can't be painted)
+        paintSelectionShader->setParameter(PARTICLE_RADIUS, 1.1f * particleRadius);
         paintSelectionShader->updateParameters(drawContext);
     }
 
