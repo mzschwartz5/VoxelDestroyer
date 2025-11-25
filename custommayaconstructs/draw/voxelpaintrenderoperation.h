@@ -182,6 +182,187 @@ public:
         return MStatus::kSuccess;
     }
 
+    /**
+     * We told maya we needed two extra input render targets. It will call this function to find out their descriptions.
+     * It can call it multiple times, say, whenever the viewport is resized.
+     */
+    bool getInputTargetDescription(const MString& name, MRenderTargetDescription& description) override {
+        MRenderer::theRenderer()->outputTargetSize(outputTargetWidth, outputTargetHeight);
+
+        if (name == paintDepthRenderTargetName) {
+            description = renderTargetDescriptions[1];
+            description.setWidth(outputTargetWidth);
+            description.setHeight(outputTargetHeight);
+            return true;
+        }
+
+        if (name == paintColorRenderTargetName) {
+            description = renderTargetDescriptions[0];
+            description.setWidth(outputTargetWidth);
+            description.setHeight(outputTargetHeight);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Called any time the user switches into painting mode. The active voxel shape sends data to the renderer -> this paint operation.
+     * The paint operation then needs to prepare GPU buffers for painting. These include:
+     * 1. An instance transform buffer for all visible voxels
+     * 2. The mapping of visible-to-global voxel IDs, as a buffer. This is used to translate instance IDs (visible) to global voxels IDs.
+     * 3. A copy of the voxel paint value buffer (for a double buffer approach, to avoid read-write conflicts).
+     * 4. A double buffer for the IDs of painted voxels (current and previous).
+     */
+    void prepareToPaint(
+        VoxelEditMode paintMode,
+        const MMatrixArray& allVoxelMatrices, 
+        const std::vector<uint32_t>& visibleVoxelIdToGlobalId,
+        PingPongView& paintViews,
+        float particleRadius
+    ) {
+        this->paintMode = paintMode;
+        this->particleRadius = particleRadius;
+        voxelPaintViews = &paintViews;
+        int numVoxels = static_cast<int>(allVoxelMatrices.length());
+        unsigned int voxelInstanceCount = static_cast<unsigned int>(visibleVoxelIdToGlobalId.size());
+
+        if (voxelInstanceCount == 0) {
+            instanceTransformSRV.Reset();
+            instanceTransformBuffer.Reset();
+            return;
+        }
+        
+        MMatrixArray voxelInstanceTransforms;
+        for (uint globalVoxelId : visibleVoxelIdToGlobalId) {
+            voxelInstanceTransforms.append(allVoxelMatrices[globalVoxelId]);
+        }
+
+        // Flatten MMatrixArray into a std::vector of Float4x4
+        std::vector<std::array<float, 16>> gpuMats(voxelInstanceCount);
+        for (unsigned int i = 0; i < voxelInstanceCount; ++i) {
+            const MMatrix& M = voxelInstanceTransforms[i];
+            for (int r = 0; r < 4; ++r) {
+                for (int c = 0; c < 4; ++c) {
+                    gpuMats[i][c * 4 + r] = static_cast<float>(M(r, c));
+                }
+            }
+        }
+
+        instanceTransformBuffer = DirectX::createReadOnlyBuffer<std::array<float, 16>>(gpuMats);
+        instanceTransformSRV = DirectX::createSRV(instanceTransformBuffer);
+        visibleToGlobalVoxelBuffer = DirectX::createReadOnlyBuffer<uint32_t>(visibleVoxelIdToGlobalId);
+        visibleToGlobalVoxelSRV = DirectX::createSRV(visibleToGlobalVoxelBuffer);
+
+        int componentsPerVoxel = (paintMode == VoxelEditMode::FacePaint) ? 6 : 8; // 6 faces or 8 vertices
+        int elementCount = numVoxels * componentsPerVoxel;
+        const std::vector<uint8_t> emptyIDData(elementCount, 0); 
+        voxelIDBufferA = DirectX::createReadWriteBuffer(emptyIDData, false);
+        voxelIDBufferB = DirectX::createReadWriteBuffer(emptyIDData, false);
+        voxelIDViews = PingPongView(
+            DirectX::createSRV(voxelIDBufferB, elementCount, 0, DXGI_FORMAT_R8_UINT),
+            DirectX::createSRV(voxelIDBufferA, elementCount, 0, DXGI_FORMAT_R8_UINT),
+            DirectX::createUAV(voxelIDBufferB, elementCount, 0, DXGI_FORMAT_R8_UINT),
+            DirectX::createUAV(voxelIDBufferA, elementCount, 0, DXGI_FORMAT_R8_UINT)
+        );
+
+        // Point buffer references for drawing based on paint mode
+        bool faceMode = (paintMode == VoxelEditMode::FacePaint);
+        instanceCount = faceMode ? voxelInstanceCount : 8 * voxelInstanceCount; // 8 quads per voxel for particle painting
+        cubeVb = faceMode ? cubeFaceVb : cubeVertVb;
+        cubeIb = faceMode ? cubeFaceIb : cubeVertIb;
+        paintSelectionShader = faceMode ? facePaintSelectionShader : particlePaintSelectionShader;
+        indexCountPerInstance = faceMode ? static_cast<unsigned int>(cubeFacesFlattened.size()) 
+                                         : static_cast<unsigned int>(cubeQuadIndicesFlattened.size());
+    }
+
+private:
+
+    MRenderTargetDescription renderTargetDescriptions[2];
+    MRenderTarget* renderTargets[2] = { nullptr, nullptr };
+    const MRasterizerState* scissorRasterState = nullptr;
+    const MRasterizerState* depthBiasRasterState = nullptr;
+    const MBlendState* alphaEnabledBlendState = nullptr;
+    MShaderInstance* particlePaintSelectionShader = nullptr;
+    MShaderInstance* facePaintSelectionShader = nullptr;
+    D3D11_RECT scissor = { 0, 0, 0, 0 };
+
+    VoxelEditMode paintMode = VoxelEditMode::FacePaint;
+    bool hasBrushMoved = false;
+    float paintRadius = 25.0f;
+    BrushMode brushMode = BrushMode::SET;
+    float brushValue = 0.5f;
+    bool cameraBased = true;
+    MColor lowColor = MColor(1.0f, 0.0f, 0.0f, 0.0f);
+    MColor highColor = MColor(1.0f, 0.0f, 0.0f, 1.0f);
+    int componentMask = 0b11111111; // All directions enabled by default
+    int paintPosX;
+    int paintPosY;
+    unsigned int outputTargetWidth = 0;
+    unsigned int outputTargetHeight = 0;
+    MCallbackId playbackCallbackId = 0;
+    bool isPlayingBack = false;
+    float particleRadius = 0.0f;
+
+    // Alllll the buffers and views we need for painting
+    ComPtr<ID3D11Buffer> instanceTransformBuffer;
+    ComPtr<ID3D11ShaderResourceView> instanceTransformSRV;
+    ComPtr<ID3D11Buffer> visibleToGlobalVoxelBuffer;
+    ComPtr<ID3D11ShaderResourceView> visibleToGlobalVoxelSRV;
+    PingPongView* voxelPaintViews;
+    ComPtr<ID3D11Buffer> voxelIDBufferA;
+    ComPtr<ID3D11Buffer> voxelIDBufferB;
+    PingPongView voxelIDViews;
+    // Used for tracking when the main render target has changed
+    ComPtr<ID3D11ShaderResourceView> renderTargetSRV; 
+
+    // Cube geometry resources
+    ComPtr<ID3D11Buffer> cubeFaceVb;
+    ComPtr<ID3D11Buffer> cubeFaceIb;
+    ComPtr<ID3D11Buffer> cubeVertVb;
+    ComPtr<ID3D11Buffer> cubeVertIb;
+    // The following resources are just used to reference the correct IB/VB based on paint mode
+    MShaderInstance* paintSelectionShader = nullptr;
+    ComPtr<ID3D11Buffer> cubeVb;
+    ComPtr<ID3D11Buffer> cubeIb;
+    unsigned int indexCountPerInstance;
+
+    unsigned int instanceCount = 0;
+
+    EventBase::Unsubscribe unsubscribeFromPaintMove;
+    EventBase::Unsubscribe unsubscribeFromPaintStateChange;
+
+    void setInputAssemblyState() {
+        ID3D11DeviceContext* dxContext = DirectX::getContext();
+        UINT stride = sizeof(float) * 3;
+        UINT offset = 0;
+        dxContext->IASetVertexBuffers(0, 1, cubeVb.GetAddressOf(), &stride, &offset);
+        dxContext->IASetIndexBuffer(cubeIb.Get(), DXGI_FORMAT_R16_UINT, 0);
+        dxContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    }
+
+    void unbindResources(const MDrawContext& drawContext) {
+        ID3D11DeviceContext* dxContext = DirectX::getContext();
+        const MRenderTarget* mainColorTarget = getInputTarget(kColorTargetName);
+        const MRenderTarget* mainDepthTarget = getInputTarget(kDepthTargetName);
+        ID3D11RenderTargetView* mainColorRTV = static_cast<ID3D11RenderTargetView*>(mainColorTarget->resourceHandle());
+        ID3D11DepthStencilView* mainDepthDSV = static_cast<ID3D11DepthStencilView*>(mainDepthTarget->resourceHandle());
+
+        ID3D11ShaderResourceView* nullVSSRV[] = { nullptr, nullptr };
+        ID3D11ShaderResourceView* nullPSSRV[] = { nullptr, nullptr, nullptr };
+        ID3D11UnorderedAccessView* nullUAVs[] = { nullptr, nullptr };
+        dxContext->VSSetShaderResources(0, ARRAYSIZE(nullVSSRV), nullVSSRV);
+        dxContext->PSSetShaderResources(2, ARRAYSIZE(nullPSSRV), nullPSSRV);
+        dxContext->OMSetRenderTargetsAndUnorderedAccessViews(
+            1, &mainColorRTV, mainDepthDSV,
+            2, ARRAYSIZE(nullUAVs),
+            nullUAVs,
+            nullptr
+        );
+        paintSelectionShader->unbind(drawContext);
+    }
+
+
     void prepareShader(const MDrawContext& drawContext) {
         paintSelectionShader->bind(drawContext);
         float paintPos[2] = { static_cast<float>(paintPosX), static_cast<float>(paintPosY) };
@@ -328,130 +509,6 @@ public:
         stateManager->setRasterizerState(prevRasterizerState);
     }
 
-    void setInputAssemblyState() {
-        ID3D11DeviceContext* dxContext = DirectX::getContext();
-        UINT stride = sizeof(float) * 3;
-        UINT offset = 0;
-        dxContext->IASetVertexBuffers(0, 1, cubeVb.GetAddressOf(), &stride, &offset);
-        dxContext->IASetIndexBuffer(cubeIb.Get(), DXGI_FORMAT_R16_UINT, 0);
-        dxContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    }
-
-    void unbindResources(const MDrawContext& drawContext) {
-        ID3D11DeviceContext* dxContext = DirectX::getContext();
-        const MRenderTarget* mainColorTarget = getInputTarget(kColorTargetName);
-        const MRenderTarget* mainDepthTarget = getInputTarget(kDepthTargetName);
-        ID3D11RenderTargetView* mainColorRTV = static_cast<ID3D11RenderTargetView*>(mainColorTarget->resourceHandle());
-        ID3D11DepthStencilView* mainDepthDSV = static_cast<ID3D11DepthStencilView*>(mainDepthTarget->resourceHandle());
-
-        ID3D11ShaderResourceView* nullVSSRV[] = { nullptr, nullptr };
-        ID3D11ShaderResourceView* nullPSSRV[] = { nullptr, nullptr, nullptr };
-        ID3D11UnorderedAccessView* nullUAVs[] = { nullptr, nullptr };
-        dxContext->VSSetShaderResources(0, ARRAYSIZE(nullVSSRV), nullVSSRV);
-        dxContext->PSSetShaderResources(2, ARRAYSIZE(nullPSSRV), nullPSSRV);
-        dxContext->OMSetRenderTargetsAndUnorderedAccessViews(
-            1, &mainColorRTV, mainDepthDSV,
-            2, ARRAYSIZE(nullUAVs),
-            nullUAVs,
-            nullptr
-        );
-        paintSelectionShader->unbind(drawContext);
-    }
-
-    /**
-     * We told maya we needed two extra input render targets. It will call this function to find out their descriptions.
-     * It can call it multiple times, say, whenever the viewport is resized.
-     */
-    bool getInputTargetDescription(const MString& name, MRenderTargetDescription& description) override {
-        MRenderer::theRenderer()->outputTargetSize(outputTargetWidth, outputTargetHeight);
-
-        if (name == paintDepthRenderTargetName) {
-            description = renderTargetDescriptions[1];
-            description.setWidth(outputTargetWidth);
-            description.setHeight(outputTargetHeight);
-            return true;
-        }
-
-        if (name == paintColorRenderTargetName) {
-            description = renderTargetDescriptions[0];
-            description.setWidth(outputTargetWidth);
-            description.setHeight(outputTargetHeight);
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * Called any time the user switches into painting mode. The active voxel shape sends data to the renderer -> this paint operation.
-     * The paint operation then needs to prepare GPU buffers for painting. These include:
-     * 1. An instance transform buffer for all visible voxels
-     * 2. The mapping of visible-to-global voxel IDs, as a buffer. This is used to translate instance IDs (visible) to global voxels IDs.
-     * 3. A copy of the voxel paint value buffer (for a double buffer approach, to avoid read-write conflicts).
-     * 4. A double buffer for the IDs of painted voxels (current and previous).
-     */
-    void prepareToPaint(
-        VoxelEditMode paintMode,
-        const MMatrixArray& allVoxelMatrices, 
-        const std::vector<uint32_t>& visibleVoxelIdToGlobalId,
-        PingPongView& paintViews,
-        float particleRadius
-    ) {
-        this->paintMode = paintMode;
-        this->particleRadius = particleRadius;
-        voxelPaintViews = &paintViews;
-        int numVoxels = static_cast<int>(allVoxelMatrices.length());
-        unsigned int voxelInstanceCount = static_cast<unsigned int>(visibleVoxelIdToGlobalId.size());
-
-        if (voxelInstanceCount == 0) {
-            instanceTransformSRV.Reset();
-            instanceTransformBuffer.Reset();
-            return;
-        }
-        
-        MMatrixArray voxelInstanceTransforms;
-        for (uint globalVoxelId : visibleVoxelIdToGlobalId) {
-            voxelInstanceTransforms.append(allVoxelMatrices[globalVoxelId]);
-        }
-
-        // Flatten MMatrixArray into a std::vector of Float4x4
-        std::vector<std::array<float, 16>> gpuMats(voxelInstanceCount);
-        for (unsigned int i = 0; i < voxelInstanceCount; ++i) {
-            const MMatrix& M = voxelInstanceTransforms[i];
-            for (int r = 0; r < 4; ++r) {
-                for (int c = 0; c < 4; ++c) {
-                    gpuMats[i][c * 4 + r] = static_cast<float>(M(r, c));
-                }
-            }
-        }
-
-        instanceTransformBuffer = DirectX::createReadOnlyBuffer<std::array<float, 16>>(gpuMats);
-        instanceTransformSRV = DirectX::createSRV(instanceTransformBuffer);
-        visibleToGlobalVoxelBuffer = DirectX::createReadOnlyBuffer<uint32_t>(visibleVoxelIdToGlobalId);
-        visibleToGlobalVoxelSRV = DirectX::createSRV(visibleToGlobalVoxelBuffer);
-
-        int componentsPerVoxel = (paintMode == VoxelEditMode::FacePaint) ? 6 : 8; // 6 faces or 8 vertices
-        int elementCount = numVoxels * componentsPerVoxel;
-        const std::vector<uint8_t> emptyIDData(elementCount, 0); 
-        voxelIDBufferA = DirectX::createReadWriteBuffer(emptyIDData, false);
-        voxelIDBufferB = DirectX::createReadWriteBuffer(emptyIDData, false);
-        voxelIDViews = PingPongView(
-            DirectX::createSRV(voxelIDBufferB, elementCount, 0, DXGI_FORMAT_R8_UINT),
-            DirectX::createSRV(voxelIDBufferA, elementCount, 0, DXGI_FORMAT_R8_UINT),
-            DirectX::createUAV(voxelIDBufferB, elementCount, 0, DXGI_FORMAT_R8_UINT),
-            DirectX::createUAV(voxelIDBufferA, elementCount, 0, DXGI_FORMAT_R8_UINT)
-        );
-
-        // Point buffer references for drawing based on paint mode
-        bool faceMode = (paintMode == VoxelEditMode::FacePaint);
-        instanceCount = faceMode ? voxelInstanceCount : 8 * voxelInstanceCount; // 8 quads per voxel for particle painting
-        cubeVb = faceMode ? cubeFaceVb : cubeVertVb;
-        cubeIb = faceMode ? cubeFaceIb : cubeVertIb;
-        paintSelectionShader = faceMode ? facePaintSelectionShader : particlePaintSelectionShader;
-        indexCountPerInstance = faceMode ? static_cast<unsigned int>(cubeFacesFlattened.size()) 
-                                         : static_cast<unsigned int>(cubeQuadIndicesFlattened.size());
-    }
-
     void updatePaintToolPos(int mouseX, int mouseY) {
         paintPosX = mouseX;
         paintPosY = static_cast<int>(outputTargetHeight) - 1 - mouseY;
@@ -466,62 +523,6 @@ public:
         scissor.top = std::max(0, top);
         scissor.bottom = std::min(static_cast<int>(outputTargetHeight), bottom);
     }
-
-private:
-
-    MRenderTargetDescription renderTargetDescriptions[2];
-    MRenderTarget* renderTargets[2] = { nullptr, nullptr };
-    const MRasterizerState* scissorRasterState = nullptr;
-    const MRasterizerState* depthBiasRasterState = nullptr;
-    const MBlendState* alphaEnabledBlendState = nullptr;
-    MShaderInstance* particlePaintSelectionShader = nullptr;
-    MShaderInstance* facePaintSelectionShader = nullptr;
-    D3D11_RECT scissor = { 0, 0, 0, 0 };
-
-    VoxelEditMode paintMode = VoxelEditMode::FacePaint;
-    bool hasBrushMoved = false;
-    float paintRadius = 25.0f;
-    BrushMode brushMode = BrushMode::SET;
-    float brushValue = 0.5f;
-    bool cameraBased = true;
-    MColor lowColor = MColor(1.0f, 0.0f, 0.0f, 0.0f);
-    MColor highColor = MColor(1.0f, 0.0f, 0.0f, 1.0f);
-    int componentMask = 0b11111111; // All directions enabled by default
-    int paintPosX;
-    int paintPosY;
-    unsigned int outputTargetWidth = 0;
-    unsigned int outputTargetHeight = 0;
-    MCallbackId playbackCallbackId = 0;
-    bool isPlayingBack = false;
-    float particleRadius = 0.0f;
-
-    // Alllll the buffers and views we need for painting
-    ComPtr<ID3D11Buffer> instanceTransformBuffer;
-    ComPtr<ID3D11ShaderResourceView> instanceTransformSRV;
-    ComPtr<ID3D11Buffer> visibleToGlobalVoxelBuffer;
-    ComPtr<ID3D11ShaderResourceView> visibleToGlobalVoxelSRV;
-    PingPongView* voxelPaintViews;
-    ComPtr<ID3D11Buffer> voxelIDBufferA;
-    ComPtr<ID3D11Buffer> voxelIDBufferB;
-    PingPongView voxelIDViews;
-    // Used for tracking when the main render target has changed
-    ComPtr<ID3D11ShaderResourceView> renderTargetSRV; 
-
-    // Cube geometry resources
-    ComPtr<ID3D11Buffer> cubeFaceVb;
-    ComPtr<ID3D11Buffer> cubeFaceIb;
-    ComPtr<ID3D11Buffer> cubeVertVb;
-    ComPtr<ID3D11Buffer> cubeVertIb;
-    // The following resources are just used to reference the correct IB/VB based on paint mode
-    MShaderInstance* paintSelectionShader = nullptr;
-    ComPtr<ID3D11Buffer> cubeVb;
-    ComPtr<ID3D11Buffer> cubeIb;
-    unsigned int indexCountPerInstance;
-
-    unsigned int instanceCount = 0;
-
-    EventBase::Unsubscribe unsubscribeFromPaintMove;
-    EventBase::Unsubscribe unsubscribeFromPaintStateChange;
 
     void updateRenderTargetSRV(ID3D11RenderTargetView* rtv) {
         if (!rtv) return;
@@ -540,7 +541,6 @@ private:
         if (FAILED(hr)) {
             MGlobal::displayError(MString("Failed to create shader resource view for render target. ") + Utils::HResultToString(hr).c_str());
         }
-
     }
 
     std::array<MShaderCompileMacro, 10> shaderMacros(bool particleMode) {

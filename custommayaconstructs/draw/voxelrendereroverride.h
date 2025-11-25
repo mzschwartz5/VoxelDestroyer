@@ -18,8 +18,9 @@ struct CameraMatrices
 };
 
 /**
- * Pass-through implementation of a render override, simply to get consistent access to the render target's depth buffer and camera matrices.
- * Does not add any render operations; should just replicate default viewport rendering.
+ * This render override currently performs two main functions:
+ * 1. Passes the viewport's depth target to the voxel drag tool for reading in the drag compute pass
+ * 2. Adds a render operation for a custom paint tool for painting simulation weights onto voxel faces/particles.
  * 
  * Note: to actually activate a render override, you need to register it and THEN select it from the renderer drop down menu in Maya.
  * There *is* a way to programmatically switch to the override via MEL (see plugin.cpp).
