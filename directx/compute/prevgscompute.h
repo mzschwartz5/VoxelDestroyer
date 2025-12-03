@@ -49,6 +49,13 @@ public:
         ComputeShader::dispatch(numWorkgroups, updateParticleWeightsEntryPoint);
     }
 
+    void updateTimeStep(float timeStep) {
+        if (timeStep != simConstants.timeStep) {
+            simConstants.timeStep = timeStep;
+            DirectX::updateConstantBuffer(simConstantsBuffer, simConstants);
+        }
+    }
+
     void setPositionsUAV(const ComPtr<ID3D11UnorderedAccessView>& positionsUAV) {
         this->positionsUAV = positionsUAV;
     }

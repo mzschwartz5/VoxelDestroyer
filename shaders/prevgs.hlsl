@@ -27,12 +27,15 @@ void main(uint3 gId : SV_DispatchThreadID)
     float4 oldPos = oldPositions[gId.x];
     oldPositions[gId.x] = pos;
 
-    float4 velocity = (pos - oldPos) / TIMESTEP;
+    // Note: delay applying timestep (i.e. don't calculate velocity now) because:
+    // 1. Division is expensive
+    // 2. Makes delta rounding errors worse when timestep is small
+    float4 delta = (pos - oldPos);
     
     int voxelIndex = gId.x >> 3;
     if (!isDragging[voxelIndex]) {
-        velocity += float4(0, GRAVITY_STRENGTH, 0, 0) * TIMESTEP; // Gravity
-        pos.xyz += (velocity * TIMESTEP).xyz; // Update position
+        delta += float4(0, GRAVITY_STRENGTH, 0, 0) * TIMESTEP * TIMESTEP; // Gravity
+        pos.xyz += delta.xyz; // Update position
     }
     
     // Write back to global memory

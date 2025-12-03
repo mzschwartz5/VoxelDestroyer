@@ -98,7 +98,8 @@ void PBD::createComputeShaders(
         vgsCompute.getVoxelSimInfoBuffer()
 	);
 
-    PreVGSConstantBuffer preVGSConstants{GRAVITY_STRENGTH, GROUND_COLLISION_Y, TIMESTEP, numParticles()};
+    // Hardcode initial timestep of 1/60 (assumes 60 FPS and 10 substeps).
+    PreVGSConstantBuffer preVGSConstants{GRAVITY_STRENGTH, GROUND_COLLISION_Y, 1.0f / 600.0f, numParticles()};
     preVGSCompute = PreVGSCompute(
         numParticles(),
 		preVGSConstants
@@ -135,6 +136,12 @@ void PBD::updateParticleMassWithPaintValues(
     float massHigh
 ) {
     preVGSCompute.updateParticleMassFromPaintValues(paintDeltaUAV, paintValueUAV, massLow, massHigh);
+}
+
+// Note that FPS changes just make the playback choppier / smoother. A lower FPS means each frame is a bigger simulation timestep,
+// but the same time passes overall. To make the sim *run* slower or faster, you need to change the timeslider playback speed factor.
+void PBD::updateTimestep(float secondsPerFrame) {
+    preVGSCompute.updateTimeStep(secondsPerFrame);
 }
 
 void PBD::simulateSubstep() {

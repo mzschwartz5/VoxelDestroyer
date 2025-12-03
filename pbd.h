@@ -63,6 +63,8 @@ public:
     
     void simulateSubstep();
 
+    void updateTimestep(float secondsPerFrame);
+
 private:
     // Inverse mass (w) and particle radius stored, packed at half-precision, as 4th component.
     std::vector<MFloatPoint> particles;

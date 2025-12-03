@@ -45,6 +45,8 @@ public:
 
     static const MTypeId id;
     static const MString globalSolverNodeName;
+    // User-set attributes
+    static MObject aNumSubsteps;
     // Input attributes
     static MObject aTime;
     static MObject aParticleData;

@@ -14,6 +14,7 @@
 const MTypeId GlobalSolver::id(0x0013A7B1);
 const MString GlobalSolver::globalSolverNodeName("globalSolverNode");
 MObject GlobalSolver::globalSolverNodeObject = MObject::kNullObj;
+MObject GlobalSolver::aNumSubsteps = MObject::kNullObj;
 MObject GlobalSolver::aParticleData = MObject::kNullObj;
 MObject GlobalSolver::aColliderData = MObject::kNullObj;
 MObject GlobalSolver::aParticleBufferOffset = MObject::kNullObj;
@@ -355,6 +356,20 @@ void GlobalSolver::onColliderDataDirty(MObject& node, MPlug& plug, void* clientD
 MStatus GlobalSolver::initialize() {
     MStatus status;
 
+    // User-set attributes
+    MFnNumericAttribute nAttr;
+    aNumSubsteps = nAttr.create("numSubsteps", "nss", MFnNumericData::kInt, 10, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    nAttr.setMin(1);
+    nAttr.setSoftMin(5);
+    nAttr.setSoftMax(20);
+    nAttr.setMax(30);
+    nAttr.setStorable(true);
+    nAttr.setWritable(true);
+    nAttr.setReadable(true);
+    status = addAttribute(aNumSubsteps);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
     // Input attribute
     // Time attribute
     MFnUnitAttribute uTimeAttr;
@@ -400,7 +415,6 @@ MStatus GlobalSolver::initialize() {
 
     // Output attribute
     // Trigger - tells PBD nodes to propogate changes to their deformers
-    MFnNumericAttribute nAttr;
     aTrigger = nAttr.create("trigger", "trg", MFnNumericData::kBoolean, false, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     nAttr.setStorable(false);

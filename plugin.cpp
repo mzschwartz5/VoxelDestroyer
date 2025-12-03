@@ -26,6 +26,7 @@
 #include "custommayaconstructs/commands/applyvoxelpaintcommand.h"
 #include <maya/MDrawRegistry.h>
 #include <maya/MItDependencyNodes.h>
+#include <maya/MTimer.h>
 #include "directx/compute/computeshader.h"
 #include "globalsolver.h"
 
@@ -100,6 +101,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	MProgressWindow::setProgress(100);
 
 	maybeCreateGroundCollider();
+	MTime::setUIUnit(MTime::k60FPS);
 
 	MProgressWindow::endProgress();
 	MGlobal::executeCommand("undoInfo -closeChunk", false, false); // close the undo chunk	
