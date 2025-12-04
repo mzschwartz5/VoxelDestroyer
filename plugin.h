@@ -31,7 +31,7 @@ struct PluginArgs {
 	MPoint position{ 0.0f, 0.0f, 0.0f };
 	MVector scale{ 1.0f, 1.0f, 1.0f };
 	int voxelsPerEdge{ 10 };
-	MString gridDisplayName{ "VoxelGridDisplay" };
+	MString selectedMeshName;
 	bool voxelizeSurface{ false };
 	bool voxelizeInterior{ false };
 	bool renderAsVoxels{ false };

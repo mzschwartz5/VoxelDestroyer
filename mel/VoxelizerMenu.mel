@@ -6,14 +6,17 @@ global proc VoxelizerMenu() {
         deleteUI VoxelizerMenuWindow;
     }
 
-    string $ret[] = createVoxelGridDisplay();
-    string $voxelGridDisplayName = $ret[0];
-    float $scale[]  = { float($ret[1]), float($ret[2]), float($ret[3]) };
-    float $center[] = { float($ret[4]), float($ret[5]), float($ret[6]) };
-    if ($voxelGridDisplayName == "") {
+    string $selection[] = `ls -selection`;
+    if (size($selection) <= 0) {
         warning("No mesh selected to voxelize.");
         return;
     }
+    string $selectedMeshName = $selection[0];
+
+    string $ret[] = createVoxelGridDisplay($selectedMeshName);
+    string $voxelGridDisplayName = $ret[0];
+    float $scale[]  = { float($ret[1]), float($ret[2]), float($ret[3]) };
+    float $center[] = { float($ret[4]), float($ret[5]), float($ret[6]) };
 
     window -title "Voxelizer Menu" VoxelizerMenuWindow;
     formLayout VoxelizerMenuForm;
@@ -50,7 +53,7 @@ global proc VoxelizerMenu() {
     string $cancelButton = `button -label "Cancel" -command ("VoxelizerMenu_close(\"" + $voxelGridDisplayName + "\")")`;
     string $runButton = `button -label "Voxelize" 
         -annotation "Voxelizes a mesh in preparation for VGS simulation. Uses selected mesh or, if none selected, the closest mesh to the center of the grid bounds."
-        -command ("VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", \"" + $positionField + "\", \"" + $scaleField + "\", \"" + $subdivField + "\", \"" + $surfaceCheckbox + "\", \"" + $solidCheckbox + "\", \"" + $renderAsVoxelsCheckbox + "\", \"" + $clipTrianglesCheckbox + "\")")`;
+        -command ("VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", \"" + $selectedMeshName + "\", \"" + $positionField + "\", \"" + $scaleField + "\", \"" + $subdivField + "\", \"" + $surfaceCheckbox + "\", \"" + $solidCheckbox + "\", \"" + $renderAsVoxelsCheckbox + "\", \"" + $clipTrianglesCheckbox + "\")")`;
 
     // Attach elements to form layout 
     formLayout -edit
@@ -78,7 +81,7 @@ global proc VoxelizerMenu() {
     scriptJob -attributeChange ($voxelGridDisplayName + ".scale") ("VoxelizerMenu_syncScale(\"" + $voxelGridDisplayName + "\", \"" + $scaleField + "\")");
 }
 
-global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $scaleField, string $subdivField, string $surfaceCheckbox, string $solidCheckbox, string $renderAsVoxelsCheckbox, string $clipTrianglesCheckbox) {
+global proc VoxelizerMenu_run(string $cubeName, string $selectedMeshName, string $positionField, string $scaleField, string $subdivField, string $surfaceCheckbox, string $solidCheckbox, string $renderAsVoxelsCheckbox, string $clipTrianglesCheckbox) {
     float $posX = `floatFieldGrp -query -value1 $positionField`;
     float $posY = `floatFieldGrp -query -value2 $positionField`;
     float $posZ = `floatFieldGrp -query -value3 $positionField`;
@@ -90,18 +93,12 @@ global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $s
     int $solid = `checkBox -query -value $solidCheckbox`;
     int $renderAsVoxels = `checkBox -query -value $renderAsVoxelsCheckbox`;
     int $clipTriangles = `checkBox -query -value $clipTrianglesCheckbox`;
-    
-    // Deselect the cube if it's currently selected, so it's not a voxelization target itself
-    if (`objExists $cubeName` && `objExists ($cubeName + ".visibility")`) {
-        select -deselect $cubeName;
-    }
-
     int $type = $surface + ($solid * 2) + ($renderAsVoxels * 4) + ($clipTriangles * 8); // Convert checkboxes to a single integer
 
     // Construct the VoxelDestroyer command with the passed arguments
     string $command = "VoxelDestroyer -px " + $posX + " -py " + $posY + " -pz " + $posZ +
                                     " -sx " + $scaleX + " -sy " + $scaleY + " -sz " + $scaleZ + 
-                                    " -v " + $voxelsPerEdge + " -n \"" + $cubeName + "\"" + " -t " + $type + ";";
+                                    " -v " + $voxelsPerEdge + " -n \"" + $selectedMeshName + "\"" + " -t " + $type + ";";
 
     // Execute the command and handle errors
     if (catch(eval($command))) {
@@ -111,17 +108,14 @@ global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $s
     }
 }
 
-global proc string[] createVoxelGridDisplay() {
-    string $selection[] = `ls -selection`;
-    if (size($selection) <= 0) return {"", "1", "1", "1", "0", "0", "0"}; // No selection, return default values
-
+global proc string[] createVoxelGridDisplay(string $selectedMeshName) {
     // First get the bounding box of the selected object
     // The bounding box of an object is axis aligned. We want to get the oriented bounding box, so unrotate the object,
     // get the bounding box, then restore the rotation.
-    float $originalRotation[] = `xform -q -ws -rotation $selection[0]`;
-    xform -ws -rotation 0 0 0 $selection[0];
-    float $bbox[] = `xform -q -ws -bb $selection[0]`;
-    xform -ws -rotation $originalRotation[0] $originalRotation[1] $originalRotation[2] $selection[0];
+    float $originalRotation[] = `xform -q -ws -rotation $selectedMeshName`;
+    xform -ws -rotation 0 0 0 $selectedMeshName;
+    float $bbox[] = `xform -q -ws -bb $selectedMeshName`;
+    xform -ws -rotation $originalRotation[0] $originalRotation[1] $originalRotation[2] $selectedMeshName;
     float $scale[] = {$bbox[3] - $bbox[0], $bbox[4] - $bbox[1], $bbox[5] - $bbox[2]};
     float $center[] = {(($bbox[3] + $bbox[0]) / 2.0), (($bbox[4] + $bbox[1]) / 2.0), (($bbox[5] + $bbox[2]) / 2.0)};
 
