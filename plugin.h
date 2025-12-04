@@ -29,7 +29,7 @@ using namespace MHWRender;
 
 struct PluginArgs {
 	MPoint position{ 0.0f, 0.0f, 0.0f };
-	double scale{ 1.0f };
+	MVector scale{ 1.0f, 1.0f, 1.0f };
 	int voxelsPerEdge{ 10 };
 	MString gridDisplayName{ "VoxelGridDisplay" };
 	bool voxelizeSurface{ false };

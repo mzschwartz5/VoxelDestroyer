@@ -48,7 +48,9 @@ MSyntax plugin::syntax()
 	syntax.addFlag("-px", "-positionX", MSyntax::kDouble);
 	syntax.addFlag("-py", "-positionY", MSyntax::kDouble);
 	syntax.addFlag("-pz", "-positionZ", MSyntax::kDouble);
-	syntax.addFlag("-s", "-scale", MSyntax::kDouble);
+	syntax.addFlag("-sx", "-scaleX", MSyntax::kDouble);
+	syntax.addFlag("-sy", "-scaleY", MSyntax::kDouble);
+	syntax.addFlag("-sz", "-scaleZ", MSyntax::kDouble);
 	syntax.addFlag("-v", "-voxelsPerEdge", MSyntax::kLong);
 	syntax.addFlag("-n", "-gridDisplayName", MSyntax::kString);
 	syntax.addFlag("-t", "-type", MSyntax::kLong);
@@ -63,10 +65,10 @@ MStatus plugin::doIt(const MArgList& argList)
 	MProgressWindow::startProgress();
 
 	PluginArgs pluginArgs = parsePluginArgs(argList);
-	MDagPath selectedMeshDagPath = getSelectedObject(pluginArgs.position, pluginArgs.scale);
+	MDagPath selectedMeshDagPath = getSelectedObject(pluginArgs.position, pluginArgs.scale.x);
 	// Fall back to finding the closest object to the voxel grid if nothing is selected
 	if (selectedMeshDagPath == MDagPath()) {
-		selectedMeshDagPath = findClosestObjectToVoxelGrid(pluginArgs.position, pluginArgs.scale, pluginArgs.gridDisplayName);
+		selectedMeshDagPath = findClosestObjectToVoxelGrid(pluginArgs.position, pluginArgs.scale.x, pluginArgs.gridDisplayName);
 		if (selectedMeshDagPath == MDagPath()) {
 			MGlobal::displayError("No mesh found to voxelize.");
 			return MS::kFailure;
@@ -79,7 +81,7 @@ MStatus plugin::doIt(const MArgList& argList)
 
 	// Progress window message updates done within the voxelizer (for finer-grained control)
 	const VoxelizationGrid voxelizationGrid {
-		pluginArgs.scale * 1.02, // To avoid precision / cut off issues, scale up the voxelization grid very slightly.
+		pluginArgs.scale.x * 1.02, // To avoid precision / cut off issues, scale up the voxelization grid very slightly.
 		pluginArgs.voxelsPerEdge,
 		pluginArgs.position
 	};
@@ -139,10 +141,22 @@ PluginArgs plugin::parsePluginArgs(const MArgList& args) {
 	}
 
 	// Voxel grid edge length (scale)
-	if (argData.isFlagSet("-s")) {
-		status = argData.getFlagArgument("-s", 0, pluginArgs.scale);
+	if (argData.isFlagSet("-sx")) {
+		status = argData.getFlagArgument("-sx", 0, pluginArgs.scale.x);
 		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to get scale: " + status.errorString());
+			MGlobal::displayError("Failed to get scale X: " + status.errorString());
+		}
+	}
+	if (argData.isFlagSet("-sy")) {
+		status = argData.getFlagArgument("-sy", 0, pluginArgs.scale.y);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get scale Y: " + status.errorString());
+		}
+	}
+	if (argData.isFlagSet("-sz")) {
+		status = argData.getFlagArgument("-sz", 0, pluginArgs.scale.z);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get scale Z: " + status.errorString());
 		}
 	}
 	

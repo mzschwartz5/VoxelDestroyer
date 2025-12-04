@@ -6,8 +6,14 @@ global proc VoxelizerMenu() {
         deleteUI VoxelizerMenuWindow;
     }
 
-    float $bbox[] = getBoundingBoxCenterAndExtentOfSelectedObj();
-    string $voxelGridDisplayName = createVoxelGridDisplay($bbox[0], $bbox[1], $bbox[2], $bbox[3]);
+    string $ret[] = createVoxelGridDisplay();
+    string $voxelGridDisplayName = $ret[0];
+    float $scale[]  = { float($ret[1]), float($ret[2]), float($ret[3]) };
+    float $center[] = { float($ret[4]), float($ret[5]), float($ret[6]) };
+    if ($voxelGridDisplayName == "") {
+        warning("No mesh selected to voxelize.");
+        return;
+    }
 
     window -title "Voxelizer Menu" VoxelizerMenuWindow;
     formLayout VoxelizerMenuForm;
@@ -19,14 +25,14 @@ global proc VoxelizerMenu() {
     string $spacer = `separator -style "none"`;
 
     // Position controls
-    string $positionField = `floatFieldGrp -numberOfFields 3 -label "Position: " -value1 $bbox[0] -value2 $bbox[1] -value3 $bbox[2]
+    string $positionField = `floatFieldGrp -numberOfFields 3 -label "Position: " -value1 $center[0] -value2 $center[1] -value3 $center[2]
         -cc ("VoxelizerMenu_updatePosition(\"" + $voxelGridDisplayName + "\", #1, #2, #3)") 
         -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50
         - precision 2`;
 
     // Scale controls
-    string $scaleField = `floatFieldGrp -numberOfFields 1 -label "Scale: " -value1 $bbox[3]
-        -cc ("VoxelizerMenu_updateScale(\"" + $voxelGridDisplayName + "\", #1)") 
+    string $scaleField = `floatFieldGrp -numberOfFields 3 -label "Scale: " -value1 $scale[0] -value2 $scale[1] -value3 $scale[2]
+        -cc ("VoxelizerMenu_updateScale(\"" + $voxelGridDisplayName + "\", #1, #2, #3)") 
         -columnAlign 1 "left" -columnWidth 1 80 -columnWidth 2 50
         - precision 2`;
 
@@ -69,14 +75,16 @@ global proc VoxelizerMenu() {
 
     // Sync viewport changes to scale and translation with menu inputs
     scriptJob -attributeChange ($voxelGridDisplayName + ".translate") ("VoxelizerMenu_syncPosition(\"" + $voxelGridDisplayName + "\", \"" + $positionField + "\")");
-    scriptJob -attributeChange ($voxelGridDisplayName + ".scaleX") ("VoxelizerMenu_syncScale(\"" + $voxelGridDisplayName + "\", \"" + $scaleField + "\")");
+    scriptJob -attributeChange ($voxelGridDisplayName + ".scale") ("VoxelizerMenu_syncScale(\"" + $voxelGridDisplayName + "\", \"" + $scaleField + "\")");
 }
 
 global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $scaleField, string $subdivField, string $surfaceCheckbox, string $solidCheckbox, string $renderAsVoxelsCheckbox, string $clipTrianglesCheckbox) {
     float $posX = `floatFieldGrp -query -value1 $positionField`;
     float $posY = `floatFieldGrp -query -value2 $positionField`;
     float $posZ = `floatFieldGrp -query -value3 $positionField`;
-    float $scale = `floatFieldGrp -query -value1 $scaleField`;
+    float $scaleX = `floatFieldGrp -query -value1 $scaleField`;
+    float $scaleY = `floatFieldGrp -query -value2 $scaleField`;
+    float $scaleZ = `floatFieldGrp -query -value3 $scaleField`;
     int $voxelsPerEdge = `intSliderGrp -query -value $subdivField`;
     int $surface = `checkBox -query -value $surfaceCheckbox`;
     int $solid = `checkBox -query -value $solidCheckbox`;
@@ -92,7 +100,8 @@ global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $s
 
     // Construct the VoxelDestroyer command with the passed arguments
     string $command = "VoxelDestroyer -px " + $posX + " -py " + $posY + " -pz " + $posZ +
-                      " -s " + $scale + " -v " + $voxelsPerEdge + " -n \"" + $cubeName + "\"" + " -t " + $type + ";";
+                                    " -sx " + $scaleX + " -sy " + $scaleY + " -sz " + $scaleZ + 
+                                    " -v " + $voxelsPerEdge + " -n \"" + $cubeName + "\"" + " -t " + $type + ";";
 
     // Execute the command and handle errors
     if (catch(eval($command))) {
@@ -102,43 +111,24 @@ global proc VoxelizerMenu_run(string $cubeName, string $positionField, string $s
     }
 }
 
-global proc float[] getBoundingBoxCenterAndExtentOfSelectedObj() {
-    float $result[] = { 0, 0, 0, 1 };
-    
+global proc string[] createVoxelGridDisplay() {
     string $selection[] = `ls -selection`;
-    if (size($selection) > 0) {
-        // The bounding box of an object is not axis aligned if the object is rotated.
-        // To get the correct bounding box, we need to unrotate the object first, then restore it after.
-        float $originalRotation[] = `xform -q -ws -rotation $selection[0]`;
-        xform -ws -rotation 0 0 0 $selection[0];
-        float $bbox[] = `xform -q -ws -bb $selection[0]`;
-        xform -ws -rotation $originalRotation[0] $originalRotation[1] $originalRotation[2] $selection[0];
+    if (size($selection) <= 0) return {"", "1", "1", "1", "0", "0", "0"}; // No selection, return default values
 
-        float $bboxMin[] = { $bbox[0], $bbox[1], $bbox[2] };
-        float $bboxMax[] = { $bbox[3], $bbox[4], $bbox[5] };
+    // First get the bounding box of the selected object
+    // The bounding box of an object is axis aligned. We want to get the oriented bounding box, so unrotate the object,
+    // get the bounding box, then restore the rotation.
+    float $originalRotation[] = `xform -q -ws -rotation $selection[0]`;
+    xform -ws -rotation 0 0 0 $selection[0];
+    float $bbox[] = `xform -q -ws -bb $selection[0]`;
+    xform -ws -rotation $originalRotation[0] $originalRotation[1] $originalRotation[2] $selection[0];
+    float $scale[] = {$bbox[3] - $bbox[0], $bbox[4] - $bbox[1], $bbox[5] - $bbox[2]};
+    float $center[] = {(($bbox[3] + $bbox[0]) / 2.0), (($bbox[4] + $bbox[1]) / 2.0), (($bbox[5] + $bbox[2]) / 2.0)};
 
-        // Calculate the center of the bounding box
-        $result[0] = ($bboxMin[0] + $bboxMax[0]) / 2;
-        $result[1] = ($bboxMin[1] + $bboxMax[1]) / 2;
-        $result[2] = ($bboxMin[2] + $bboxMax[2]) / 2;
-
-        // Calculate the extents of the bounding box
-        float $extentX = abs($bboxMax[0] - $bboxMin[0]);
-        float $extentY = abs($bboxMax[1] - $bboxMin[1]);
-        float $extentZ = abs($bboxMax[2] - $bboxMin[2]);
-
-        $result[3] = Voxelizer_max(Voxelizer_max($extentX, $extentY), $extentZ);
-    }
-
-    return $result;
-}
-
-global proc string createVoxelGridDisplay(float $x, float $y, float $z, float $maxExtent) {
     // Create a polyCube and store its name
     string $voxelGridDisplay[] = `polyCube -n "VoxelGridDisplay" -w 1 -h 1 -d 1 -ch 1 -sx 2 -sy 2 -sz 2`;
     string $voxelGridDisplayName = $voxelGridDisplay[0];
-    scale $maxExtent $maxExtent $maxExtent $voxelGridDisplayName;
-    move $x $y $z $voxelGridDisplayName;
+    xform -ws -scale $scale[0] $scale[1] $scale[2] -translation $center[0] $center[1] $center[2] -rotation $originalRotation[0] $originalRotation[1] $originalRotation[2] $voxelGridDisplayName;
 
     // Hide the cube in the outliner
     setAttr ($voxelGridDisplayName + ".hiddenInOutliner") true;
@@ -147,11 +137,6 @@ global proc string createVoxelGridDisplay(float $x, float $y, float $z, float $m
     setAttr ($voxelGridDisplayName + ".overrideEnabled") true;
     setAttr ($voxelGridDisplayName + ".overrideShading") 0;
 
-    // Effectively lock Y and Z scaling and connect them to X to enforce uniform scaling
-    // Can't find a better way that allows Y and Z to continue to be moved
-    connectAttr ($voxelGridDisplayName + ".scaleX") ($voxelGridDisplayName + ".scaleY");
-    connectAttr ($voxelGridDisplayName + ".scaleX") ($voxelGridDisplayName + ".scaleZ");
-    
     // Lock all attributes except translation and scaling
     string $attributes[] = `listAttr -keyable -settable $voxelGridDisplayName`;
     for ($attr in $attributes) {
@@ -163,8 +148,13 @@ global proc string createVoxelGridDisplay(float $x, float $y, float $z, float $m
     // Lock the node to prevent deletion
     lockNode -lock true $voxelGridDisplayName;
 
-    // Return the name of the created voxel grid
-    return $voxelGridDisplayName;
+    // Return name + numeric values as strings: {name, sx, sy, sz, cx, cy, cz}
+    string $out[] = {
+        $voxelGridDisplayName,
+        ("" + $scale[0]), ("" + $scale[1]), ("" + $scale[2]),
+        ("" + $center[0]), ("" + $center[1]), ("" + $center[2])
+    };
+    return $out;
 }
 
 // Update position of the polyCube
@@ -179,10 +169,11 @@ global proc VoxelizerMenu_updatePosition(string $cubeName, float $x, float $y, f
 }
 
 // Update scale of the polyCube
-global proc VoxelizerMenu_updateScale(string $cubeName, float $scale) {
-    // Only need to scale X, as Y and Z are connected
+global proc VoxelizerMenu_updateScale(string $cubeName, float $scaleX, float $scaleY, float $scaleZ) {
     if (`objExists $cubeName`) {
-        setAttr ($cubeName + ".scaleX") $scale;
+        setAttr ($cubeName + ".scaleX") $scaleX;
+        setAttr ($cubeName + ".scaleY") $scaleY;
+        setAttr ($cubeName + ".scaleZ") $scaleZ;
     } else {
         warning("Voxel grid display does not exist.");
     }
@@ -233,8 +224,10 @@ global proc VoxelizerMenu_syncPosition(string $cubeName, string $positionField) 
 // Sync scale changes to the UI
 global proc VoxelizerMenu_syncScale(string $cubeName, string $scaleField) {
     if (`objExists $cubeName`) {
-        float $scale = `getAttr ($cubeName + ".scaleX")`;
-        floatFieldGrp -edit -value1 $scale $scaleField;
+        float $scaleX = `getAttr ($cubeName + ".scaleX")`;
+        float $scaleY = `getAttr ($cubeName + ".scaleY")`;
+        float $scaleZ = `getAttr ($cubeName + ".scaleZ")`;
+        floatFieldGrp -edit -value1 $scaleX -value2 $scaleY -value3 $scaleZ $scaleField;
     }
 }
 
