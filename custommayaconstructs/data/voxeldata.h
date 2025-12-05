@@ -41,9 +41,9 @@ public:
         }
 
         // Voxelization Grid
-        out.write(reinterpret_cast<const char*>(&voxelizationGrid.gridEdgeLength), sizeof(voxelizationGrid.gridEdgeLength));
-        out.write(reinterpret_cast<const char*>(&voxelizationGrid.voxelsPerEdge), sizeof(voxelizationGrid.voxelsPerEdge));
-        out.write(reinterpret_cast<const char*>(&voxelizationGrid.gridCenter), sizeof(voxelizationGrid.gridCenter));
+        // out.write(reinterpret_cast<const char*>(&voxelizationGrid.voxelSize), sizeof(voxelizationGrid.voxelSize));
+        // out.write(reinterpret_cast<const char*>(&voxelizationGrid.voxelsPerEdge), sizeof(voxelizationGrid.voxelsPerEdge));
+        // out.write(reinterpret_cast<const char*>(&voxelizationGrid.gridCenter), sizeof(voxelizationGrid.gridCenter));
 
         return MS::kSuccess;
     }
@@ -69,9 +69,9 @@ public:
         }
 
         // Voxelization Grid
-        in.read(reinterpret_cast<char*>(&voxelizationGrid.gridEdgeLength), sizeof(voxelizationGrid.gridEdgeLength));
-        in.read(reinterpret_cast<char*>(&voxelizationGrid.voxelsPerEdge), sizeof(voxelizationGrid.voxelsPerEdge));
-        in.read(reinterpret_cast<char*>(&voxelizationGrid.gridCenter), sizeof(voxelizationGrid.gridCenter));
+        // in.read(reinterpret_cast<char*>(&voxelizationGrid.gridEdgeLength), sizeof(voxelizationGrid.gridEdgeLength));
+        // in.read(reinterpret_cast<char*>(&voxelizationGrid.voxelsPerEdge), sizeof(voxelizationGrid.voxelsPerEdge));
+        // in.read(reinterpret_cast<char*>(&voxelizationGrid.gridCenter), sizeof(voxelizationGrid.gridCenter));
 
         return MS::kSuccess;
     }
