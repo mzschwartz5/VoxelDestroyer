@@ -54,6 +54,7 @@ struct VoxelizationGrid {
     double voxelSize;
     std::array<int, 3> voxelsPerEdge;
     MPoint gridCenter;
+    MVector gridRotation;
 };
 
 struct VoxelDimensions {
