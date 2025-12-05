@@ -1,7 +1,14 @@
 // Create a named instance of the voxel paint context command to reuse so it retains user settings
 global string $voxelPaintContext;
+global int $VOXEL_SUBDIV_SOFTMAX = 32;
+global int $VOXEL_SUBDIV_HARDMAX = 64;
+global int $VOXEL_SUBDIV_MIN = 2;
 
 global proc VoxelizerMenu() {
+    global int $VOXEL_SUBDIV_SOFTMAX;
+    global int $VOXEL_SUBDIV_HARDMAX;
+    global int $VOXEL_SUBDIV_MIN;
+
     if (`window -exists VoxelizerMenuWindow`) {
         deleteUI VoxelizerMenuWindow;
     }
@@ -15,6 +22,9 @@ global proc VoxelizerMenu() {
 
     float $initialValues[] = getInitialVoxelGridValues($selectedMeshName);
     string $voxelGridDisplayName = createVoxelGridDisplay($selectedMeshName, $initialValues);
+    float $voxelMinSizeSoft = max($initialValues[0], max($initialValues[1], $initialValues[2])) / $VOXEL_SUBDIV_SOFTMAX;
+    float $voxelMinSizeHard = max($initialValues[0], max($initialValues[1], $initialValues[2])) / $VOXEL_SUBDIV_HARDMAX;
+    float $voxelMaxSizeSoft = min($initialValues[0], min($initialValues[1], $initialValues[2])) / $VOXEL_SUBDIV_MIN;
 
     window -title "Voxelizer Menu" VoxelizerMenuWindow;
     formLayout VoxelizerMenuForm;
@@ -31,22 +41,23 @@ global proc VoxelizerMenu() {
 
     string $gridPropsTitle = `text -label "Voxel Grid:" -align "left" -font "boldLabelFont"`;
 
-    string $voxelSizeField = `floatSliderGrp -label "Voxel Size: " -value $initialValues[6] -field true -minValue 0.1 -maxValue 10.0 -fieldMinValue 0.01 -fieldMaxValue 100.0
+    string $voxelSizeField = `floatSliderGrp -label "Voxel Size: " -value $initialValues[6] -field true -minValue $voxelMinSizeSoft -fieldMinValue $voxelMinSizeHard -maxValue $voxelMaxSizeSoft -fieldMaxValue 1e6
+        -pre 4 -step 0.0001
         -columnAlign 1 "left" -columnWidth 1 55 -columnWidth 2 50
         -cc ("VoxelizerMenu_updateVoxelSize(\"" + $voxelGridDisplayName + "\", #1, `checkBox -query -value \"" + $constrainCheckbox + "\"`)")
         VoxelSizeField`;
 
-    string $subdivWidthField = `intSliderGrp -label "Width: " -value $initialValues[7] -field true -minValue 2 -maxValue 32 -fieldMinValue 2 -fieldMaxValue 64
+    string $subdivWidthField = `intSliderGrp -label "Width: " -value $initialValues[7] -field true -minValue $VOXEL_SUBDIV_MIN -maxValue $VOXEL_SUBDIV_SOFTMAX -fieldMinValue $VOXEL_SUBDIV_MIN -fieldMaxValue $VOXEL_SUBDIV_HARDMAX
         -cc ("VoxelizerMenu_updateSubdivisions(\"" + $voxelGridDisplayName + "\", #1, 0, `checkBox -query -value \"" + $constrainCheckbox + "\"`)") 
         -columnAlign 1 "left" -columnWidth 1 55 -columnWidth 2 50
         SubdivWidthField`;
 
-    string $subdivHeightField = `intSliderGrp -label "Height: " -value $initialValues[8] -field true -minValue 2 -maxValue 32 -fieldMinValue 2 -fieldMaxValue 64
+    string $subdivHeightField = `intSliderGrp -label "Height: " -value $initialValues[8] -field true -minValue $VOXEL_SUBDIV_MIN -maxValue $VOXEL_SUBDIV_SOFTMAX -fieldMinValue $VOXEL_SUBDIV_MIN -fieldMaxValue $VOXEL_SUBDIV_HARDMAX
         -cc ("VoxelizerMenu_updateSubdivisions(\"" + $voxelGridDisplayName + "\", #1, 1, `checkBox -query -value \"" + $constrainCheckbox + "\"`)") 
         -columnAlign 1 "left" -columnWidth 1 55 -columnWidth 2 50
         SubdivHeightField`;
 
-    string $subdivDepthField = `intSliderGrp -label "Depth: " -value $initialValues[9] -field true -minValue 2 -maxValue 32 -fieldMinValue 2 -fieldMaxValue 64
+    string $subdivDepthField = `intSliderGrp -label "Depth: " -value $initialValues[9] -field true -minValue $VOXEL_SUBDIV_MIN -maxValue $VOXEL_SUBDIV_SOFTMAX -fieldMinValue $VOXEL_SUBDIV_MIN -fieldMaxValue $VOXEL_SUBDIV_HARDMAX
         -cc ("VoxelizerMenu_updateSubdivisions(\"" + $voxelGridDisplayName + "\", #1, 2, `checkBox -query -value \"" + $constrainCheckbox + "\"`)") 
         -columnAlign 1 "left" -columnWidth 1 55 -columnWidth 2 50
         SubdivDepthField`;
@@ -183,6 +194,7 @@ global proc string createVoxelGridDisplay(string $selectedMeshName, float $initi
 
 // Update subdivisions of the polyCube
 global proc VoxelizerMenu_updateSubdivisions(string $cubeName, int $subdivs, int $axis, int $constrain) {
+    global int $VOXEL_SUBDIV_HARDMAX;
     string $history[] = `listHistory $cubeName`;
     string $polyCubeNode[] = `ls -type "polyCube" $history`; // Ensure this is treated as an array
     if (size($polyCubeNode) <= 0) return;
@@ -200,11 +212,16 @@ global proc VoxelizerMenu_updateSubdivisions(string $cubeName, int $subdivs, int
 
     if ($constrain) {
         // If the user wants to keep the extents (more or less) constant, the voxels per edge must change 
-        // to accommodate the new subdivision count on the specified axis.
+        // to accommodate the new subdivision count on the specified axis. But make sure the voxel size does not go below the minimum.
+        float $maxExtent = max($cubeExtents[0], max($cubeExtents[1], $cubeExtents[2]));
+        float $voxelMinSizeHard = $maxExtent / $VOXEL_SUBDIV_HARDMAX;
         float $newVoxelSize = $cubeExtents[$axis] / $subdivs;
-        $voxelsPerEdge[0] = ceil(($cubeExtents[0] / $newVoxelSize) - $eps);
-        $voxelsPerEdge[1] = ceil(($cubeExtents[1] / $newVoxelSize) - $eps);
-        $voxelsPerEdge[2] = ceil(($cubeExtents[2] / $newVoxelSize) - $eps);
+        if ($newVoxelSize < $voxelMinSizeHard) {
+            $newVoxelSize = $voxelMinSizeHard;
+        }
+        $voxelsPerEdge[0] = floor(($cubeExtents[0] / $newVoxelSize) + $eps);
+        $voxelsPerEdge[1] = floor(($cubeExtents[1] / $newVoxelSize) + $eps);
+        $voxelsPerEdge[2] = floor(($cubeExtents[2] / $newVoxelSize) + $eps);
         floatSliderGrp -e -value ($newVoxelSize) VoxelSizeField;
     } else {
         float $voxelSize = $cubeExtents[$axis] / $voxelsPerEdge[$axis];
@@ -221,6 +238,7 @@ global proc VoxelizerMenu_updateSubdivisions(string $cubeName, int $subdivs, int
 }
 
 global proc VoxelizerMenu_updateVoxelSize(string $cubeName, float $voxelSize, int $constrain) {
+    global int $VOXEL_SUBDIV_MIN;
     string $history[] = `listHistory $cubeName`;
     string $polyCubeNode[] = `ls -type "polyCube" $history`; // Ensure this is treated as an array
     if (size($polyCubeNode) <= 0) return;
@@ -237,7 +255,13 @@ global proc VoxelizerMenu_updateVoxelSize(string $cubeName, float $voxelSize, in
     int $voxelsPerEdge[3] = {$sx, $sy, $sz};
     if ($constrain) {
         // If the user wants to keep the extents (more or less) constant, the voxels per edge must change 
-        // to accommodate the new voxel size.
+        // to accommodate the new voxel size. But make sure the smallest side has at least the minimum subdivisions. (in the case the user types in a value above the slider soft max)
+        float $minExtent = min($cubeExtents[0], min($cubeExtents[1], $cubeExtents[2]));
+        float $voxelMaxSizeSoft = $minExtent / $VOXEL_SUBDIV_MIN;
+        if ($voxelSize > $voxelMaxSizeSoft) {
+            $voxelSize = $voxelMaxSizeSoft;
+            floatSliderGrp -e -value ($voxelSize) VoxelSizeField;
+        }
         $voxelsPerEdge[0] = ceil(($cubeExtents[0] / $voxelSize) - $eps);
         $voxelsPerEdge[1] = ceil(($cubeExtents[1] / $voxelSize) - $eps);
         $voxelsPerEdge[2] = ceil(($cubeExtents[2] / $voxelSize) - $eps);
