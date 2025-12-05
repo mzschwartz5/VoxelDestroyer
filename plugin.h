@@ -30,6 +30,7 @@ using namespace MHWRender;
 
 struct PluginArgs {
 	MPoint position{ 0.0f, 0.0f, 0.0f };
+	MVector rotation{ 0.0f, 0.0f, 0.0f };
 	double voxelSize{ 1.0 };
 	std::array<int, 3> voxelsPerEdge{ 2, 2, 2 };
 	MString selectedMeshName;

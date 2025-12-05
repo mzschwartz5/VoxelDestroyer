@@ -49,6 +49,9 @@ MSyntax plugin::syntax()
 	syntax.addFlag("-px", "-positionX", MSyntax::kDouble);
 	syntax.addFlag("-py", "-positionY", MSyntax::kDouble);
 	syntax.addFlag("-pz", "-positionZ", MSyntax::kDouble);
+	syntax.addFlag("-rx", "-rotationX", MSyntax::kDouble);
+	syntax.addFlag("-ry", "-rotationY", MSyntax::kDouble);
+	syntax.addFlag("-rz", "-rotationZ", MSyntax::kDouble);
 	syntax.addFlag("-vsz", "-voxelSize", MSyntax::kDouble);
 	syntax.addFlag("-vx", "-numVoxelsX", MSyntax::kLong);
 	syntax.addFlag("-vy", "-numVoxelsY", MSyntax::kLong);
@@ -75,7 +78,8 @@ MStatus plugin::doIt(const MArgList& argList)
 	const VoxelizationGrid voxelizationGrid {
 		pluginArgs.voxelSize * 1.02, // To avoid precision / cut off issues, scale up the voxelization grid very slightly.
 		pluginArgs.voxelsPerEdge,
-		pluginArgs.position
+		pluginArgs.position,
+		pluginArgs.rotation
 	};
 
 	MDagPath voxelizedMeshDagPath;
@@ -106,71 +110,59 @@ PluginArgs plugin::parsePluginArgs(const MArgList& args) {
 	PluginArgs pluginArgs;
 	MStatus status;
 	MArgDatabase argData(syntax(), args, &status);
-
-	if (argData.isFlagSet("-n")) {
-		status = argData.getFlagArgument("-n", 0, pluginArgs.selectedMeshName);
-		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to get selected mesh name: " + status.errorString());
-		}
-	}
-
 	if (status != MS::kSuccess) {
 		MGlobal::displayError("Failed to parse arguments: " + status.errorString());
 		return pluginArgs;
+	}
+
+	if (argData.isFlagSet("-n")) {
+		status = argData.getFlagArgument("-n", 0, pluginArgs.selectedMeshName);
 	}
 	
 	// Voxel grid center position
 	if (argData.isFlagSet("-px")) {
 		status = argData.getFlagArgument("-px", 0, pluginArgs.position.x);
-		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to get position X: " + status.errorString());
-		}
 	}
+
 	if (argData.isFlagSet("-py")) {
 		status = argData.getFlagArgument("-py", 0, pluginArgs.position.y);
-		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to get position Y: " + status.errorString());
-		}
 	}
+
 	if (argData.isFlagSet("-pz")) {
 		status = argData.getFlagArgument("-pz", 0, pluginArgs.position.z);
-		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to get position Z: " + status.errorString());
-		}
+	}
+
+	if (argData.isFlagSet("-rx")) {
+		status = argData.getFlagArgument("-rx", 0, pluginArgs.rotation.x);
+	}
+
+	if (argData.isFlagSet("-ry")) {
+		status = argData.getFlagArgument("-ry", 0, pluginArgs.rotation.y);
+	}
+
+	if (argData.isFlagSet("-rz")) {
+		status = argData.getFlagArgument("-rz", 0, pluginArgs.rotation.z);
 	}
 
 	if (argData.isFlagSet("-vsz")) {
 		status = argData.getFlagArgument("-vsz", 0, pluginArgs.voxelSize);
-		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to get scale X: " + status.errorString());
-		}
 	}
 	
 	if (argData.isFlagSet("-vx")) {
 		status = argData.getFlagArgument("-vx", 0, pluginArgs.voxelsPerEdge[0]);
-		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to get voxels per edge X: " + status.errorString());
-		}
 	}
+
 	if (argData.isFlagSet("-vy")) {
 		status = argData.getFlagArgument("-vy", 0, pluginArgs.voxelsPerEdge[1]);
-		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to get voxels per edge Y: " + status.errorString());
-		}
 	}
+
 	if (argData.isFlagSet("-vz")) {
 		status = argData.getFlagArgument("-vz", 0, pluginArgs.voxelsPerEdge[2]);
-		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to get voxels per edge Z: " + status.errorString());
-		}
 	}
 
 	if (argData.isFlagSet("-t")) {
 		int type;
 		status = argData.getFlagArgument("-t", 0, type);
-		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to get type: " + status.errorString());
-		}
 
 		pluginArgs.voxelizeSurface = (type & 0x1) != 0;
 		pluginArgs.voxelizeInterior = (type & 0x2) != 0;

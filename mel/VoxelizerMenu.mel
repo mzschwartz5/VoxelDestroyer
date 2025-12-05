@@ -114,6 +114,9 @@ global proc VoxelizerMenu_run(
     float $posX = `getAttr ($cubeName + ".translateX")`;
     float $posY = `getAttr ($cubeName + ".translateY")`;
     float $posZ = `getAttr ($cubeName + ".translateZ")`;
+    float $rotX = `getAttr ($cubeName + ".rotateX")`;
+    float $rotY = `getAttr ($cubeName + ".rotateY")`;
+    float $rotZ = `getAttr ($cubeName + ".rotateZ")`;
 
     int $voxelsPerEdgeX = `intSliderGrp -query -value SubdivWidthField`;
     int $voxelsPerEdgeY = `intSliderGrp -query -value SubdivHeightField`;
@@ -126,9 +129,10 @@ global proc VoxelizerMenu_run(
     int $type = $surface + ($solid * 2) + ($renderAsVoxels * 4) + ($clipTriangles * 8); // Convert checkboxes to a single integer
 
     // Construct the VoxelDestroyer command with the passed arguments
-    string $command = "VoxelDestroyer -px " + $posX + " -py " + $posY + " -pz " + $posZ + " -vsz " + $voxelSize +
+    string $command = "VoxelDestroyer -px " + $posX + " -py " + $posY + " -pz " + $posZ + 
+                                    " -rx " + $rotX + " -ry " + $rotY + " -rz " + $rotZ + 
                                     " -vx " + $voxelsPerEdgeX + " -vy " + $voxelsPerEdgeY + " -vz " + $voxelsPerEdgeZ + 
-                                    " -n \"" + $selectedMeshName + "\"" + " -t " + $type + ";";
+                                    " -vsz " + $voxelSize + " -n \"" + $selectedMeshName + "\"" + " -t " + $type + ";";
 
     // Execute the command and handle errors
     if (catch(eval($command))) {
