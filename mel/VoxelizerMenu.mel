@@ -22,9 +22,13 @@ global proc VoxelizerMenu() {
 
     float $initialValues[] = getInitialVoxelGridValues($selectedMeshName);
     string $voxelGridDisplayName = createVoxelGridDisplay($selectedMeshName, $initialValues);
-    float $voxelMinSizeSoft = max($initialValues[0], max($initialValues[1], $initialValues[2])) / $VOXEL_SUBDIV_SOFTMAX;
-    float $voxelMinSizeHard = max($initialValues[0], max($initialValues[1], $initialValues[2])) / $VOXEL_SUBDIV_HARDMAX;
-    float $voxelMaxSizeSoft = min($initialValues[0], min($initialValues[1], $initialValues[2])) / $VOXEL_SUBDIV_MIN;
+    float $gridDisplayExtents[];
+    $gridDisplayExtents[0] = `polyCube -q -w $voxelGridDisplayName`;
+    $gridDisplayExtents[1] = `polyCube -q -h $voxelGridDisplayName`;
+    $gridDisplayExtents[2] = `polyCube -q -d $voxelGridDisplayName`;
+    float $voxelMinSizeSoft = max($gridDisplayExtents[0], max($gridDisplayExtents[1], $gridDisplayExtents[2])) / $VOXEL_SUBDIV_SOFTMAX;
+    float $voxelMinSizeHard = max($gridDisplayExtents[0], max($gridDisplayExtents[1], $gridDisplayExtents[2])) / $VOXEL_SUBDIV_HARDMAX;
+    float $voxelMaxSizeSoft = min($gridDisplayExtents[0], min($gridDisplayExtents[1], $gridDisplayExtents[2])) / $VOXEL_SUBDIV_MIN;
 
     window -title "Voxelizer Menu" VoxelizerMenuWindow;
     formLayout VoxelizerMenuForm;
