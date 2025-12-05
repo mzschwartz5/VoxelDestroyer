@@ -16,6 +16,7 @@
 #include <maya/MItDag.h>
 #include "utils.h"
 #include <vector>
+#include <array>
 #include "voxelizer.h"
 #include "directx/directx.h"
 #include "constants.h"
@@ -29,8 +30,8 @@ using namespace MHWRender;
 
 struct PluginArgs {
 	MPoint position{ 0.0f, 0.0f, 0.0f };
-	MVector scale{ 1.0f, 1.0f, 1.0f };
-	int voxelsPerEdge{ 10 };
+	double voxelSize{ 1.0 };
+	std::array<int, 3> voxelsPerEdge{ 2, 2, 2 };
 	MString selectedMeshName;
 	bool voxelizeSurface{ false };
 	bool voxelizeInterior{ false };

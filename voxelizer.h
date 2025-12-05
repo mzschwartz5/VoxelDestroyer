@@ -51,8 +51,8 @@ struct Triangle {
 };
 
 struct VoxelizationGrid {
-    double gridEdgeLength;
-    int voxelsPerEdge;
+    double voxelSize;
+    std::array<int, 3> voxelsPerEdge;
     MPoint gridCenter;
 };
 

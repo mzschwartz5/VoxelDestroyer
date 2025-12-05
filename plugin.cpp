@@ -49,10 +49,10 @@ MSyntax plugin::syntax()
 	syntax.addFlag("-px", "-positionX", MSyntax::kDouble);
 	syntax.addFlag("-py", "-positionY", MSyntax::kDouble);
 	syntax.addFlag("-pz", "-positionZ", MSyntax::kDouble);
-	syntax.addFlag("-sx", "-scaleX", MSyntax::kDouble);
-	syntax.addFlag("-sy", "-scaleY", MSyntax::kDouble);
-	syntax.addFlag("-sz", "-scaleZ", MSyntax::kDouble);
-	syntax.addFlag("-v", "-voxelsPerEdge", MSyntax::kLong);
+	syntax.addFlag("-vsz", "-voxelSize", MSyntax::kDouble);
+	syntax.addFlag("-vx", "-numVoxelsX", MSyntax::kLong);
+	syntax.addFlag("-vy", "-numVoxelsY", MSyntax::kLong);
+	syntax.addFlag("-vz", "-numVoxelsZ", MSyntax::kLong);
 	syntax.addFlag("-t", "-type", MSyntax::kLong);
 	return syntax;
 }
@@ -73,7 +73,7 @@ MStatus plugin::doIt(const MArgList& argList)
 
 	// Progress window message updates done within the voxelizer (for finer-grained control)
 	const VoxelizationGrid voxelizationGrid {
-		pluginArgs.scale.x * 1.02, // To avoid precision / cut off issues, scale up the voxelization grid very slightly.
+		pluginArgs.voxelSize * 1.02, // To avoid precision / cut off issues, scale up the voxelization grid very slightly.
 		pluginArgs.voxelsPerEdge,
 		pluginArgs.position
 	};
@@ -139,31 +139,29 @@ PluginArgs plugin::parsePluginArgs(const MArgList& args) {
 		}
 	}
 
-	// Voxel grid edge length (scale)
-	if (argData.isFlagSet("-sx")) {
-		status = argData.getFlagArgument("-sx", 0, pluginArgs.scale.x);
+	if (argData.isFlagSet("-vsz")) {
+		status = argData.getFlagArgument("-vsz", 0, pluginArgs.voxelSize);
 		if (status != MS::kSuccess) {
 			MGlobal::displayError("Failed to get scale X: " + status.errorString());
 		}
 	}
-	if (argData.isFlagSet("-sy")) {
-		status = argData.getFlagArgument("-sy", 0, pluginArgs.scale.y);
-		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to get scale Y: " + status.errorString());
-		}
-	}
-	if (argData.isFlagSet("-sz")) {
-		status = argData.getFlagArgument("-sz", 0, pluginArgs.scale.z);
-		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to get scale Z: " + status.errorString());
-		}
-	}
 	
-	// Number of voxels per edge
-	if (argData.isFlagSet("-v")) {
-		status = argData.getFlagArgument("-v", 0, pluginArgs.voxelsPerEdge);
+	if (argData.isFlagSet("-vx")) {
+		status = argData.getFlagArgument("-vx", 0, pluginArgs.voxelsPerEdge[0]);
 		if (status != MS::kSuccess) {
-			MGlobal::displayError("Failed to get voxels per edge: " + status.errorString());
+			MGlobal::displayError("Failed to get voxels per edge X: " + status.errorString());
+		}
+	}
+	if (argData.isFlagSet("-vy")) {
+		status = argData.getFlagArgument("-vy", 0, pluginArgs.voxelsPerEdge[1]);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get voxels per edge Y: " + status.errorString());
+		}
+	}
+	if (argData.isFlagSet("-vz")) {
+		status = argData.getFlagArgument("-vz", 0, pluginArgs.voxelsPerEdge[2]);
+		if (status != MS::kSuccess) {
+			MGlobal::displayError("Failed to get voxels per edge Z: " + status.errorString());
 		}
 	}
 

@@ -26,8 +26,8 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     MString newMeshName = originalMeshName + "_voxelized";
 
     Voxels voxels;
-    voxels.voxelSize = grid.gridEdgeLength / grid.voxelsPerEdge;
-    voxels.resize(grid.voxelsPerEdge * grid.voxelsPerEdge * grid.voxelsPerEdge);
+    voxels.voxelSize = grid.voxelSize;
+    voxels.resize(grid.voxelsPerEdge[0] * grid.voxelsPerEdge[1] * grid.voxelsPerEdge[2]);
     MThreadPool::init();
     
     // Freeze transformations on the original mesh before any processing
@@ -175,8 +175,9 @@ void Voxelizer::getSurfaceVoxels(
     MProgressWindow::setProgressRange(0, static_cast<int>(triangles.size()));
     MProgressWindow::setProgress(0);
 
-    double voxelSize = grid.gridEdgeLength / grid.voxelsPerEdge;
-    MPoint gridMin = grid.gridCenter - MVector(grid.gridEdgeLength / 2, grid.gridEdgeLength / 2, grid.gridEdgeLength / 2);
+    double voxelSize = grid.voxelSize;
+    const std::array<int, 3>& voxelsPerEdge = grid.voxelsPerEdge;
+    MPoint gridMin = grid.gridCenter - ((voxelSize / 2) * MVector(voxelsPerEdge[0], voxelsPerEdge[1], voxelsPerEdge[2]));
 
     int triIdx = 0;
     for (const Triangle& tri : triangles) {
@@ -187,15 +188,15 @@ void Voxelizer::getSurfaceVoxels(
         );
 
         MPoint voxelMax = MPoint(
-            std::min(grid.voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().x - gridMin.x) / voxelSize))),
-            std::min(grid.voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().y - gridMin.y) / voxelSize))),
-            std::min(grid.voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().z - gridMin.z) / voxelSize)))
+            std::min(voxelsPerEdge[0] - 1, static_cast<int>(std::floor((tri.boundingBox.max().x - gridMin.x) / voxelSize))),
+            std::min(voxelsPerEdge[1] - 1, static_cast<int>(std::floor((tri.boundingBox.max().y - gridMin.y) / voxelSize))),
+            std::min(voxelsPerEdge[2] - 1, static_cast<int>(std::floor((tri.boundingBox.max().z - gridMin.z) / voxelSize)))
         );
 
         for (int x = static_cast<int>(voxelMin.x); x <= voxelMax.x; ++x) {
             for (int y = static_cast<int>(voxelMin.y); y <= voxelMax.y; ++y) {
                 for (int z = static_cast<int>(voxelMin.z); z <= voxelMax.z; ++z) {
-                    int index = x * grid.voxelsPerEdge * grid.voxelsPerEdge + y * grid.voxelsPerEdge + z;
+                    int index = x * voxelsPerEdge[1] * voxelsPerEdge[2] + y * voxelsPerEdge[2] + z;
 
                     MVector voxelMinCorner(MVector(x, y, z) * voxelSize + gridMin);
                     if (!doesTriangleOverlapVoxel(tri, voxelMinCorner)) continue;
@@ -259,8 +260,9 @@ void Voxelizer::getInteriorVoxels(
     MProgressWindow::setProgressRange(0, static_cast<int>(triangles.size()));
     MProgressWindow::setProgress(0);
 
-    double voxelSize = grid.gridEdgeLength / grid.voxelsPerEdge;
-    MPoint gridMin = grid.gridCenter - MVector(grid.gridEdgeLength / 2, grid.gridEdgeLength / 2, grid.gridEdgeLength / 2);
+    double voxelSize = grid.voxelSize;
+    const std::array<int, 3>& voxelsPerEdge = grid.voxelsPerEdge;
+    MPoint gridMin = grid.gridCenter - ((voxelSize / 2) * MVector(voxelsPerEdge[0], voxelsPerEdge[1], voxelsPerEdge[2]));
 
     int progressCounter = 0;
     for (const Triangle& tri : triangles) {
@@ -274,8 +276,8 @@ void Voxelizer::getInteriorVoxels(
 
         MPoint voxelMax = MPoint(
             0,
-            std::min(grid.voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().y - (voxelSize / 2.0) - gridMin.y) / voxelSize))),
-            std::min(grid.voxelsPerEdge - 1, static_cast<int>(std::floor((tri.boundingBox.max().z - (voxelSize / 2.0) - gridMin.z) / voxelSize)))
+            std::min(voxelsPerEdge[1] - 1, static_cast<int>(std::floor((tri.boundingBox.max().y - (voxelSize / 2.0) - gridMin.y) / voxelSize))),
+            std::min(voxelsPerEdge[2] - 1, static_cast<int>(std::floor((tri.boundingBox.max().z - (voxelSize / 2.0) - gridMin.z) / voxelSize)))
         );
 
         for (int y = static_cast<int>(voxelMin.y); y <= voxelMax.y; ++y) {
@@ -291,8 +293,8 @@ void Voxelizer::getInteriorVoxels(
                 int xVoxelMin = std::max(0, static_cast<int>(std::ceil((xIntercept - (voxelSize / 2.0) - gridMin.x) / voxelSize)));
 
                 // Now iterate over all voxels in the column (in +x) and flip their occupancy state
-                for (int x = xVoxelMin; x < grid.voxelsPerEdge; ++x) {
-                    int index = x * grid.voxelsPerEdge * grid.voxelsPerEdge + y * grid.voxelsPerEdge + z;
+                for (int x = xVoxelMin; x < voxelsPerEdge[0]; ++x) {
+                    int index = x * voxelsPerEdge[1] * voxelsPerEdge[2] + y * voxelsPerEdge[2] + z;
                     voxels.occupied[index] = !voxels.occupied[index];
                 }
             }
@@ -349,16 +351,17 @@ void Voxelizer::createVoxels(
     Voxels& overlappedVoxels,
     const VoxelizationGrid& grid
 ) {
-    double voxelSize = grid.gridEdgeLength / grid.voxelsPerEdge;
-    MPoint gridMin = grid.gridCenter - MVector(grid.gridEdgeLength / 2, grid.gridEdgeLength / 2, grid.gridEdgeLength / 2);
+    double voxelSize = grid.voxelSize;
+    const std::array<int, 3>& voxelsPerEdge = grid.voxelsPerEdge;
+    MPoint gridMin = grid.gridCenter - ((voxelSize / 2) * MVector(voxelsPerEdge[0], voxelsPerEdge[1], voxelsPerEdge[2]));
 
-    MProgressWindow::setProgressRange(0, grid.voxelsPerEdge * grid.voxelsPerEdge * grid.voxelsPerEdge);
+    MProgressWindow::setProgressRange(0, voxelsPerEdge[0] * voxelsPerEdge[1] * voxelsPerEdge[2]);
     MProgressWindow::setProgress(0);
 
-    for (int x = 0; x < grid.voxelsPerEdge; ++x) {
-        for (int y = 0; y < grid.voxelsPerEdge; ++y) {
-            for (int z = 0; z < grid.voxelsPerEdge; ++z) {
-                int index = x * grid.voxelsPerEdge * grid.voxelsPerEdge + y * grid.voxelsPerEdge + z;
+    for (int x = 0; x < voxelsPerEdge[0]; ++x) {
+        for (int y = 0; y < voxelsPerEdge[1]; ++y) {
+            for (int z = 0; z < voxelsPerEdge[2]; ++z) {
+                int index = x * voxelsPerEdge[1] * voxelsPerEdge[2] + y * voxelsPerEdge[2] + z;
                 if (index % 100 == 0) MProgressWindow::advanceProgress(100);
                 if (!overlappedVoxels.occupied[index]) continue;
                 
