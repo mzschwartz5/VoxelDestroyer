@@ -360,6 +360,6 @@ global proc VoxelizerMenu_addToShelf() {
 
 global proc VoxelizerMenu_removeFromShelf() {
     if (`shelfLayout -exists "VoxelDestroyer"`) {
-        deleteUI -control "VoxelDestroyer";
+        deleteShelfTabNoPrompt("VoxelDestroyer");
     }
 }
