@@ -363,6 +363,8 @@ EXPORT MStatus initializePlugin(MObject obj)
 	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL2);
 	// AETemplates
 	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL3);
+	// deleteShelfTabNoPrompt
+	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL6);
 
 	// Unlike other MEL scripts, these two can't be loaded into memory, but have to be copied (into the user scripts directory)
 	// Maya specifically looks for these files by name when setting up a tool's property sheet.
