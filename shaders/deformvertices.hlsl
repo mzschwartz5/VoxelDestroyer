@@ -12,7 +12,8 @@ RWBuffer<float> outVertNormals : register(u1);
 
 cbuffer DeformConstants : register(b0)
 {
-    float4x4 inverseWorldMatrix;
+    // The rest frame of each voxel may be rotated if the voxel grid is rotated. We need to account for that in the deformation.
+    float4x4 gridRotationInverse;
     uint vertexCount;
     uint padding0;
     uint padding1;
@@ -69,19 +70,11 @@ void main(uint3 gId : SV_DispatchThreadID)
     float3 e1 = (v2 - v0) * voxelRestLengthInv;
     float3 e2 = (v4 - v0) * voxelRestLengthInv;
 
-    // Particles and related quantities are in world space (necessary since collisions between different models' voxels are computed)
-    // Convert particles and related quantities to model space for deformation
-    float3x3 inverseWorldMatrix3x3 = (float3x3)inverseWorldMatrix;
-    e0 = mul(inverseWorldMatrix3x3, e0);
-    e1 = mul(inverseWorldMatrix3x3, e1);
-    e2 = mul(inverseWorldMatrix3x3, e2);
-
     // Deform position
-    float3 restPosition = originalVertPositions[gId.x] - mul(inverseWorldMatrix3x3, v0_orig.xyz);
-    restPosition = mul(inverseWorldMatrix3x3, v0) + restPosition.x * e0
-                                                  + restPosition.y * e1
-                                                  + restPosition.z * e2;
-
+    float3 restPosition = mul((float3x3)gridRotationInverse, originalVertPositions[gId.x] - v0_orig.xyz);
+    restPosition = v0 + restPosition.x * e0
+                      + restPosition.y * e1
+                      + restPosition.z * e2;
     uint outOffset = gId.x * 3;
     outVertPositions[outOffset + 0] = restPosition.x;
     outVertPositions[outOffset + 1] = restPosition.y;

@@ -172,12 +172,13 @@ public:
         Utils::PluginData<ParticleData> particleData(thisMObject(), aParticleData);
         Utils::PluginData<D3D11Data> particleSRVData(thisMObject(), aParticleSRV);
         const ParticleDataContainer& particleDataContainer = particleData.get()->getData();
-        const MDagPath originalGeomPath = pathToOriginalGeometry();
+        Utils::PluginData<VoxelData> voxelData(thisMObject(), aVoxelData);
+        const VoxelizationGrid& voxelGrid = voxelData.get()->getVoxelizationGrid();
 
         deformVerticesCompute = DeformVerticesCompute(
             particleDataContainer.numParticles,
             numVertices,
-            originalGeomPath.inclusiveMatrix().inverse(),
+            voxelGrid.gridTransform.asRotateMatrix().inverse(),
             *particleDataContainer.particlePositionsCPU,
             vertexVoxelIds,
             positionsUAV,
