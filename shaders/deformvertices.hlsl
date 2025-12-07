@@ -71,7 +71,8 @@ void main(uint3 gId : SV_DispatchThreadID)
     float3 e2 = (v4 - v0) * voxelRestLengthInv;
 
     // Deform position
-    float3 restPosition = mul((float3x3)gridRotationInverse, originalVertPositions[gId.x] - v0_orig.xyz);
+    float3x3 gridRotInv3x3 = (float3x3)gridRotationInverse;
+    float3 restPosition = mul(gridRotInv3x3, originalVertPositions[gId.x] - v0_orig.xyz);
     restPosition = v0 + restPosition.x * e0
                       + restPosition.y * e1
                       + restPosition.z * e2;
@@ -83,6 +84,7 @@ void main(uint3 gId : SV_DispatchThreadID)
     // Deform normal
     float3x3 deformMatrix = transpose(inverseFromRows(e0, e1, e2));
     float3 normal = originalVertNormals[gId.x];
+    normal = mul(gridRotInv3x3, normal);
     normal = normalize(mul(deformMatrix, normal));
 
     outVertNormals[outOffset + 0] = normal.x;
