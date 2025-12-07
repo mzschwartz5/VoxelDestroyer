@@ -53,13 +53,7 @@ struct Triangle {
 struct VoxelizationGrid {
     double voxelSize;
     std::array<int, 3> voxelsPerEdge;
-    MPoint gridCenter;
-    MVector gridRotation;
-};
-
-struct VoxelDimensions {
-    MFloatPoint min;
-    double edgeLength;
+    MTransformationMatrix gridTransform;
 };
 
 struct Voxels {
@@ -215,7 +209,7 @@ private:
     );
 
     // Iterates over voxels and, for each that is occupied (overlaps or is contained in the mesh), 
-    // creates a cube mesh for it.
+    // creates its model matrix (in grid local space - needs to be transformed after intersection).
     void createVoxels(
         Voxels& occupiedVoxels,
         const VoxelizationGrid& grid
@@ -235,6 +229,7 @@ private:
         MFnMesh& originalMesh,
         const std::vector<Triangle>& meshTris,
         const MString& newMeshName,
+        const MMatrix& gridTransform,
         bool doBoolean,
         bool clipTriangles
     );
@@ -248,6 +243,7 @@ private:
         MObject* const surfaceFaces;
         MObject* const interiorFaces;
         MObjectArray* const faceComponents;
+        const MMatrix* const gridTransform;
         bool doBoolean;
         bool clipTriangles;
         MString newMeshName;
@@ -281,7 +277,7 @@ private:
     MDagPath finalizeVoxelMesh(
         const MString& newMeshName,
         const MString& originalMesh,
-        const MPoint& originalPivot,
+        const MMatrix& gridTransform,
         const std::tuple<MObject, MObject>& faceComponents
     );
 };

@@ -21,7 +21,6 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     MDagPath transformPath = selectedMesh.dagPath();
     transformPath.pop(); // Move up to the transform node
     MFnTransform transform(transformPath);
-    MPoint originalPivot = transform.rotatePivot(MSpace::kWorld);
     MString originalMeshName = transformPath.partialPathName();
     MString newMeshName = originalMeshName + "_voxelized";
 
@@ -30,8 +29,13 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     voxels.resize(grid.voxelsPerEdge[0] * grid.voxelsPerEdge[1] * grid.voxelsPerEdge[2]);
     MThreadPool::init();
     
-    // Freeze transformations on the original mesh before any processing
-    MGlobal::executeCommand(MString("makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 -pn 1"), false, true);
+    // Because the grid may not be axis-aligned, we need to transform the mesh into the grid's local space
+    // We do this by changing the mesh's world matrix so that when we make calls like getPoint(MSpace::kWorld), we get points in grid local space
+    MTransformationMatrix gridTransform = grid.gridTransform;
+    MMatrix inverseGridTransform = gridTransform.asMatrixInverse();
+    MMatrix originalMeshMatrix = selectedMeshPath.inclusiveMatrix();
+    MMatrix meshToGridMatrix = originalMeshMatrix * inverseGridTransform;
+    transform.set(MTransformationMatrix(meshToGridMatrix));
 
     MProgressWindow::setProgressStatus("Processing mesh triangles...");
     std::vector<Triangle> meshTris = getTrianglesOfMesh(selectedMesh, voxels.voxelSize);
@@ -71,11 +75,13 @@ Voxels Voxelizer::voxelizeSelectedMesh(
         selectedMesh,
         meshTris,
         newMeshName,
+        gridTransform.asMatrix(),
         doBoolean,
         clipTriangles
     );
 
-    sortedVoxels.voxelizedMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, originalPivot, faceComponents); // TODO: if no boolean, should get rid of non-manifold geometry
+    transform.set(MTransformationMatrix(originalMeshMatrix));
+    sortedVoxels.voxelizedMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, gridTransform.asMatrix(), faceComponents); // TODO: if no boolean, should get rid of non-manifold geometry
     MGlobal::executeCommand("delete " + originalMeshName, false, true); // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh (or just allow for undo)
 
     MThreadPool::release(); // reduce reference count incurred by init()
@@ -177,7 +183,7 @@ void Voxelizer::getSurfaceVoxels(
 
     double voxelSize = grid.voxelSize;
     const std::array<int, 3>& voxelsPerEdge = grid.voxelsPerEdge;
-    MPoint gridMin = grid.gridCenter - ((voxelSize / 2) * MVector(voxelsPerEdge[0], voxelsPerEdge[1], voxelsPerEdge[2]));
+    MPoint gridMin = -(voxelSize / 2) * MVector(voxelsPerEdge[0], voxelsPerEdge[1], voxelsPerEdge[2]);
 
     int triIdx = 0;
     for (const Triangle& tri : triangles) {
@@ -262,7 +268,7 @@ void Voxelizer::getInteriorVoxels(
 
     double voxelSize = grid.voxelSize;
     const std::array<int, 3>& voxelsPerEdge = grid.voxelsPerEdge;
-    MPoint gridMin = grid.gridCenter - ((voxelSize / 2) * MVector(voxelsPerEdge[0], voxelsPerEdge[1], voxelsPerEdge[2]));
+    MPoint gridMin = -(voxelSize / 2) * MVector(voxelsPerEdge[0], voxelsPerEdge[1], voxelsPerEdge[2]);
 
     int progressCounter = 0;
     for (const Triangle& tri : triangles) {
@@ -353,7 +359,7 @@ void Voxelizer::createVoxels(
 ) {
     double voxelSize = grid.voxelSize;
     const std::array<int, 3>& voxelsPerEdge = grid.voxelsPerEdge;
-    MPoint gridMin = grid.gridCenter - ((voxelSize / 2) * MVector(voxelsPerEdge[0], voxelsPerEdge[1], voxelsPerEdge[2]));
+    MPoint gridMin = -(voxelSize / 2) * MVector(voxelsPerEdge[0], voxelsPerEdge[1], voxelsPerEdge[2]);
 
     MProgressWindow::setProgressRange(0, voxelsPerEdge[0] * voxelsPerEdge[1] * voxelsPerEdge[2]);
     MProgressWindow::setProgress(0);
@@ -367,7 +373,6 @@ void Voxelizer::createVoxels(
                 
                 overlappedVoxels.mortonCodes[index] = Utils::toMortonCode(x, y, z);
 
-                // For now, voxels are axis-aligned, so the model matrix is just a translation and scale.
                 MTransformationMatrix modelMatrix;
                 MPoint voxelCenter(
                     (x + 0.5) * voxelSize + gridMin.x,
@@ -389,6 +394,7 @@ std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
     MFnMesh& originalMesh,
     const std::vector<Triangle>& meshTris,
     const MString& newMeshName,
+    const MMatrix& gridTransform,
     bool doBoolean,
     bool clipTriangles
 ) 
@@ -421,6 +427,7 @@ std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
         &surfaceFaceComponent,
         &interiorFaceComponent,
         &voxels.faceComponents,
+        &gridTransform,
         doBoolean,
         clipTriangles,
         newMeshName
@@ -443,7 +450,7 @@ std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
 MDagPath Voxelizer::finalizeVoxelMesh(
     const MString& newMeshName,
     const MString& originalMeshName,
-    const MPoint& originalPivot,
+    const MMatrix& gridTransform,
     const std::tuple<MObject, MObject>& faceComponents
 ) {
     MProgressWindow::setProgressRange(0, 100);
@@ -451,27 +458,29 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     int numSubsteps = 4; // purely for progress bar
     int progressIncrement = 100 / numSubsteps;
 
-    // Retrieve the MObject of the resulting mesh
-    MProgressWindow::setProgressStatus("Transferring pivot...");
-    MStatus status;
+    // Retrieve the dag path and transform of the resulting mesh
     MSelectionList selectionList;
     selectionList.add(newMeshName);
     MObject resultMeshObject;
     selectionList.getDependNode(0, resultMeshObject);
     MDagPath resultMeshDagPath;
     MDagPath::getAPathTo(resultMeshObject, resultMeshDagPath);
-    MFnMesh resultMeshFn(resultMeshDagPath, &status);
-    MFnTransform resultTransformFn(resultMeshDagPath, &status);
-    resultTransformFn.setRotatePivot(originalPivot, MSpace::kTransform, false); // Set the pivot to the original mesh's pivot
-    MProgressWindow::advanceProgress(progressIncrement);
+    MFnMesh resultMeshFn(resultMeshDagPath);
+    MFnTransform resultTransformFn(resultMeshDagPath);
 
+    MProgressWindow::setProgressStatus("Baking transform of voxelized mesh...");
+    resultTransformFn.set(gridTransform);
+    MGlobal::setActiveSelectionList(selectionList);
+    MGlobal::executeCommand(MString("makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 -pn 1"), false, true);
+    MProgressWindow::advanceProgress(progressIncrement);
+    
     // Use MEL to transferAttributes the normals / uvs / colors, and transferShadingSets, from the original mesh to the surface faces of the voxelized one
     MProgressWindow::setProgressStatus("Transferring attributes from original mesh...");
     selectionList.clear();
     selectionList.add(originalMeshName);
     selectionList.add(resultMeshDagPath, std::get<0>(faceComponents));
-    MGlobal::setActiveSelectionList(selectionList, MGlobal::kReplaceList);
-    MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 1 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
+    MGlobal::setActiveSelectionList(selectionList);
+    MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 0 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
     MProgressWindow::advanceProgress(progressIncrement);
     
     MProgressWindow::setProgressStatus("Transferring shading sets from original mesh...");
@@ -484,7 +493,7 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MProgressWindow::setProgressStatus("Setting normals and shading on interior faces...");
     
     selectionList.add(resultMeshDagPath, std::get<1>(faceComponents));
-    MGlobal::setActiveSelectionList(selectionList, MGlobal::kReplaceList);
+    MGlobal::setActiveSelectionList(selectionList);
     MGlobal::executeCommand("sets -e -forceElement initialShadingGroup", false, false);
     MGlobal::executeCommand("polySetToFaceNormal;", false, false);
     
@@ -636,15 +645,19 @@ MThreadRetVal Voxelizer::getSingleVoxelMeshIntersection(void* threadData) {
 
     int voxelIndex = data->threadIdx;
     bool doBoolean = taskData->doBoolean;
+    const MMatrix& gridTransform = *taskData->gridTransform;
     MPointArray& meshPointsAfterIntersection = (*data->meshPointsAfterIntersection)[voxelIndex];
     MIntArray& polyCountsAfterIntersection = (*data->polyCountsAfterIntersection)[voxelIndex];
     MIntArray& polyConnectsAfterIntersection = (*data->polyConnectsAfterIntersection)[voxelIndex];
     int& numSurfaceFacesAfterIntersection = (*data->numSurfaceFacesAfterIntersection)[voxelIndex];
     std::unordered_map<Point_3, int, CGALHelper::Point3Hash> cgalVertexToMayaIdx;
 
-    const Voxels* voxels = taskData->voxels;
-    const MMatrix& modelMatrix = voxels->modelMatrices[voxelIndex];
+    Voxels* voxels = taskData->voxels;
+    // Make a cube from the voxel's (grid-local) model matrix, then modify the model matrix to be in world space
+    // (Because consumers of the voxelization data expect world space transforms)
+    MMatrix& modelMatrix = voxels->modelMatrices[voxelIndex];
     SurfaceMesh cube = CGALHelper::cube(modelMatrix);
+    modelMatrix = modelMatrix * gridTransform;
 
     // In this case, we just return the points of the cube without intersection.
     if (!voxels->isSurface[voxelIndex] || !doBoolean) {

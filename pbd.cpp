@@ -1,6 +1,7 @@
 #include "pbd.h"
 #include "utils.h"
 #include "cube.h"
+#include <maya/MFloatMatrix.h>
 
 std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(const MSharedPtr<Voxels> voxels) {
     std::array<std::vector<FaceConstraint>, 3> faceConstraints;
@@ -56,22 +57,18 @@ ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
     double scaleArr[3] = {1.0, 1.0, 1.0};
 
     for (int i = 0; i < numOccupied; i++) {
-        MTransformationMatrix tmat(modelMatrices[i]);
-        MFloatPoint voxelCenter = tmat.getTranslation(MSpace::kWorld);
-        tmat.getScale(scaleArr, MSpace::kWorld);
-        const float edgeLength = static_cast<float>(scaleArr[0]);
+        MMatrix voxelToWorld = modelMatrices[i];
+        MTransformationMatrix voxelTransform(voxelToWorld);
+        voxelTransform.getScale(scaleArr, MSpace::kWorld);
 
         for (int j = 0; j < 8; j++) {
-            MFloatPoint corner = MFloatPoint(
-                voxelCenter.x + (cubeCorners[j][0] * edgeLength),
-                voxelCenter.y + (cubeCorners[j][1] * edgeLength),
-                voxelCenter.z + (cubeCorners[j][2] * edgeLength)
-            );
-
-            // Offset the corner towards the center by the radius of the particle
-            const MFloatPoint position = corner - (particleRadius * Utils::sign(corner - voxelCenter));
-            float packedRadiusAndW = Utils::packTwoFloatsAsHalfs(particleRadius, 1.0f); // for now, w is hardcoded to 1.0f
-            particles.push_back(MFloatPoint(position.x, position.y, position.z, packedRadiusAndW));
+            // Offset the particle towards the center of the voxel by particleRadius along each axis
+            MPoint corner = MPoint(cubeCorners[j][0], cubeCorners[j][1], cubeCorners[j][2]);
+            corner -= ((particleRadius / scaleArr[0]) * Utils::sign(corner));
+            
+            corner = corner * voxelToWorld;
+            float packedRadiusAndW = Utils::packTwoFloatsAsHalfs(particleRadius, 1.0f); // w is initialized to 1.0f but is user-editable via the voxel paint tool
+            particles.push_back(MFloatPoint(corner.x, corner.y, corner.z, packedRadiusAndW));
             totalParticles++;
         }
     }

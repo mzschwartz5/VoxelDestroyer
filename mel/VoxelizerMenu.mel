@@ -114,9 +114,12 @@ global proc VoxelizerMenu_run(
     float $posX = `getAttr ($cubeName + ".translateX")`;
     float $posY = `getAttr ($cubeName + ".translateY")`;
     float $posZ = `getAttr ($cubeName + ".translateZ")`;
-    float $rotX = `getAttr ($cubeName + ".rotateX")`;
-    float $rotY = `getAttr ($cubeName + ".rotateY")`;
-    float $rotZ = `getAttr ($cubeName + ".rotateZ")`;
+    float $rotXDeg = `getAttr ($cubeName + ".rotateX")`;
+    float $rotYDeg = `getAttr ($cubeName + ".rotateY")`;
+    float $rotZDeg = `getAttr ($cubeName + ".rotateZ")`;
+    float $rotX = deg_to_rad($rotXDeg);
+    float $rotY = deg_to_rad($rotYDeg);
+    float $rotZ = deg_to_rad($rotZDeg);
 
     int $voxelsPerEdgeX = `intSliderGrp -query -value SubdivWidthField`;
     int $voxelsPerEdgeY = `intSliderGrp -query -value SubdivHeightField`;
@@ -190,7 +193,7 @@ global proc string createVoxelGridDisplay(string $selectedMeshName, float $initi
     // Lock all attributes except translation
     string $attributes[] = `listAttr -keyable -settable $voxelGridDisplayName`;
     for ($attr in $attributes) {
-        if (!(`gmatch $attr "translate*"`)) {
+        if (!(`gmatch $attr "translate*"` || `gmatch $attr "rotate*"`)) {
             setAttr -lock true ($voxelGridDisplayName + "." + $attr);
         }
     }
