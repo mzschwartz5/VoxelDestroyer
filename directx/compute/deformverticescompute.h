@@ -3,7 +3,7 @@
 #include "directx/compute/computeshader.h"
 
 struct DeformVerticesConstantBuffer {
-    float inverseWorldMatrix[4][4];
+    float gridRotationInverse[4][4];
     int vertexCount;
     int padding[3]; // Padding to align to 16 bytes
 };
@@ -15,7 +15,7 @@ public:
     DeformVerticesCompute(
         int numParticles,
         int vertexCount,
-        const MMatrix& inverseWorldMatrix,
+        const MMatrix& gridRotationInverse,
         const std::vector<MFloatPoint>& originalParticlePositions,   // Will be uploaded to GPU
         const std::vector<uint>& vertexVoxelIds,        // Will be uploaded to GPU
         const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
@@ -25,7 +25,7 @@ public:
         const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV
     ) : ComputeShader(IDR_SHADER1), positionsUAV(positionsUAV), normalsUAV(normalsUAV), originalVertPositionsSRV(originalVertPositionsSRV), originalNormalsSRV(originalNormalsSRV), particlePositionsSRV(particlePositionsSRV)
     {
-        initializeBuffers(numParticles, vertexCount, inverseWorldMatrix, originalParticlePositions, vertexVoxelIds);
+        initializeBuffers(numParticles, vertexCount, gridRotationInverse, originalParticlePositions, vertexVoxelIds);
     }
 
     ~DeformVerticesCompute() {
@@ -92,7 +92,7 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(nullConstBuffers), nullConstBuffers);
     };
 
-    void initializeBuffers(int numParticles, int vertexCount, const MMatrix& inverseWorldMatrix, const std::vector<MFloatPoint>& originalParticlePositions, const std::vector<uint>& vertexVoxelIds)
+    void initializeBuffers(int numParticles, int vertexCount, const MMatrix& gridRotationInverse, const std::vector<MFloatPoint>& originalParticlePositions, const std::vector<uint>& vertexVoxelIds)
     {
         numWorkgroups = Utils::divideRoundUp(vertexCount, DEFORM_VERTICES_THREADS);
 
@@ -110,7 +110,7 @@ private:
         vertexVoxelIdsSRV = DirectX::createSRV(vertexVoxelIdsBuffer);
        
         DeformVerticesConstantBuffer constants = {};
-        inverseWorldMatrix.get(constants.inverseWorldMatrix);
+        gridRotationInverse.get(constants.gridRotationInverse);
         constants.vertexCount = vertexCount;
         constantsBuffer = DirectX::createConstantBuffer<DeformVerticesConstantBuffer>(constants);
     }
