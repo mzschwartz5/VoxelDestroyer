@@ -27,6 +27,7 @@
 #include <maya/MDrawRegistry.h>
 #include <maya/MItDependencyNodes.h>
 #include <maya/MTimer.h>
+#include <maya/MTransformationMatrix.h>
 #include "directx/compute/computeshader.h"
 #include "globalsolver.h"
 
@@ -75,11 +76,15 @@ MStatus plugin::doIt(const MArgList& argList)
 	selectedMesh.getDagPath(0, selectedMeshDagPath);
 
 	// Progress window message updates done within the voxelizer (for finer-grained control)
+	double rotation[3];
+	MTransformationMatrix gridTransform;
+	pluginArgs.rotation.get(rotation);
+	gridTransform.setTranslation(MVector(pluginArgs.position), MSpace::kWorld);
+	gridTransform.setRotation(rotation, MTransformationMatrix::kXYZ);
 	const VoxelizationGrid voxelizationGrid {
 		pluginArgs.voxelSize * 1.02, // To avoid precision / cut off issues, scale up the voxelization grid very slightly.
 		pluginArgs.voxelsPerEdge,
-		pluginArgs.position,
-		pluginArgs.rotation
+		gridTransform
 	};
 
 	MDagPath voxelizedMeshDagPath;
