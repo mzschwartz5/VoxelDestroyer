@@ -478,6 +478,9 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MProgressWindow::setProgressStatus("Transferring attributes from original mesh...");
     selectionList.clear();
     selectionList.add(originalMeshName);
+    MGlobal::setActiveSelectionList(selectionList);
+    // The original mesh may have a transform; bake it first. (TODO: would like to avoid mutating the input mesh, but transferAttributes doesn't work without even if sampleSpace is worldspace.)
+    MGlobal::executeCommand(MString("makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 -pn 1"), false, true); 
     selectionList.add(resultMeshDagPath, std::get<0>(faceComponents));
     MGlobal::setActiveSelectionList(selectionList);
     MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 0 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
