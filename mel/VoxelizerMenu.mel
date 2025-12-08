@@ -170,7 +170,6 @@ global proc float[] getInitialVoxelGridValues(string $selectedMeshName) {
 }
 
 global proc string createVoxelGridDisplay(string $selectedMeshName, float $initialValues[]) {
-    // Create a polyCube and store its name
     float $cubeExtents[3] = {$initialValues[6] * $initialValues[7], 
                             $initialValues[6] * $initialValues[8], 
                             $initialValues[6] * $initialValues[9]};
@@ -178,10 +177,13 @@ global proc string createVoxelGridDisplay(string $selectedMeshName, float $initi
                                   -sx $initialValues[7] -sy $initialValues[8] -sz $initialValues[9] -ch 1`;
     string $voxelGridDisplayName = $voxelGridDisplay[0];
     float $rotation[] = `xform -q -ws -rotation $selectedMeshName`;
-    xform -ws
-          -translation $initialValues[3] $initialValues[4] $initialValues[5]
-          -rotation $rotation[0] $rotation[1] $rotation[2]
-          $voxelGridDisplayName;
+    float $position[] = `xform -q -ws -translation $selectedMeshName`;
+    float $pivotWS[] = `xform -q -ws -rotatePivot $selectedMeshName`;
+
+    xform -ws -translation $initialValues[3] $initialValues[4] $initialValues[5] $voxelGridDisplayName;
+    xform -ws -rotatePivot $pivotWS[0] $pivotWS[1] $pivotWS[2] $voxelGridDisplayName;
+    xform -ws -rotation $rotation[0] $rotation[1] $rotation[2] $voxelGridDisplayName;
+    BakeCustomPivot;
 
     // Hide the cube in the outliner
     setAttr ($voxelGridDisplayName + ".hiddenInOutliner") true;
