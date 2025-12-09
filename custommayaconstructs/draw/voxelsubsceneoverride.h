@@ -150,7 +150,7 @@ private:
     // These are just stored to persist the buffers. Subscene owns any geometry buffers it creates.
     std::vector<unique_ptr<MVertexBuffer>> meshVertexBuffers;
     std::unordered_map<MString, unique_ptr<MIndexBuffer>, Utils::MStringHash, Utils::MStringEq> meshIndexBuffers; // Stored by render item name, so we can update them easily.
-    std::vector<uint> allMeshIndices; // Mesh vertex indices, _not_ split per render item but rather for the entire mesh.
+    std::vector<uint32_t> allMeshIndices; // Mesh vertex indices, _not_ split per render item but rather for the entire mesh.
     std::unordered_set<MUint64> meshRenderItemIDs;
 
     unique_ptr<MVertexBuffer> voxelVertexBuffer;
@@ -633,7 +633,7 @@ private:
         auto indexBuffer = make_unique<MIndexBuffer>(MGeometry::kUnsignedInt32);
         void* indexData = indexBuffer->acquire(3 * numTriangles, true);
 
-        extractor.populateIndexBuffer(indexData, 3 * numTriangles, itemInfo.indexDesc);
+        extractor.populateIndexBuffer(indexData, numTriangles, itemInfo.indexDesc);
         indexBuffer->commit(indexData);
 
         MIndexBuffer* rawIndexBuffer = indexBuffer.get();
@@ -674,7 +674,7 @@ private:
         MIndexBufferDescriptor indexDesc(MIndexBufferDescriptor::kTriangle, MString(), MGeometry::kTriangles, 0);
         const unsigned int primitiveCount = extractor.primitiveCount(indexDesc);
         allMeshIndices.resize(primitiveCount * 3);
-        extractor.populateIndexBuffer(allMeshIndices.data(), primitiveCount * 3, indexDesc);
+        extractor.populateIndexBuffer(allMeshIndices.data(), primitiveCount, indexDesc);
 
         return extractor.vertexCount(); 
     }
