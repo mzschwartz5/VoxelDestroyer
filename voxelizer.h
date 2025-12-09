@@ -154,7 +154,8 @@ public:
         bool voxelizeSurface,
         bool voxelizeInterior,
         bool doBoolean,
-        bool clipTriangles
+        bool clipTriangles,
+        MStatus& status
     );
 
 private:
@@ -231,7 +232,8 @@ private:
         const MString& newMeshName,
         const MMatrix& gridTransform,
         bool doBoolean,
-        bool clipTriangles
+        bool clipTriangles,
+        MStatus& status
     );
 
     // Payload for the function that sets up all threads.

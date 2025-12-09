@@ -41,7 +41,8 @@ public:
         bool voxelizeInterior,
         bool doBoolean,
         bool clipTriangles,
-        MDagPath& outDagPath
+        MDagPath& outDagPath,
+        MStatus& status
     ) {
         MObject voxelizerNodeObj = Utils::createDGNode(VoxelizerNode::typeName);
         MFnDependencyNode voxelizerNode(voxelizerNodeObj);
@@ -54,9 +55,15 @@ public:
                 voxelizeSurface,
                 voxelizeInterior,
                 doBoolean,
-                clipTriangles
+                clipTriangles,
+                status
             )
         );
+
+        if (status != MStatus::kSuccess) {
+            Utils::deleteDGNode(voxelizerNodeObj);
+            return MObject::kNullObj;
+        }
         outDagPath = voxels->voxelizedMeshDagPath;
 
         Utils::createPluginData<VoxelData>(

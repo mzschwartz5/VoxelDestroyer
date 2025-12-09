@@ -20,14 +20,13 @@ SurfaceMesh cube(const MMatrix& modelMatrix)
     MPoint center = tmat.getTranslation(MSpace::kWorld);
     double scaleArr[3] = {1.0, 1.0, 1.0};
     tmat.getScale(scaleArr, MSpace::kWorld);
-    const double edge = (1.0 - 1e-9) * scaleArr[0]; // Slightly shrink the cube to avoid precision issues.
 
     std::array<SurfaceMesh::Vertex_index, 8> vertexIndices;
     for (size_t i = 0; i < 8; ++i) {
         Point_3 p(
-            static_cast<double>(center.x + cubeCorners[i][0] * edge),
-            static_cast<double>(center.y + cubeCorners[i][1] * edge),
-            static_cast<double>(center.z + cubeCorners[i][2] * edge)
+            static_cast<double>(center.x + cubeCorners[i][0] * scaleArr[0]),
+            static_cast<double>(center.y + cubeCorners[i][1] * scaleArr[0]),
+            static_cast<double>(center.z + cubeCorners[i][2] * scaleArr[0])
         );
         vertexIndices[i] = cubeMesh.add_vertex(p);
     }

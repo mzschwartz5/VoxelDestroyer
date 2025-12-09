@@ -82,12 +82,13 @@ MStatus plugin::doIt(const MArgList& argList)
 	gridTransform.setTranslation(MVector(pluginArgs.position), MSpace::kWorld);
 	gridTransform.setRotation(rotation, MTransformationMatrix::kXYZ);
 	const VoxelizationGrid voxelizationGrid {
-		pluginArgs.voxelSize * 1.02, // To avoid precision / cut off issues, scale up the voxelization grid very slightly.
+		pluginArgs.voxelSize * 1.005, // To avoid precision / cut off issues, scale up the voxelization grid very slightly.
 		pluginArgs.voxelsPerEdge,
 		gridTransform
 	};
 
 	MDagPath voxelizedMeshDagPath;
+	MStatus status = MS::kSuccess;
 	MObject voxelizerNodeObj = VoxelizerNode::createVoxelizerNode(
 		voxelizationGrid,
 		selectedMeshDagPath,
@@ -95,8 +96,16 @@ MStatus plugin::doIt(const MArgList& argList)
 		pluginArgs.voxelizeInterior,
 		!pluginArgs.renderAsVoxels,
 		pluginArgs.clipTriangles,
-		voxelizedMeshDagPath
+		voxelizedMeshDagPath,
+		status
 	);
+
+	if (status != MS::kSuccess) {
+		MProgressWindow::endProgress();
+		MGlobal::executeCommand("undoInfo -closeChunk", false, false);
+		return status;
+	}
+
 	
 	MProgressWindow::setProgressStatus("Creating PBD particles and face constraints..."); MProgressWindow::setProgressRange(0, 100); MProgressWindow::setProgress(0);
 	MObject pbdNodeObj = PBDNode::createPBDNode(voxelizerNodeObj, voxelizedMeshDagPath);

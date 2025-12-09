@@ -178,6 +178,8 @@ MPxNode* connectedNode(const MPlug& plug, bool nodeIsSource = true);
 
 MObject createDGNode(const MString& typeName);
 
+void deleteDGNode(const MObject& nodeObj);
+
 MObject createDagNode(const MString& typeName, const MObject& parent = MObject::kNullObj, const MString& name = "", MDagModifier* dagMod = nullptr);
 
 MMatrix getWorldMatrix(const MObject& node);

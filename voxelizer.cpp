@@ -15,7 +15,8 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     bool voxelizeSurface,
     bool voxelizeInterior,
     bool doBoolean,
-    bool clipTriangles
+    bool clipTriangles,
+    MStatus& status
 ) {
     MFnMesh selectedMesh(selectedMeshPath);
     MDagPath transformPath = selectedMesh.dagPath();
@@ -77,8 +78,14 @@ Voxels Voxelizer::voxelizeSelectedMesh(
         newMeshName,
         gridTransform.asMatrix(),
         doBoolean,
-        clipTriangles
+        clipTriangles,
+        status
     );
+
+    if (status != MStatus::kSuccess) {
+        MThreadPool::release();
+        return Voxels();
+    }
 
     transform.set(MTransformationMatrix(originalMeshMatrix));
     sortedVoxels.voxelizedMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, gridTransform.asMatrix(), faceComponents); // TODO: if no boolean, should get rid of non-manifold geometry
@@ -396,10 +403,10 @@ std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
     const MString& newMeshName,
     const MMatrix& gridTransform,
     bool doBoolean,
-    bool clipTriangles
+    bool clipTriangles,
+    MStatus& status
 ) 
 {
-
     // Prepare for boolean operations
     // We only want to create the acceleration structure once (which is why we do it here, before all the boolean ops begin)
     std::vector<int> allTriangleIndices(meshTris.size());
@@ -409,6 +416,22 @@ std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
     SurfaceMesh originalMeshCGAL = CGALHelper::toSurfaceMesh(&originalVertices, allTriangleIndices, &meshTris);
     Tree aabbTree(originalMeshCGAL.faces().first, originalMeshCGAL.faces().second, originalMeshCGAL);
     SideTester sideTester(aabbTree);
+
+    if (!CGAL::is_closed(originalMeshCGAL)) {
+        MGlobal::displayError("Input mesh must be water tight.");
+        status = MStatus::kFailure;
+        return std::make_tuple(MObject(), MObject());
+    }
+    if (!CGAL::is_valid_polygon_mesh(originalMeshCGAL)) {
+        MGlobal::displayError("Invalid mesh - try checking for and resolving non-manifold geometry.");
+        status = MStatus::kFailure;
+        return std::make_tuple(MObject(), MObject());
+    }
+    if (CGAL::Polygon_mesh_processing::does_self_intersect(originalMeshCGAL)) {
+        MGlobal::displayError("Input mesh self-intersects.");
+        status = MStatus::kFailure;
+        return std::make_tuple(MObject(), MObject());
+    }
 
     // These components will be built out in getVoxelMeshIntersection
     MFnSingleIndexedComponent singleIndexComponentFn;

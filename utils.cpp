@@ -273,6 +273,13 @@ MObject createDGNode(const MString& typeName)
     return nodeObj;
 }
 
+void deleteDGNode(const MObject& nodeObj) 
+{
+    MDGModifier dgMod;
+    dgMod.deleteNode(nodeObj);
+    dgMod.doIt();
+}
+
 MObject createDagNode(const MString& typeName, const MObject& parent, const MString& name, MDagModifier* dagMod) 
 {
     MDagModifier localMod;
