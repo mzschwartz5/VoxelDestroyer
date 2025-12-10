@@ -159,6 +159,9 @@ global proc float[] getInitialVoxelGridValues(string $selectedMeshName) {
     // Get the shortest extent - divide it into 2 voxels (thus determining the voxel size).
     float $minExtent = min($extents[0], min($extents[1], $extents[2]));
     float $voxelSize = $minExtent / 2.0;
+    if ($voxelSize <= 0.0) {
+        error("Selected mesh has zero size in at least one dimension.");
+    }
     float $eps = 0.0001;
     float $voxelsPerEdge[] = {ceil(($extents[0] / $voxelSize) - $eps), ceil(($extents[1] / $voxelSize) - $eps), ceil(($extents[2] / $voxelSize) - $eps)};
 
