@@ -211,6 +211,7 @@ global proc string createVoxelGridDisplay(string $selectedMeshName, float $initi
 // Update subdivisions of the polyCube
 global proc VoxelizerMenu_updateSubdivisions(string $cubeName, int $subdivs, int $axis, int $constrain) {
     global int $VOXEL_SUBDIV_HARDMAX;
+    global int $VOXEL_SUBDIV_MIN;
     string $history[] = `listHistory $cubeName`;
     string $polyCubeNode[] = `ls -type "polyCube" $history`; // Ensure this is treated as an array
     if (size($polyCubeNode) <= 0) return;
@@ -230,10 +231,15 @@ global proc VoxelizerMenu_updateSubdivisions(string $cubeName, int $subdivs, int
         // If the user wants to keep the extents (more or less) constant, the voxels per edge must change 
         // to accommodate the new subdivision count on the specified axis. But make sure the voxel size does not go below the minimum.
         float $maxExtent = max($cubeExtents[0], max($cubeExtents[1], $cubeExtents[2]));
+        float $minExtent = min($cubeExtents[0], min($cubeExtents[1], $cubeExtents[2]));
+        float $voxelMaxSize = $minExtent / $VOXEL_SUBDIV_MIN;
         float $voxelMinSizeHard = $maxExtent / $VOXEL_SUBDIV_HARDMAX;
         float $newVoxelSize = $cubeExtents[$axis] / $subdivs;
         if ($newVoxelSize < $voxelMinSizeHard) {
             $newVoxelSize = $voxelMinSizeHard;
+        }
+        if ($newVoxelSize > $voxelMaxSize) {
+            $newVoxelSize = $voxelMaxSize;
         }
         $voxelsPerEdge[0] = floor(($cubeExtents[0] / $newVoxelSize) + $eps);
         $voxelsPerEdge[1] = floor(($cubeExtents[1] / $newVoxelSize) + $eps);
