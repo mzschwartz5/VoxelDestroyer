@@ -110,6 +110,8 @@ void toMayaMesh(
     }
 }
 
+constexpr static double DEGENERATE_AREA_THRESHOLD = 1e-10;
+
 void openMeshBooleanIntersection(
     SurfaceMesh& openMesh,
     SurfaceMesh& closedMesh,
@@ -136,7 +138,7 @@ void openMeshBooleanIntersection(
     }
 
     // Then iterate through the triangles of the closed mesh, discarding any
-    // that are outside the SideTester reference mesh.
+    // that are outside the SideTester reference mesh or have degenerate area.
     for (auto face : closedMesh.faces()) {
         // By construction, no triangles will straddle the surface of the reference mesh, so the centroid will always tell the truth about which side the triangle is on.
         auto halfedge = closedMesh.halfedge(face);
@@ -151,9 +153,21 @@ void openMeshBooleanIntersection(
             // because this only marks faces for removal, does not delete them immediately.
             // As long as we don't traverse the mesh halfedge structure, we're okay.
             closedMesh.remove_face(face);
+            continue;
         }
+
+        double area = CGAL::Polygon_mesh_processing::face_area(face, closedMesh);
+        if (area < DEGENERATE_AREA_THRESHOLD) closedMesh.remove_face(face);
     }
     closedMesh.collect_garbage(); // Clean up the mesh after removing faces
+
+    // Note: I wanted to use CGAL::Polygon_mesh_processing::remove_degenerate_faces and/or other clean up operations here,
+    // but they all cause crashes (when there are actually degenerate faces). Couldn't figure out why.
+    for (auto face : openMesh.faces()) {
+        double area = CGAL::Polygon_mesh_processing::face_area(face, openMesh);
+        if (area < DEGENERATE_AREA_THRESHOLD) openMesh.remove_face(face);
+    }
+    openMesh.collect_garbage();
 
     // Note: the last step is left to the caller. The openMesh and closedMesh, together, form a water tight mesh.
     // The caller can either do a logical join on the two, or merge their vertices together by distance into a manifold mesh.

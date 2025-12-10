@@ -357,9 +357,6 @@ private:
      * 
      * We do this now, instead of in the voxelizer, because the subscene override is the ultimate source of truth on the order of vertices in the GPU buffers.
      * Supporting split normals, UV seams, etc. requires duplicating vertices. So we have to do this step after the subscene override has created the final vertex buffers.
-     * 
-     * TODO: this sometimes crashes... face indices that are out of range of the vertex index buffer. A better method may involve creating a UV set containing voxel IDs
-     * during voxelization, then reading that directly using the MGeometryExtractor - that would gurantee correct alignment with the vertex buffers.
      */
     std::vector<uint> getVoxelIdsForVertices(
         const std::vector<uint>& vertexIndices,
