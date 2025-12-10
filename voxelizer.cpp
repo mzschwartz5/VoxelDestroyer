@@ -478,21 +478,15 @@ MDagPath Voxelizer::finalizeVoxelMesh(
 ) {
     MProgressWindow::setProgressRange(0, 100);
     MProgressWindow::setProgress(0);
-    int numSubsteps = 4; // purely for progress bar
+    int numSubsteps = 5; // purely for progress bar
     int progressIncrement = 100 / numSubsteps;
-
-    // Retrieve the dag path and transform of the resulting mesh
     MSelectionList selectionList;
-    selectionList.add(newMeshName);
-    MObject resultMeshObject;
-    selectionList.getDependNode(0, resultMeshObject);
-    MDagPath resultMeshDagPath;
-    MDagPath::getAPathTo(resultMeshObject, resultMeshDagPath);
-    MFnMesh resultMeshFn(resultMeshDagPath);
-    MFnTransform resultTransformFn(resultMeshDagPath);
-
+    MDagPath resultMeshDagPath = Utils::getDagPathFromName(newMeshName);
+    
     MProgressWindow::setProgressStatus("Baking transform of voxelized mesh...");
+    MFnTransform resultTransformFn(resultMeshDagPath);
     resultTransformFn.set(gridTransform);
+    selectionList.add(newMeshName);
     MGlobal::setActiveSelectionList(selectionList);
     MGlobal::executeCommand(MString("makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 -pn 1"), false, true);
     MProgressWindow::advanceProgress(progressIncrement);
@@ -523,6 +517,11 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MGlobal::executeCommand("sets -e -forceElement initialShadingGroup", false, false);
     MGlobal::executeCommand("polySetToFaceNormal;", false, false);
     
+    MProgressWindow::advanceProgress(progressIncrement);
+
+    MProgressWindow::setProgressStatus("Linking transferred UV sets to shading engines...");
+    MDagPath originalMeshDagPath = Utils::getDagPathFromName(originalMeshName);
+    Utils::transferUVLinks(originalMeshDagPath, resultMeshDagPath);
     MProgressWindow::advanceProgress(progressIncrement);
 
     MGlobal::executeCommand("delete -ch " + newMeshName); // Delete the history of the combined mesh to decouple it from the original mesh

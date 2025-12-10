@@ -190,4 +190,14 @@ MObject getMostRecentlySelectedObject();
 
 bool tryGetShapePathFromObject(const MObject& object, MDagPath& shapePath);
 
+MDagPath getDagPathFromName(const MString& name);
+
+/**
+ * Transfers UV set links from the source mesh to the destination mesh. Assumes both meshes have the same UV sets and shading engines.
+ * 
+ * Note: in the voxelizer, we transfer attributes (including uv sets) and shading sets. However,
+ * the links between uv sets and shaders are not transferred, so we have to do that manually.
+ */
+void transferUVLinks(const MDagPath& srcMeshPath, const MDagPath& dstMeshPath);
+
 } // namespace Utils

@@ -7,6 +7,7 @@
 #include <maya/MDagPath.h> 
 #include <maya/MMatrix.h>
 #include <maya/MSelectionList.h>
+#include <maya/MFnMesh.h>
 #include <windows.h>
 #include <sstream>
 #include <cstring>
@@ -338,6 +339,43 @@ bool tryGetShapePathFromObject(const MObject& object, MDagPath& shapePath) {
     }
     
     return false;
+}
+
+MDagPath getDagPathFromName(const MString& name) {
+    MSelectionList selectionList;
+    selectionList.add(name);
+    MDagPath dagPath;
+    selectionList.getDagPath(0, dagPath);
+    return dagPath;
+}
+
+// Use MEL to query and perform linking (in this case, C++ is _much_ more verbose and this isn't performance critical)
+void transferUVLinks(const MDagPath& srcMeshPath, const MDagPath& dstMeshPath) {
+    MFnMesh srcMeshFn(srcMeshPath);
+    
+    // This command gets all texture nodes linked to a given UV set.
+    MString queryLinkTemplateCmd = "uvLink -q -uvs " + srcMeshPath.fullPathName() + ".uvSet[^1s].uvSetName;";
+    MString addLinkTemplateCmd = "uvLink -make -uvs " + dstMeshPath.fullPathName() + ".uvSet[^1s].uvSetName -texture \"^2s\";";
+    MString uvSetNumStr;
+    MString queryLinksCmd;
+    MStringArray textureNameLinks;
+    MString addLinkCmd;
+
+    for (int i = 0; i < srcMeshFn.numUVSets(); ++i) {
+        textureNameLinks.clear();
+        uvSetNumStr.set(i);
+        queryLinksCmd = queryLinkTemplateCmd;
+        queryLinksCmd.format(queryLinkTemplateCmd, uvSetNumStr);
+
+        MGlobal::executeCommand(queryLinksCmd, textureNameLinks);
+
+        for (uint j = 0; j < textureNameLinks.length(); ++j) {
+            MString textureName = textureNameLinks[j];
+            addLinkCmd = addLinkTemplateCmd;
+            addLinkCmd.format(addLinkTemplateCmd, uvSetNumStr, textureName);
+            MGlobal::executeCommand(addLinkCmd);
+        }
+    }
 }
 
 } // namespace Utils
