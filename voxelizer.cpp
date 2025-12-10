@@ -506,7 +506,7 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MGlobal::executeCommand(MString("makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 -pn 1"), false, true); 
     selectionList.add(resultMeshDagPath, std::get<0>(faceComponents));
     MGlobal::setActiveSelectionList(selectionList);
-    MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 0 -sourceUvSpace \"map1\" -targetUvSpace \"map1\" -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
+    MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 0 -searchMethod 0 -flipUVs 0 -colorBorders 1;", false, true);
     MProgressWindow::advanceProgress(progressIncrement);
     
     MProgressWindow::setProgressStatus("Transferring shading sets from original mesh...");
