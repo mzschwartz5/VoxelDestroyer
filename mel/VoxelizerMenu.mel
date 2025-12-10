@@ -235,24 +235,32 @@ global proc VoxelizerMenu_updateSubdivisions(string $cubeName, int $subdivs, int
         float $voxelMaxSize = $minExtent / $VOXEL_SUBDIV_MIN;
         float $voxelMinSizeHard = $maxExtent / $VOXEL_SUBDIV_HARDMAX;
         float $newVoxelSize = $cubeExtents[$axis] / $subdivs;
+       
         if ($newVoxelSize < $voxelMinSizeHard) {
             $newVoxelSize = $voxelMinSizeHard;
         }
         if ($newVoxelSize > $voxelMaxSize) {
             $newVoxelSize = $voxelMaxSize;
         }
-        $voxelsPerEdge[0] = floor(($cubeExtents[0] / $newVoxelSize) + $eps);
-        $voxelsPerEdge[1] = floor(($cubeExtents[1] / $newVoxelSize) + $eps);
-        $voxelsPerEdge[2] = floor(($cubeExtents[2] / $newVoxelSize) + $eps);
+        
+        $voxelsPerEdge[0] = ceil(($cubeExtents[0] / $newVoxelSize) - $eps);
+        $voxelsPerEdge[1] = ceil(($cubeExtents[1] / $newVoxelSize) - $eps);
+        $voxelsPerEdge[2] = ceil(($cubeExtents[2] / $newVoxelSize) - $eps);
+
+        // The display grid _is_ constrained, but because we can't have fractional voxels (and they must be cubic), the extents must change slightly to accommodate the new voxel size.
+        $cubeExtents[0] = $newVoxelSize * $voxelsPerEdge[0];
+        $cubeExtents[1] = $newVoxelSize * $voxelsPerEdge[1];
+        $cubeExtents[2] = $newVoxelSize * $voxelsPerEdge[2];
+
         floatSliderGrp -e -value ($newVoxelSize) VoxelSizeField;
     } else {
         float $voxelSize = $cubeExtents[$axis] / $voxelsPerEdge[$axis];
         float $newExtent = $voxelSize * $subdivs;
         $cubeExtents[$axis] = $newExtent;
         $voxelsPerEdge[$axis] = $subdivs;
-        polyCube -e -w $cubeExtents[0] -h $cubeExtents[1] -d $cubeExtents[2] $cubeName;
     }
 
+    polyCube -e -w $cubeExtents[0] -h $cubeExtents[1] -d $cubeExtents[2] $cubeName;
     polyCube -e -sx $voxelsPerEdge[0] -sy $voxelsPerEdge[1] -sz $voxelsPerEdge[2] $cubeName;
     intSliderGrp -e -value ($voxelsPerEdge[0]) SubdivWidthField;
     intSliderGrp -e -value ($voxelsPerEdge[1]) SubdivHeightField;
