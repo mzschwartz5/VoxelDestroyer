@@ -118,6 +118,9 @@ void openMeshBooleanIntersection(
     const SideTester* const sideTester,
     bool clipTriangles
 ) {
+    if (!CGAL::is_triangle_mesh(openMesh)) CGAL::Polygon_mesh_processing::triangulate_faces(openMesh);
+    if (!CGAL::is_triangle_mesh(closedMesh)) CGAL::Polygon_mesh_processing::triangulate_faces(closedMesh);
+
     // Split adds edges to the target mesh where the two meshes intersect. Clip does the same thing, but also clips the triangles of the open mesh
     // to the closed mesh boundary. The choice here is mostly aesthetic, though clipping has a small upfront performance cost but has savings during simulation time.
     if (clipTriangles) {
