@@ -378,4 +378,29 @@ void transferUVLinks(const MDagPath& srcMeshPath, const MDagPath& dstMeshPath) {
     }
 }
 
+bool MStringArrayContains(const MStringArray& array, const MString& value) {
+    for (unsigned int i = 0; i < array.length(); ++i) {
+        if (array[i] == value) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void deleteDefaultUVSet(const MString& meshName) {
+    // Can't delete the default UV set while it's current - reorder UV sets, first, if possible.
+    MStringArray allUVSets;
+    MGlobal::executeCommand("polyUVSet -q -allUVSets " + meshName, allUVSets);
+    MString firstUVSet = allUVSets[0];
+
+    if (allUVSets.length() < 2) {
+        MGlobal::displayWarning(MString("VoxelDestroyer cannot delete default UV set ") + firstUVSet + " because it's the only UV set");
+        return;
+    }
+
+    MString secondUVSet = allUVSets[1];
+    MGlobal::executeCommand("polyUVSet -reorder -uvSet " + firstUVSet + " -newUVSet " + secondUVSet + " " + meshName + ";");
+    MGlobal::executeCommand("polyUVSet -delete -uvSet " + firstUVSet + " " + meshName + ";");
+}
+
 } // namespace Utils

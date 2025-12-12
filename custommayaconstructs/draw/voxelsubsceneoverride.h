@@ -511,7 +511,7 @@ private:
 
     MObject getShaderNodeFromShadingSet(const MObject& shadingSet) {
         MFnDependencyNode fnShadingSet(shadingSet);
-        MPlug shaderPlug = fnShadingSet.findPlug("surfaceShader", true);
+        MPlug shaderPlug = fnShadingSet.findPlug("surfaceShader", true); // TODO: support for other shaders? (There's surface, volume, and displacement)
         MPlugArray conns;
         if (shaderPlug.isNull() || !shaderPlug.connectedTo(conns, true, false) || conns.length() == 0) return MObject::kNullObj;
         return conns[0].node(); // API returns a plug array but there can only be one shader connected.
@@ -545,14 +545,8 @@ private:
         std::vector<RenderItemInfo>& renderItemInfos
     ) {
         MFnSingleIndexedComponent fnFaceComponent;
-        MFnMesh originalMeshFn(originalGeomPath.node());
-
-        // TODO: may need to support multiple UV sets in future.
-        MString uvSet;
-        originalMeshFn.getCurrentUVSetName(uvSet);
-        const bool haveUVs = (uvSet.length() > 0) && (originalMeshFn.numUVs(uvSet) > 0);
-        
         std::unordered_set<MGeometry::Semantic> existingVBRequirements;
+
         for (uint i = 0; i < shadingSets.length(); ++i) {
             fnFaceComponent.setObject(shadingSetFaceComponents[i]);
             if (fnFaceComponent.elementCount() == 0) continue;
@@ -569,9 +563,8 @@ private:
                 if (!vbDescList.getDescriptor(j, vbDesc)) continue;
                 
                 if (existingVBRequirements.find(vbDesc.semantic()) != existingVBRequirements.end()) continue;
-                existingVBRequirements.insert(vbDesc.semantic());
 
-                if (vbDesc.semantic() == MGeometry::kTexture && !haveUVs) continue;
+                existingVBRequirements.insert(vbDesc.semantic());
                 geomReqs.addVertexRequirement(vbDesc);
             }
 
@@ -588,7 +581,6 @@ private:
             renderItemInfos.push_back({indexDesc, shaderInstance, 
                 "voxelRenderItem_" + MFnDependencyNode(shadingSets[i]).name()});
         }
-
     }
 
     void createMeshVertexBuffer(const MVertexBufferDescriptor& vbDesc, const MGeometryExtractor& extractor, uint vertexCount, MVertexBufferArray& vertexBufferArray) {
@@ -648,7 +640,7 @@ private:
 
         renderItem = MRenderItem::Create(itemInfo.renderItemName, MRenderItem::MaterialSceneItem, MGeometry::kTriangles);
         renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kShaded | MGeometry::kTextured));
-        renderItem->setWantConsolidation(true);
+        renderItem->setWantConsolidation(false);
         renderItem->setShader(itemInfo.shaderInstance);
         container.add(renderItem);
 
@@ -695,7 +687,7 @@ private:
 
         renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kWireframe | MGeometry::kShaded | MGeometry::kTextured));
         renderItem->depthPriority(MRenderItem::sActiveWireDepthPriority);
-        renderItem->setWantConsolidation(true);
+        renderItem->setWantConsolidation(false);
         renderItem->setHideOnPlayback(true);
         renderItem->setShader(shader);
         container.add(renderItem);
@@ -721,7 +713,7 @@ private:
         renderItem->setDrawMode(MGeometry::kSelectionOnly);
         renderItem->setSelectionMask(selMask);
         renderItem->depthPriority(MRenderItem::sSelectionDepthPriority);
-        renderItem->setWantConsolidation(true);
+        renderItem->setWantConsolidation(false);
         renderItem->setHideOnPlayback(true);
         renderItem->setShader(shader);
         renderItem->setCustomData(customData);

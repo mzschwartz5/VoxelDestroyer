@@ -7,6 +7,7 @@
 #include <maya/MFloatPointArray.h>
 #include <numeric>
 #include "cgalhelper.h"
+#include <maya/MFloatVectorArray.h>
 #include <maya/MProgressWindow.h>
 
 Voxels Voxelizer::voxelizeSelectedMesh(
@@ -478,7 +479,7 @@ MDagPath Voxelizer::finalizeVoxelMesh(
 ) {
     MProgressWindow::setProgressRange(0, 100);
     MProgressWindow::setProgress(0);
-    int numSubsteps = 5; // purely for progress bar
+    int numSubsteps = 6; // purely for progress bar
     int progressIncrement = 100 / numSubsteps;
     MSelectionList selectionList;
     MDagPath resultMeshDagPath = Utils::getDagPathFromName(newMeshName);
@@ -506,26 +507,39 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MProgressWindow::setProgressStatus("Transferring shading sets from original mesh...");
     MGlobal::executeCommand("transferShadingSets", false, false);
     MProgressWindow::advanceProgress(progressIncrement);
-
+    
     // For now at least, let the interior faces be grey and flat shaded.
     // (Otherwise, they try to extend the shading and normals from the surface and look weird).
     selectionList.clear();
     MProgressWindow::setProgressStatus("Setting normals and shading on interior faces...");
-    
     selectionList.add(resultMeshDagPath, std::get<1>(faceComponents));
     MGlobal::setActiveSelectionList(selectionList);
     MGlobal::executeCommand("sets -e -forceElement initialShadingGroup", false, false);
-    MGlobal::executeCommand("polySetToFaceNormal;", false, false);
-    
+    MGlobal::executeCommand("polySetToFaceNormal;", false, false);    
     MProgressWindow::advanceProgress(progressIncrement);
+    
+    MGlobal::executeCommand("delete -ch " + newMeshName); // Delete the history of the combined mesh to decouple it from the original mesh
+    MGlobal::executeCommand("select -cl;", false, false); // Clear selection
 
+    // The new mesh is created with a default uv set ("map1") - if the source mesh didn't have that UV set, delete it on the new mesh.
+    MStringArray sourceUVSets;
+    MGlobal::executeCommand("polyUVSet -q -allUVSets " + originalMeshName, sourceUVSets);
+    if (!Utils::MStringArrayContains(sourceUVSets, "map1")) Utils::deleteDefaultUVSet(newMeshName);
+    
     MProgressWindow::setProgressStatus("Linking transferred UV sets to shading engines...");
     MDagPath originalMeshDagPath = Utils::getDagPathFromName(originalMeshName);
     Utils::transferUVLinks(originalMeshDagPath, resultMeshDagPath);
     MProgressWindow::advanceProgress(progressIncrement);
 
-    MGlobal::executeCommand("delete -ch " + newMeshName); // Delete the history of the combined mesh to decouple it from the original mesh
-    MGlobal::executeCommand("select -cl;", false, false); // Clear selection
+    // We don't actually need the tangents now, just need to trigger generation so that, later, when we replicate the mesh to the custom VoxelShape
+    // using an MGeometryExtractor, we can request the tangents and binormals as well.
+    MProgressWindow::setProgressStatus("Generating tangents...");
+    MFnMesh resultMeshFn(resultMeshDagPath);
+    MString currentUVSet;
+    MFloatVectorArray tangents; 
+    resultMeshFn.getCurrentUVSetName(currentUVSet);
+    resultMeshFn.getTangents(tangents, MSpace::kWorld, &currentUVSet);
+    MProgressWindow::advanceProgress(progressIncrement);
 
     return resultMeshDagPath;
 }

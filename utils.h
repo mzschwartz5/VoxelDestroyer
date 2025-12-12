@@ -200,4 +200,8 @@ MDagPath getDagPathFromName(const MString& name);
  */
 void transferUVLinks(const MDagPath& srcMeshPath, const MDagPath& dstMeshPath);
 
+bool MStringArrayContains(const MStringArray& array, const MString& value);
+
+void deleteDefaultUVSet(const MString& meshName);
+
 } // namespace Utils
