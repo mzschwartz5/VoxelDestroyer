@@ -483,6 +483,9 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     int progressIncrement = 100 / numSubsteps;
     MSelectionList selectionList;
     MDagPath resultMeshDagPath = Utils::getDagPathFromName(newMeshName);
+    MFnMesh resultMeshFn(resultMeshDagPath);
+    MDagPath originalMeshDagPath = Utils::getDagPathFromName(originalMeshName);
+    MFnMesh originalMeshFn(originalMeshDagPath);
     
     MProgressWindow::setProgressStatus("Baking transform of voxelized mesh...");
     MFnTransform resultTransformFn(resultMeshDagPath);
@@ -521,20 +524,20 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MGlobal::executeCommand("delete -ch " + newMeshName); // Delete the history of the combined mesh to decouple it from the original mesh
     MGlobal::executeCommand("select -cl;", false, false); // Clear selection
 
-    // The new mesh is created with a default uv set ("map1") - if the source mesh didn't have that UV set, delete it on the new mesh.
+    // The new mesh is created with a default uv set ("map1") - if the source mesh didn't have that UV set, or that UV set had no UVs, delete it on the new mesh.
     MStringArray sourceUVSets;
     MGlobal::executeCommand("polyUVSet -q -allUVSets " + originalMeshName, sourceUVSets);
-    if (!Utils::MStringArrayContains(sourceUVSets, "map1")) Utils::deleteDefaultUVSet(newMeshName);
+    if (!Utils::MStringArrayContains(sourceUVSets, "map1") || originalMeshFn.numUVs("map1") == 0) {
+        Utils::deleteDefaultUVSet(newMeshName);
+    }
     
     MProgressWindow::setProgressStatus("Linking transferred UV sets to shading engines...");
-    MDagPath originalMeshDagPath = Utils::getDagPathFromName(originalMeshName);
     Utils::transferUVLinks(originalMeshDagPath, resultMeshDagPath);
     MProgressWindow::advanceProgress(progressIncrement);
 
     // We don't actually need the tangents now, just need to trigger generation so that, later, when we replicate the mesh to the custom VoxelShape
     // using an MGeometryExtractor, we can request the tangents and binormals as well.
     MProgressWindow::setProgressStatus("Generating tangents...");
-    MFnMesh resultMeshFn(resultMeshDagPath);
     MString currentUVSet;
     MFloatVectorArray tangents; 
     resultMeshFn.getCurrentUVSetName(currentUVSet);

@@ -545,7 +545,8 @@ private:
         std::vector<RenderItemInfo>& renderItemInfos
     ) {
         MFnSingleIndexedComponent fnFaceComponent;
-        std::unordered_set<MGeometry::Semantic> existingVBRequirements;
+        // Need to deduplicate requirements across shaders (e.g. two shaders may both request POSITION)
+        std::unordered_set<MString, Utils::MStringHash, Utils::MStringEq> existingVBRequirements;
 
         for (uint i = 0; i < shadingSets.length(); ++i) {
             fnFaceComponent.setObject(shadingSetFaceComponents[i]);
@@ -561,10 +562,9 @@ private:
             for (int j = 0; j < vbDescList.length(); ++j) {
                 MVertexBufferDescriptor vbDesc;
                 if (!vbDescList.getDescriptor(j, vbDesc)) continue;
-                
-                if (existingVBRequirements.find(vbDesc.semantic()) != existingVBRequirements.end()) continue;
+                if (existingVBRequirements.find(vbDesc.semanticName()) != existingVBRequirements.end()) continue;
 
-                existingVBRequirements.insert(vbDesc.semantic());
+                existingVBRequirements.insert(vbDesc.semanticName());
                 geomReqs.addVertexRequirement(vbDesc);
             }
 
