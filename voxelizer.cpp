@@ -511,13 +511,12 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MGlobal::executeCommand("transferShadingSets", false, false);
     MProgressWindow::advanceProgress(progressIncrement);
     
-    // For now at least, let the interior faces be grey and flat shaded.
-    // (Otherwise, they try to extend the shading and normals from the surface and look weird).
+    // For some reason, the above attribute transfer seems to transfer normals to the interior even though we didn't select those faces. So we explicitly set the interior face normals to face normal now.
+    // This could be a place for optimization- transfering normals to interior faces is slow because the search process for closest point is expensive.
     selectionList.clear();
     MProgressWindow::setProgressStatus("Setting normals and shading on interior faces...");
     selectionList.add(resultMeshDagPath, std::get<1>(faceComponents));
     MGlobal::setActiveSelectionList(selectionList);
-    MGlobal::executeCommand("sets -e -forceElement initialShadingGroup", false, false);
     MGlobal::executeCommand("polySetToFaceNormal;", false, false);    
     MProgressWindow::advanceProgress(progressIncrement);
     
@@ -527,7 +526,7 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     // The new mesh is created with a default uv set ("map1") - if the source mesh didn't have that UV set, or that UV set had no UVs, delete it on the new mesh.
     MStringArray sourceUVSets;
     MGlobal::executeCommand("polyUVSet -q -allUVSets " + originalMeshName, sourceUVSets);
-    if (!Utils::MStringArrayContains(sourceUVSets, "map1") || originalMeshFn.numUVs("map1") == 0) {
+    if (!Utils::MStringArrayContains(sourceUVSets, "map1") || (originalMeshFn.numUVSets() > 1 && originalMeshFn.numUVs("map1") == 0)) {
         Utils::deleteDefaultUVSet(newMeshName);
     }
     
