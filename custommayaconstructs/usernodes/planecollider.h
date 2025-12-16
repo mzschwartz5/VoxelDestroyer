@@ -4,6 +4,7 @@
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MStatus.h>
 #include <maya/MVector.h>
+#include <maya/MItDependencyNodes.h>
 
 class PlaneCollider : public ColliderLocator {
 
@@ -119,6 +120,20 @@ public:
         );
 
         return MS::kSuccess;
+    }
+
+    // TODO: when gravity becomes directional, make ground plane in the "down" direction.
+    // Also, the act of searching for existing colliders should be a utility.
+    // Potentially have this as an opt-out feature as well (checkbox in the voxelizer menu)
+    static MObject createGroundColliderIfNoneExists() {
+        // First, see if there are any colliders in the scene already.
+        MItDependencyNodes it;
+        for (; !it.isDone(); it.next()) {
+            MObject node = it.thisNode();
+            if (ColliderLocator::isColliderNode(node)) return MObject::kNullObj;
+        }
+
+        return Utils::createDagNode(PlaneCollider::typeName, MObject::kNullObj, "GroundPlaneCollider");
     }
 
 private:

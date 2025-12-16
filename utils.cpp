@@ -403,4 +403,14 @@ void deleteDefaultUVSet(const MString& meshName) {
     MGlobal::executeCommand("polyUVSet -delete -uvSet " + firstUVSet + " " + meshName + ";");
 }
 
+MString getActiveModelPanelName() {
+	MString result;
+	MGlobal::executeCommand("playblast -ae", result);
+
+	// Parse the result to get the active model panel name (result is in form MainPane|viewPanes|modelPanel4|modelPanel4|modelPanel4)
+	MStringArray parts;
+	result.split('|', parts);
+	return parts[parts.length() - 1];
+}
+
 } // namespace Utils

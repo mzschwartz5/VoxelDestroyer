@@ -204,4 +204,6 @@ bool MStringArrayContains(const MStringArray& array, const MString& value);
 
 void deleteDefaultUVSet(const MString& meshName);
 
+MString getActiveModelPanelName();
+
 } // namespace Utils

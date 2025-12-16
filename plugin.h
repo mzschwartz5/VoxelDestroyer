@@ -13,7 +13,6 @@
 #include <maya/MFnDagNode.h>
 #include <maya/MFnTransform.h>
 #include <maya/MVector.h>
-#include <maya/MItDag.h>
 #include "utils.h"
 #include <vector>
 #include <array>
@@ -51,15 +50,7 @@ public:
 	// Called when the command is registered in Maya
 	static void* creator();
 	static MSyntax syntax();
-	
-	// Compare the center of an object's bounding box to the center of the voxel grid
-	// to determine the closest object to the voxel grid (used as a fallback if nothing selected)
-	MDagPath findClosestObjectToVoxelGrid(const MPoint& voxelGridCenter, double voxelGridSize, MString gridDisplayName);
-	MDagPath getSelectedObject(const MPoint& voxelGridCenter, double voxelGridSize);
-	bool isBoundingBoxOverlappingVoxelGrid(const MBoundingBox& bbox, const MPoint& voxelGridCenter, double voxelGridSize);
-	void maybeCreateGroundCollider();
 
-	static MString getActiveModelPanel();
 	static VoxelRendererOverride* voxelRendererOverride;
 	static MCallbackId toolChangedCallbackId;
 	
