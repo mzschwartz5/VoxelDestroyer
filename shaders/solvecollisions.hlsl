@@ -54,15 +54,15 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
     // Store particles in shared memory.
     uint numParticlesInCell = particleEndIdx - particleStartIdx;
     for (uint u = 0; u < numParticlesInCell; ++u) {
-        if (sharedMemoryStartIdx + u >= SHARED_MEMORY_SIZE) continue; // Ignore any particles that would overflow shared memory.
+        if (sharedMemoryStartIdx + u >= SHARED_MEMORY_SIZE) break; // Ignore any particles that would overflow shared memory.
         s_particles[sharedMemoryStartIdx + u] = particles[particleIndices[particleStartIdx + u]];
         s_positionChanged[sharedMemoryStartIdx + u] = false; // Initialize position changed flags.
     }
 
     for (uint i = 0; i < numParticlesInCell; ++i) {
-        if (sharedMemoryStartIdx + i >= SHARED_MEMORY_SIZE) continue;
+        if (sharedMemoryStartIdx + i >= SHARED_MEMORY_SIZE) break;
         for (uint j = i + 1; j < numParticlesInCell; ++j) {
-            if (sharedMemoryStartIdx + j >= SHARED_MEMORY_SIZE) continue;
+            if (sharedMemoryStartIdx + j >= SHARED_MEMORY_SIZE) break;
 
             float4 particleA = s_particles[sharedMemoryStartIdx + i];
             float4 particleB = s_particles[sharedMemoryStartIdx + j];
@@ -100,7 +100,7 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
 
     // Write the particles back to global memory.
     for (uint v = 0; v < numParticlesInCell; ++v) {
-        if (sharedMemoryStartIdx + v >= SHARED_MEMORY_SIZE) continue; // Ignore any particles that would overflow shared memory.
+        if (sharedMemoryStartIdx + v >= SHARED_MEMORY_SIZE) break; // Ignore any particles that would overflow shared memory.
         if (!s_positionChanged[sharedMemoryStartIdx + v]) continue;
         particles[particleIndices[particleStartIdx + v]] = s_particles[sharedMemoryStartIdx + v];
     }
