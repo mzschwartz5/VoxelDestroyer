@@ -23,9 +23,7 @@ bool doParticlesOverlap(
 
 // Approximates the center of a voxel that owns a particle by the average of the particle and its diagonal particle in the voxel.
 // The diagonal particle is retrieved using index relationships between different particles in the voxel (by construction).
-float4 getVoxelCenterOfParticle(float4 particle, uint localParticleIdx) {
-    int particleGlobalIdx = particleIndices[localParticleIdx];
-    int voxelIdx = particleGlobalIdx >> 3;
+float4 getVoxelCenterOfParticle(float4 particle, uint particleGlobalIdx, uint voxelIdx) {
     int particleIdxInVoxel = (particleGlobalIdx - (voxelIdx << 3));
     int particleDiagIdx = (voxelIdx << 3) + 7 - particleIdxInVoxel;
     float4 particleDiag = particles[particleDiagIdx];
@@ -35,8 +33,9 @@ float4 getVoxelCenterOfParticle(float4 particle, uint localParticleIdx) {
 
 // Max out shared memory. See note below about how many particles each thread can store, based
 // on the number of threads per workgroup and how many threads are assigned to each cell. (And see constants.h for SOLVE_COLLISION_THREADS).
-#define SHARED_MEMORY_SIZE 1638 // maximum number of (float4 + bool)'s can fit in 32KB of shared memory
+#define SHARED_MEMORY_SIZE 1365 // maximum number of (float4 + uint + bool)'s can fit in 32KB of shared memory
 groupshared float4 s_particles[SHARED_MEMORY_SIZE];
+groupshared uint s_globalParticleIndices[SHARED_MEMORY_SIZE];
 groupshared bool s_positionChanged[SHARED_MEMORY_SIZE];
 
 /**
@@ -55,7 +54,9 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
     uint numParticlesInCell = particleEndIdx - particleStartIdx;
     for (uint u = 0; u < numParticlesInCell; ++u) {
         if (sharedMemoryStartIdx + u >= SHARED_MEMORY_SIZE) break; // Ignore any particles that would overflow shared memory.
-        s_particles[sharedMemoryStartIdx + u] = particles[particleIndices[particleStartIdx + u]];
+        uint globalParticleIdx = particleIndices[particleStartIdx + u];
+        s_globalParticleIndices[sharedMemoryStartIdx + u] = globalParticleIdx;
+        s_particles[sharedMemoryStartIdx + u] = particles[globalParticleIdx];
         s_positionChanged[sharedMemoryStartIdx + u] = false; // Initialize position changed flags.
     }
 
@@ -64,8 +65,19 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
         for (uint j = i + 1; j < numParticlesInCell; ++j) {
             if (sharedMemoryStartIdx + j >= SHARED_MEMORY_SIZE) break;
 
-            float4 particleA = s_particles[sharedMemoryStartIdx + i];
-            float4 particleB = s_particles[sharedMemoryStartIdx + j];
+            uint sharedMemIdx_i = sharedMemoryStartIdx + i;
+            uint sharedMemIdx_j = sharedMemoryStartIdx + j;
+            
+            uint globalParticleIdx_i = s_globalParticleIndices[sharedMemIdx_i];
+            uint globalParticleIdx_j = s_globalParticleIndices[sharedMemIdx_j];
+            
+            uint globalVoxelIdx_i = globalParticleIdx_i >> 3;
+            uint globalVoxelIdx_j = globalParticleIdx_j >> 3;
+            
+            if (globalVoxelIdx_i == globalVoxelIdx_j) continue; // Skip particle pairs from the same voxel.
+
+            float4 particleA = s_particles[sharedMemIdx_i];
+            float4 particleB = s_particles[sharedMemIdx_j];
 
             float distanceSquared;
             float3 particleAToB;
@@ -77,8 +89,8 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
 
             // Get the particles diagonal to A and B within their respective voxels.
             // Then approximate the voxel centers to augment collision normals, to avoid voxel interlock.
-            float4 voxelACenter = getVoxelCenterOfParticle(particleA, particleStartIdx + i);
-            float4 voxelBCenter = getVoxelCenterOfParticle(particleB, particleStartIdx + j);
+            float4 voxelACenter = getVoxelCenterOfParticle(particleA, globalParticleIdx_i, globalVoxelIdx_i);
+            float4 voxelBCenter = getVoxelCenterOfParticle(particleB, globalParticleIdx_j, globalVoxelIdx_j);
             float voxelARadius = 1.5f * unpackHalf2x16(voxelACenter.w).x;
             float voxelBRadius = 1.5f * unpackHalf2x16(voxelBCenter.w).x;
 
@@ -90,11 +102,10 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
             }
             
             // TODO: take particle mass into account
-            // Factor of 0.35 is somewhat arbitrary. 0.5 would be inifinite stiffness - so this is a little more compliant.
-            s_particles[sharedMemoryStartIdx + i].xyz -= delta * 0.35f * augmentedNormal;
-            s_particles[sharedMemoryStartIdx + j].xyz += delta * 0.35f * augmentedNormal;
-            s_positionChanged[sharedMemoryStartIdx + i] = true;
-            s_positionChanged[sharedMemoryStartIdx + j] = true;
+            s_particles[sharedMemIdx_i].xyz -= delta * 0.5f * augmentedNormal;
+            s_particles[sharedMemIdx_j].xyz += delta * 0.5f * augmentedNormal;
+            s_positionChanged[sharedMemIdx_i] = true;
+            s_positionChanged[sharedMemIdx_j] = true;
         }
     }
 
