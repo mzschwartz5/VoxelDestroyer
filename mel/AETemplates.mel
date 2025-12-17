@@ -92,6 +92,46 @@ global proc AE_enforceMinMax(string $attr, string $lowName, string $highName)
     }
 }
 
+global proc AE_createParticleCollisionsEnabled(string $attr)
+{
+    string $ctrl = "AE_particleCollisionsEnabled_ctrl";
+    attrControlGrp -label "Enable Particle Collisions" -annotation "Toggle particle-particle collisions." -attribute $attr $ctrl;
+}
+
+global proc AE_updateParticleCollisionsEnabled(string $attr)
+{
+    string $ctrl = "AE_particleCollisionsEnabled_ctrl";
+    attrControlGrp -edit -attribute $attr $ctrl;
+}
+
+global proc AE_createPrimitiveCollisionsEnabled(string $attr)
+{
+    string $ctrl = "AE_primitiveCollisionsEnabled_ctrl";
+    attrControlGrp -label "Enable Primitive Collisions" -annotation "Toggle collisions between particles and primitive shapes." -attribute $attr $ctrl;
+}
+
+global proc AE_updatePrimitiveCollisionsEnabled(string $attr)
+{
+    string $ctrl = "AE_primitiveCollisionsEnabled_ctrl";
+    attrControlGrp -edit -attribute $attr $ctrl;
+}
+
+global proc AEGlobalSolverTemplate(string $nodeName)
+{
+    editorTemplate -beginScrollLayout;
+
+    editorTemplate -beginLayout "Global Solver Settings" -collapse 0;
+        editorTemplate -callCustom "AE_createParticleCollisionsEnabled" "AE_updateParticleCollisionsEnabled" "particleCollisionsEnabled";
+        editorTemplate -callCustom "AE_createPrimitiveCollisionsEnabled" "AE_updatePrimitiveCollisionsEnabled" "primitiveCollisionsEnabled";
+        editorTemplate -label "Substeps Per Frame" -annotation "Number of simulation substeps to perform per frame. Higher values may yield better results at the cost of performance." -addControl "numSubsteps";
+    editorTemplate -endLayout;
+
+    string $keep[] = {"numSubsteps", "particleCollisionsEnabled", "primitiveCollisionsEnabled"};
+    suppressAttributesExcept($nodeName, $keep);
+
+    editorTemplate -endScrollLayout;
+}
+
 global proc AEBoxColliderTemplate(string $nodeName)
 {
     editorTemplate -beginScrollLayout;

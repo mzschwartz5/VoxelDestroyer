@@ -12,9 +12,11 @@
 #include "custommayaconstructs/usernodes/colliderlocator.h"
 
 const MTypeId GlobalSolver::id(0x0013A7B1);
-const MString GlobalSolver::globalSolverNodeName("globalSolverNode");
+const MString GlobalSolver::globalSolverNodeName("GlobalSolver");
 MObject GlobalSolver::globalSolverNodeObject = MObject::kNullObj;
 MObject GlobalSolver::aNumSubsteps = MObject::kNullObj;
+MObject GlobalSolver::aParticleCollisionsEnabled = MObject::kNullObj;
+MObject GlobalSolver::aPrimitiveCollisionsEnabled = MObject::kNullObj;
 MObject GlobalSolver::aParticleData = MObject::kNullObj;
 MObject GlobalSolver::aColliderData = MObject::kNullObj;
 MObject GlobalSolver::aParticleBufferOffset = MObject::kNullObj;
@@ -370,6 +372,23 @@ MStatus GlobalSolver::initialize() {
     status = addAttribute(aNumSubsteps);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
+    MFnNumericAttribute nBoolAttr;
+    aParticleCollisionsEnabled = nBoolAttr.create("particleCollisionsEnabled", "pce", MFnNumericData::kBoolean, true, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    nBoolAttr.setStorable(true);
+    nBoolAttr.setWritable(true);
+    nBoolAttr.setReadable(true);
+    status = addAttribute(aParticleCollisionsEnabled);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    aPrimitiveCollisionsEnabled = nBoolAttr.create("primitiveCollisionsEnabled", "pre", MFnNumericData::kBoolean, true, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    nBoolAttr.setStorable(true);
+    nBoolAttr.setWritable(true);
+    nBoolAttr.setReadable(true);
+    status = addAttribute(aPrimitiveCollisionsEnabled);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
     // Input attribute
     // Time attribute
     MFnUnitAttribute uTimeAttr;
@@ -481,7 +500,11 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
     }
     lastComputeTime = time;
 
-    for (int i = 0; i < SUBSTEPS; ++i) {
+    int substeps = block.inputValue(aNumSubsteps).asInt();
+    bool particleCollisionsEnabled = block.inputValue(aParticleCollisionsEnabled).asBool();
+    bool primitiveCollisionsEnabled = block.inputValue(aPrimitiveCollisionsEnabled).asBool();
+
+    for (int i = 0; i < substeps; ++i) {
         for (const auto& [j, pbdSimulateFunc] : pbdSimulateFuncs) {
             pbdSimulateFunc();
         }
@@ -490,11 +513,16 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
             dragParticlesCompute.dispatch();
         }   
 
-        buildCollisionGridCompute.dispatch();
-        prefixScanCompute.dispatch(); 
-        buildCollisionParticleCompute.dispatch();
-        solveCollisionsCompute.dispatch();
-        solvePrimitiveCollisionsCompute.dispatch();
+        if (particleCollisionsEnabled) {
+            buildCollisionGridCompute.dispatch();
+            prefixScanCompute.dispatch(); 
+            buildCollisionParticleCompute.dispatch();
+            solveCollisionsCompute.dispatch();
+        }
+
+        if (primitiveCollisionsEnabled) {
+            solvePrimitiveCollisionsCompute.dispatch();
+        }
     }
 
     return MS::kSuccess;

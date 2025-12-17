@@ -47,6 +47,8 @@ public:
     static const MString globalSolverNodeName;
     // User-set attributes
     static MObject aNumSubsteps;
+    static MObject aParticleCollisionsEnabled;
+    static MObject aPrimitiveCollisionsEnabled;
     // Input attributes
     static MObject aTime;
     static MObject aParticleData;
@@ -79,8 +81,6 @@ private:
     static void calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNodeMessage::AttributeMessage changeType, std::unordered_map<int, int>& offsetForLogicalPlug, float& maximumParticleRadius);
     static void maybeDeleteGlobalSolver();
     MCallbackIdArray callbackIds;
-
-    static constexpr int SUBSTEPS = 10;
 
     // Maps PBD node plug index to its simulate function.
     // Essentially a cache so we don't have to retrieve the function from plugs every frame.
