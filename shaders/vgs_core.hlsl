@@ -67,18 +67,18 @@ void doVGSIterations(
 
             // Per mcgraw et al., if the voxel has been inverted (negative volume), flip the shortest edge to correct it.
             // Only for VGS within voxels, not for face-to-face VGS (thus the option to bail).
-            float len0 = length(u0);
-            float len1 = length(u1);
-            float len2 = length(u2);
-            float minLen = min(len0, min(len1, len2));
+            float len0sq = dot(u0, u0);
+            float len1sq = dot(u1, u1);
+            float len2sq = dot(u2, u2);
 
-            if (len0 == minLen) {
-                u0 = -u0;
-            } else if (len1 == minLen) {
-                u1 = -u1;
-            } else if (len2 == minLen) {
-                u2 = -u2;
-            }
+            // Branchless selection and inversion of the shortest edge.
+            float m0 = step(len0sq, len1sq) * step(len0sq, len2sq);                      
+            float m1 = step(len1sq, len0sq) * step(len1sq, len2sq) * (1.0f - m0);        
+            float m2 = step(len2sq, len0sq) * step(len2sq, len1sq) * (1.0f - m0) * (1.0f - m1);
+
+            u0 = lerp(u0, -u0, m0);
+            u1 = lerp(u1, -u1, m1);
+            u2 = lerp(u2, -u2, m2);
         }
 
         // Volume preservation
