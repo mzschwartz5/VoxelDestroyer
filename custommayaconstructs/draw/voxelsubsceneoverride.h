@@ -28,6 +28,9 @@ struct RenderItemInfo {
     MIndexBufferDescriptor indexDesc;
     MShaderInstance* shaderInstance;
     MString renderItemName;
+
+    RenderItemInfo(const MIndexBufferDescriptor& idx, MShaderInstance* shader, const MString& name)
+        : indexDesc(idx), shaderInstance(shader), renderItemName(name) {}
 };
 
 class SelectionCustomData : public MUserData {
@@ -577,9 +580,7 @@ private:
             );
 
             geomReqs.addIndexingRequirement(indexDesc);
-
-            renderItemInfos.push_back({indexDesc, shaderInstance, 
-                "voxelRenderItem_" + MFnDependencyNode(shadingSets[i]).name()});
+            renderItemInfos.emplace_back(indexDesc, shaderInstance, "voxelRenderItem_" + MFnDependencyNode(shadingSets[i]).name());
         }
     }
 
