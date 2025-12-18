@@ -6,6 +6,9 @@ StructuredBuffer<uint> collisionCellParticleCounts : register(t1);
 StructuredBuffer<float4> frameStartParticles : register(t2);
 RWStructuredBuffer<float4> particles : register(u0);
 
+static const float jitterEpsilon = 1e-3f;
+static const float relaxationFactor = 0.35f;
+
 bool doParticlesOverlap(
     float3 particleA,
     float3 particleB,
@@ -107,6 +110,10 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
             if (!doParticlesOverlap(particleA.xyz, particleB.xyz, particleARadius, particleBRadius, distanceSquared, particleAToB)) continue;
             particleAToB = normalize(particleAToB);
             float delta = (particleARadius + particleBRadius) - sqrt(distanceSquared);
+            
+            float jitterThreshold = jitterEpsilon * min(particleARadius, particleBRadius);            
+            if (delta <= jitterThreshold) continue;
+            delta -= jitterThreshold; 
 
             // Get the particles diagonal to A and B within their respective voxels.
             // Then approximate the voxel centers to augment collision normals, to avoid voxel interlock.
@@ -118,13 +125,13 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
             // Test for voxel-center collision, treating each center as an imaginary "particle" with radius 1.5x that of the voxel's real particles. 
             float3 augmentedNormal = particleAToB;
             float3 voxelAToB;
-            if (doParticlesOverlap(voxelACenter, voxelBCenter, voxelARadius, voxelBRadius, distanceSquared, voxelAToB)) {
+            if (doParticlesOverlap(voxelACenter.xyz, voxelBCenter.xyz, voxelARadius, voxelBRadius, distanceSquared, voxelAToB)) {
                 augmentedNormal = normalize(normalize(voxelAToB) + particleAToB);
             }
             
             // TODO: take particle mass into account
-            s_particles[sharedMemIdx_i].xyz -= delta * 0.5f * augmentedNormal;
-            s_particles[sharedMemIdx_j].xyz += delta * 0.5f * augmentedNormal;
+            s_particles[sharedMemIdx_i].xyz -= delta * relaxationFactor * augmentedNormal;
+            s_particles[sharedMemIdx_j].xyz += delta * relaxationFactor * augmentedNormal;
 
             // We do have to do some extra per-collision-pair global reads to apply friction. There's not enough shared memory to store frame start positions.
             // But since these reads only happen on actual collisions (not on all candidates), it's manageable.
