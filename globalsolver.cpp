@@ -30,6 +30,13 @@ ColliderBuffer GlobalSolver::colliderBuffer;
 std::unordered_set<int> GlobalSolver::dirtyColliderIndices;
 MTime GlobalSolver::lastComputeTime = MTime();
 
+GlobalSolver::~GlobalSolver() {
+    // As with other Maya nodes, preRemovalCallback is not always called (e.g. on a new scene load), so also do cleanup here.
+    MMessage::removeCallbacks(callbackIds);
+    unsubscribeFromDragStateChange();
+    tearDown();
+}
+
 const MObject& GlobalSolver::getOrCreateGlobalSolver() {
     if (!globalSolverNodeObject.isNull()) {
         return globalSolverNodeObject;

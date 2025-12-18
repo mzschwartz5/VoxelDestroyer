@@ -71,7 +71,7 @@ public:
 
 private:
     GlobalSolver() = default;
-    ~GlobalSolver() override = default;
+    ~GlobalSolver();
     void postConstructor() override;
     static void onSimulateFunctionConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
