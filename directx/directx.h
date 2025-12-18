@@ -14,7 +14,7 @@ public:
     DirectX() = delete;
     ~DirectX() = delete;
 
-    static void initialize(HINSTANCE pluginInstance);
+    static MStatus initialize(HINSTANCE pluginInstance);
     
     static ID3D11Device* getDevice();
     static ID3D11DeviceContext* getContext();

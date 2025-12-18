@@ -29,6 +29,7 @@
 #include <maya/MTransformationMatrix.h>
 #include "directx/compute/computeshader.h"
 #include "globalsolver.h"
+#include <maya/M3dView.h>
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)
@@ -114,7 +115,12 @@ MStatus plugin::doIt(const MArgList& argList)
 	MTime::setUIUnit(MTime::k60FPS);
 
 	MProgressWindow::endProgress();
-	MGlobal::executeCommand("undoInfo -closeChunk", false, false); // close the undo chunk	
+
+	// Switch the active model panel to use the VoxelRendererOverride (used for dragging and painting support)
+	MString activeModelPanel = Utils::getActiveModelPanelName();
+	status = MGlobal::executeCommandOnIdle(MString("modelEditor -edit -rnm $gViewport2 -rom " + VoxelRendererOverride::voxelRendererOverrideName + " " + activeModelPanel));
+
+	MGlobal::executeCommand("undoInfo -closeChunk", false, false); // close the undo chunk
 	return MS::kSuccess;
 }
 
@@ -187,14 +193,26 @@ PluginArgs plugin::parsePluginArgs(const MArgList& args) {
 // Initialize Maya Plugin upon loading
 EXPORT MStatus initializePlugin(MObject obj)
 {
+	MStatus status;
+	M3dView activeView = M3dView::active3dView();
+	if (activeView.getRendererName(&status) != M3dView::kViewport2Renderer) {
+		MGlobal::displayError("VoxelDestroyer requires Viewport 2.0 to be the current renderer.");
+		return MStatus::kFailure;
+	}
+
+	if (MRenderer::theRenderer()->drawAPI() != DrawAPI::kDirectX11) {
+		MGlobal::displayError("VoxelDestroyer requires DirectX 11 to be the current Viewport 2.0 rendering engine.");
+		return MStatus::kFailure;
+	}
+
 	// Initialize DirectX
 	// MhInstPlugin is a global variable defined in the MfnPlugin.h file
-	DirectX::initialize(MhInstPlugin);
+	status = DirectX::initialize(MhInstPlugin);
+	CHECK_MSTATUS_AND_RETURN_IT(status);
 	plugin::toolChangedCallbackId = MEventMessage::addEventCallback("PostToolChanged", ChangeVoxelEditModeCommand::onExternalToolChange, nullptr);
 	plugin::voxelRendererOverride = new VoxelRendererOverride(VoxelRendererOverride::voxelRendererOverrideName);
 
 	// Register all commands, nodes, and custom plug data types
-	MStatus status;
 	MFnPlugin plugin(obj, "VoxelDestroyer", "1.0", "Any");
 	status = plugin.registerCommand("VoxelDestroyer", plugin::creator, plugin::syntax);
 	CHECK_MSTATUS(status);
@@ -245,10 +263,9 @@ EXPORT MStatus initializePlugin(MObject obj)
 	status = MDrawRegistry::registerSubSceneOverrideCreator(VoxelSubSceneOverride::drawDbClassification, VoxelSubSceneOverride::drawRegistrantId, VoxelSubSceneOverride::creator);
 	CHECK_MSTATUS(status);
 	
-	// TODO: potentially make this more robust / only allow in perspective panel?
+	// Switch the active model panel to use the VoxelRendererOverride (used for dragging and painting support)
 	MString activeModelPanel = Utils::getActiveModelPanelName();
-	status = MGlobal::executeCommandOnIdle(MString("setRendererAndOverrideInModelPanel $gViewport2 " + VoxelRendererOverride::voxelRendererOverrideName + " " + activeModelPanel));
-
+	status = MGlobal::executeCommandOnIdle(MString("modelEditor -edit -rnm $gViewport2 -rom " + VoxelRendererOverride::voxelRendererOverrideName + " " + activeModelPanel));
 	// VoxelShapeMarkingMenu
 	Utils::loadMELScriptByResourceID(MhInstPlugin, IDR_MEL1);
 	// VoxelizerMenu
