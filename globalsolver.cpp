@@ -17,6 +17,7 @@ MObject GlobalSolver::globalSolverNodeObject = MObject::kNullObj;
 MObject GlobalSolver::aNumSubsteps = MObject::kNullObj;
 MObject GlobalSolver::aParticleCollisionsEnabled = MObject::kNullObj;
 MObject GlobalSolver::aPrimitiveCollisionsEnabled = MObject::kNullObj;
+MObject GlobalSolver::aParticleFriction = MObject::kNullObj;
 MObject GlobalSolver::aParticleData = MObject::kNullObj;
 MObject GlobalSolver::aColliderData = MObject::kNullObj;
 MObject GlobalSolver::aParticleBufferOffset = MObject::kNullObj;
@@ -268,6 +269,7 @@ void GlobalSolver::createGlobalComputeShaders(float maximumParticleRadius) {
         buildCollisionGridCompute.getParticleCollisionCB()
     );
     solveCollisionsCompute.setParticlePositionsUAV(particleUAV);
+    solveCollisionsCompute.setOldParticlePositionsSRV(oldParticlesSRV);
 
     dragParticlesCompute = DragParticlesCompute(totalVoxels);
     dragParticlesCompute.setParticlesUAV(particleUAV);
@@ -389,6 +391,17 @@ MStatus GlobalSolver::initialize() {
     status = addAttribute(aPrimitiveCollisionsEnabled);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
+    MFnNumericAttribute nFloatAttr;
+    aParticleFriction = nFloatAttr.create("particleFriction", "pf", MFnNumericData::kFloat, 0.5f, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    nFloatAttr.setMin(0.0f);
+    nFloatAttr.setMax(1.0f);
+    nFloatAttr.setStorable(true);
+    nFloatAttr.setWritable(true);
+    nFloatAttr.setReadable(true);
+    status = addAttribute(aParticleFriction);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
     // Input attribute
     // Time attribute
     MFnUnitAttribute uTimeAttr;
@@ -503,6 +516,8 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
     int substeps = block.inputValue(aNumSubsteps).asInt();
     bool particleCollisionsEnabled = block.inputValue(aParticleCollisionsEnabled).asBool();
     bool primitiveCollisionsEnabled = block.inputValue(aPrimitiveCollisionsEnabled).asBool();
+    float particleFriction = block.inputValue(aParticleFriction).asFloat();
+    buildCollisionGridCompute.setFriction(particleFriction);
 
     for (int i = 0; i < substeps; ++i) {
         for (const auto& [j, pbdSimulateFunc] : pbdSimulateFuncs) {

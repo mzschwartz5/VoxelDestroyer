@@ -49,6 +49,7 @@ public:
     static MObject aNumSubsteps;
     static MObject aParticleCollisionsEnabled;
     static MObject aPrimitiveCollisionsEnabled;
+    static MObject aParticleFriction;
     // Input attributes
     static MObject aTime;
     static MObject aParticleData;

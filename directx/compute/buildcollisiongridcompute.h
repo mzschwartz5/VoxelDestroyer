@@ -6,7 +6,7 @@ struct ParticleCollisionCB {
     float inverseCellSize;
     unsigned int hashGridSize;
     unsigned int numParticles;
-    uint padding = 0;
+    float friction = 0.5f;
 };
 
 static constexpr int HASH_TABLE_SIZE_TO_PARTICLES = 2;
@@ -48,6 +48,12 @@ public:
 
     void setIsSurfaceSRV(const ComPtr<ID3D11ShaderResourceView>& isSurfaceSRV) {
         this->isSurfaceSRV = isSurfaceSRV;
+    }
+
+    void setFriction(float friction) {
+        if (friction == particleCollisionCBData.friction) return;
+        particleCollisionCBData.friction = friction;
+        DirectX::updateConstantBuffer(particleCollisionCB, particleCollisionCBData);
     }
 
 private:

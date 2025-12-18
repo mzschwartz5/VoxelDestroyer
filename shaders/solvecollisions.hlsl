@@ -3,6 +3,7 @@
 
 StructuredBuffer<uint> particleIndices : register(t0);
 StructuredBuffer<uint> collisionCellParticleCounts : register(t1);
+StructuredBuffer<float4> frameStartParticles : register(t2);
 RWStructuredBuffer<float4> particles : register(u0);
 
 bool doParticlesOverlap(
@@ -37,6 +38,26 @@ float4 getVoxelCenterOfParticle(float4 particle, uint particleGlobalIdx, uint vo
 groupshared float4 s_particles[SHARED_MEMORY_SIZE];
 groupshared uint s_globalParticleIndices[SHARED_MEMORY_SIZE];
 groupshared bool s_positionChanged[SHARED_MEMORY_SIZE];
+
+void applyFriction(float4 particleA, float4 particleB, float4 frameStartParticleA, float4 frameStartParticleB, inout float4 s_particleA, inout float4 s_particleB, float3 augmentedNormal, float collisionDelta) {
+    if (friction <= 0) return;
+
+    float3 frameDeltaA = particleA.xyz - frameStartParticleA.xyz;
+    float3 frameDeltaB = particleB.xyz - frameStartParticleB.xyz;
+
+    float3 relFrameDelta = frameDeltaA - frameDeltaB;
+    float3 relTangent = relFrameDelta - dot(relFrameDelta, augmentedNormal) * augmentedNormal;
+
+    float relTangentLen = length(relTangent);
+    if (relTangentLen < 1e-6f) return;
+
+    float maxTangent = friction * collisionDelta;
+    float scale = min(1.0f, maxTangent / relTangentLen);
+    float3 relTangentClamped = relTangent * scale;
+
+    s_particleA.xyz -= 0.5f * relTangentClamped;
+    s_particleB.xyz += 0.5f * relTangentClamped;
+}
 
 /**
  * Resolve collisions between particles in the same collision cell. (Particles have been pre-binned into all cells they overlap)
@@ -104,6 +125,20 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
             // TODO: take particle mass into account
             s_particles[sharedMemIdx_i].xyz -= delta * 0.5f * augmentedNormal;
             s_particles[sharedMemIdx_j].xyz += delta * 0.5f * augmentedNormal;
+
+            // We do have to do some extra per-collision-pair global reads to apply friction. There's not enough shared memory to store frame start positions.
+            // But since these reads only happen on actual collisions (not on all candidates), it's manageable.
+            applyFriction(
+                particleA, 
+                particleB,
+                frameStartParticles[globalParticleIdx_i],
+                frameStartParticles[globalParticleIdx_j],
+                s_particles[sharedMemIdx_i],
+                s_particles[sharedMemIdx_j],
+                augmentedNormal,
+                delta
+            );
+
             s_positionChanged[sharedMemIdx_i] = true;
             s_positionChanged[sharedMemIdx_j] = true;
         }
@@ -113,6 +148,8 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
     for (uint v = 0; v < numParticlesInCell; ++v) {
         if (sharedMemoryStartIdx + v >= SHARED_MEMORY_SIZE) break; // Ignore any particles that would overflow shared memory.
         if (!s_positionChanged[sharedMemoryStartIdx + v]) continue;
-        particles[particleIndices[particleStartIdx + v]] = s_particles[sharedMemoryStartIdx + v];
+
+        uint globalParticleIdx = s_globalParticleIndices[sharedMemoryStartIdx + v];
+        particles[globalParticleIdx] = s_particles[sharedMemoryStartIdx + v];
     }
 }

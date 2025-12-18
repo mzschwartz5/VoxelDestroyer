@@ -124,9 +124,10 @@ global proc AEGlobalSolverTemplate(string $nodeName)
         editorTemplate -callCustom "AE_createParticleCollisionsEnabled" "AE_updateParticleCollisionsEnabled" "particleCollisionsEnabled";
         editorTemplate -callCustom "AE_createPrimitiveCollisionsEnabled" "AE_updatePrimitiveCollisionsEnabled" "primitiveCollisionsEnabled";
         editorTemplate -label "Substeps Per Frame" -annotation "Number of simulation substeps to perform per frame. Higher values may yield better results at the cost of performance." -addControl "numSubsteps";
+        editorTemplate -label "Particle Friction" -annotation "Friction coefficient applied during particle collisions." -addControl "particleFriction";
     editorTemplate -endLayout;
 
-    string $keep[] = {"numSubsteps", "particleCollisionsEnabled", "primitiveCollisionsEnabled"};
+    string $keep[] = {"numSubsteps", "particleCollisionsEnabled", "primitiveCollisionsEnabled", "particleFriction"};
     suppressAttributesExcept($nodeName, $keep);
 
     editorTemplate -endScrollLayout;

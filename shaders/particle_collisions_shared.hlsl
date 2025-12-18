@@ -3,7 +3,7 @@ cbuffer ParticleCollisionsConstantBuffer : register(b0)
     float inverseCellSize;
     uint hashGridSize;
     uint numParticles;    // typically the same as hashGridSize, but to be more robust, bind separately.
-    uint padding;
+    float friction;
 };
 
 int getParticleCellHash(int gridPosX, int gridPosY, int gridPosZ) {
