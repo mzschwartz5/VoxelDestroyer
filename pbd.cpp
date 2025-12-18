@@ -11,40 +11,20 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(c
     const int numOccupied = voxels->numOccupied;
 
     for (int i = 0; i < numOccupied; i++) {
-        uint32_t x, y, z;
-        Utils::fromMortonCode(mortonCodes[i], x, y, z);
+        std::array<uint32_t, 3> voxelCoords;
+        Utils::fromMortonCode(mortonCodes[i], voxelCoords[0], voxelCoords[1], voxelCoords[2]);
 
-        int rightVoxelMortonCode = static_cast<int>(Utils::toMortonCode(x + 1, y, z));
-        int upVoxelMortonCode = static_cast<int>(Utils::toMortonCode(x, y + 1, z));
-        int frontVoxelMortonCode = static_cast<int>(Utils::toMortonCode(x, y, z + 1));
-
-        // Checks that the right voxel is in the grid and is occupied
-        if (mortonCodesToSortedIdx.find(rightVoxelMortonCode) != mortonCodesToSortedIdx.end()) {
-            int rightNeighborIndex = mortonCodesToSortedIdx.at(rightVoxelMortonCode);
-            FaceConstraint newConstraint;
-            newConstraint.voxelOneIdx = i;
-            newConstraint.voxelTwoIdx = rightNeighborIndex;
-            faceConstraints[0].push_back(newConstraint);
-        }
-
-        // Checks that the up voxel is in the grid and is occupied
-        if (mortonCodesToSortedIdx.find(upVoxelMortonCode) != mortonCodesToSortedIdx.end()) {
-            int upNeighborIndex = mortonCodesToSortedIdx.at(upVoxelMortonCode);
+        // Check each neighboring direction (x+, y+, z+) (only need to do half the neighbors to avoid double-counting)
+        for (int j = 0; j < 3; j++) {
+            std::array<uint32_t, 3> neighborCoords = voxelCoords;
+            neighborCoords[j] += 1;
+            int neighborMortonCode = static_cast<int>(Utils::toMortonCode(neighborCoords[0], neighborCoords[1], neighborCoords[2]));
+            if (mortonCodesToSortedIdx.find(neighborMortonCode) == mortonCodesToSortedIdx.end()) continue;
 
             FaceConstraint newConstraint;
             newConstraint.voxelOneIdx = i;
-            newConstraint.voxelTwoIdx = upNeighborIndex;
-            faceConstraints[1].push_back(newConstraint);
-        }
-
-        // Checks that the front voxel is in the grid and is occupied
-        if (mortonCodesToSortedIdx.find(frontVoxelMortonCode) != mortonCodesToSortedIdx.end()) {
-            int frontNeighborIndex = mortonCodesToSortedIdx.at(frontVoxelMortonCode);
-
-            FaceConstraint newConstraint;
-            newConstraint.voxelOneIdx = i;
-            newConstraint.voxelTwoIdx = frontNeighborIndex;
-            faceConstraints[2].push_back(newConstraint);
+            newConstraint.voxelTwoIdx = mortonCodesToSortedIdx.at(neighborMortonCode);
+            faceConstraints[j].push_back(newConstraint);
         }
     }
 
