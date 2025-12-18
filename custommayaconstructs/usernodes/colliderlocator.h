@@ -25,7 +25,10 @@ class ColliderLocator : public MPxLocatorNode {
 public:
 
     ColliderLocator() {}
-    ~ColliderLocator() override {}
+    ~ColliderLocator() override {
+        // The pre-removal callback doesn't get called on new scene / file.
+        MMessage::removeCallback(parentTransformAddedCallbackId);
+    }
 
     virtual void draw(MUIDrawManager& drawManager) = 0;
     virtual void prepareForDraw() {
