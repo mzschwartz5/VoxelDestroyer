@@ -91,29 +91,13 @@ void doVGSIterations(
         u1 *= mult;
         u2 *= mult;
 
-        if (!massIsInfinite(pos[0])) {
-            pos[0].xyz = center - u0 - u1 - u2;
-        }
-        if (!massIsInfinite(pos[1])) {
-            pos[1].xyz = center + u0 - u1 - u2;
-        }
-        if (!massIsInfinite(pos[2])) {
-            pos[2].xyz = center - u0 + u1 - u2;
-        }
-        if (!massIsInfinite(pos[3])) {
-            pos[3].xyz = center + u0 + u1 - u2;
-        }
-        if (!massIsInfinite(pos[4])) {
-            pos[4].xyz = center - u0 - u1 + u2;
-        }
-        if (!massIsInfinite(pos[5])) {
-            pos[5].xyz = center + u0 - u1 + u2;
-        }
-        if (!massIsInfinite(pos[6])) {
-            pos[6].xyz = center - u0 + u1 + u2;
-        }
-        if (!massIsInfinite(pos[7])) {
-            pos[7].xyz = center + u0 + u1 + u2;
-        }
+        if (!massIsInfinite(pos[0])) { pos[0].xyz = center - u0 - u1 - u2; }
+        if (!massIsInfinite(pos[1])) { pos[1].xyz = center + u0 - u1 - u2; }
+        if (!massIsInfinite(pos[2])) { pos[2].xyz = center - u0 + u1 - u2; }
+        if (!massIsInfinite(pos[3])) { pos[3].xyz = center + u0 + u1 - u2; }
+        if (!massIsInfinite(pos[4])) { pos[4].xyz = center - u0 - u1 + u2; }
+        if (!massIsInfinite(pos[5])) { pos[5].xyz = center + u0 - u1 + u2; }
+        if (!massIsInfinite(pos[6])) { pos[6].xyz = center - u0 + u1 + u2; }
+        if (!massIsInfinite(pos[7])) { pos[7].xyz = center + u0 + u1 + u2; }
     }
 }
