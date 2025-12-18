@@ -81,6 +81,10 @@ void doVGSIterations(
             u2 = lerp(u2, -u2, m2);
         }
 
+        // Bail if volume is too small (voxel is degenerate, there's no way to know how to restore it.
+        // Other constraints may restore it later).
+        if (volume < eps) return;
+
         // Volume preservation
         float mult = 0.5f * pow((voxelRestVolume / volume), oneThird);
         u0 *= mult;
