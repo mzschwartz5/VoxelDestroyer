@@ -1,4 +1,5 @@
 #include "common.hlsl"
+#include "constants.hlsli"
 
 StructuredBuffer<float3> originalVertPositions : register(t0);
 StructuredBuffer<float3> originalVertNormals : register(t1);

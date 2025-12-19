@@ -47,7 +47,7 @@
     <ClInclude Include="directx\compute\computeshader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="constants.h">
+    <ClInclude Include="constants.hlsli">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="utils.h">

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "directx/compute/computeshader.h"
-#include "constants.h"
 
 // Hard-limit number of colliders. This is partly because dynamic-sized arrays
 // are not supported by constant buffers. But also, collider primitives aren't optimized for performance.

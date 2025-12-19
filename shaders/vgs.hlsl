@@ -1,4 +1,5 @@
 #include "vgs_core.hlsl"
+#include "constants.hlsli"
 
 RWStructuredBuffer<float4> positions : register(u0);
 

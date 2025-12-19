@@ -1,4 +1,5 @@
 #include "common.hlsl"
+#include "constants.hlsli"
 
 RWStructuredBuffer<float4> particlePositions : register(u0);
 StructuredBuffer<float4> oldParticlePositions : register(t0);

@@ -1,4 +1,5 @@
 #include "vgs_core.hlsl"
+#include "constants.hlsli"
 
 // Face constraint structure
 struct FaceConstraint {

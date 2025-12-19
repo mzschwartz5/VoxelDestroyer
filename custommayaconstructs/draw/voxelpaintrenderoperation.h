@@ -10,7 +10,7 @@
 #include "../../directx/directx.h"
 #include "../../directx/pingpongview.h"
 #include <maya/MDrawContext.h>
-#include "../../constants.h"
+#include "paintconstants.h"
 #include "../../resource.h"
 #include "../tools/voxelpaintcontext.h"
 #include "../commands/changevoxeleditmodecommand.h"

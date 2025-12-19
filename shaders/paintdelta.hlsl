@@ -1,3 +1,4 @@
+#include "constants.hlsli"
 
 RWBuffer<float> beforePaintValues : register(u0);
 RWBuffer<float> afterPaintValues : register(u1);

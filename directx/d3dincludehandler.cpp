@@ -7,7 +7,8 @@
 const std::unordered_map<std::string, int> D3DIncludeHandler::shaderNameToID = {
     {"vgs_core.hlsl", IDR_SHADER6},
     {"particle_collisions_shared.hlsl", IDR_SHADER10},
-    {"common.hlsl", IDR_SHADER13}
+    {"common.hlsl", IDR_SHADER13},
+    {"constants.hlsli", IDR_SHADER17}
 };
 
 HRESULT D3DIncludeHandler::Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes) {
