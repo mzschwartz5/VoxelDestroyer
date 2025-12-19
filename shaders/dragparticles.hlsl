@@ -82,7 +82,7 @@ void main( uint3 gId : SV_DispatchThreadID )
     // OK: the voxel is visible and within the selection radius. Move its particles by the drag amount in world space.
     // To do this, we'll reverse-project the mouse start/end points to world space, get the difference, and apply it to each particle.
     // For performance, the reverse-projection happens on the CPU to an imaginary voxel at unit-distance, then we just scale it here by the voxel's depth.
-    // It looks weird unintuitive but it's just the mathematical result of some commutativity. Intuitively, it works because similar triangles.
+    // It looks unintuitive but it's just the mathematical result of some commutativity. Intuitively, it works because similar triangles.
     float4 scaledDragWorldDiff = float4(voxelCameraDepth * pixelSpaceVoxelCenter.z * dragWorldDiff, 0.0f);
 
     particles[start_idx + 0] = float4(p0.xyz + scaledDragWorldDiff, p0.w);

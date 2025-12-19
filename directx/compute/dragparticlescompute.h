@@ -137,8 +137,9 @@ public:
 
     void onMousePositionChanged(const MousePosition& mousePosition)
     {
-        this->dragValues.lastMousePosition = this->dragValues.currentMousePosition;
-        this->dragValues.currentMousePosition = mousePosition;
+        // Don't update the last position until dispatch
+        // That way the delta is indepdent of how often the mouse position changes
+        dragValues.currentMousePosition = mousePosition;
     }
 
     void onCameraMatricesChange(const CameraMatrices& cameraMatrices)
@@ -153,19 +154,18 @@ public:
 
     void dispatch() override
     {
-        // May happen if the override render has not yet been setup
+        // May happen if the render override has not yet been setup
         if (!depthSRV) {
             return;
         }
 
-        // *Could* do this in onMousePositionChanged, but no reason to copy the buffer on
-        // every mouse event, which can fire more frequently than dispatches. Cheaper to do it on dispatch as needed.
         if (dragValues.currentMousePosition.x != dragValues.lastMousePosition.x ||
             dragValues.currentMousePosition.y != dragValues.lastMousePosition.y) {
             copyConstantBufferToGPU();
         }
         
         ComputeShader::dispatch(numWorkgroups);
+        dragValues.lastMousePosition = dragValues.currentMousePosition;
     };
 
 private:
@@ -212,6 +212,7 @@ private:
         );
 
         MFloatVector diff = MVector(mouseEndNDC - mouseStartNDC) * cameraMatrices.invViewProjMatrix;
+        diff /= 10.0f;
         return { diff.x, diff.y, diff.z };
     }
 
