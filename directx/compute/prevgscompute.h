@@ -5,7 +5,7 @@ struct PreVGSConstantBuffer {
     float gravityStrength;
     float groundCollisionY;
     float timeStep;
-    int numParticles;
+    uint numParticles;
     float massLow;
     float massHigh;
     int padding0;
@@ -18,7 +18,7 @@ public:
     PreVGSCompute() = default;
 
     PreVGSCompute(
-        int numParticles,
+        uint numParticles,
         const PreVGSConstantBuffer& simConstants
 	) : ComputeShader(IDR_SHADER5), simConstants(simConstants)
     {
@@ -103,7 +103,7 @@ private:
 		DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
-    void initializeBuffers(int numParticles) {
+    void initializeBuffers(uint numParticles) {
         numWorkgroups = Utils::divideRoundUp(numParticles, VGS_THREADS);
         simConstantsBuffer = DirectX::createConstantBuffer<PreVGSConstantBuffer>(simConstants);
     }

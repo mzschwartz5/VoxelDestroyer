@@ -86,7 +86,7 @@ void doVGSIterations(
         if (volume < eps) return;
 
         // Volume preservation
-        float mult = 0.5f * pow((voxelRestVolume / volume), oneThird);
+        float mult = 0.5f * pow(abs(voxelRestVolume / volume), oneThird); // (abs to appease FXC)
         u0 *= mult;
         u1 *= mult;
         u2 *= mult;

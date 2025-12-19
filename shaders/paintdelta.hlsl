@@ -5,7 +5,7 @@ RWBuffer<float> afterPaintValues : register(u1);
 
 cbuffer PaintDeltaCB : register(b0)
 {
-    int numElements;
+    uint numElements;
     int sign; // +1 redo, -1 undo (and -1 for computing delta)
     int padding0;
     int padding1;

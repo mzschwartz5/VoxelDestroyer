@@ -248,12 +248,73 @@
     <None Include="mel\deleteShelfTabNoPrompt.mel" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="shaders\build_collision_grid_buffer.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\build_collision_grid_buffer.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\build_collision_particle_buffer.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\build_collision_particle_buffer.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\deformvertices.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\deformvertices.cso</ObjectFileOutput>
+    </FxCompile>
     <FxCompile Include="shaders\dragparticles.hlsl">
       <EntryPoint>main</EntryPoint>
       <ShaderType>Compute</ShaderType>
       <ShaderModel>5.0</ShaderModel>
       <ObjectFileOutput>$(ProjectDir)\shaders\cso\dragparticles.cso</ObjectFileOutput>
     </FxCompile>
+    <FxCompile Include="shaders\faceconstraints.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\faceconstraints.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\paintdelta.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\paintdelta.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\prefixscan.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\prefixscan.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\prevgs.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\prevgs.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\solvecollisions.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\solvecollisions.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\solveprimitivecollisions.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\solveprimitivecollisions.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\vgs.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\vgs.cso</ObjectFileOutput>
+    </FxCompile>
+    
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

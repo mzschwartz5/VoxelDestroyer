@@ -43,7 +43,7 @@ public:
         this->initialized = initialized;
     }
 
-    int numParticles() const {
+    uint numParticles() const {
         return totalParticles;
     }
 
@@ -68,7 +68,7 @@ public:
 private:
     // Inverse mass (w) and particle radius stored, packed at half-precision, as 4th component.
     std::vector<MFloatPoint> particles;
-    int totalParticles{ 0 };
+    uint totalParticles{ 0 };
     bool initialized = false;
 
     // Shaders

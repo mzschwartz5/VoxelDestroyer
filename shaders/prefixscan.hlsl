@@ -39,11 +39,11 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupId : SV_GroupID, uint
 
     // Upsweep phase
     int depth = ilog2ceil(2 * PREFIX_SCAN_THREADS);
-    for (int stride = 0; stride < depth; ++stride) {
+    for (int upStride = 0; upStride < depth; ++upStride) {
         GroupMemoryBarrierWithGroupSync();
 
-        int twoToTheStridePlusOne = 1 << (stride + 1);
-        int twoToTheStride = 1 << stride;
+        int twoToTheStridePlusOne = 1 << (upStride + 1);
+        int twoToTheStride = 1 << upStride;
         int rightChildIdx = groupThreadId.x * twoToTheStridePlusOne + twoToTheStridePlusOne - 1;
         int leftChildIdx = groupThreadId.x * twoToTheStridePlusOne + twoToTheStride - 1;
 
@@ -65,12 +65,12 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupId : SV_GroupID, uint
     }
 
     // Downsweep phase
-    for (int stride = depth - 1; stride >= 1; --stride)
+    for (int downStride = depth - 1; downStride >= 1; --downStride)
     {
         GroupMemoryBarrierWithGroupSync();
 
-        int twoToTheStridePlusOne = 1 << (stride + 1);
-        int twoToTheStride = 1 << stride;
+        int twoToTheStridePlusOne = 1 << (downStride + 1);
+        int twoToTheStride = 1 << downStride;
         int rightChildIdx = groupThreadId.x * twoToTheStridePlusOne + twoToTheStridePlusOne - 1;
         int leftChildIdx = groupThreadId.x * twoToTheStridePlusOne + twoToTheStride - 1;
 

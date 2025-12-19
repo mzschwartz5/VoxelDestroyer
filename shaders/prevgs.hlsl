@@ -10,7 +10,7 @@ cbuffer VoxelSimBuffer : register(b0)
     float GRAVITY_STRENGTH;
     float GROUND_Y;
     float TIMESTEP;
-    int numParticles;
+    uint numParticles;
     float massLow;
     float massHigh;
     int padding0;

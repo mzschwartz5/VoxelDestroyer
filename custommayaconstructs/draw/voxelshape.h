@@ -216,7 +216,7 @@ public:
     void subscribeToPaintStateChanges(VoxelEditMode paintMode) {
         bool isFacePaintMode = (paintMode == VoxelEditMode::FacePaint);
         PingPongView* paintViews = isFacePaintMode ? &facePaintViews : &particlePaintViews;
-        const int numElements = getVoxels()->numOccupied * (isFacePaintMode ? 6 : 8);
+        const uint numElements = getVoxels()->numOccupied * (isFacePaintMode ? 6 : 8);
         paintDeltaCompute.setPaintViews(paintViews, numElements);
 
         unsubPaintStateChanges = VoxelPaintContext::subscribeToPaintDragStateChange([this, paintViews, paintMode](const PaintDragState& paintState) {

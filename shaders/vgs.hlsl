@@ -12,7 +12,7 @@ cbuffer VoxelSimBuffer : register(b0)
     float ITER_COUNT;
     float PADDING_0;
     float PADDING_1;
-    int NUM_VOXELS;
+    uint NUM_VOXELS;
 };
 
 [numthreads(VGS_THREADS, 1, 1)]
@@ -44,9 +44,9 @@ void main(
     );
 
     // Write back the updated positions
-    for (int i = 0; i < 8; ++i) {
-        if (massIsInfinite(pos[i])) continue;
-        positions[start_idx + i] = pos[i];
+    for (int j = 0; j < 8; ++j) {
+        if (massIsInfinite(pos[j])) continue;
+        positions[start_idx + j] = pos[j];
     }
 
 }
