@@ -35,6 +35,7 @@ public:
     ~VoxelDragContext() override {
         MTimerMessage::removeCallback(timerCallbackId);
         MEventMessage::removeCallback(timeChangedCallbackId);
+        MConditionMessage::removeCallback(playbackChangeCallbackId);
     }
 
     void getClassName(MString& name) const override {

@@ -6,16 +6,16 @@
 #include <maya/MPoint.h>
 #include <maya/MFloatPoint.h>
 #include <maya/MFloatVector.h>
-
-// NOTE: currently, the ConstantBuffer is perfectly 16-byte aligned. Adding any values to these structs
-// or even changing their order can break this shader. Any extra data must fit into the next 16-byte chunk.
 struct DragValues
 {
     MousePosition lastMousePosition;
     MousePosition currentMousePosition;
     float selectRadius{ 0.0f };
+    float selectStrength{ 1.0f };
 };
 
+// NOTE: currently, the ConstantBuffer is perfectly 16-byte aligned. Adding any values to these structs (that gets copied to the GPU)
+// or even changing their order can break this shader. Any extra data must fit into the next 16-byte chunk.
 struct ConstantBuffer{
     // Difference in world space between the last and current mouse positions
     // for a hypothetical unit depth.
@@ -50,6 +50,11 @@ public:
     void setParticlesUAV(const ComPtr<ID3D11UnorderedAccessView>& particlesUAV)
     {
         this->particlesUAV = particlesUAV;
+    }
+
+    void setNumSubsteps(int numSubsteps)
+    {
+        this->numSubsteps = numSubsteps;
     }
 
     void initSubscriptions() {
@@ -129,6 +134,7 @@ public:
             dragValues.currentMousePosition = dragState.mousePosition;
             dragValues.lastMousePosition = dragState.mousePosition;
             dragValues.selectRadius = dragState.selectRadius;
+            dragValues.selectStrength = dragState.selectStrength;
             copyConstantBufferToGPU();
         } else {
             DirectX::clearUintBuffer(isDraggingUAV);
@@ -176,6 +182,7 @@ private:
     ComPtr<ID3D11Buffer> isDraggingBuffer;
     CameraMatrices cameraMatrices;
     DragValues dragValues;
+    int numSubsteps; // simultation substeps per frame
     int numWorkgroups;
     EventBase::Unsubscribe unsubscribeFromDragStateChange;
     EventBase::Unsubscribe unsubscribeFromMousePositionChange;
@@ -212,7 +219,8 @@ private:
         );
 
         MFloatVector diff = MVector(mouseEndNDC - mouseStartNDC) * cameraMatrices.invViewProjMatrix;
-        diff /= 10.0f;
+        diff /= static_cast<float>(numSubsteps);               // Spread the drag effect over the number of simulation substeps
+        diff *= dragValues.selectStrength; // Scale by the user-defined strength
         return { diff.x, diff.y, diff.z };
     }
 

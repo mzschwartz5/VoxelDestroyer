@@ -520,11 +520,12 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
     }
     lastComputeTime = time;
 
-    int substeps = block.inputValue(aNumSubsteps).asInt();
     bool particleCollisionsEnabled = block.inputValue(aParticleCollisionsEnabled).asBool();
     bool primitiveCollisionsEnabled = block.inputValue(aPrimitiveCollisionsEnabled).asBool();
     float particleFriction = block.inputValue(aParticleFriction).asFloat();
     buildCollisionGridCompute.setFriction(particleFriction);
+    int substeps = block.inputValue(aNumSubsteps).asInt();
+    dragParticlesCompute.setNumSubsteps(substeps);
 
     for (int i = 0; i < substeps; ++i) {
         for (const auto& [j, pbdSimulateFunc] : pbdSimulateFuncs) {
