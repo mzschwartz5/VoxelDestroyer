@@ -36,6 +36,10 @@ public:
         MTimerMessage::removeCallback(timerCallbackId);
         MEventMessage::removeCallback(timeChangedCallbackId);
     }
+
+    void getClassName(MString& name) const override {
+        name.set("VoxelDragContext");
+    }
     
 private:
     inline static double lastTimeValue = MAnimControl::currentTime().value();

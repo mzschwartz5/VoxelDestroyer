@@ -1,0 +1,42 @@
+
+// This procedure has to have this specific name to be recognized by Maya
+// See docs here: https://help.autodesk.com/view/MAYAUL/2022/ENU/?guid=Maya_SDK_Command_plug_ins_Tool_property_sheets_html
+global proc VoxelDragContextValues(string $toolName) {
+    string $parent = (`toolPropertyWindow -q -location`);
+    setParent $parent;
+
+    // Override the default title and buttons of the tool property window
+    string $field = `toolPropertyWindow -q -field`;
+    string $helpBtn  = `toolPropertyWindow -q -helpButton`;
+    string $resetBtn = `toolPropertyWindow -q -resetButton`;
+    text -e -label "Voxel Drag Tool" $field;
+    button -e -c "VoxelDragContext_Help()" $helpBtn;
+    button -e -c "VoxelDragContext_Reset()" $resetBtn;
+
+    string $ctx              = `currentCtx`;
+    float  $radius           = `voxelDragContextCommand -q -radius $ctx`;
+    float  $strength            = `voxelDragContextCommand -q -strength $ctx`;
+
+    floatSliderGrp -e -v $radius VoxelDragRadiusControl;
+    floatSliderGrp -e -v $strength VoxelDragStrengthControl;
+
+    toolPropertySelect "VoxelDragContext";
+}
+
+global proc VoxelDragContext_Reset()
+{
+    // reset UI controls to defaults
+    floatSliderGrp -e -v 25.0 VoxelDragRadiusControl;
+    floatSliderGrp -e -v 1.0 VoxelDragStrengthControl;
+
+    // push defaults into the active context (if active)
+    string $ctx = `currentCtx`;
+    catchQuiet(`voxelDragContextCommand -e -radius 25.0 $ctx`);
+    catchQuiet(`voxelDragContextCommand -e -strength 1.0 $ctx`);
+}
+
+global proc VoxelDragContext_Help()
+{
+    // TODO: better URL?
+    showHelp -a "http://github.com/mzschwartz5/VoxelDestroyer";
+}

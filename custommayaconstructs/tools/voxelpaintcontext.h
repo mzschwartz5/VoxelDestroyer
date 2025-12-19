@@ -69,10 +69,6 @@ public:
         name.set("VoxelPaintContext");
     }
 
-    float getSelectRadius() const override {
-        return VoxelContextBase::getSelectRadius();
-    }
-
     void setBrushMode(BrushMode mode) {
         brushMode = mode;
         MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI

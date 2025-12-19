@@ -1,0 +1,61 @@
+// This procedure has to have this specific name to be recognized by Maya
+// See docs here: https://help.autodesk.com/view/MAYAUL/2022/ENU/?guid=Maya_SDK_Command_plug_ins_Tool_property_sheets_html
+global proc VoxelDragContextProperties() {
+    // Required: parent into the Tool Settings property sheet
+    string $parent = `toolPropertyWindow -q -location`;
+
+    if (`control -exists $parent`)
+        setParent $parent;
+
+    setUITemplate -pushTemplate ToolOptionBoxTemplate;
+
+    columnLayout VoxelDragContext;
+
+        frameLayout -collapsable false -label "Voxel Drag Settings";
+            columnLayout;
+
+                separator -style "none";
+
+                floatSliderGrp -label "Radius"
+                    -field true
+                    -minValue 0.001
+                    -maxValue 200.0
+                    -fieldMinValue 0.001
+                    -fieldMaxValue 1000.0
+                    -value 25.0
+                    -adjustableColumn 3
+                    -annotation "Screen space area of effect for the drag tool."
+                    -cc "VoxelDragRadiusChanged()"
+                    VoxelDragRadiusControl;
+
+                floatSliderGrp -label "Strength"
+                    -field true
+                    -minValue 0.000
+                    -maxValue 2.0
+                    -fieldMinValue 0.000
+                    -fieldMaxValue 10.0
+                    -value 1.0
+                    -adjustableColumn 3
+                    -annotation "A multiplier on the drag sensitivity. Value of 1.0 means voxels move at the same speed as the mouse."
+                    -cc "VoxelDragStrengthChanged()"
+                    VoxelDragStrengthControl;
+
+            setParent ..;
+        setParent ..;
+
+    setParent ..;
+
+    setUITemplate -popTemplate;
+}
+
+global proc VoxelDragRadiusChanged() {
+    string $ctx = `currentCtx`;
+    float $radius = `floatSliderGrp -q -v VoxelDragRadiusControl`;
+    catchQuiet(`voxelDragContextCommand -e -radius $radius $ctx`);
+}
+
+global proc VoxelDragStrengthChanged() {
+    string $ctx = `currentCtx`;
+    float $strength = `floatSliderGrp -q -v VoxelDragStrengthControl`;
+    catchQuiet(`voxelDragContextCommand -e -strength $strength $ctx`);
+}

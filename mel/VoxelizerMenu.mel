@@ -1,5 +1,6 @@
-// Create a named instance of the voxel paint context command to reuse so it retains user settings
+// Create a named instance of the voxel context commands to reuse so they retains user settings
 global string $voxelPaintContext;
+global string $voxelDragContext;
 global int $VOXEL_SUBDIV_SOFTMAX = 32;
 global int $VOXEL_SUBDIV_HARDMAX = 64;
 global int $VOXEL_SUBDIV_MIN = 2;
@@ -324,7 +325,9 @@ global proc VoxelizerMenu_close(string $cubeName) {
 
 global proc VoxelizerMenu_addToShelf() {
     global string $voxelPaintContext;
+    global string $voxelDragContext;
     $voxelPaintContext = `voxelPaintContextCommand`;
+    $voxelDragContext = `voxelDragContextCommand`;
     // Ensure the "VoxelDestroyer" shelf exists
     global string $gShelfTopLevel;
     if (!`shelfLayout -exists "VoxelDestroyer"`) {
@@ -356,7 +359,8 @@ global proc VoxelizerMenu_addToShelf() {
             -label "VoxelDragTool"
             -annotation "Interactively drag voxels in the viewport while previewing an animation"
             -image1 "VoxelDrag.png"
-            -command "string $ctx = `voxelDragContextCommand`; setToolTo $ctx;";
+            -command "setToolTo $voxelDragContext;"
+            -doubleClickCommand "setToolTo $voxelDragContext; toolPropertyWindow;";
 
         shelfButton -parent "VoxelDestroyer"
             -label "VoxelCollider"

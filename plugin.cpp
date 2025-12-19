@@ -281,6 +281,8 @@ EXPORT MStatus initializePlugin(MObject obj)
 	MGlobal::executeCommand("internalVar -usd", scriptsDir);
 	Utils::extractResourceToFile(MhInstPlugin, IDR_MEL4, L"MEL", scriptsDir + "VoxelPaintContextProperties.mel");
 	Utils::extractResourceToFile(MhInstPlugin, IDR_MEL5, L"MEL", scriptsDir + "VoxelPaintContextValues.mel");
+	Utils::extractResourceToFile(MhInstPlugin, IDR_MEL7, L"MEL", scriptsDir + "VoxelDragContextProperties.mel");
+	Utils::extractResourceToFile(MhInstPlugin, IDR_MEL8, L"MEL", scriptsDir + "VoxelDragContextValues.mel");
 
 	// Write icon files to user pref's directory
 	MString prefsDir;
