@@ -61,6 +61,7 @@ global proc VoxelPaintContextValues(string $toolName) {
     float  $lowColor[]       = stringToFloatArray(`voxelPaintContextCommand -q -lowColor $ctx`);
     float  $highColor[]      = stringToFloatArray(`voxelPaintContextCommand -q -highColor $ctx`);
 
+    floatSliderGrp -e -v $radius VoxelPaintRadiusControl;
     floatSliderGrp -e -v $value VoxelPaintValueControl;
     checkBoxGrp -e -v1 $infiniteStrength VoxelPaintInfiniteStrengthControl;
     optionMenuGrp -e -sl ($mode + 1) VoxelPaintModeControl; // UI indices are 1-based
