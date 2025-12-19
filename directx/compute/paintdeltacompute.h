@@ -3,7 +3,7 @@
 #include "directx/pingpongview.h"
 
 struct Constants {
-    int numElements;
+    uint numElements;
     int sign;
     int padding0;
     int padding1;
@@ -32,7 +32,7 @@ public:
         ComputeShader::dispatch(numWorkgroups);
     }
 
-    void setPaintViews(const PingPongView* paintViews, int numElements) {
+    void setPaintViews(const PingPongView* paintViews, uint numElements) {
         this->paintViews = paintViews;
         this->numElements = numElements;
         numWorkgroups = Utils::divideRoundUp(numElements, VGS_THREADS);
@@ -61,7 +61,7 @@ public:
     }
 
 private:
-    int numElements;
+    uint numElements;
     int numWorkgroups;
     const PingPongView* paintViews = nullptr;
     ComPtr<ID3D11UnorderedAccessView> deltaUAV;

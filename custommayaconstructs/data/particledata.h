@@ -7,7 +7,7 @@
 #include <vector>
 
 struct ParticleDataContainer {
-    int numParticles = 0;
+    uint numParticles = 0;
     std::vector<MFloatPoint>* particlePositionsCPU = nullptr;
     std::vector<uint>* isSurface = nullptr;
     float particleRadius = 0.0f;
