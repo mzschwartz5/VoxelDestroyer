@@ -15,7 +15,6 @@ enum class BrushMode {
 // Richer payload for paint-tool specific drag state change event
 struct PaintDragState : DragState {
     BrushMode brushMode{ BrushMode::SET };
-    float brushValue{ 0.0f };
     bool cameraBased{ true };
     MColor lowColor;
     MColor highColor;
@@ -32,6 +31,7 @@ public:
         setHelpString("Paint various simulation weights onto the voxel grid.");
         setImage("VoxelPaint.png", MPxContext::kImage1);
         setCursor(MCursor::crossHairCursor);
+        setSelectStrength(50.0f); // Default brush value
     }
     
     ~VoxelPaintContext() override {}
@@ -46,9 +46,9 @@ public:
             PaintDragState paintDragState {
                 baseState.isDragging,
                 baseState.selectRadius,
+                baseState.selectStrength,
                 baseState.mousePosition,
                 brushMode,
-                brushValue,
                 cameraBased,
                 lowColor,
                 highColor,
@@ -69,11 +69,6 @@ public:
         name.set("VoxelPaintContext");
     }
 
-    void setSelectRadius(float radius) override {
-        VoxelContextBase::setSelectRadius(radius);
-        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
-    }
-
     float getSelectRadius() const override {
         return VoxelContextBase::getSelectRadius();
     }
@@ -85,15 +80,6 @@ public:
 
     BrushMode getBrushMode() const {
         return brushMode;
-    }
-
-    float getBrushValue() const {
-        return brushValue;
-    }
-
-    void setBrushValue(float value) {
-        brushValue = value;
-        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
     }
 
     void setCameraBased(bool enabled) {
@@ -112,9 +98,9 @@ public:
         paintDragStateChangedEvent.notify(PaintDragState{
             false,
             getSelectRadius(),
+            getSelectStrength(),
             getMousePosition(),
             brushMode,
-            brushValue,
             cameraBased,
             lowColor,
             highColor,
@@ -131,9 +117,9 @@ public:
         paintDragStateChangedEvent.notify(PaintDragState{
             false,
             getSelectRadius(),
+            getSelectStrength(),
             getMousePosition(),
             brushMode,
-            brushValue,
             cameraBased,
             lowColor,
             highColor,
@@ -204,7 +190,6 @@ private:
     inline static Event<const PaintDragState&> paintDragStateChangedEvent;
     EventBase::Unsubscribe unsubscribeBaseDragStateEvent;
     BrushMode brushMode = BrushMode::SET;
-    float brushValue = 50.0f;
     bool cameraBased = true;
     MCallbackId timerCallbackId;
     MColor lowColor = MColor(1.0f, 0.0f, 0.0f, 0.0f);

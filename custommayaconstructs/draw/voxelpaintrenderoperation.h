@@ -101,7 +101,7 @@ public:
             brushMode = state.brushMode;
             // If infinite strength is enabled, we use a paint value of -1.0 to indicate full strength.
             // Otherwise, the UI provides percentage, so normalize.
-            brushValue = state.infiniteStrength ? -1.0f : state.brushValue / 100.0f; 
+            brushValue = state.infiniteStrength ? -1.0f : state.selectStrength / 100.0f; 
             cameraBased = state.cameraBased;
             lowColor = state.lowColor;
             highColor = state.highColor;

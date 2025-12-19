@@ -40,7 +40,7 @@ public:
         }
         if (ap.isFlagSet("-v")) {
             double v; ap.getFlagArgument("-v", 0, v);
-            fCtx->setBrushValue(v);
+            fCtx->setSelectStrength(v);
         }
         if (ap.isFlagSet("-ifs")) {
             int v; ap.getFlagArgument("-ifs", 0, v);
@@ -85,7 +85,7 @@ public:
         if (!fCtx) return MS::kFailure;
         MArgParser ap = parser();
         if (ap.isFlagSet("-r")) setResult(fCtx->getSelectRadius());
-        if (ap.isFlagSet("-v")) setResult(fCtx->getBrushValue());
+        if (ap.isFlagSet("-v")) setResult(fCtx->getSelectStrength());
         if (ap.isFlagSet("-ifs")) setResult(fCtx->isInfiniteStrength() ? 1 : 0);
         if (ap.isFlagSet("-m")) setResult((int)fCtx->getBrushMode());
         if (ap.isFlagSet("-cb")) setResult(fCtx->isCameraBased() ? 1 : 0);

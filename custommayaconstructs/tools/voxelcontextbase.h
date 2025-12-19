@@ -16,6 +16,7 @@ struct DragState
 {
     bool isDragging{ false };
     float selectRadius{ 25.0f };
+    float selectStrength{ 1.0f };
     MousePosition mousePosition;
 };
 
@@ -40,6 +41,24 @@ public:
     {
         return mousePositionChangedEvent.subscribe(listener);
     }
+
+    virtual void setSelectRadius(float radius) {
+        selectRadius = radius;
+        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
+    }
+
+    virtual float getSelectRadius() const {
+        return selectRadius;
+    }
+
+    virtual void setSelectStrength(float strength) {
+        selectStrength = strength;
+        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
+    }
+
+    virtual float getSelectStrength() const {
+        return selectStrength;
+    }
     
 private:
     inline static Event<const DragState&> dragStateChangedEvent;
@@ -50,6 +69,7 @@ private:
     short mouseX, mouseY;
     short screenDragStartX, screenDragStartY;
     float selectRadius = 25.0f;
+    float selectStrength = 1.0f;
     MStatus status;
 
 protected:
@@ -73,7 +93,7 @@ protected:
         screenDragStartY = mouseY;
                 
         isDragging = true;
-        dragStateChangedEvent.notify({ isDragging, selectRadius, { mouseX, mouseY } });
+        dragStateChangedEvent.notify({ isDragging, selectRadius, selectStrength, { mouseX, mouseY } });
         return MS::kSuccess;
     }
 
@@ -99,7 +119,7 @@ protected:
         event.getPosition(mouseX, mouseY);
 
         isDragging = false;
-        dragStateChangedEvent.notify({ isDragging, selectRadius, { mouseX, mouseY } });
+        dragStateChangedEvent.notify({ isDragging, selectRadius, selectStrength, { mouseX, mouseY } });
         return MS::kSuccess;
     }
 
@@ -125,14 +145,6 @@ protected:
         drawMgr.endDrawable();
 
         return MS::kSuccess;
-    }
-
-    virtual void setSelectRadius(float radius) {
-        selectRadius = radius;
-    }
-
-    virtual float getSelectRadius() const {
-        return selectRadius;
     }
 
     virtual MousePosition getMousePosition() const {
