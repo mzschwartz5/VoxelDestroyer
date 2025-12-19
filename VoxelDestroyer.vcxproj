@@ -247,6 +247,14 @@
     <None Include="mel\VoxelPaintToolSettings.mel" />
     <None Include="mel\deleteShelfTabNoPrompt.mel" />
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="shaders\dragparticles.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\dragparticles.cso</ObjectFileOutput>
+    </FxCompile>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
