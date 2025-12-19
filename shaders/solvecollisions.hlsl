@@ -1,5 +1,6 @@
 #include "particle_collisions_shared.hlsl"
 #include "common.hlsl"
+#include "constants.hlsli"
 
 StructuredBuffer<uint> particleIndices : register(t0);
 StructuredBuffer<uint> collisionCellParticleCounts : register(t1);
@@ -36,7 +37,7 @@ float4 getVoxelCenterOfParticle(float4 particle, uint particleGlobalIdx, uint vo
 }
 
 // Max out shared memory. See note below about how many particles each thread can store, based
-// on the number of threads per workgroup and how many threads are assigned to each cell. (And see constants.h for SOLVE_COLLISION_THREADS).
+// on the number of threads per workgroup and how many threads are assigned to each cell. (And see constants.hlsli for SOLVE_COLLISION_THREADS).
 #define SHARED_MEMORY_SIZE 1365 // maximum number of (float4 + uint + bool)'s can fit in 32KB of shared memory
 groupshared float4 s_particles[SHARED_MEMORY_SIZE];
 groupshared uint s_globalParticleIndices[SHARED_MEMORY_SIZE];

@@ -1,3 +1,5 @@
+#include "constants.hlsli"
+
 // Note that on subscans (scanning the partial sums of a previous scan), this first UAV will actually
 // be a view into the previous scan's partial sums buffer. For readability, it's written as if it's always the primary invocation.
 RWStructuredBuffer<uint> collisionCellParticleCounts : register(u0);

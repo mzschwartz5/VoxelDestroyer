@@ -18,7 +18,6 @@
 #include <array>
 #include "voxelizer.h"
 #include "directx/directx.h"
-#include "constants.h"
 #include <maya/MConditionMessage.h>
 #include <unordered_map>
 #include <string>

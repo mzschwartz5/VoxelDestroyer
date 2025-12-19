@@ -1,5 +1,6 @@
 #include "particle_collisions_shared.hlsl"
 #include "common.hlsl"
+#include "constants.hlsli"
 
 StructuredBuffer<float4> particlePositions : register(t0);
 StructuredBuffer<uint> isSurfaceVoxel : register(t1);

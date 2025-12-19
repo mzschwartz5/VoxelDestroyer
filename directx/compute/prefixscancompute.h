@@ -2,7 +2,6 @@
 #include "directx/compute/computeshader.h"
 #include "./prefixscancollectcompute.h"
 #include <algorithm>
-#include "constants.h"
 
 /**
  * Class to perform an *inclusive* parallel prefix scan via GPU compute (GPU Gems algorithm).

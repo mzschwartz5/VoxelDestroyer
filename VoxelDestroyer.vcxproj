@@ -181,7 +181,7 @@
     <ClInclude Include="utils.h" />
     <ClInclude Include="voxelizer.h" />
     <ClInclude Include="cgalhelper.h" />
-    <ClInclude Include="constants.h" />
+    <ClInclude Include="shaders\constants.hlsli" />
     <ClInclude Include="cube.h" />
     <ClInclude Include="globalsolver.h" />
     <ClInclude Include="custommayaconstructs\tools\voxelcontextbase.h" />
@@ -199,6 +199,7 @@
     <ClInclude Include="custommayaconstructs\draw\voxelshape.h" />
     <ClInclude Include="custommayaconstructs\draw\voxelsubsceneoverride.h" />
     <ClInclude Include="custommayaconstructs\draw\colliderdrawoverride.h" />
+    <ClInclude Include="custommayaconstructs\draw\paintcontants.h" />
     <ClInclude Include="custommayaconstructs\usernodes\pbdnode.h" />
     <ClInclude Include="custommayaconstructs\usernodes\voxelizernode.h" />
     <ClInclude Include="custommayaconstructs\usernodes\colliderlocator.h" />

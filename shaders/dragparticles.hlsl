@@ -1,3 +1,5 @@
+#include "constants.hlsli"
+
 RWStructuredBuffer<float4> particles : register(u0);
 RWStructuredBuffer<bool> isDragging : register(u1);
 Texture2D<float> depthBuffer : register(t0);
