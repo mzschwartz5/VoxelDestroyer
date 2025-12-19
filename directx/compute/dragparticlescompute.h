@@ -38,6 +38,7 @@ public:
         int numVoxels
     ) : ComputeShader(IDR_SHADER7)
     {
+        if (numVoxels <= 0) return;
         initializeBuffers(numVoxels);
         initSubscriptions();
     };

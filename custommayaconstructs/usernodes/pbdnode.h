@@ -40,7 +40,6 @@ public:
     inline static MObject aFaceConstraintHigh;
     inline static MObject aParticleMassLow;
     inline static MObject aParticleMassHigh;
-    inline static MObject aMeshOwner;
     // Inputs
     inline static MObject aTriggerIn;
     inline static MObject aVoxelDataIn;
@@ -103,16 +102,6 @@ public:
         nAttr.setMin(0.01f);
         nAttr.setMax(FLT_MAX);
         status = addAttribute(aParticleMassHigh);
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-
-        // Special message attribute for associating a PBD node with a mesh (for lifetime management)
-        MFnMessageAttribute mAttr;
-        aMeshOwner = mAttr.create("mesh", "msh", &status);
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-        mAttr.setStorable(true);
-        mAttr.setWritable(true);
-        mAttr.setReadable(false);
-        addAttribute(aMeshOwner);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         // Input attribute for GlobalSolver to trigger updates
@@ -201,9 +190,8 @@ public:
         return MS::kSuccess;
     }
     
-    static MObject createPBDNode(const MObject& voxelizerNode, const MDagPath& meshDagPath) {
+    static MObject createPBDNode(const MObject& voxelizerNode) {
         MObject pbdNodeObj = Utils::createDGNode(PBDNode::pbdNodeName);
-        Utils::connectPlugs(pbdNodeObj, aMeshOwner, meshDagPath.node(), MPxNode::message);
         Utils::connectPlugs(voxelizerNode, VoxelizerNode::aVoxelData, pbdNodeObj, aVoxelDataIn);
 
         // Connect the particle data attribute output to the global solver node's particle data (array) input.
@@ -223,9 +211,6 @@ public:
         MPxNode::postConstructor();
         
         MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onVoxelDataConnected, this, &status);
-        callbackIds.append(callbackId);
-
-        callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onMeshConnectionDeleted, this, &status);
         callbackIds.append(callbackId);
 
         callbackId = MConditionMessage::addConditionCallback("playingBack", updateTimestep, this);
@@ -280,19 +265,6 @@ public:
                 functionalData->setFunction([&pbd]() { pbd.simulateSubstep(); });
             }
         );
-    }
-    
-    static void onMeshConnectionDeleted(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
-        if (plug != aMeshOwner || !(msg & MNodeMessage::kConnectionBroken)) {
-            return;
-        }
-
-        PBDNode* pbdNode = static_cast<PBDNode*>(clientData);
-        MObject pbdNodeObj = pbdNode->thisMObject();
-        if (pbdNodeObj.isNull()) return;
-
-        // On idle - don't want to delete the node while it's processing graph connection changes.
-        MGlobal::executeCommandOnIdle("delete " + pbdNode->name(), false);
     }
 
     // Note that FPS changes just make the playback choppier / smoother. A lower FPS means each frame is a bigger simulation timestep,

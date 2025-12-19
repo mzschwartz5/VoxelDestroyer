@@ -134,6 +134,8 @@ public:
             numExistingElements
         );
 
+        notifyMayaOfMemoryUsage(buffer, false);
+        notifyMayaOfMemoryUsage(newBuffer, true);
         buffer = newBuffer;
     }
 
@@ -141,6 +143,12 @@ public:
     static void deleteFromBuffer(ComPtr<ID3D11Buffer>& buffer, uint numRemovedElements, uint offset) {
         // Create a new buffer sized for the data minus the deleted elements
         uint numExistingElements = getNumElementsInBuffer(buffer);
+        if (numRemovedElements >= numExistingElements) {
+            notifyMayaOfMemoryUsage(buffer, false);
+            buffer.Reset();
+            return;
+        }
+
         std::vector<T> newData(numExistingElements - numRemovedElements);
         ComPtr<ID3D11Buffer> newBuffer = createBufferFromBufferTemplate<T>(buffer, newData);
 
@@ -166,6 +174,7 @@ public:
             );
         }
 
+        notifyMayaOfMemoryUsage(buffer, false);
         buffer = newBuffer;
     }
 

@@ -15,6 +15,7 @@ public:
         particleCollisionCB(particleCollisionCB),
         collisionCellParticleCountsUAV(collisionCellParticleCountsUAV)
     {
+        if (numParticles <= 0) return;
         initializeBuffers(numParticles);
     }
 

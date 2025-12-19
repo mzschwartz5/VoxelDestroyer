@@ -42,6 +42,8 @@ ComPtr<ID3D11ShaderResourceView> DirectX::createSRV(
     UINT offset,
     DXGI_FORMAT viewFormat
 ) {
+    if (!buffer) return nullptr;
+
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     D3D11_BUFFER_DESC bufferDesc = {};
     int numElements = (elementCount == 0) ? getNumElementsInBuffer(buffer) : elementCount;
@@ -54,7 +56,6 @@ ComPtr<ID3D11ShaderResourceView> DirectX::createSRV(
     ComPtr<ID3D11ShaderResourceView> srv;
     HRESULT hr = dxDevice->CreateShaderResourceView(buffer.Get(), &srvDesc, srv.GetAddressOf());
     return srv;
-
 }
 
 ComPtr<ID3D11UnorderedAccessView> DirectX::createUAV(
@@ -63,6 +64,8 @@ ComPtr<ID3D11UnorderedAccessView> DirectX::createUAV(
     UINT offset,
     DXGI_FORMAT viewFormat
 ) {
+    if (!buffer) return nullptr;
+
     D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
     D3D11_BUFFER_DESC bufferDesc = {};
     int numElements = (elementCount == 0) ? getNumElementsInBuffer(buffer) : elementCount;

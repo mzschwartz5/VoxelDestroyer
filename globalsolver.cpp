@@ -111,12 +111,6 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
     MObject globalSolverObj = getOrCreateGlobalSolver();
     int numPBDNodes = Utils::arrayPlugNumElements(globalSolverObj, aParticleData);
     numPBDNodes -= connectionMade ? 0 : 1; // If disconnecting, the plug is still counted in numElements, so subtract 1.
-    
-    if (numPBDNodes == 0) {
-        Utils::removePlugMultiInstance(plug);
-        maybeDeleteGlobalSolver();
-        return;
-    }
 
     std::unordered_map<int, int> offsetForLogicalPlug;
     float maximumParticleRadius = 0;
@@ -153,8 +147,6 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
 // These two operations are done together because they both need to iterate through all connected PBD nodes
 void GlobalSolver::calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNodeMessage::AttributeMessage changeType, std::unordered_map<int, int>& offsetForLogicalPlug, float& maximumParticleRadius)
 {
-    MStatus status;
-
     Utils::PluginData<ParticleData> particleData(changedPlug);
     uint numChangedParticles = particleData.get()->getData().numParticles;
     float particleRadius = particleData.get()->getData().particleRadius;
@@ -204,7 +196,6 @@ void GlobalSolver::calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNode
 
 // Prepends new particle data (corresponding to a new model) to the particle (and related) buffer(s)
 void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
-    MStatus status;
     MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
     
     Utils::PluginData<ParticleData> particleData(particleDataToAddPlug);

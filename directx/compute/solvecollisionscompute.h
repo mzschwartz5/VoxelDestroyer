@@ -21,6 +21,7 @@ public:
         collisionCellParticleCountsSRV(collisionCellParticleCountsSRV),
         particleCollisionCB(particleCollisionCB)
     {
+        if (hashGridSize <= 0) return;
         numWorkgroups = Utils::divideRoundUp(hashGridSize, SOLVE_COLLISION_THREADS);
     }
 

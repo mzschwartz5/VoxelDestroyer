@@ -20,6 +20,7 @@ public:
         int numParticles,
         float particleSize
     ) : ComputeShader(IDR_SHADER8) {
+        if (numParticles <= 0) return;
         initializeBuffers(numParticles, particleSize);
     };
 

@@ -107,7 +107,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	}
 	
 	MProgressWindow::setProgressStatus("Creating PBD particles and face constraints..."); MProgressWindow::setProgressRange(0, 100); MProgressWindow::setProgress(0);
-	MObject pbdNodeObj = PBDNode::createPBDNode(voxelizerNodeObj, voxelizedMeshDagPath);
+	MObject pbdNodeObj = PBDNode::createPBDNode(voxelizerNodeObj);
 	MObject voxelShapeObj = VoxelShape::createVoxelShapeNode(pbdNodeObj, voxelizedMeshDagPath);
 	MProgressWindow::setProgress(100);
 

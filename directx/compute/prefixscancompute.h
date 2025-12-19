@@ -18,6 +18,7 @@ public:
     PrefixScanCompute(
         const ComPtr<ID3D11UnorderedAccessView>& collisionCellParticleCountsUAV
     ) : ComputeShader(IDR_SHADER2), collisionCellParticleCountsUAV(collisionCellParticleCountsUAV) {
+        if (!collisionCellParticleCountsUAV) return;
         initializeBuffers();
     }
 

@@ -346,6 +346,18 @@ private:
             voxelShape->unsubPaintStateChanges();
         }, this);
         callbackIds.append(callbackId);
+
+        callbackId = MNodeMessage::addNodeAboutToDeleteCallback(thisMObject(), [](MObject &node, MDGModifier& dgMod, void* clientData) {
+            VoxelShape* voxelShape = static_cast<VoxelShape*>(clientData);
+            
+            PBDNode* pbdNode = static_cast<PBDNode*>(Utils::connectedNode(MPlug(node, aTrigger)));
+            dgMod.deleteNode(pbdNode->thisMObject());
+
+            MObject originalGeom = voxelShape->pathToOriginalGeometry().node();
+            dgMod.deleteNode(originalGeom);
+
+        }, this);
+        callbackIds.append(callbackId);
     }
 
     /**
