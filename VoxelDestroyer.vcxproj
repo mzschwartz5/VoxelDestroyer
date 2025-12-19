@@ -276,7 +276,13 @@
       <EntryPoint>main</EntryPoint>
       <ShaderType>Compute</ShaderType>
       <ShaderModel>5.0</ShaderModel>
-      <ObjectFileOutput>$(ProjectDir)\shaders\cso\faceconstraints.cso</ObjectFileOutput>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\faceconstraints_main.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\faceconstraints.hlsl">
+      <EntryPoint>updateFaceConstraintsFromPaint</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\faceconstraints_updateFaceConstraintsFromPaint.cso</ObjectFileOutput>
     </FxCompile>
     <FxCompile Include="shaders\paintdelta.hlsl">
       <EntryPoint>main</EntryPoint>
@@ -294,7 +300,13 @@
       <EntryPoint>main</EntryPoint>
       <ShaderType>Compute</ShaderType>
       <ShaderModel>5.0</ShaderModel>
-      <ObjectFileOutput>$(ProjectDir)\shaders\cso\prevgs.cso</ObjectFileOutput>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\prevgs_main.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\prevgs.hlsl">
+      <EntryPoint>updateParticleMassFromPaint</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\prevgs_updateParticleMassFromPaint.cso</ObjectFileOutput>
     </FxCompile>
     <FxCompile Include="shaders\solvecollisions.hlsl">
       <EntryPoint>main</EntryPoint>
