@@ -225,7 +225,6 @@
     <ClInclude Include="directx\compute\deformverticescompute.h" />
     <ClInclude Include="directx\compute\solveprimitivecollisionscompute.h" />
     <ClInclude Include="directx\compute\paintdeltacompute.h" />
-    <ClInclude Include="directx\d3dincludehandler.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="plugin.cpp" />
@@ -234,7 +233,6 @@
     <ClCompile Include="directx\directx.cpp" />
     <ClCompile Include="voxelizer.cpp" />
     <ClCompile Include="cgalhelper.cpp" />
-    <ClCompile Include="directx\d3dincludehandler.cpp" />
     <ClCompile Include="globalsolver.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -295,6 +293,12 @@
       <ShaderType>Compute</ShaderType>
       <ShaderModel>5.0</ShaderModel>
       <ObjectFileOutput>$(ProjectDir)\shaders\cso\prefixscan.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\prefixscancollect.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\prefixscancollect.cso</ObjectFileOutput>
     </FxCompile>
     <FxCompile Include="shaders\prevgs.hlsl">
       <EntryPoint>main</EntryPoint>

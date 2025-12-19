@@ -19,7 +19,7 @@ public:
     BuildCollisionGridCompute(
         int numParticles,
         float particleSize
-    ) : ComputeShader(IDR_SHADER8) {
+    ) : ComputeShader(IDR_SHADER9) {
         if (numParticles <= 0) return;
         initializeBuffers(numParticles, particleSize);
     };

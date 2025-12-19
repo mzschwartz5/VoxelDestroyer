@@ -36,7 +36,7 @@ public:
 
     DragParticlesCompute(
         int numVoxels
-    ) : ComputeShader(IDR_SHADER7)
+    ) : ComputeShader(IDR_SHADER8)
     {
         if (numVoxels <= 0) return;
         initializeBuffers(numVoxels);

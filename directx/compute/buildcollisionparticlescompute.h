@@ -11,7 +11,7 @@ public:
         int numParticles,
         const ComPtr<ID3D11UnorderedAccessView>& collisionCellParticleCountsUAV,
         const ComPtr<ID3D11Buffer>& particleCollisionCB
-    ) : ComputeShader(IDR_SHADER9), 
+    ) : ComputeShader(IDR_SHADER10), 
         particleCollisionCB(particleCollisionCB),
         collisionCellParticleCountsUAV(collisionCellParticleCountsUAV)
     {

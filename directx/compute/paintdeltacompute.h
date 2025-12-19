@@ -23,7 +23,7 @@ public:
 
     PaintDeltaCompute(
         const ComPtr<ID3D11UnorderedAccessView>& deltaUAV
-    ) : ComputeShader(IDR_SHADER16), deltaUAV(deltaUAV)
+    ) : ComputeShader(IDR_SHADER15), deltaUAV(deltaUAV)
     {
         constantBuffer = DirectX::createConstantBuffer<Constants>({ 0, -1, 0, 0 });
     };

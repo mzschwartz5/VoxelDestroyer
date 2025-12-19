@@ -65,7 +65,7 @@ public:
         alphaEnabledBlendState = MStateManager::acquireBlendState(blendDesc);
 
         void* shaderData = nullptr;
-        DWORD size = Utils::loadResourceFile(DirectX::getPluginInstance(), IDR_SHADER15, L"SHADER", &shaderData);
+        DWORD size = Utils::loadResourceFile(DirectX::getPluginInstance(), IDR_SHADER14, L"SHADER", &shaderData);
 
         auto macros = shaderMacros(false);
         facePaintSelectionShader = MRenderer::theRenderer()->getShaderManager()->getEffectsBufferShader(

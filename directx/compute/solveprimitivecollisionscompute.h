@@ -19,7 +19,7 @@ public:
     SolvePrimitiveCollisionsCompute() = default;
     SolvePrimitiveCollisionsCompute(
         const ColliderBuffer& initColliderBuffer
-    ) : ComputeShader(IDR_SHADER14)
+    ) : ComputeShader(IDR_SHADER13)
     {
         initializeBuffers(initColliderBuffer);
     };
