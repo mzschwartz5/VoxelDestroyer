@@ -79,7 +79,7 @@ public:
         VoxelEditMode modeEnum = static_cast<VoxelEditMode>(currentEditMode);
         MString setComponentCmd = modeToComponentMaskCommand.at(modeEnum);
         MGlobal::executeCommand(setComponentCmd);
-        MGlobal::executeCommand("setToolTo " + currentContext);
+        MGlobal::executeCommand("setToolTo " + currentContext + "; toolPropertyWindow;");
 
         voxelEditModeChangedEvent.notify(
             EditModeChangedEventArgs{
@@ -109,7 +109,7 @@ public:
         
         selectShapeByUUID(shapeUUID);
         MGlobal::executeCommand(setComponentCmd);
-        MGlobal::executeCommand("setToolTo " + context);
+        MGlobal::executeCommand("setToolTo " + context + "; toolPropertyWindow;");
 
         M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
