@@ -17,27 +17,25 @@
 #define IDR_SHADER13                    115
 #define IDR_SHADER14                    116
 #define IDR_SHADER15                    117
-#define IDR_SHADER16                    118
-#define IDR_SHADER17                    119
-#define IDR_MEL1                        120
-#define IDR_MEL2                        121
-#define IDR_MEL3                        122
-#define IDR_MEL4                        123
-#define IDR_MEL5                        124
-#define IDR_MEL6                        125
-#define IDR_MEL7                        126
-#define IDR_MEL8                        127
-#define IDR_PNG_VOXELIZER               128
-#define IDR_PNG_VOXELDRAG               129
-#define IDR_PNG_VOXELCOLLIDER           130
-#define IDR_PNG_VOXELPAINT              131
+#define IDR_MEL1                        118
+#define IDR_MEL2                        119
+#define IDR_MEL3                        120
+#define IDR_MEL4                        121
+#define IDR_MEL5                        122
+#define IDR_MEL6                        123
+#define IDR_MEL7                        124
+#define IDR_MEL8                        125
+#define IDR_PNG_VOXELIZER               126
+#define IDR_PNG_VOXELDRAG               127
+#define IDR_PNG_VOXELCOLLIDER           128
+#define IDR_PNG_VOXELPAINT              129
 
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        132
+#define _APS_NEXT_RESOURCE_VALUE        130
 #define _APS_NEXT_COMMAND_VALUE         40001
 #define _APS_NEXT_CONTROL_VALUE         1001
 #define _APS_NEXT_SYMED_VALUE           101

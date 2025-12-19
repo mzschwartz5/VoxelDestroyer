@@ -20,7 +20,7 @@ public:
     PreVGSCompute(
         uint numParticles,
         const PreVGSConstantBuffer& simConstants
-	) : ComputeShader(IDR_SHADER5), simConstants(simConstants)
+	) : ComputeShader(IDR_SHADER6), simConstants(simConstants)
     {
         // This shader has a second entry point for updating particle weights from paint data.
         loadEntryPoint(updateParticleWeightsEntryPoint);
@@ -69,7 +69,7 @@ public:
     }
 
 private:
-    inline static const std::string updateParticleWeightsEntryPoint = "updateParticleMassFromPaint";
+    inline static const int updateParticleWeightsEntryPoint = IDR_SHADER7;
     int numWorkgroups;
     PreVGSConstantBuffer simConstants;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
