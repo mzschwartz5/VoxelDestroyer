@@ -304,13 +304,13 @@
       <EntryPoint>main</EntryPoint>
       <ShaderType>Compute</ShaderType>
       <ShaderModel>5.0</ShaderModel>
-      <ObjectFileOutput>$(ProjectDir)\shaders\cso\prevgs_main.cso</ObjectFileOutput>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\prevgs.cso</ObjectFileOutput>
     </FxCompile>
-    <FxCompile Include="shaders\prevgs.hlsl">
+    <FxCompile Include="shaders\updateParticleMassFromPaint.hlsl">
       <EntryPoint>updateParticleMassFromPaint</EntryPoint>
       <ShaderType>Compute</ShaderType>
       <ShaderModel>5.0</ShaderModel>
-      <ObjectFileOutput>$(ProjectDir)\shaders\cso\prevgs_updateParticleMassFromPaint.cso</ObjectFileOutput>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\updateParticleMassFromPaint.cso</ObjectFileOutput>
     </FxCompile>
     <FxCompile Include="shaders\solvecollisions.hlsl">
       <EntryPoint>main</EntryPoint>
