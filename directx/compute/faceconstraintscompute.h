@@ -33,8 +33,8 @@ public:
         const ComPtr<ID3D11Buffer>& voxelSimInfoBuffer
     ) : ComputeShader(IDR_SHADER4), voxelSimInfoBuffer(voxelSimInfoBuffer)
     {
-        // This shader has a second entry point for updating constraint limits from paint data.
-        loadEntryPoint(updateFaceConstraintsEntryPoint);
+        // This shader has a second "entry point" for updating constraint limits from paint data.
+        loadShaderObject(updateFaceConstraintsEntryPoint);
         initializeBuffers(constraints);
     };
 

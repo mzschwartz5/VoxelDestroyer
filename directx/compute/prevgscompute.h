@@ -22,8 +22,8 @@ public:
         const PreVGSConstantBuffer& simConstants
 	) : ComputeShader(IDR_SHADER6), simConstants(simConstants)
     {
-        // This shader has a second entry point for updating particle weights from paint data.
-        loadEntryPoint(updateParticleWeightsEntryPoint);
+        // This shader has a second "entry point" for updating particle weights from paint data.
+        loadShaderObject(updateParticleWeightsEntryPoint);
         initializeBuffers(numParticles);
     };
 
