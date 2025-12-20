@@ -78,7 +78,7 @@ public:
     }
 
 private:
-    inline static const int updateFaceConstraintsEntryPoint = IDR_SHADER5;
+    inline static constexpr int updateFaceConstraintsEntryPoint = IDR_SHADER5;
     int activeConstraintAxis = 0; // x = 0, y = 1, z = 2
     std::array<int, 3> numWorkgroups = { 0, 0, 0 };
     std::array<FaceConstraintsCB, 3> faceConstraintsCBData;

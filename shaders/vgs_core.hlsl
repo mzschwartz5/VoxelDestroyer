@@ -1,6 +1,5 @@
 #include "common.hlsl"
 
-static const float eps = 1e-8f;
 static const float oneThird = 1.0f / 3.0f;
 
 float3 safeProject(float3 v, float3 onto)

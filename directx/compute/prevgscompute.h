@@ -69,7 +69,7 @@ public:
     }
 
 private:
-    inline static const int updateParticleWeightsEntryPoint = IDR_SHADER7;
+    inline static constexpr int updateParticleWeightsEntryPoint = IDR_SHADER7;
     int numWorkgroups;
     PreVGSConstantBuffer simConstants;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
