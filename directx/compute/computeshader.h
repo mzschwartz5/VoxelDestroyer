@@ -13,7 +13,7 @@ class ComputeShader
 public:
     ComputeShader() = default;
     ComputeShader(int mainId) : mainId(mainId) {
-        loadEntryPoint(mainId);
+        loadShaderObject(mainId);
     }
     virtual ~ComputeShader() = default;
 
@@ -41,7 +41,7 @@ protected:
     virtual void bind() = 0;
     virtual void unbind() = 0;
 
-    void loadEntryPoint(int id) {
+    void loadShaderObject(int id) {
         if (shaderCache.find(id) != shaderCache.end()) {
             return;
         }
