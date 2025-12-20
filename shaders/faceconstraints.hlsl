@@ -56,7 +56,7 @@ void main(
     doVGSIterations(
         pos,
         PARTICLE_RADIUS,
-        VOXEL_REST_VOLUME,
+        voxelRestVolume,
         ITER_COUNT,
         FTF_RELAXATION,
         FTF_BETA,

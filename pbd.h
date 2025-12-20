@@ -36,7 +36,7 @@ public:
 
     void setRadiusAndVolumeFromLength(float edge_length) {
         particleRadius = edge_length * 0.25f;
-        VOXEL_REST_VOLUME = 8.0f * particleRadius * particleRadius * particleRadius;
+        voxelRestVolume = 8.0f * particleRadius * particleRadius * particleRadius;
     }
 
     void setInitialized(bool initialized) {
@@ -82,7 +82,7 @@ private:
     float RELAXATION{ 0.5f };
     // This is really the rest volume of the volume between particles, which are offset one particle radius from each corner of the voxel
     // towards the center of the voxel. So with a particle radius = 1/4 voxel edge length, the rest volume is (2 * 1/4 edge length)^3 or 8 * (particle radius^3) 
-    float VOXEL_REST_VOLUME{ 1.0f };
+    float voxelRestVolume{ 1.0f };
 
     float FTF_BETA{ 0.f };
     float FTF_RELAXATION{ 0.5f };

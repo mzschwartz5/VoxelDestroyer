@@ -10,7 +10,7 @@ cbuffer VoxelSimBuffer : register(b0)
     float RELAXATION;
     float BETA;
     float PARTICLE_RADIUS;
-    float VOXEL_REST_VOLUME;
+    float voxelRestVolume;
     float ITER_COUNT;
     float FTF_RELAXATION;
     float FTF_BETA;

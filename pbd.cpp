@@ -67,7 +67,7 @@ void PBD::createComputeShaders(
 ) {
     vgsCompute = VGSCompute(
         numParticles(),
-        VGSConstantBuffer{ RELAXATION, BETA, particleRadius, VOXEL_REST_VOLUME, 3.0f, FTF_RELAXATION, FTF_BETA, static_cast<uint>(voxels->size()) }
+        VGSConstantBuffer{ RELAXATION, BETA, particleRadius, voxelRestVolume, 3.0f, FTF_RELAXATION, FTF_BETA, static_cast<uint>(voxels->size()) }
     );
 
 	faceConstraintsCompute = FaceConstraintsCompute(
