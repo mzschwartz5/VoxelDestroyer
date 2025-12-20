@@ -1,3 +1,5 @@
+static const float eps = 1e-8f;
+
 float2 unpackHalf2x16(float packed)
 {
     uint lo = asuint(packed) & 0xFFFF;
