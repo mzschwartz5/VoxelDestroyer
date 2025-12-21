@@ -1,11 +1,10 @@
 #include "common.hlsl"
-#include "constants.hlsli"
 #include "prevgs_shared.hlsl"
 
 [numthreads(VGS_THREADS, 1, 1)]
 void main(uint3 gId : SV_DispatchThreadID) 
 {
-    if (gId.x >= numParticles) return; 
+    if (gId.x >= preVgsConstants.numParticles) return; 
     
     float4 pos = positions[gId.x];
     if (massIsInfinite(pos)) return;
@@ -20,8 +19,8 @@ void main(uint3 gId : SV_DispatchThreadID)
     
     int voxelIndex = gId.x >> 3;
     if (!isDragging[voxelIndex]) {
-        delta += float4(0, GRAVITY_STRENGTH, 0, 0) * TIMESTEP * TIMESTEP; // Gravity
-        pos.xyz += delta.xyz; // Update position
+        delta += float4(0, preVgsConstants.gravityStrength, 0, 0) * preVgsConstants.timeStep * preVgsConstants.timeStep;
+        pos.xyz += delta.xyz;
     }
     
     // Write back to global memory

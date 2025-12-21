@@ -26,4 +26,16 @@ struct VGSConstants
     int padding1;
 };
 
+struct PreVGSConstants
+{
+    float gravityStrength;
+    float timeStep;
+    uint numParticles;
+    float massLow;
+    float massHigh;
+    int padding0;
+    int padding1;
+    int padding2;
+};
+
 #endif // CONSTANTS_HLSLI

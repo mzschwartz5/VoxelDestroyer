@@ -78,12 +78,7 @@ void PBD::createComputeShaders(
         voxelRestVolume
 	);
 
-    // Hardcode initial timestep of 1/60 (assumes 60 FPS and 10 substeps).
-    PreVGSConstantBuffer preVGSConstants{GRAVITY_STRENGTH, GROUND_COLLISION_Y, 1.0f / 600.0f, numParticles()};
-    preVGSCompute = PreVGSCompute(
-        numParticles(),
-		preVGSConstants
-    );
+    preVGSCompute = PreVGSCompute(numParticles());
 }
 
 void PBD::setGPUResourceHandles(
@@ -131,7 +126,7 @@ void PBD::updateSimulationParameters(
 ) {
     vgsCompute.updateVGSParameters(vgsRelaxation, vgsEdgeUniformity, static_cast<uint>(vgsIterations));
     faceConstraintsCompute.updateVGSParameters(ftfRelaxation, ftfEdgeUniformity, static_cast<uint>(vgsIterations));
-    preVGSCompute.updateTimeStep(secondsPerFrame);
+    preVGSCompute.updatePreVgsConstants(secondsPerFrame, gravityStrength);
 }
 
 void PBD::simulateSubstep() {
