@@ -57,9 +57,9 @@ void doVGSIterations(
         float3 u2 = v2 - relaxation * (safeProject(v2, v0) + safeProject(v2, v1));
 
         // Normalize and scale
-        u0 = safeNormal(u0, u1, u2) * ((1.0f - edgeUniformity) * particleRadius + (edgeUniformity * safeLength(v0) * 0.5f));
-        u1 = safeNormal(u1, u2, u0) * ((1.0f - edgeUniformity) * particleRadius + (edgeUniformity * safeLength(v1) * 0.5f));
-        u2 = safeNormal(u2, u0, u1) * ((1.0f - edgeUniformity) * particleRadius + (edgeUniformity * safeLength(v2) * 0.5f));
+        u0 = safeNormal(u0, u1, u2) * (edgeUniformity * particleRadius + ((1.0f - edgeUniformity) * safeLength(v0) * 0.5f));
+        u1 = safeNormal(u1, u2, u0) * (edgeUniformity * particleRadius + ((1.0f - edgeUniformity) * safeLength(v1) * 0.5f));
+        u2 = safeNormal(u2, u0, u1) * (edgeUniformity * particleRadius + ((1.0f - edgeUniformity) * safeLength(v2) * 0.5f));
 
         // Check for flipping
         float volume = dot(cross(u0, u1), u2);
