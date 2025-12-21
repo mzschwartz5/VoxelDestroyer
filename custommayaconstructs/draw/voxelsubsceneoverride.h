@@ -642,6 +642,8 @@ private:
         renderItem = MRenderItem::Create(itemInfo.renderItemName, MRenderItem::MaterialSceneItem, MGeometry::kTriangles);
         renderItem->setDrawMode(static_cast<MGeometry::DrawMode>(MGeometry::kShaded | MGeometry::kTextured));
         renderItem->setWantConsolidation(false);
+        renderItem->castsShadows(true);
+        renderItem->receivesShadows(true);
         renderItem->setShader(itemInfo.shaderInstance);
         container.add(renderItem);
 
