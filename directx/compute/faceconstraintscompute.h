@@ -134,7 +134,7 @@ private:
     void initializeBuffers(const std::array<std::vector<FaceConstraint>, 3>& constraints, uint numParticles, float particleRadius, float voxelRestVolume) {
 
         vgsConstants.relaxation = 0.5f;
-        vgsConstants.edgeUniformity = 0.0f;
+        vgsConstants.edgeUniformity = 1.0f;
         vgsConstants.iterCount = 3;
         vgsConstants.numVoxels = numParticles / 8;
         vgsConstants.particleRadius = particleRadius;

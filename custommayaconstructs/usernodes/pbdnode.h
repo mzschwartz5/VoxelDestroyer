@@ -80,7 +80,7 @@ public:
         addAttribute(aVgsRelaxation);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
-        aVgsEdgeUniformity = nAttr.create("vgsEdgeUniformity", "vgseu", MFnNumericData::kFloat, 0.0f, &status);
+        aVgsEdgeUniformity = nAttr.create("vgsEdgeUniformity", "vgseu", MFnNumericData::kFloat, 1.0f, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         nAttr.setMin(0.0f);
         nAttr.setMax(1.0f);
@@ -94,7 +94,7 @@ public:
         addAttribute(aFtfRelaxation);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
-        aFtfEdgeUniformity = nAttr.create("ftfEdgeUniformity", "ftfeu", MFnNumericData::kFloat, 0.0f, &status);
+        aFtfEdgeUniformity = nAttr.create("ftfEdgeUniformity", "ftfeu", MFnNumericData::kFloat, 1.0f, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         nAttr.setMin(0.0f);
         nAttr.setMax(1.0f);
