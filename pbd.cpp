@@ -67,12 +67,15 @@ void PBD::createComputeShaders(
 ) {
     vgsCompute = VGSCompute(
         numParticles(),
-        VGSConstantBuffer{ RELAXATION, BETA, particleRadius, voxelRestVolume, 3.0f, FTF_RELAXATION, FTF_BETA, static_cast<uint>(voxels->size()) }
+        particleRadius, 
+        voxelRestVolume
     );
 
 	faceConstraintsCompute = FaceConstraintsCompute(
 		faceConstraints,
-        vgsCompute.getVoxelSimInfoBuffer()
+        numParticles(),
+        particleRadius,
+        voxelRestVolume
 	);
 
     // Hardcode initial timestep of 1/60 (assumes 60 FPS and 10 substeps).
@@ -122,10 +125,12 @@ void PBD::updateSimulationParameters(
     float vgsEdgeUniformity,
     float ftfRelaxation,
     float ftfEdgeUniformity,
-    int vgsIterations,
+    uint vgsIterations,
     float gravityStrength,
     float secondsPerFrame
 ) {
+    vgsCompute.updateVGSParameters(vgsRelaxation, vgsEdgeUniformity, static_cast<uint>(vgsIterations));
+    faceConstraintsCompute.updateVGSParameters(ftfRelaxation, ftfEdgeUniformity, static_cast<uint>(vgsIterations));
     preVGSCompute.updateTimeStep(secondsPerFrame);
 }
 

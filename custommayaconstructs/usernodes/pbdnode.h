@@ -324,7 +324,7 @@ public:
             MPlug(pbdNodeObj, aVgsEdgeUniformity).asFloat(),
             MPlug(pbdNodeObj, aFtfRelaxation).asFloat(),
             MPlug(pbdNodeObj, aFtfEdgeUniformity).asFloat(),
-            MPlug(pbdNodeObj, aVgsIterations).asInt(),
+            static_cast<uint>(MPlug(pbdNodeObj, aVgsIterations).asInt()),
             MPlug(pbdNodeObj, aGravityStrength).asFloat(),
             static_cast<float>(secondsPerFrame) / numSubsteps
         );

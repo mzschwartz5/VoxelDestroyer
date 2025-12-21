@@ -5,16 +5,9 @@ struct FaceConstraint {
     float compressionLimit;
 };
 
-cbuffer VoxelSimBuffer : register(b0)
+cbuffer VGSConstantsBuffer : register(b0)
 {
-    float RELAXATION;
-    float BETA;
-    float PARTICLE_RADIUS;
-    float voxelRestVolume;
-    float ITER_COUNT;
-    float FTF_RELAXATION;
-    float FTF_BETA;
-    int NUM_VOXELS;
+    VGSConstants vgsConstants;
 };
 
 cbuffer FaceConstraintsCB : register(b1)

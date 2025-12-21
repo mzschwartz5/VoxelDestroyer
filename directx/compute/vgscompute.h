@@ -1,16 +1,7 @@
 #pragma once
 
 #include "directx/compute/computeshader.h"
-struct VGSConstantBuffer {
-    float relaxation;
-    float edgeUniformity;
-    float particleRadius;
-    float voxelRestVolume;
-    float iterCount;
-    float ftfRelaxation;
-    float ftfEdgeUniformity;
-    uint numVoxels;
-};
+#include "shaders/constants.hlsli"
 
 class VGSCompute : public ComputeShader
 {
@@ -18,12 +9,13 @@ public:
     VGSCompute() = default;
 
     VGSCompute(
-        int numParticles,
-        const VGSConstantBuffer& voxelSimInfo
+        uint numParticles,
+        float particleRadius,
+        float voxelRestVolume
 	) : ComputeShader(IDR_SHADER3)
     {
         numWorkgroups = Utils::divideRoundUp(numParticles / 8, VGS_THREADS);
-        initializeBuffers(voxelSimInfo);
+        initializeBuffers(numParticles, particleRadius, voxelRestVolume);
     };
 
     void dispatch() override
@@ -31,11 +23,16 @@ public:
         ComputeShader::dispatch(numWorkgroups);
     };
 
-    void updateConstantBuffer(const VGSConstantBuffer& newCB) {
-        DirectX::updateConstantBuffer(voxelSimInfoBuffer, newCB);
+    void updateVGSParameters(
+        float relaxation,
+        float edgeUniformity,
+        uint iterCount
+    ) {
+        vgsConstants.relaxation = relaxation;
+        vgsConstants.edgeUniformity = edgeUniformity;
+        vgsConstants.iterCount = iterCount;
+        DirectX::updateConstantBuffer(vgsConstantBuffer, vgsConstants);
     }
-
-    const ComPtr<ID3D11Buffer>& getVoxelSimInfoBuffer() const { return voxelSimInfoBuffer; }
 
     void setParticlesUAV(const ComPtr<ID3D11UnorderedAccessView>& particlesUAV) {
         this->particlesUAV = particlesUAV;
@@ -43,15 +40,16 @@ public:
 
 private:
     int numWorkgroups = 0;
-    ComPtr<ID3D11Buffer> voxelSimInfoBuffer;
+    ComPtr<ID3D11Buffer> vgsConstantBuffer;
     ComPtr<ID3D11UnorderedAccessView> particlesUAV;
+    VGSConstants vgsConstants;
     
     void bind() override
     {
 		ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get() };
 		DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
-        ID3D11Buffer* cbvs[] = { voxelSimInfoBuffer.Get() };
+        ID3D11Buffer* cbvs[] = { vgsConstantBuffer.Get() };
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
@@ -64,7 +62,16 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
-    void initializeBuffers(const VGSConstantBuffer& voxelSimInfo) {
-        voxelSimInfoBuffer = DirectX::createConstantBuffer<VGSConstantBuffer>(voxelSimInfo);
+    void initializeBuffers(
+        uint numParticles,
+        float particleRadius,
+        float voxelRestVolume
+    ) {
+
+        vgsConstants.numVoxels = numParticles / 8;
+        vgsConstants.particleRadius = particleRadius;
+        vgsConstants.voxelRestVolume = voxelRestVolume;
+    
+        vgsConstantBuffer = DirectX::createConstantBuffer(vgsConstants);
     }
 };
