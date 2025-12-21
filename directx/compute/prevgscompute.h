@@ -1,16 +1,6 @@
 #pragma once
 #include "directx/compute/computeshader.h"
-
-struct PreVGSConstantBuffer {
-    float gravityStrength;
-    float groundCollisionY;
-    float timeStep;
-    uint numParticles;
-    float massLow;
-    float massHigh;
-    int padding0;
-    int padding1;
-};
+#include "shaders/constants.hlsli"
 
 class PreVGSCompute : public ComputeShader
 {
@@ -18,9 +8,8 @@ public:
     PreVGSCompute() = default;
 
     PreVGSCompute(
-        uint numParticles,
-        const PreVGSConstantBuffer& simConstants
-	) : ComputeShader(IDR_SHADER6), simConstants(simConstants)
+        uint numParticles
+	) : ComputeShader(IDR_SHADER6)
     {
         // This shader has a second "entry point" for updating particle weights from paint data.
         loadShaderObject(updateParticleWeightsEntryPoint);
@@ -40,20 +29,17 @@ public:
         this->paintDeltaUAV = paintDeltaUAV;
         this->paintValueUAV = paintValueUAV;
         
-        if (massLow != simConstants.massLow || massHigh != simConstants.massHigh) {
-            simConstants.massLow = massLow;
-            simConstants.massHigh = massHigh;
-            DirectX::updateConstantBuffer(simConstantsBuffer, simConstants);
-        }
+        preVgsConstants.massLow = massLow;
+        preVgsConstants.massHigh = massHigh;
+        DirectX::updateConstantBuffer(preVgsConstantsBuffer, preVgsConstants);
 
         ComputeShader::dispatch(numWorkgroups, updateParticleWeightsEntryPoint);
     }
 
-    void updateTimeStep(float timeStep) {
-        if (timeStep != simConstants.timeStep) {
-            simConstants.timeStep = timeStep;
-            DirectX::updateConstantBuffer(simConstantsBuffer, simConstants);
-        }
+    void updatePreVgsConstants(float timeStep, float gravityStrength) {
+        preVgsConstants.timeStep = timeStep;
+        preVgsConstants.gravityStrength = gravityStrength;
+        DirectX::updateConstantBuffer(preVgsConstantsBuffer, preVgsConstants);
     }
 
     void setPositionsUAV(const ComPtr<ID3D11UnorderedAccessView>& positionsUAV) {
@@ -71,11 +57,11 @@ public:
 private:
     inline static constexpr int updateParticleWeightsEntryPoint = IDR_SHADER7;
     int numWorkgroups;
-    PreVGSConstantBuffer simConstants;
+    PreVGSConstants preVgsConstants;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
     ComPtr<ID3D11UnorderedAccessView> oldPositionsUAV;
     ComPtr<ID3D11ShaderResourceView> isDraggingSRV;
-    ComPtr<ID3D11Buffer> simConstantsBuffer; //gravity on, ground on, ground collision y, padding
+    ComPtr<ID3D11Buffer> preVgsConstantsBuffer;
     ComPtr<ID3D11UnorderedAccessView> paintDeltaUAV;  // Only used during update from paint values
     ComPtr<ID3D11UnorderedAccessView> paintValueUAV;  // Only used during update from paint values
 
@@ -87,7 +73,7 @@ private:
 		ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), oldPositionsUAV.Get(), paintDeltaUAV.Get(), paintValueUAV.Get() };
 		DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
-		ID3D11Buffer* cbvs[] = { simConstantsBuffer.Get() };
+		ID3D11Buffer* cbvs[] = { preVgsConstantsBuffer.Get() };
 		DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
@@ -105,6 +91,10 @@ private:
 
     void initializeBuffers(uint numParticles) {
         numWorkgroups = Utils::divideRoundUp(numParticles, VGS_THREADS);
-        simConstantsBuffer = DirectX::createConstantBuffer<PreVGSConstantBuffer>(simConstants);
+
+        preVgsConstants.numParticles = numParticles;
+        preVgsConstants.gravityStrength = -9.81f; // Default gravity strength
+        preVgsConstants.timeStep = 1.0f / 600.0f; // Default timestep (60 FPS and 10 substeps)
+        preVgsConstantsBuffer = DirectX::createConstantBuffer(preVgsConstants);
     }
 };

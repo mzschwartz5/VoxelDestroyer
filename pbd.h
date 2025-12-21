@@ -84,18 +84,8 @@ private:
     FaceConstraintsCompute faceConstraintsCompute;
     PreVGSCompute preVGSCompute;
 
-    float BETA{ 0.0f };
     float particleRadius{ 0.25f };
-
-    float RELAXATION{ 0.5f };
     // This is really the rest volume of the volume between particles, which are offset one particle radius from each corner of the voxel
     // towards the center of the voxel. So with a particle radius = 1/4 voxel edge length, the rest volume is (2 * 1/4 edge length)^3 or 8 * (particle radius^3) 
     float voxelRestVolume{ 1.0f };
-
-    float FTF_BETA{ 0.f };
-    float FTF_RELAXATION{ 0.5f };
-
-	float GRAVITY_STRENGTH { -10.f };
-	float GROUND_COLLISION_ENABLED{ 1.f };
-	float GROUND_COLLISION_Y{ 0.f };
 };
