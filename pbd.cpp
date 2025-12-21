@@ -117,7 +117,15 @@ void PBD::updateParticleMassWithPaintValues(
 
 // Note that FPS changes just make the playback choppier / smoother. A lower FPS means each frame is a bigger simulation timestep,
 // but the same time passes overall. To make the sim *run* slower or faster, you need to change the timeslider playback speed factor.
-void PBD::updateTimestep(float secondsPerFrame) {
+void PBD::updateSimulationParameters(
+    float vgsRelaxation,
+    float vgsEdgeUniformity,
+    float ftfRelaxation,
+    float ftfEdgeUniformity,
+    int vgsIterations,
+    float gravityStrength,
+    float secondsPerFrame
+) {
     preVGSCompute.updateTimeStep(secondsPerFrame);
 }
 

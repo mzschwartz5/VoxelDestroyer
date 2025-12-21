@@ -63,7 +63,15 @@ public:
     
     void simulateSubstep();
 
-    void updateTimestep(float secondsPerFrame);
+    void updateSimulationParameters(
+        float vgsRelaxation,
+        float vgsEdgeUniformity,
+        float ftfRelaxation,
+        float ftfEdgeUniformity,
+        int vgsIterations,
+        float gravityStrength,
+        float secondsPerFrame
+    );
 
 private:
     // Inverse mass (w) and particle radius stored, packed at half-precision, as 4th component.
@@ -90,5 +98,4 @@ private:
 	float GRAVITY_STRENGTH { -10.f };
 	float GROUND_COLLISION_ENABLED{ 1.f };
 	float GROUND_COLLISION_Y{ 0.f };
-    float TIMESTEP{ 0.00166666666666667f };
 };

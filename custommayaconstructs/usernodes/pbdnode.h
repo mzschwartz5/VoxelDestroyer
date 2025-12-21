@@ -36,6 +36,12 @@ public:
     inline static const MString pbdNodeName{"PBD"};
     inline static const MTypeId id{0x0013A7B0};
     // Attributes
+    inline static MObject aVgsRelaxation;
+    inline static MObject aVgsEdgeUniformity;
+    inline static MObject aFtfRelaxation;
+    inline static MObject aFtfEdgeUniformity;
+    inline static MObject aVgsIterations;
+    inline static MObject aGravityStrength;
     inline static MObject aFaceConstraintLow;
     inline static MObject aFaceConstraintHigh;
     inline static MObject aParticleMassLow;
@@ -62,13 +68,55 @@ public:
     static MStatus initialize() {
         MStatus status;
 
-        // TODO: consolidate with functions to create common attributes settings (storable, readable, writable)
+        // User attributes
         MFnNumericAttribute nAttr;
-        aFaceConstraintLow = nAttr.create("faceConstraintLow", "fcl", MFnNumericData::kFloat, 0.0f, &status);
+        aVgsRelaxation = nAttr.create("vgsRelaxation", "vgsr", MFnNumericData::kFloat, 0.5f, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         nAttr.setStorable(true);
         nAttr.setReadable(true);
         nAttr.setWritable(true);
+        nAttr.setMin(0.01f);
+        nAttr.setMax(0.99f);
+        addAttribute(aVgsRelaxation);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        aVgsEdgeUniformity = nAttr.create("vgsEdgeUniformity", "vgseu", MFnNumericData::kFloat, 0.0f, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        nAttr.setMin(0.0f);
+        nAttr.setMax(1.0f);
+        addAttribute(aVgsEdgeUniformity);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        aFtfRelaxation = nAttr.create("ftfRelaxation", "ftfr", MFnNumericData::kFloat, 0.5f, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        nAttr.setMin(0.01f);
+        nAttr.setMax(0.99f);
+        addAttribute(aFtfRelaxation);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        aFtfEdgeUniformity = nAttr.create("ftfEdgeUniformity", "ftfeu", MFnNumericData::kFloat, 0.0f, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        nAttr.setMin(0.0f);
+        nAttr.setMax(1.0f);
+        addAttribute(aFtfEdgeUniformity);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        aVgsIterations = nAttr.create("vgsIterations", "vgsi", MFnNumericData::kInt, 3, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        nAttr.setMin(1);
+        nAttr.setMax(10);
+        addAttribute(aVgsIterations);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        aGravityStrength = nAttr.create("gravityStrength", "gs", MFnNumericData::kFloat, -9.81f, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        nAttr.setMin(-100.0f);
+        nAttr.setMax(100.0f);
+        addAttribute(aGravityStrength);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        aFaceConstraintLow = nAttr.create("faceConstraintLow", "fcl", MFnNumericData::kFloat, 0.0f, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
         nAttr.setMin(0.0f);
         nAttr.setMax(FLT_MAX);
         addAttribute(aFaceConstraintLow);
@@ -76,9 +124,6 @@ public:
 
         aFaceConstraintHigh = nAttr.create("faceConstraintHigh", "fch", MFnNumericData::kFloat, 50.0f, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
-        nAttr.setStorable(true);
-        nAttr.setReadable(true);
-        nAttr.setWritable(true);
         nAttr.setMin(0.0f);
         nAttr.setMax(FLT_MAX);
         status = addAttribute(aFaceConstraintHigh);
@@ -86,9 +131,6 @@ public:
 
         aParticleMassLow = nAttr.create("particleMassLow", "pcl", MFnNumericData::kFloat, 0.01f, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
-        nAttr.setStorable(true);
-        nAttr.setReadable(true);
-        nAttr.setWritable(true);
         nAttr.setMin(0.01f);
         nAttr.setMax(FLT_MAX);
         addAttribute(aParticleMassLow);
@@ -96,9 +138,6 @@ public:
 
         aParticleMassHigh = nAttr.create("particleMassHigh", "pch", MFnNumericData::kFloat, 5.0f, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
-        nAttr.setStorable(true);
-        nAttr.setReadable(true);
-        nAttr.setWritable(true);
         nAttr.setMin(0.01f);
         nAttr.setMax(FLT_MAX);
         status = addAttribute(aParticleMassHigh);
@@ -213,7 +252,7 @@ public:
         MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onVoxelDataConnected, this, &status);
         callbackIds.append(callbackId);
 
-        callbackId = MConditionMessage::addConditionCallback("playingBack", updateTimestep, this);
+        callbackId = MConditionMessage::addConditionCallback("playingBack", updateSimulationParameters, this);
         callbackIds.append(callbackId);
 
         // Effectively a destructor callback to clean up when the node is deleted
@@ -269,16 +308,26 @@ public:
 
     // Note that FPS changes just make the playback choppier / smoother. A lower FPS means each frame is a bigger simulation timestep,
     // but the same time passes overall. To make the sim *run* slower or faster, you need to change the timeslider playback speed factor.
-    static void updateTimestep(bool state, void* clientData) {
+    static void updateSimulationParameters(bool state, void* clientData) {
         PBDNode* pbdNode = static_cast<PBDNode*>(clientData);
         const double secondsPerFrame = MTime(1.0, MTime::uiUnit()).as(MTime::kSeconds);
         if (secondsPerFrame < 0.005) {
             MGlobal::displayWarning("High FPS (low simulation timestep) may cause precision issues.");
         }
 
+        MObject pbdNodeObj = pbdNode->thisMObject();
         MObject globalSolverNode = GlobalSolver::getOrCreateGlobalSolver();
         int numSubsteps = MPlug(globalSolverNode, GlobalSolver::aNumSubsteps).asInt();
-        pbdNode->pbd.updateTimestep(static_cast<float>(secondsPerFrame) / numSubsteps);
+        
+        pbdNode->pbd.updateSimulationParameters(
+            MPlug(pbdNodeObj, aVgsRelaxation).asFloat(),
+            MPlug(pbdNodeObj, aVgsEdgeUniformity).asFloat(),
+            MPlug(pbdNodeObj, aFtfRelaxation).asFloat(),
+            MPlug(pbdNodeObj, aFtfEdgeUniformity).asFloat(),
+            MPlug(pbdNodeObj, aVgsIterations).asInt(),
+            MPlug(pbdNodeObj, aGravityStrength).asFloat(),
+            static_cast<float>(secondsPerFrame) / numSubsteps
+        );
     }
 
     void updateFaceConstraintsWithPaintValues(const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV, const ComPtr<ID3D11UnorderedAccessView>& paintValueUAV) {
