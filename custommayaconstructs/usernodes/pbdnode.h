@@ -281,7 +281,6 @@ public:
 
         PBDNode* pbdNode = static_cast<PBDNode*>(clientData);
         PBD& pbd = pbdNode->pbd;
-        pbd.setRadiusAndVolumeFromLength(voxels->voxelSize);
         ParticleDataContainer particleDataContainer = pbd.createParticles(voxels);
 
         Utils::createPluginData<ParticleData>(
