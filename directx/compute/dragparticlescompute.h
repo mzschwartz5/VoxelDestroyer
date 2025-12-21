@@ -104,6 +104,7 @@ public:
     void onDepthTargetChange(void* depthResourceHandle)
     {
         ID3D11DepthStencilView* depthStencilView = static_cast<ID3D11DepthStencilView*>(depthResourceHandle);
+        if (!depthStencilView) return;
 
         // Get the underlying resource from the depth stencil view, so we can create a shader resource view for it,
         // if it has changed.
