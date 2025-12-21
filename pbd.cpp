@@ -35,6 +35,7 @@ ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
     const int numOccupied = voxels->numOccupied;
     const MMatrixArray& modelMatrices = voxels->modelMatrices;
     double scaleArr[3] = {1.0, 1.0, 1.0};
+    float particleRadius = static_cast<float>(voxels->voxelSize) * 0.25f;
 
     for (int i = 0; i < numOccupied; i++) {
         MMatrix voxelToWorld = modelMatrices[i];
@@ -65,6 +66,12 @@ void PBD::createComputeShaders(
     const MSharedPtr<Voxels> voxels, 
     const std::array<std::vector<FaceConstraint>, 3>& faceConstraints
 ) {
+
+    float particleRadius = static_cast<float>(voxels->voxelSize) * 0.25f;
+    // This is really the rest volume of the cube made from particle centers, which are offset one particle radius from each corner of the voxel
+    // towards the center of the voxel. So with a particle radius = 1/4 voxel edge length, the rest volume is (2 * 1/4 edge length)^3 or 8 * (particle radius^3) 
+    float voxelRestVolume = 8.0f * particleRadius * particleRadius * particleRadius;
+
     vgsCompute = VGSCompute(
         numParticles(),
         particleRadius, 

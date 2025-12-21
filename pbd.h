@@ -34,11 +34,6 @@ public:
         ComPtr<ID3D11ShaderResourceView> isDraggingSRV
     );
 
-    void setRadiusAndVolumeFromLength(float edge_length) {
-        particleRadius = edge_length * 0.25f;
-        voxelRestVolume = 8.0f * particleRadius * particleRadius * particleRadius;
-    }
-
     void setInitialized(bool initialized) {
         this->initialized = initialized;
     }
@@ -75,6 +70,9 @@ public:
 
 private:
     // Inverse mass (w) and particle radius stored, packed at half-precision, as 4th component.
+    // TODO: particles should be stored on the PBD node as an attribute 
+    // (we have to hold onto them in CPU memory because they're used to recreate the one-big-buffer whenever a PBD node is added or deleted,
+    //  and they should be stored on the node so that they get saved with the scene)
     std::vector<MFloatPoint> particles;
     uint totalParticles{ 0 };
     bool initialized = false;
@@ -83,9 +81,4 @@ private:
     VGSCompute vgsCompute;
     FaceConstraintsCompute faceConstraintsCompute;
     PreVGSCompute preVGSCompute;
-
-    float particleRadius{ 0.25f };
-    // This is really the rest volume of the volume between particles, which are offset one particle radius from each corner of the voxel
-    // towards the center of the voxel. So with a particle radius = 1/4 voxel edge length, the rest volume is (2 * 1/4 edge length)^3 or 8 * (particle radius^3) 
-    float voxelRestVolume{ 1.0f };
 };
