@@ -1,4 +1,5 @@
 #include "common.hlsl"
+#include "constants.hlsli"
 
 static const float oneThird = 1.0f / 3.0f;
 
@@ -29,14 +30,16 @@ float safeLength(float3 v) {
 
 void doVGSIterations(
     inout float4 pos[8],
-    float particleRadius,
-    float voxelRestVolume,
-    float iterCount,
-    float relaxation,
-    float edgeUniformity,
+    VGSConstants vgsConstants,
     bool bailOnInverted
 ) {
-    for (int iter = 0; iter < iterCount; iter++)
+    float relaxation = vgsConstants.relaxation;
+    float edgeUniformity = vgsConstants.edgeUniformity;
+    float voxelRestVolume = vgsConstants.voxelRestVolume;
+    float particleRadius = vgsConstants.particleRadius;
+    uint iterCount = vgsConstants.iterCount;
+
+    for (uint iter = 0; iter < iterCount; iter++)
     {
         float3 center = 0.125 * (pos[0].xyz + pos[1].xyz + pos[2].xyz + pos[3].xyz + pos[4].xyz + pos[5].xyz + pos[6].xyz + pos[7].xyz);
 

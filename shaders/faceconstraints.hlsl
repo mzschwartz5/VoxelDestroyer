@@ -1,5 +1,4 @@
 #include "vgs_core.hlsl"
-#include "constants.hlsli"
 #include "faceconstraints_shared.hlsl"
 
 void breakConstraint(int constraintIdx, int voxelAIdx, int voxelBIdx) {
@@ -45,7 +44,7 @@ void main(
 
         // Check if the constraint between these two voxels should be broken due to tension/compression
         float edgeLength = length(pos[faceAParticles[i]].xyz - pos[faceBParticles[i]].xyz);
-        float strain = (edgeLength - 2.0f * PARTICLE_RADIUS) / (2.0f * PARTICLE_RADIUS);
+        float strain = (edgeLength - 2.0f * vgsConstants.particleRadius) / (2.0f * vgsConstants.particleRadius);
         if (strain > constraint.tensionLimit || strain < constraint.compressionLimit) {
             breakConstraint(constraintIdx, voxelAIdx, voxelBIdx);
             return;
@@ -53,15 +52,7 @@ void main(
     }
 
     // Now we do VGS iterations on the imaginary "voxel" formed by the particles of the two voxels' faces.
-    doVGSIterations(
-        pos,
-        PARTICLE_RADIUS,
-        voxelRestVolume,
-        ITER_COUNT,
-        FTF_RELAXATION,
-        FTF_BETA,
-        true
-    );
+    doVGSIterations(pos, vgsConstants, true);
 
     // Write back the updated positions to global memory
     for (int j = 0; j < 4; ++j) {

@@ -30,12 +30,14 @@ public:
 
     FaceConstraintsCompute(
         const std::array<std::vector<FaceConstraint>, 3>& constraints,
-        const ComPtr<ID3D11Buffer>& voxelSimInfoBuffer
-    ) : ComputeShader(IDR_SHADER4), voxelSimInfoBuffer(voxelSimInfoBuffer)
+        uint numParticles,
+        float particleRadius,
+        float voxelRestVolume
+    ) : ComputeShader(IDR_SHADER4)
     {
         // This shader has a second "entry point" for updating constraint limits from paint data.
         loadShaderObject(updateFaceConstraintsEntryPoint);
-        initializeBuffers(constraints);
+        initializeBuffers(constraints, numParticles, particleRadius, voxelRestVolume);
     };
 
     ~FaceConstraintsCompute() {
@@ -69,6 +71,17 @@ public:
         }
     }
 
+    void updateVGSParameters(
+        float relaxation,
+        float edgeUniformity,
+        uint iterCount
+    ) {
+        vgsConstants.relaxation = relaxation;
+        vgsConstants.edgeUniformity = edgeUniformity;
+        vgsConstants.iterCount = iterCount;
+        DirectX::updateConstantBuffer(vgsConstantBuffer, vgsConstants);
+    }
+
     void setPositionsUAV(const ComPtr<ID3D11UnorderedAccessView>& positionsUAV) {
         this->positionsUAV = positionsUAV;
     }
@@ -85,7 +98,8 @@ private:
     std::array<ComPtr<ID3D11UnorderedAccessView>, 3> faceConstraintUAVs;
     std::array<ComPtr<ID3D11Buffer>, 3> faceConstraintsCBs;
     std::array<ComPtr<ID3D11Buffer>, 3> constraintBuffers;
-    ComPtr<ID3D11Buffer> voxelSimInfoBuffer;
+    VGSConstants vgsConstants;
+    ComPtr<ID3D11Buffer> vgsConstantBuffer;
     ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV;
     ComPtr<ID3D11UnorderedAccessView> positionsUAV;
     ComPtr<ID3D11UnorderedAccessView> paintDeltaUAV;  // Only used during update from paint values
@@ -96,7 +110,7 @@ private:
         ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), faceConstraintUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get(), paintDeltaUAV.Get(), paintValueUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
-        ID3D11Buffer* cbvs[] = { voxelSimInfoBuffer.Get(), faceConstraintsCBs[activeConstraintAxis].Get() };
+        ID3D11Buffer* cbvs[] = { vgsConstantBuffer.Get(), faceConstraintsCBs[activeConstraintAxis].Get() };
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
     };
 
@@ -117,7 +131,12 @@ private:
         }
     };
     
-    void initializeBuffers(const std::array<std::vector<FaceConstraint>, 3>& constraints) {
+    void initializeBuffers(const std::array<std::vector<FaceConstraint>, 3>& constraints, uint numParticles, float particleRadius, float voxelRestVolume) {
+
+        vgsConstants.numVoxels = numParticles / 8;
+        vgsConstants.particleRadius = particleRadius;
+        vgsConstants.voxelRestVolume = voxelRestVolume;
+        vgsConstantBuffer = DirectX::createConstantBuffer<VGSConstants>(vgsConstants);
 
         // Order of vertex indices and face IDs corresponds to definitions in cube.h
         faceConstraintsCBData = std::array<FaceConstraintsCB, 3>{

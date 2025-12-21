@@ -1,18 +1,10 @@
 #include "vgs_core.hlsl"
-#include "constants.hlsli"
 
 RWStructuredBuffer<float4> positions : register(u0);
 
-cbuffer VoxelSimBuffer : register(b0)
+cbuffer VGSConstantBuffer : register(b0)
 {
-    float RELAXATION;
-    float BETA;
-    float PARTICLE_RADIUS;
-    float voxelRestVolume;
-    float ITER_COUNT;
-    float PADDING_0;
-    float PADDING_1;
-    uint NUM_VOXELS;
+    VGSConstants vgsConstants;
 };
 
 [numthreads(VGS_THREADS, 1, 1)]
@@ -23,7 +15,7 @@ void main(
 )
 {
     uint voxel_idx = globalThreadId.x;
-    if (voxel_idx >= NUM_VOXELS) return;
+    if (voxel_idx >= vgsConstants.numVoxels) return;
 
     uint start_idx = voxel_idx << 3;
     
@@ -32,16 +24,7 @@ void main(
         pos[i] = positions[start_idx + i];
     }
 
-    // Perform VGS iterations
-    doVGSIterations(
-        pos,
-        PARTICLE_RADIUS,
-        voxelRestVolume,
-        ITER_COUNT,
-        RELAXATION,
-        BETA,
-        false
-    );
+    doVGSIterations(pos, vgsConstants, false);
 
     // Write back the updated positions
     for (int j = 0; j < 8; ++j) {

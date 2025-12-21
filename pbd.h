@@ -68,7 +68,7 @@ public:
         float vgsEdgeUniformity,
         float ftfRelaxation,
         float ftfEdgeUniformity,
-        int vgsIterations,
+        uint vgsIterations,
         float gravityStrength,
         float secondsPerFrame
     );
