@@ -95,10 +95,10 @@ void PBD::setGPUResourceHandles(
     ComPtr<ID3D11ShaderResourceView> isDraggingSRV
 ) {
     vgsCompute.setParticlesUAV(particleUAV);
-    faceConstraintsCompute.setPositionsUAV(particleUAV);
+    faceConstraintsCompute.setParticlesUAV(particleUAV);
     faceConstraintsCompute.setIsSurfaceUAV(isSurfaceUAV);
-    preVGSCompute.setPositionsUAV(particleUAV);
-    preVGSCompute.setOldPositionsUAV(oldParticlesUAV);
+    preVGSCompute.setParticlesUAV(particleUAV);
+    preVGSCompute.setOldParticlesUAV(oldParticlesUAV);
     preVGSCompute.setIsDraggingSRV(isDraggingSRV);
 }
 

@@ -42,12 +42,12 @@ public:
         DirectX::updateConstantBuffer(preVgsConstantsBuffer, preVgsConstants);
     }
 
-    void setPositionsUAV(const ComPtr<ID3D11UnorderedAccessView>& positionsUAV) {
-        this->positionsUAV = positionsUAV;
+    void setParticlesUAV(const ComPtr<ID3D11UnorderedAccessView>& particlesUAV) {
+        this->particlesUAV = particlesUAV;
     }
 
-    void setOldPositionsUAV(const ComPtr<ID3D11UnorderedAccessView>& oldPositionsUAV) {
-        this->oldPositionsUAV = oldPositionsUAV;
+    void setOldParticlesUAV(const ComPtr<ID3D11UnorderedAccessView>& oldParticlesUAV) {
+        this->oldParticlesUAV = oldParticlesUAV;
     }
 
     void setIsDraggingSRV(const ComPtr<ID3D11ShaderResourceView>& isDraggingSRV) {
@@ -58,8 +58,8 @@ private:
     inline static constexpr int updateParticleWeightsEntryPoint = IDR_SHADER7;
     int numWorkgroups;
     PreVGSConstants preVgsConstants;
-    ComPtr<ID3D11UnorderedAccessView> positionsUAV;
-    ComPtr<ID3D11UnorderedAccessView> oldPositionsUAV;
+    ComPtr<ID3D11UnorderedAccessView> particlesUAV;
+    ComPtr<ID3D11UnorderedAccessView> oldParticlesUAV;
     ComPtr<ID3D11ShaderResourceView> isDraggingSRV;
     ComPtr<ID3D11Buffer> preVgsConstantsBuffer;
     ComPtr<ID3D11UnorderedAccessView> paintDeltaUAV;  // Only used during update from paint values
@@ -70,7 +70,7 @@ private:
         ID3D11ShaderResourceView* srvs[] = { isDraggingSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
-		ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), oldPositionsUAV.Get(), paintDeltaUAV.Get(), paintValueUAV.Get() };
+		ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get(), oldParticlesUAV.Get(), paintDeltaUAV.Get(), paintValueUAV.Get() };
 		DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
 		ID3D11Buffer* cbvs[] = { preVgsConstantsBuffer.Get() };

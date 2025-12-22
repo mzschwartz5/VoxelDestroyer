@@ -201,9 +201,9 @@ void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
     Utils::PluginData<ParticleData> particleData(particleDataToAddPlug);
     uint totalParticles = getTotalParticles();
     
-    std::vector<Particle>* const positions = particleData.get()->getData().particlePositionsCPU;
-    DirectX::addToBuffer<Particle>(buffers[BufferType::PARTICLE], *positions);
-    DirectX::addToBuffer<Particle>(buffers[BufferType::OLDPARTICLE], *positions);
+    std::vector<Particle>* const particles = particleData.get()->getData().particles;
+    DirectX::addToBuffer<Particle>(buffers[BufferType::PARTICLE], *particles);
+    DirectX::addToBuffer<Particle>(buffers[BufferType::OLDPARTICLE], *particles);
 
     std::vector<uint>* const surfaceVal = particleData.get()->getData().isSurface;
     DirectX::addToBuffer<uint>(buffers[BufferType::SURFACE], *surfaceVal);
@@ -245,7 +245,7 @@ void GlobalSolver::createGlobalComputeShaders(float maximumParticleRadius) {
         totalParticles,
         maximumParticleRadius // For collision assumptions to work, grid cell must be at least as big as the biggest particle
     );
-    buildCollisionGridCompute.setParticlePositionsSRV(particleSRV);
+    buildCollisionGridCompute.setParticlesSRV(particleSRV);
     buildCollisionGridCompute.setIsSurfaceSRV(isSurfaceSRV);
 
     prefixScanCompute = PrefixScanCompute(
@@ -257,7 +257,7 @@ void GlobalSolver::createGlobalComputeShaders(float maximumParticleRadius) {
         buildCollisionGridCompute.getCollisionCellParticleCountsUAV(),
         buildCollisionGridCompute.getParticleCollisionCB()
     );
-    buildCollisionParticleCompute.setParticlePositionsSRV(particleSRV);
+    buildCollisionParticleCompute.setParticlesSRV(particleSRV);
     buildCollisionParticleCompute.setIsSurfaceSRV(isSurfaceSRV);
 
     solveCollisionsCompute = SolveCollisionsCompute(
@@ -266,8 +266,8 @@ void GlobalSolver::createGlobalComputeShaders(float maximumParticleRadius) {
         buildCollisionGridCompute.getCollisionCellParticleCountsSRV(),
         buildCollisionGridCompute.getParticleCollisionCB()
     );
-    solveCollisionsCompute.setParticlePositionsUAV(particleUAV);
-    solveCollisionsCompute.setOldParticlePositionsSRV(oldParticlesSRV);
+    solveCollisionsCompute.setParticlesUAV(particleUAV);
+    solveCollisionsCompute.setOldParticlesSRV(oldParticlesSRV);
 
     dragParticlesCompute = DragParticlesCompute(totalVoxels);
     dragParticlesCompute.setParticlesUAV(particleUAV);
@@ -275,8 +275,8 @@ void GlobalSolver::createGlobalComputeShaders(float maximumParticleRadius) {
 
     colliderBuffer.totalParticles = totalParticles;
     solvePrimitiveCollisionsCompute = SolvePrimitiveCollisionsCompute(colliderBuffer);
-    solvePrimitiveCollisionsCompute.setParticlePositionsUAV(particleUAV);
-    solvePrimitiveCollisionsCompute.setOldParticlePositionsSRV(oldParticlesSRV);
+    solvePrimitiveCollisionsCompute.setParticlesUAV(particleUAV);
+    solvePrimitiveCollisionsCompute.setOldParticlesSRV(oldParticlesSRV);
     buffers[BufferType::COLLIDER] = solvePrimitiveCollisionsCompute.getColliderBuffer();
 }
 

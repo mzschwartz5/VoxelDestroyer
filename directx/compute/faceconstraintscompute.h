@@ -82,8 +82,8 @@ public:
         DirectX::updateConstantBuffer(vgsConstantBuffer, vgsConstants);
     }
 
-    void setPositionsUAV(const ComPtr<ID3D11UnorderedAccessView>& positionsUAV) {
-        this->positionsUAV = positionsUAV;
+    void setParticlesUAV(const ComPtr<ID3D11UnorderedAccessView>& particlesUAV) {
+        this->particlesUAV = particlesUAV;
     }
 
     void setIsSurfaceUAV(const ComPtr<ID3D11UnorderedAccessView>& isSurfaceUAV) {
@@ -101,13 +101,13 @@ private:
     VGSConstants vgsConstants;
     ComPtr<ID3D11Buffer> vgsConstantBuffer;
     ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV;
-    ComPtr<ID3D11UnorderedAccessView> positionsUAV;
+    ComPtr<ID3D11UnorderedAccessView> particlesUAV;
     ComPtr<ID3D11UnorderedAccessView> paintDeltaUAV;  // Only used during update from paint values
     ComPtr<ID3D11UnorderedAccessView> paintValueUAV;  // Only used during update from paint values
 
     void bind() override
     {
-        ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), faceConstraintUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get(), paintDeltaUAV.Get(), paintValueUAV.Get() };
+        ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get(), faceConstraintUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get(), paintDeltaUAV.Get(), paintValueUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
         ID3D11Buffer* cbvs[] = { vgsConstantBuffer.Get(), faceConstraintsCBs[activeConstraintAxis].Get() };

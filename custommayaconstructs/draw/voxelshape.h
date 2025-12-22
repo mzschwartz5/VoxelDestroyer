@@ -161,9 +161,9 @@ public:
     void initializeDeformVerticesCompute(
         const std::vector<uint>& vertexIndices,
         const unsigned int numVertices,
-        const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
+        const ComPtr<ID3D11UnorderedAccessView>& particlesUAV,
         const ComPtr<ID3D11UnorderedAccessView>& normalsUAV,
-        const ComPtr<ID3D11ShaderResourceView>& originalPositionsSRV,
+        const ComPtr<ID3D11ShaderResourceView>& originalParticlesSRV,
         const ComPtr<ID3D11ShaderResourceView>& originalNormalsSRV
     ) {
 
@@ -179,11 +179,11 @@ public:
             particleDataContainer.numParticles,
             numVertices,
             voxelGrid.gridTransform.asRotateMatrix().inverse(),
-            *particleDataContainer.particlePositionsCPU,
+            *particleDataContainer.particles,
             vertexVoxelIds,
-            positionsUAV,
+            particlesUAV,
             normalsUAV,
-            originalPositionsSRV,
+            originalParticlesSRV,
             originalNormalsSRV,
             particleSRVData.get()->getSRV()
         );
@@ -305,7 +305,7 @@ private:
             // The particle SRV has changed, so we need to update the compute shader with the new one.
             MDataHandle d3d11DataHandle = dataBlock.inputValue(aParticleSRV);
             D3D11Data* particleSRVData = static_cast<D3D11Data*>(d3d11DataHandle.asPluginData());
-            deformVerticesCompute.setParticlePositionsSRV(particleSRVData->getSRV());
+            deformVerticesCompute.setParticlesSRV(particleSRVData->getSRV());
             isParticleSRVPlugDirty = false;
         }
 

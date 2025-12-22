@@ -9,7 +9,7 @@
 
 struct ParticleDataContainer {
     uint numParticles = 0;
-    std::vector<Particle>* particlePositionsCPU = nullptr;
+    std::vector<Particle>* particles = nullptr;
     std::vector<uint>* isSurface = nullptr;
     float particleRadius = 0.0f;
 };

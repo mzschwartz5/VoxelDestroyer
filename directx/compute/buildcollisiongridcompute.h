@@ -43,8 +43,8 @@ public:
         return particleCollisionCBData.hashGridSize;
     }
 
-    void setParticlePositionsSRV(const ComPtr<ID3D11ShaderResourceView>& particlePositionsSRV) {
-        this->particlePositionsSRV = particlePositionsSRV;
+    void setParticlesSRV(const ComPtr<ID3D11ShaderResourceView>& particlesSRV) {
+        this->particlesSRV = particlesSRV;
     }
 
     void setIsSurfaceSRV(const ComPtr<ID3D11ShaderResourceView>& isSurfaceSRV) {
@@ -64,11 +64,11 @@ private:
     ComPtr<ID3D11Buffer> collisionCellParticleCountsBuffer;
     ComPtr<ID3D11ShaderResourceView> collisionCellParticleCountsSRV;
     ComPtr<ID3D11UnorderedAccessView> collisionCellParticleCountsUAV;
-    ComPtr<ID3D11ShaderResourceView> particlePositionsSRV;
+    ComPtr<ID3D11ShaderResourceView> particlesSRV;
     ComPtr<ID3D11ShaderResourceView> isSurfaceSRV;
 
     void bind() override {
-        ID3D11ShaderResourceView* srvs[] = { particlePositionsSRV.Get(), isSurfaceSRV.Get() };
+        ID3D11ShaderResourceView* srvs[] = { particlesSRV.Get(), isSurfaceSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
         ID3D11UnorderedAccessView* uavs[] = { collisionCellParticleCountsUAV.Get() };
