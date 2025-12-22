@@ -62,9 +62,9 @@ void main(uint3 gId : SV_DispatchThreadID)
 
     // Note: originalParticles contains only one reference particle per voxel, thus the index into it
     // does not need to be multiplied by 8 to account for the 8 particles per voxel.
-    Particle v0_orig = originalParticles[voxelId];
-    float v0_orig_radius = unpackHalf2x16(v0_orig.radiusAndInvMass).x;
-    float voxelRestLengthInv = 1.0 / (2.0 * v0_orig_radius); // All particles in a voxel have the same radius.
+    Particle p0_orig = originalParticles[voxelId];
+    float p0_orig_radius = unpackHalf2x16(p0_orig.radiusAndInvMass).x;
+    float voxelRestLengthInv = 1.0 / (2.0 * p0_orig_radius); // All particles in a voxel have the same radius.
 
     // The deformed basis of the voxel (not normalized, but scaled by voxelRestLengthInv)
     float3 e0 = (v1 - v0) * voxelRestLengthInv;
@@ -73,7 +73,7 @@ void main(uint3 gId : SV_DispatchThreadID)
 
     // Deform position
     float3x3 gridRotInv3x3 = (float3x3)gridRotationInverse;
-    float3 restPosition = mul(gridRotInv3x3, originalVertPositions[gId.x] - v0_orig.position);
+    float3 restPosition = mul(gridRotInv3x3, originalVertPositions[gId.x] - p0_orig.position);
     restPosition = v0 + restPosition.x * e0
                       + restPosition.y * e1
                       + restPosition.z * e2;
