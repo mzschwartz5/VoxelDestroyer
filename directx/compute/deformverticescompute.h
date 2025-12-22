@@ -18,12 +18,12 @@ public:
         const MMatrix& gridRotationInverse,
         const std::vector<Particle>& originalParticles,             // Will be uploaded to GPU
         const std::vector<uint>& vertexVoxelIds,                    // Will be uploaded to GPU
-        const ComPtr<ID3D11UnorderedAccessView>& particlesUAV,
+        const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
         const ComPtr<ID3D11UnorderedAccessView>& normalsUAV,
         const ComPtr<ID3D11ShaderResourceView>& originalVertPositionsSRV,
         const ComPtr<ID3D11ShaderResourceView>& originalNormalsSRV,
         const ComPtr<ID3D11ShaderResourceView>& particlesSRV
-    ) : ComputeShader(IDR_SHADER1), particlesUAV(particlesUAV), normalsUAV(normalsUAV), originalVertPositionsSRV(originalVertPositionsSRV), originalNormalsSRV(originalNormalsSRV), particlesSRV(particlesSRV)
+    ) : ComputeShader(IDR_SHADER1), positionsUAV(positionsUAV), normalsUAV(normalsUAV), originalVertPositionsSRV(originalVertPositionsSRV), originalNormalsSRV(originalNormalsSRV), particlesSRV(particlesSRV)
     {
         initializeBuffers(numParticles, vertexCount, gridRotationInverse, originalParticles, vertexVoxelIds);
     }
@@ -47,7 +47,7 @@ private:
     int numWorkgroups = 0;
 
     // Inputs
-    ComPtr<ID3D11UnorderedAccessView> particlesUAV;
+    ComPtr<ID3D11UnorderedAccessView> positionsUAV;
     ComPtr<ID3D11UnorderedAccessView> normalsUAV;
     ComPtr<ID3D11ShaderResourceView> originalVertPositionsSRV;
     ComPtr<ID3D11ShaderResourceView> originalNormalsSRV;
@@ -73,7 +73,7 @@ private:
         ID3D11ShaderResourceView* srvs[] = { originalVertPositionsSRV.Get(), originalNormalsSRV.Get(), originalParticlesSRV.Get(), particlesSRV.Get(), vertexVoxelIdsSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
-        ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get(), normalsUAV.Get() };
+        ID3D11UnorderedAccessView* uavs[] = { positionsUAV.Get(), normalsUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
         ID3D11Buffer* constBuffers[] = { constantsBuffer.Get() };

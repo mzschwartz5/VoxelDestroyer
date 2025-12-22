@@ -138,7 +138,7 @@ private:
     };
 
     ComPtr<ID3D11Buffer> positionsBuffer;
-    ComPtr<ID3D11UnorderedAccessView> particlesUAV;
+    ComPtr<ID3D11UnorderedAccessView> positionsUAV;
 
     ComPtr<ID3D11Buffer> normalsBuffer;
     ComPtr<ID3D11UnorderedAccessView> normalsUAV;
@@ -599,7 +599,7 @@ private:
             buffer = DirectX::createReadWriteBuffer(data, false, D3D11_BIND_VERTEX_BUFFER | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS);
             vertexBuffer->resourceHandle(buffer.Get(), data.size());
 
-            ComPtr<ID3D11UnorderedAccessView>& uav = (semantic == MGeometry::kPosition) ? particlesUAV : normalsUAV;
+            ComPtr<ID3D11UnorderedAccessView>& uav = (semantic == MGeometry::kPosition) ? positionsUAV : normalsUAV;
             uav = DirectX::createUAV(buffer, vertexCount * vbDesc.dimension(), 0, DXGI_FORMAT_R32_FLOAT);
 
             // Also need to create a buffer with the original positions/normals for the deform shader to read from
@@ -845,7 +845,7 @@ private:
         voxelShape->initializeDeformVerticesCompute(
             allMeshIndices,
             numVertices,
-            particlesUAV,
+            positionsUAV,
             normalsUAV,
             originalPositionsSRV, 
             originalNormalsSRV

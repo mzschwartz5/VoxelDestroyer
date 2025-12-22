@@ -161,9 +161,9 @@ public:
     void initializeDeformVerticesCompute(
         const std::vector<uint>& vertexIndices,
         const unsigned int numVertices,
-        const ComPtr<ID3D11UnorderedAccessView>& particlesUAV,
+        const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
         const ComPtr<ID3D11UnorderedAccessView>& normalsUAV,
-        const ComPtr<ID3D11ShaderResourceView>& originalParticlesSRV,
+        const ComPtr<ID3D11ShaderResourceView>& originalPositionsUAV,
         const ComPtr<ID3D11ShaderResourceView>& originalNormalsSRV
     ) {
 
@@ -181,9 +181,9 @@ public:
             voxelGrid.gridTransform.asRotateMatrix().inverse(),
             *particleDataContainer.particles,
             vertexVoxelIds,
-            particlesUAV,
+            positionsUAV,
             normalsUAV,
-            originalParticlesSRV,
+            originalPositionsUAV,
             originalNormalsSRV,
             particleSRVData.get()->getSRV()
         );
