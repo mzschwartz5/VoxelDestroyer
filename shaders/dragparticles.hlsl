@@ -1,10 +1,9 @@
 #include "constants.hlsli"
+#include "common.hlsl"
 
 RWStructuredBuffer<float4> particles : register(u0);
 RWStructuredBuffer<bool> isDragging : register(u1);
 Texture2D<float> depthBuffer : register(t0);
-
-static const float eps = 1e-8f;
 
 cbuffer DragValues : register(b0)
 {
@@ -87,12 +86,12 @@ void main( uint3 gId : SV_DispatchThreadID )
     // It looks unintuitive but it's just the mathematical result of some commutativity. Intuitively, it works because similar triangles.
     float3 scaledDragWorldDiff = voxelCameraDepth * pixelSpaceVoxelCenter.z * dragWorldDiff;
 
-    particles[start_idx + 0] = float4(p0.xyz + scaledDragWorldDiff, p0.w);
-    particles[start_idx + 1] = float4(p1.xyz + scaledDragWorldDiff, p1.w);
-    particles[start_idx + 2] = float4(p2.xyz + scaledDragWorldDiff, p2.w);
-    particles[start_idx + 3] = float4(p3.xyz + scaledDragWorldDiff, p3.w);
-    particles[start_idx + 4] = float4(p4.xyz + scaledDragWorldDiff, p4.w);
-    particles[start_idx + 5] = float4(p5.xyz + scaledDragWorldDiff, p5.w);
-    particles[start_idx + 6] = float4(p6.xyz + scaledDragWorldDiff, p6.w);
-    particles[start_idx + 7] = float4(p7.xyz + scaledDragWorldDiff, p7.w);
+    if (!massIsInfinite(p0)) particles[start_idx + 0] = float4(p0.xyz + scaledDragWorldDiff, p0.w);
+    if (!massIsInfinite(p1)) particles[start_idx + 1] = float4(p1.xyz + scaledDragWorldDiff, p1.w);
+    if (!massIsInfinite(p2)) particles[start_idx + 2] = float4(p2.xyz + scaledDragWorldDiff, p2.w);
+    if (!massIsInfinite(p3)) particles[start_idx + 3] = float4(p3.xyz + scaledDragWorldDiff, p3.w);
+    if (!massIsInfinite(p4)) particles[start_idx + 4] = float4(p4.xyz + scaledDragWorldDiff, p4.w);
+    if (!massIsInfinite(p5)) particles[start_idx + 5] = float4(p5.xyz + scaledDragWorldDiff, p5.w);
+    if (!massIsInfinite(p6)) particles[start_idx + 6] = float4(p6.xyz + scaledDragWorldDiff, p6.w);
+    if (!massIsInfinite(p7)) particles[start_idx + 7] = float4(p7.xyz + scaledDragWorldDiff, p7.w);
 }

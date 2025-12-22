@@ -15,9 +15,9 @@ void main(uint3 gId : SV_DispatchThreadID)
     int voxelIndex = gId.x >> 3;
     if (isDragging[voxelIndex]) return;
 
-    float4 delta = (pos - oldPos);
-    delta += float4(0, preVgsConstants.gravityStrength, 0, 0) * preVgsConstants.timeStep * preVgsConstants.timeStep;
-    pos.xyz += delta.xyz;
+    float3 delta = (pos.xyz - oldPos.xyz);
+    delta += float3(0, preVgsConstants.gravityStrength, 0) * preVgsConstants.timeStep * preVgsConstants.timeStep;
+    pos.xyz += delta;
     
     // Write back to global memory
     positions[gId.x] = pos;

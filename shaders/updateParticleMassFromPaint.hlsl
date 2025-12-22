@@ -26,4 +26,5 @@ void main(uint3 gId : SV_DispatchThreadID) {
     }
 
     positions[gId.x].w = packedRadiusAndInvMass;
+    oldPositions[gId.x].w = packedRadiusAndInvMass;
 }

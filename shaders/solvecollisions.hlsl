@@ -28,12 +28,11 @@ bool doParticlesOverlap(
 
 // Approximates the center of a voxel that owns a particle by the average of the particle and its diagonal particle in the voxel.
 // The diagonal particle is retrieved using index relationships between different particles in the voxel (by construction).
-float4 getVoxelCenterOfParticle(float4 particle, uint particleGlobalIdx, uint voxelIdx) {
+float3 getVoxelCenterOfParticle(float4 particle, uint particleGlobalIdx, uint voxelIdx) {
     int particleIdxInVoxel = (particleGlobalIdx - (voxelIdx << 3));
     int particleDiagIdx = (voxelIdx << 3) + 7 - particleIdxInVoxel;
     float4 particleDiag = particles[particleDiagIdx];
-    // It's okay to use the .w component from just one particle, because the particle radius will be the same for all particles in a voxel.
-    return float4((particle.xyz + particleDiag.xyz) * 0.5f, particle.w); 
+    return (particle.xyz + particleDiag.xyz) * 0.5f;
 }
 
 // Max out shared memory. See note below about how many particles each thread can store, based
@@ -43,12 +42,11 @@ groupshared float4 s_particles[SHARED_MEMORY_SIZE];
 groupshared uint s_globalParticleIndices[SHARED_MEMORY_SIZE];
 groupshared bool s_positionChanged[SHARED_MEMORY_SIZE];
 
-void applyFriction(float4 particleA, float4 particleB, float4 frameStartParticleA, float4 frameStartParticleB, inout float4 s_particleA, inout float4 s_particleB, float3 augmentedNormal, float collisionDelta) {
+void applyFriction(float4 preCollisionA, float4 preCollisionB, float4 frameStartParticleA, float4 frameStartParticleB, inout float4 postCollisionA, inout float4 postCollisionB, float3 augmentedNormal, float collisionDelta) {
     if (friction <= 0) return;
 
-    float3 frameDeltaA = particleA.xyz - frameStartParticleA.xyz;
-    float3 frameDeltaB = particleB.xyz - frameStartParticleB.xyz;
-
+    float3 frameDeltaA = preCollisionA.xyz - frameStartParticleA.xyz;
+    float3 frameDeltaB = preCollisionB.xyz - frameStartParticleB.xyz;
     float3 relFrameDelta = frameDeltaA - frameDeltaB;
     float3 relTangent = relFrameDelta - dot(relFrameDelta, augmentedNormal) * augmentedNormal;
 
@@ -59,8 +57,12 @@ void applyFriction(float4 particleA, float4 particleB, float4 frameStartParticle
     float scale = min(1.0f, maxTangent / relTangentLen);
     float3 relTangentClamped = relTangent * scale;
 
-    s_particleA.xyz -= 0.5f * relTangentClamped;
-    s_particleB.xyz += 0.5f * relTangentClamped;
+    float invMassA = unpackHalf2x16(preCollisionA.w).y;
+    float invMassB = unpackHalf2x16(preCollisionB.w).y;
+    float invMassSumReciprocal = 1 / (invMassA + invMassB);
+
+    postCollisionA.xyz -= (invMassA * invMassSumReciprocal) * relTangentClamped;
+    postCollisionB.xyz += (invMassB * invMassSumReciprocal) * relTangentClamped;
 }
 
 /**
@@ -106,33 +108,35 @@ void main(uint3 globalId : SV_DispatchThreadID, uint3 groupThreadId : SV_GroupTh
 
             float distanceSquared;
             float3 particleAToB;
-            float particleARadius = unpackHalf2x16(particleA.w).x;
-            float particleBRadius = unpackHalf2x16(particleB.w).x;
-            if (!doParticlesOverlap(particleA.xyz, particleB.xyz, particleARadius, particleBRadius, distanceSquared, particleAToB)) continue;
+            float2 particleRadiusAndInvMassA = unpackHalf2x16(particleA.w);
+            float2 particleRadiusAndInvMassB = unpackHalf2x16(particleB.w);
+            float invMassSum = particleRadiusAndInvMassA.y + particleRadiusAndInvMassB.y;
+            if (invMassSum <= 0.0f) continue; // Both particles are immovable.
+
+            if (!doParticlesOverlap(particleA.xyz, particleB.xyz, particleRadiusAndInvMassA.x, particleRadiusAndInvMassB.x, distanceSquared, particleAToB)) continue;
             particleAToB = normalize(particleAToB);
-            float delta = (particleARadius + particleBRadius) - sqrt(distanceSquared);
+            float delta = (particleRadiusAndInvMassA.x + particleRadiusAndInvMassB.x) - sqrt(distanceSquared);
             
-            float jitterThreshold = jitterEpsilon * min(particleARadius, particleBRadius);            
+            float jitterThreshold = jitterEpsilon * min(particleRadiusAndInvMassA.x, particleRadiusAndInvMassB.x);            
             if (delta <= jitterThreshold) continue;
             delta -= jitterThreshold; 
 
             // Get the particles diagonal to A and B within their respective voxels.
             // Then approximate the voxel centers to augment collision normals, to avoid voxel interlock.
-            float4 voxelACenter = getVoxelCenterOfParticle(particleA, globalParticleIdx_i, globalVoxelIdx_i);
-            float4 voxelBCenter = getVoxelCenterOfParticle(particleB, globalParticleIdx_j, globalVoxelIdx_j);
-            float voxelARadius = 1.5f * unpackHalf2x16(voxelACenter.w).x;
-            float voxelBRadius = 1.5f * unpackHalf2x16(voxelBCenter.w).x;
+            float3 voxelACenter = getVoxelCenterOfParticle(particleA, globalParticleIdx_i, globalVoxelIdx_i);
+            float3 voxelBCenter = getVoxelCenterOfParticle(particleB, globalParticleIdx_j, globalVoxelIdx_j);
 
             // Test for voxel-center collision, treating each center as an imaginary "particle" with radius 1.5x that of the voxel's real particles. 
             float3 augmentedNormal = particleAToB;
             float3 voxelAToB;
-            if (doParticlesOverlap(voxelACenter.xyz, voxelBCenter.xyz, voxelARadius, voxelBRadius, distanceSquared, voxelAToB)) {
+            if (doParticlesOverlap(voxelACenter, voxelBCenter, 1.5f * particleRadiusAndInvMassA.x, 1.5f * particleRadiusAndInvMassB.x, distanceSquared, voxelAToB)) {
                 augmentedNormal = normalize(normalize(voxelAToB) + particleAToB);
             }
             
-            // TODO: take particle mass into account
-            s_particles[sharedMemIdx_i].xyz -= delta * relaxationFactor * augmentedNormal;
-            s_particles[sharedMemIdx_j].xyz += delta * relaxationFactor * augmentedNormal;
+            float invMassSumReciprocal = 1 / (invMassSum);
+
+            s_particles[sharedMemIdx_i].xyz -= delta * relaxationFactor * (invMassSumReciprocal * particleRadiusAndInvMassA.y) * augmentedNormal;
+            s_particles[sharedMemIdx_j].xyz += delta * relaxationFactor * (invMassSumReciprocal * particleRadiusAndInvMassB.y) * augmentedNormal;
 
             // We do have to do some extra per-collision-pair global reads to apply friction. There's not enough shared memory to store frame start positions.
             // But since these reads only happen on actual collisions (not on all candidates), it's manageable.
