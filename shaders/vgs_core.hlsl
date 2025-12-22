@@ -29,7 +29,7 @@ float safeLength(float3 v) {
 }
 
 void doVGSIterations(
-    inout float4 pos[8],
+    inout Particle particles[8],
     VGSConstants vgsConstants,
     bool bailOnInverted
 ) {
@@ -41,12 +41,12 @@ void doVGSIterations(
 
     for (uint iter = 0; iter < iterCount; iter++)
     {
-        float3 center = 0.125 * (pos[0].xyz + pos[1].xyz + pos[2].xyz + pos[3].xyz + pos[4].xyz + pos[5].xyz + pos[6].xyz + pos[7].xyz);
+        float3 center = 0.125 * (particles[0].position + particles[1].position + particles[2].position + particles[3].position + particles[4].position + particles[5].position + particles[6].position + particles[7].position);
 
         // Calculate basis vectors (average of edges for each axis)
-        float3 v0 = 0.25 * ((pos[1].xyz - pos[0].xyz) + (pos[3].xyz - pos[2].xyz) + (pos[5].xyz - pos[4].xyz) + (pos[7].xyz - pos[6].xyz));
-        float3 v1 = 0.25 * ((pos[2].xyz - pos[0].xyz) + (pos[3].xyz - pos[1].xyz) + (pos[6].xyz - pos[4].xyz) + (pos[7].xyz - pos[5].xyz));
-        float3 v2 = 0.25 * ((pos[4].xyz - pos[0].xyz) + (pos[5].xyz - pos[1].xyz) + (pos[6].xyz - pos[2].xyz) + (pos[7].xyz - pos[3].xyz));
+        float3 v0 = 0.25 * ((particles[1].position - particles[0].position) + (particles[3].position - particles[2].position) + (particles[5].position - particles[4].position) + (particles[7].position - particles[6].position));
+        float3 v1 = 0.25 * ((particles[2].position - particles[0].position) + (particles[3].position - particles[1].position) + (particles[6].position - particles[4].position) + (particles[7].position - particles[5].position));
+        float3 v2 = 0.25 * ((particles[4].position - particles[0].position) + (particles[5].position - particles[1].position) + (particles[6].position - particles[2].position) + (particles[7].position - particles[3].position));
         if (dot(cross(v0, v1), v2) == 0.0f) {
             v2 = normalize(cross(v0, v1)) * particleRadius;
         }
@@ -93,13 +93,13 @@ void doVGSIterations(
         u1 *= mult;
         u2 *= mult;
 
-        if (!massIsInfinite(pos[0])) { pos[0].xyz = center - u0 - u1 - u2; }
-        if (!massIsInfinite(pos[1])) { pos[1].xyz = center + u0 - u1 - u2; }
-        if (!massIsInfinite(pos[2])) { pos[2].xyz = center - u0 + u1 - u2; }
-        if (!massIsInfinite(pos[3])) { pos[3].xyz = center + u0 + u1 - u2; }
-        if (!massIsInfinite(pos[4])) { pos[4].xyz = center - u0 - u1 + u2; }
-        if (!massIsInfinite(pos[5])) { pos[5].xyz = center + u0 - u1 + u2; }
-        if (!massIsInfinite(pos[6])) { pos[6].xyz = center - u0 + u1 + u2; }
-        if (!massIsInfinite(pos[7])) { pos[7].xyz = center + u0 + u1 + u2; }
+        if (!massIsInfinite(particles[0])) { particles[0].position = center - u0 - u1 - u2; }
+        if (!massIsInfinite(particles[1])) { particles[1].position = center + u0 - u1 - u2; }
+        if (!massIsInfinite(particles[2])) { particles[2].position = center - u0 + u1 - u2; }
+        if (!massIsInfinite(particles[3])) { particles[3].position = center + u0 + u1 - u2; }
+        if (!massIsInfinite(particles[4])) { particles[4].position = center - u0 - u1 + u2; }
+        if (!massIsInfinite(particles[5])) { particles[5].position = center + u0 - u1 + u2; }
+        if (!massIsInfinite(particles[6])) { particles[6].position = center - u0 + u1 + u2; }
+        if (!massIsInfinite(particles[7])) { particles[7].position = center + u0 + u1 + u2; }
     }
 }

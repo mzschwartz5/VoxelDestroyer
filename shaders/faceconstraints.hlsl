@@ -34,16 +34,16 @@ void main(
     uint voxelAParticlesIdx = voxelAIdx << 3;
     uint voxelBParticlesIdx = voxelBIdx << 3;
 
-    float4 pos[8];
+    Particle voxelParticles[8];
     for (int i = 0; i < 4; ++i) {
         // Note: this is NOT a mistake. The face indices of the opposite voxel tell us where to index
         // the particles of the first voxel. Each face*Particles array tells us which particles to use from each voxel,
         // but we leverage the order within each array to avoid axis-specific control flow.
-        pos[faceBParticles[i]] = positions[voxelAParticlesIdx + faceAParticles[i]];
-        pos[faceAParticles[i]] = positions[voxelBParticlesIdx + faceBParticles[i]];
+        voxelParticles[faceBParticles[i]] = particles[voxelAParticlesIdx + faceAParticles[i]];
+        voxelParticles[faceAParticles[i]] = particles[voxelBParticlesIdx + faceBParticles[i]];
 
         // Check if the constraint between these two voxels should be broken due to tension/compression
-        float edgeLength = length(pos[faceAParticles[i]].xyz - pos[faceBParticles[i]].xyz);
+        float edgeLength = length(voxelParticles[faceAParticles[i]].position - voxelParticles[faceBParticles[i]].position);
         float strain = (edgeLength - 2.0f * vgsConstants.particleRadius) / (2.0f * vgsConstants.particleRadius);
         if (strain > constraint.tensionLimit || strain < constraint.compressionLimit) {
             breakConstraint(constraintIdx, voxelAIdx, voxelBIdx);
@@ -52,17 +52,17 @@ void main(
     }
 
     // Now we do VGS iterations on the imaginary "voxel" formed by the particles of the two voxels' faces.
-    doVGSIterations(pos, vgsConstants, true);
+    doVGSIterations(voxelParticles, vgsConstants, true);
 
-    // Write back the updated positions to global memory
+    // Write back the updated particles to global memory
     for (int j = 0; j < 4; ++j) {
         // Again, the mixing of A and B is actually not a mistake. It's a result of how we defined the face indices,
         // taking advantage of the ordering to be able to write one shader for all axes with no branching.
-        if (!massIsInfinite(pos[j])) {
-            positions[voxelAParticlesIdx + faceAParticles[j]] = pos[faceBParticles[j]];
+        if (!massIsInfinite(voxelParticles[j])) {
+            particles[voxelAParticlesIdx + faceAParticles[j]] = voxelParticles[faceBParticles[j]];
         }
-        if (!massIsInfinite(pos[j])) {
-            positions[voxelBParticlesIdx + faceBParticles[j]] = pos[faceAParticles[j]];
+        if (!massIsInfinite(voxelParticles[j])) {
+            particles[voxelBParticlesIdx + faceBParticles[j]] = voxelParticles[faceAParticles[j]];
         }
     }
 }

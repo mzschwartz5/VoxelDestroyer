@@ -13,7 +13,7 @@ void main(uint3 gId : SV_DispatchThreadID) {
     if (abs(paintDelta) < eps) return;
 
     float paintValue = paintValues[gId.x];
-    float packedRadiusAndInvMass = positions[gId.x].w;
+    float packedRadiusAndInvMass = particles[gId.x].radiusAndInvMass;
 
     if (paintValue < 0.0f) { 
         // Infinite mass case.
@@ -25,6 +25,6 @@ void main(uint3 gId : SV_DispatchThreadID) {
         packedRadiusAndInvMass = updateMass(packedRadiusAndInvMass, invMass);
     }
 
-    positions[gId.x].w = packedRadiusAndInvMass;
-    oldPositions[gId.x].w = packedRadiusAndInvMass;
+    particles[gId.x].radiusAndInvMass = packedRadiusAndInvMass;
+    oldParticles[gId.x].radiusAndInvMass = packedRadiusAndInvMass;
 }

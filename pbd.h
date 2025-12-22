@@ -73,7 +73,7 @@ private:
     // TODO: particles should be stored on the PBD node as an attribute 
     // (we have to hold onto them in CPU memory because they're used to recreate the one-big-buffer whenever a PBD node is added or deleted,
     //  and they should be stored on the node so that they get saved with the scene)
-    std::vector<MFloatPoint> particles;
+    std::vector<Particle> particles;
     uint totalParticles{ 0 };
     bool initialized = false;
 

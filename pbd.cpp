@@ -48,8 +48,8 @@ ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
             corner -= ((particleRadius / scaleArr[0]) * Utils::sign(corner));
             
             corner = corner * voxelToWorld;
-            float packedRadiusAndW = Utils::packTwoFloatsAsHalfs(particleRadius, 1.0f); // w is initialized to 1.0f but is user-editable via the voxel paint tool
-            particles.push_back(MFloatPoint(corner.x, corner.y, corner.z, packedRadiusAndW));
+            uint32_t packedRadiusAndW = Utils::packTwoFloatsInUint32(particleRadius, 1.0f); // w is initialized to 1.0f but is user-editable via the voxel paint tool
+            particles.push_back({static_cast<float>(corner.x), static_cast<float>(corner.y), static_cast<float>(corner.z), packedRadiusAndW});
             totalParticles++;
         }
     }

@@ -201,9 +201,9 @@ void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
     Utils::PluginData<ParticleData> particleData(particleDataToAddPlug);
     uint totalParticles = getTotalParticles();
     
-    std::vector<MFloatPoint>* const positions = particleData.get()->getData().particlePositionsCPU;
-    DirectX::addToBuffer<MFloatPoint>(buffers[BufferType::PARTICLE], *positions);
-    DirectX::addToBuffer<MFloatPoint>(buffers[BufferType::OLDPARTICLE], *positions);
+    std::vector<Particle>* const positions = particleData.get()->getData().particlePositionsCPU;
+    DirectX::addToBuffer<Particle>(buffers[BufferType::PARTICLE], *positions);
+    DirectX::addToBuffer<Particle>(buffers[BufferType::OLDPARTICLE], *positions);
 
     std::vector<uint>* const surfaceVal = particleData.get()->getData().isSurface;
     DirectX::addToBuffer<uint>(buffers[BufferType::SURFACE], *surfaceVal);

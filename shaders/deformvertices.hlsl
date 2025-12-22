@@ -3,8 +3,8 @@
 
 StructuredBuffer<float3> originalVertPositions : register(t0);
 StructuredBuffer<float3> originalVertNormals : register(t1);
-StructuredBuffer<float4> originalParticlePositions : register(t2);
-StructuredBuffer<float4> particlePositions : register(t3);
+StructuredBuffer<Particle> originalParticles : register(t2);
+StructuredBuffer<Particle> particles : register(t3);
 StructuredBuffer<uint> vertexVoxelIds : register(t4);
 
 // The bind flags Maya uses prevents us from using structured buffers and requires an R32_FLOAT format for UAVs.
@@ -55,15 +55,15 @@ void main(uint3 gId : SV_DispatchThreadID)
     uint voxelId = vertexVoxelIds[gId.x];
     uint particleStartIdx = voxelId << 3;
 
-    float3 v0 = particlePositions[particleStartIdx + 0].xyz;
-    float3 v1 = particlePositions[particleStartIdx + 1].xyz;
-    float3 v2 = particlePositions[particleStartIdx + 2].xyz;
-    float3 v4 = particlePositions[particleStartIdx + 4].xyz;
+    float3 v0 = particles[particleStartIdx + 0].position;
+    float3 v1 = particles[particleStartIdx + 1].position;
+    float3 v2 = particles[particleStartIdx + 2].position;
+    float3 v4 = particles[particleStartIdx + 4].position;
 
     // Note: originalParticles contains only one reference particle per voxel, thus the index into it
     // does not need to be multiplied by 8 to account for the 8 particles per voxel.
-    float4 v0_orig = originalParticlePositions[voxelId];
-    float v0_orig_radius = unpackHalf2x16(v0_orig.w).x;
+    Particle v0_orig = originalParticles[voxelId];
+    float v0_orig_radius = unpackHalf2x16(v0_orig.radiusAndInvMass).x;
     float voxelRestLengthInv = 1.0 / (2.0 * v0_orig_radius); // All particles in a voxel have the same radius.
 
     // The deformed basis of the voxel (not normalized, but scaled by voxelRestLengthInv)
@@ -73,7 +73,7 @@ void main(uint3 gId : SV_DispatchThreadID)
 
     // Deform position
     float3x3 gridRotInv3x3 = (float3x3)gridRotationInverse;
-    float3 restPosition = mul(gridRotInv3x3, originalVertPositions[gId.x] - v0_orig.xyz);
+    float3 restPosition = mul(gridRotInv3x3, originalVertPositions[gId.x] - v0_orig.position);
     restPosition = v0 + restPosition.x * e0
                       + restPosition.y * e1
                       + restPosition.z * e2;

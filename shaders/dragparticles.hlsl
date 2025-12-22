@@ -1,7 +1,7 @@
 #include "constants.hlsli"
 #include "common.hlsl"
 
-RWStructuredBuffer<float4> particles : register(u0);
+RWStructuredBuffer<Particle> particles : register(u0);
 RWStructuredBuffer<bool> isDragging : register(u1);
 Texture2D<float> depthBuffer : register(t0);
 
@@ -29,17 +29,17 @@ void main( uint3 gId : SV_DispatchThreadID )
 
     // Calculate the voxel's center from the average position of the 8 voxel particles
     uint start_idx = gId.x << 3;
-    float4 p0 = particles[start_idx + 0];
-    float4 p1 = particles[start_idx + 1];
-    float4 p2 = particles[start_idx + 2];
-    float4 p3 = particles[start_idx + 3];
-    float4 p4 = particles[start_idx + 4];
-    float4 p5 = particles[start_idx + 5];
-    float4 p6 = particles[start_idx + 6];
-    float4 p7 = particles[start_idx + 7];
+    Particle p0 = particles[start_idx + 0];
+    Particle p1 = particles[start_idx + 1];
+    Particle p2 = particles[start_idx + 2];
+    Particle p3 = particles[start_idx + 3];
+    Particle p4 = particles[start_idx + 4];
+    Particle p5 = particles[start_idx + 5];
+    Particle p6 = particles[start_idx + 6];
+    Particle p7 = particles[start_idx + 7];
 
-    float voxelSize = length(p0 - p7);
-    float4 voxelCenter = float4(p0.xyz + p1.xyz + p2.xyz + p3.xyz + p4.xyz + p5.xyz + p6.xyz + p7.xyz, 1.0f);
+    float voxelSize = length(p0.position - p7.position);
+    float4 voxelCenter = float4(p0.position + p1.position + p2.position + p3.position + p4.position + p5.position + p6.position + p7.position, 1.0f);
     voxelCenter *= 0.125f;
     voxelCenter.w = 1.0f;
 
@@ -86,12 +86,12 @@ void main( uint3 gId : SV_DispatchThreadID )
     // It looks unintuitive but it's just the mathematical result of some commutativity. Intuitively, it works because similar triangles.
     float3 scaledDragWorldDiff = voxelCameraDepth * pixelSpaceVoxelCenter.z * dragWorldDiff;
 
-    if (!massIsInfinite(p0)) particles[start_idx + 0] = float4(p0.xyz + scaledDragWorldDiff, p0.w);
-    if (!massIsInfinite(p1)) particles[start_idx + 1] = float4(p1.xyz + scaledDragWorldDiff, p1.w);
-    if (!massIsInfinite(p2)) particles[start_idx + 2] = float4(p2.xyz + scaledDragWorldDiff, p2.w);
-    if (!massIsInfinite(p3)) particles[start_idx + 3] = float4(p3.xyz + scaledDragWorldDiff, p3.w);
-    if (!massIsInfinite(p4)) particles[start_idx + 4] = float4(p4.xyz + scaledDragWorldDiff, p4.w);
-    if (!massIsInfinite(p5)) particles[start_idx + 5] = float4(p5.xyz + scaledDragWorldDiff, p5.w);
-    if (!massIsInfinite(p6)) particles[start_idx + 6] = float4(p6.xyz + scaledDragWorldDiff, p6.w);
-    if (!massIsInfinite(p7)) particles[start_idx + 7] = float4(p7.xyz + scaledDragWorldDiff, p7.w);
+    if (!massIsInfinite(p0)) particles[start_idx + 0].position = p0.position + scaledDragWorldDiff;
+    if (!massIsInfinite(p1)) particles[start_idx + 1].position = p1.position + scaledDragWorldDiff;
+    if (!massIsInfinite(p2)) particles[start_idx + 2].position = p2.position + scaledDragWorldDiff;
+    if (!massIsInfinite(p3)) particles[start_idx + 3].position = p3.position + scaledDragWorldDiff;
+    if (!massIsInfinite(p4)) particles[start_idx + 4].position = p4.position + scaledDragWorldDiff;
+    if (!massIsInfinite(p5)) particles[start_idx + 5].position = p5.position + scaledDragWorldDiff;
+    if (!massIsInfinite(p6)) particles[start_idx + 6].position = p6.position + scaledDragWorldDiff;
+    if (!massIsInfinite(p7)) particles[start_idx + 7].position = p7.position + scaledDragWorldDiff;
 }

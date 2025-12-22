@@ -24,7 +24,7 @@ cbuffer FaceConstraintsCB : register(b1)
     int padding2;
 };
 
-RWStructuredBuffer<float4> positions : register(u0);
+RWStructuredBuffer<Particle> particles : register(u0);
 RWStructuredBuffer<FaceConstraint> faceConstraints : register(u1);
 RWStructuredBuffer<uint> isSurfaceVoxel : register(u2);
 RWBuffer<float> paintDeltas : register(u3);

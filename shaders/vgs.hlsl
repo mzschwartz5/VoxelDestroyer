@@ -1,6 +1,6 @@
 #include "vgs_core.hlsl"
 
-RWStructuredBuffer<float4> positions : register(u0);
+RWStructuredBuffer<Particle> particles : register(u0);
 
 cbuffer VGSConstantBuffer : register(b0)
 {
@@ -19,17 +19,17 @@ void main(
 
     uint start_idx = voxel_idx << 3;
     
-    float4 pos[8];
+    Particle voxelParticles[8];
     for (int i = 0; i < 8; ++i) {
-        pos[i] = positions[start_idx + i];
+        voxelParticles[i] = particles[start_idx + i];
     }
 
-    doVGSIterations(pos, vgsConstants, false);
+    doVGSIterations(voxelParticles, vgsConstants, false);
 
-    // Write back the updated positions
+    // Write back the updated particles
     for (int j = 0; j < 8; ++j) {
-        if (massIsInfinite(pos[j])) continue;
-        positions[start_idx + j] = pos[j];
+        if (massIsInfinite(voxelParticles[j])) continue;
+        particles[start_idx + j] = voxelParticles[j];
     }
 
 }

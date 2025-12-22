@@ -187,13 +187,10 @@ uint16_t floatToHalf(float value) {
     }
 }
 
-float packTwoFloatsAsHalfs(float a, float b) {
-    uint16_t ha = floatToHalf(a);
-    uint16_t hb = floatToHalf(b);
-    uint32_t packed = (hb << 16) | ha;
-    float result;
-    std::memcpy(&result, &packed, sizeof(result));
-    return result;
+uint32_t packTwoFloatsInUint32(float a, float b) {
+    uint32_t ha = static_cast<uint32_t>(floatToHalf(a));
+    uint32_t hb = static_cast<uint32_t>(floatToHalf(b));
+    return (hb << 16) | ha;
 }
 
 MFloatVector sign(const MFloatVector& v) {

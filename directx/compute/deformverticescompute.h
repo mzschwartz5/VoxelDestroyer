@@ -16,8 +16,8 @@ public:
         int numParticles,
         int vertexCount,
         const MMatrix& gridRotationInverse,
-        const std::vector<MFloatPoint>& originalParticlePositions,   // Will be uploaded to GPU
-        const std::vector<uint>& vertexVoxelIds,        // Will be uploaded to GPU
+        const std::vector<Particle>& originalParticlePositions,   // Will be uploaded to GPU
+        const std::vector<uint>& vertexVoxelIds,                     // Will be uploaded to GPU
         const ComPtr<ID3D11UnorderedAccessView>& positionsUAV,
         const ComPtr<ID3D11UnorderedAccessView>& normalsUAV,
         const ComPtr<ID3D11ShaderResourceView>& originalVertPositionsSRV,
@@ -92,18 +92,18 @@ private:
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(nullConstBuffers), nullConstBuffers);
     };
 
-    void initializeBuffers(int numParticles, int vertexCount, const MMatrix& gridRotationInverse, const std::vector<MFloatPoint>& originalParticlePositions, const std::vector<uint>& vertexVoxelIds)
+    void initializeBuffers(int numParticles, int vertexCount, const MMatrix& gridRotationInverse, const std::vector<Particle>& originalParticlePositions, const std::vector<uint>& vertexVoxelIds)
     {
         numWorkgroups = Utils::divideRoundUp(vertexCount, DEFORM_VERTICES_THREADS);
 
         // We only need one reference particle per voxel, not the whole shebang
-        std::vector<MFloatPoint> reducedOriginalParticles;
+        std::vector<Particle> reducedOriginalParticles;
         reducedOriginalParticles.reserve(numParticles / 8);
         for (int i = 0; i < numParticles; i += 8) {
             reducedOriginalParticles.push_back(originalParticlePositions[i]);
         }
 
-        originalParticlePositionsBuffer = DirectX::createReadOnlyBuffer<MFloatPoint>(reducedOriginalParticles);
+        originalParticlePositionsBuffer = DirectX::createReadOnlyBuffer<Particle>(reducedOriginalParticles);
         originalParticlePositionsSRV = DirectX::createSRV(originalParticlePositionsBuffer);
 
         vertexVoxelIdsBuffer = DirectX::createReadOnlyBuffer<uint>(vertexVoxelIds);

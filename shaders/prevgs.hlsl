@@ -6,20 +6,20 @@ void main(uint3 gId : SV_DispatchThreadID)
 {
     if (gId.x >= preVgsConstants.numParticles) return; 
     
-    float4 pos = positions[gId.x];
-    if (massIsInfinite(pos)) return;
+    Particle particle = particles[gId.x];
+    if (massIsInfinite(particle)) return;
 
-    float4 oldPos = oldPositions[gId.x];
-    oldPositions[gId.x] = pos;
+    Particle oldParticle = oldParticles[gId.x];
+    oldParticles[gId.x] = particle;
 
     int voxelIndex = gId.x >> 3;
     if (isDragging[voxelIndex]) return;
 
-    float3 delta = (pos.xyz - oldPos.xyz);
+    float3 delta = (particle.position - oldParticle.position);
     delta += float3(0, preVgsConstants.gravityStrength, 0) * preVgsConstants.timeStep * preVgsConstants.timeStep;
-    pos.xyz += delta;
+    particle.position += delta;
     
     // Write back to global memory
-    positions[gId.x] = pos;
+    particles[gId.x] = particle;
 }
 

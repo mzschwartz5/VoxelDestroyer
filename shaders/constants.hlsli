@@ -38,4 +38,16 @@ struct PreVGSConstants
     int padding2;
 };
 
+struct Particle
+{
+#ifdef __cplusplus
+    float x;
+    float y;
+    float z;
+#else
+    float3 position;
+#endif
+    uint radiusAndInvMass; // Packed as two half-floats: [lower 16 bits: inverse mass, upper 16 bits: radius]
+};
+
 #endif // CONSTANTS_HLSLI

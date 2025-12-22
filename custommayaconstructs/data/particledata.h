@@ -5,10 +5,11 @@
 #include <maya/MString.h>
 #include <maya/MPoint.h>
 #include <vector>
+#include "shaders/constants.hlsli"
 
 struct ParticleDataContainer {
     uint numParticles = 0;
-    std::vector<MFloatPoint>* particlePositionsCPU = nullptr;
+    std::vector<Particle>* particlePositionsCPU = nullptr;
     std::vector<uint>* isSurface = nullptr;
     float particleRadius = 0.0f;
 };
