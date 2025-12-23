@@ -37,6 +37,7 @@ public:
     {
         // This shader has a second "entry point" for updating constraint limits from paint data.
         loadShaderObject(updateFaceConstraintsEntryPoint);
+        loadShaderObject(closeParticleGapsEntryPoint);
         initializeBuffers(constraints, numParticles, particleRadius, voxelRestVolume);
     };
 
@@ -71,6 +72,13 @@ public:
         }
     }
 
+    void closeParticleGapsForRender() {
+        DirectX::copyBufferToBuffer(particlesUAV, renderParticlesUAV);
+        for (activeConstraintAxis = 0; activeConstraintAxis < 3; activeConstraintAxis++) {
+            ComputeShader::dispatch(numWorkgroups[activeConstraintAxis], closeParticleGapsEntryPoint);
+        }
+    }
+
     void updateVGSParameters(
         float relaxation,
         float edgeUniformity,
@@ -90,8 +98,13 @@ public:
         this->isSurfaceUAV = isSurfaceUAV;
     }
 
+    void setRenderParticlesUAV(const ComPtr<ID3D11UnorderedAccessView>& renderParticlesUAV) {
+        this->renderParticlesUAV = renderParticlesUAV;
+    }
+
 private:
     inline static constexpr int updateFaceConstraintsEntryPoint = IDR_SHADER5;
+    inline static constexpr int closeParticleGapsEntryPoint = IDR_SHADER16;
     int activeConstraintAxis = 0; // x = 0, y = 1, z = 2
     std::array<int, 3> numWorkgroups = { 0, 0, 0 };
     std::array<FaceConstraintsCB, 3> faceConstraintsCBData;
@@ -104,10 +117,11 @@ private:
     ComPtr<ID3D11UnorderedAccessView> particlesUAV;
     ComPtr<ID3D11UnorderedAccessView> paintDeltaUAV;  // Only used during update from paint values
     ComPtr<ID3D11UnorderedAccessView> paintValueUAV;  // Only used during update from paint values
+    ComPtr<ID3D11UnorderedAccessView> renderParticlesUAV; // A copy of the particles that can be adjusted (i.e. close particle gaps) for rendering (without affecting simulation).
 
     void bind() override
     {
-        ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get(), faceConstraintUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get(), paintDeltaUAV.Get(), paintValueUAV.Get() };
+        ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get(), faceConstraintUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get(), paintDeltaUAV.Get(), paintValueUAV.Get(), renderParticlesUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
         ID3D11Buffer* cbvs[] = { vgsConstantBuffer.Get(), faceConstraintsCBs[activeConstraintAxis].Get() };
@@ -116,7 +130,7 @@ private:
 
     void unbind() override
     {
-        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
         ID3D11Buffer* cbvs[] = { nullptr, nullptr };

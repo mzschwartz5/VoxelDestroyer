@@ -330,6 +330,12 @@
       <ShaderModel>5.0</ShaderModel>
       <ObjectFileOutput>$(ProjectDir)\shaders\cso\vgs.cso</ObjectFileOutput>
     </FxCompile>
+    <FxCompile Include="shaders\closeParticleGaps.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\closeParticleGaps.cso</ObjectFileOutput>
+    </FxCompile>
     
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

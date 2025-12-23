@@ -290,6 +290,14 @@ public:
                 particleData->setData(particleDataContainer);
             }
         );
+
+        Utils::createPluginData<D3D11Data>(
+            pbdNode->thisMObject(),
+            aParticleSRV,
+            [&pbd](D3D11Data* d3d11Data) {
+                d3d11Data->setSRV(pbd.getRenderParticlesSRV());
+            }
+        );
         
         std::array<std::vector<FaceConstraint>, 3> faceConstraints 
             = pbd.constructFaceToFaceConstraints(voxels);
@@ -353,20 +361,10 @@ private:
         int numVoxels = numberParticles / 8;
         ComPtr<ID3D11UnorderedAccessView> particleUAV = DirectX::createUAV(GlobalSolver::getBuffer(GlobalSolver::BufferType::PARTICLE), numberParticles, particleBufferOffset);
         ComPtr<ID3D11UnorderedAccessView> oldParticlesUAV = DirectX::createUAV(GlobalSolver::getBuffer(GlobalSolver::BufferType::OLDPARTICLE), numberParticles, particleBufferOffset);
-        ComPtr<ID3D11ShaderResourceView> particleSRV = DirectX::createSRV(GlobalSolver::getBuffer(GlobalSolver::BufferType::PARTICLE), numberParticles, particleBufferOffset);
         ComPtr<ID3D11UnorderedAccessView> isSurfaceUAV = DirectX::createUAV(GlobalSolver::getBuffer(GlobalSolver::BufferType::SURFACE), numVoxels, voxelOffset);
         ComPtr<ID3D11ShaderResourceView> isDraggingSRV = DirectX::createSRV(GlobalSolver::getBuffer(GlobalSolver::BufferType::DRAGGING), numVoxels, voxelOffset);
 
         pbd.setGPUResourceHandles(particleUAV, oldParticlesUAV, isSurfaceUAV, isDraggingSRV);
-
-        Utils::createPluginData<D3D11Data>(
-            dataBlock,
-            aParticleSRV,
-            [&particleSRV](D3D11Data* d3d11Data) {
-                d3d11Data->setSRV(particleSRV);
-            }
-        );
-
         pbd.setInitialized(true);
     }
 
