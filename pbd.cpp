@@ -54,6 +54,10 @@ ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
         }
     }
 
+    renderParticlesBuffer = DirectX::createReadWriteBuffer(particles);
+    renderParticlesUAV = DirectX::createUAV(renderParticlesBuffer);
+    renderParticlesSRV = DirectX::createSRV(renderParticlesBuffer);
+
     return {
         totalParticles,
         &particles,
@@ -84,6 +88,7 @@ void PBD::createComputeShaders(
         particleRadius,
         voxelRestVolume
 	);
+    faceConstraintsCompute.setRenderParticlesUAV(renderParticlesUAV);
 
     preVGSCompute = PreVGSCompute(numParticles());
 }
@@ -142,4 +147,8 @@ void PBD::simulateSubstep() {
     preVGSCompute.dispatch();
     vgsCompute.dispatch();
     faceConstraintsCompute.dispatch();
+
+    if (++totalSubsteps % 10 == 0) {
+        faceConstraintsCompute.closeParticleGapsForRender();
+    }
 }
