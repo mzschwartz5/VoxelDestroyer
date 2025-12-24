@@ -149,6 +149,6 @@ void PBD::simulateSubstep() {
     faceConstraintsCompute.dispatch();
 
     if (++totalSubsteps % 10 == 0) {
-        faceConstraintsCompute.closeParticleGapsForRender();
+        faceConstraintsCompute.mergeRenderParticles();
     }
 }

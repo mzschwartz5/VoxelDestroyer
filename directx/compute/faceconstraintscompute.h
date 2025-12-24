@@ -37,8 +37,10 @@ public:
     {
         // This shader has a second "entry point" for updating constraint limits from paint data.
         loadShaderObject(updateFaceConstraintsEntryPoint);
-        loadShaderObject(closeParticleGapsEntryPoint);
+        loadShaderObject(mergeRenderParticlesEntryPoint);
+        loadShaderObject(expandRenderParticlesEntryPoint);
         initializeBuffers(constraints, numParticles, particleRadius, voxelRestVolume);
+        numExpandParticlesWorkgroups = Utils::divideRoundUp(numParticles / 8, VGS_THREADS);
     };
 
     ~FaceConstraintsCompute() {
@@ -52,6 +54,7 @@ public:
         for (activeConstraintAxis = 0; activeConstraintAxis < 3; activeConstraintAxis++) {
             ComputeShader::dispatch(numWorkgroups[activeConstraintAxis]);
         }
+        activeConstraintAxis = 0;
     };
 
     void updateFaceConstraintsFromPaint(
@@ -72,11 +75,12 @@ public:
         }
     }
 
-    void closeParticleGapsForRender() {
-        DirectX::copyBufferToBuffer(particlesUAV, renderParticlesUAV);
+    void mergeRenderParticles() {
+        ComputeShader::dispatch(numExpandParticlesWorkgroups, expandRenderParticlesEntryPoint);
         for (activeConstraintAxis = 0; activeConstraintAxis < 3; activeConstraintAxis++) {
-            ComputeShader::dispatch(numWorkgroups[activeConstraintAxis], closeParticleGapsEntryPoint);
+            ComputeShader::dispatch(numWorkgroups[activeConstraintAxis], mergeRenderParticlesEntryPoint);
         }
+        activeConstraintAxis = 0;
     }
 
     void updateVGSParameters(
@@ -104,9 +108,11 @@ public:
 
 private:
     inline static constexpr int updateFaceConstraintsEntryPoint = IDR_SHADER5;
-    inline static constexpr int closeParticleGapsEntryPoint = IDR_SHADER16;
+    inline static constexpr int mergeRenderParticlesEntryPoint = IDR_SHADER16;
+    inline static constexpr int expandRenderParticlesEntryPoint = IDR_SHADER17;
     int activeConstraintAxis = 0; // x = 0, y = 1, z = 2
     std::array<int, 3> numWorkgroups = { 0, 0, 0 };
+    int numExpandParticlesWorkgroups = 0;
     std::array<FaceConstraintsCB, 3> faceConstraintsCBData;
     std::array<ComPtr<ID3D11UnorderedAccessView>, 3> faceConstraintUAVs;
     std::array<ComPtr<ID3D11Buffer>, 3> faceConstraintsCBs;
