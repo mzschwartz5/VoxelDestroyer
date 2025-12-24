@@ -141,14 +141,14 @@ void PBD::updateSimulationParameters(
     preVGSCompute.updatePreVgsConstants(secondsPerFrame, gravityStrength);
 }
 
+void PBD::mergeRenderParticles() {
+    faceConstraintsCompute.mergeRenderParticles();
+}
+
 void PBD::simulateSubstep() {
     if (!initialized) return;
 
     preVGSCompute.dispatch();
     vgsCompute.dispatch();
     faceConstraintsCompute.dispatch();
-
-    if (++totalSubsteps % 10 == 0) {
-        faceConstraintsCompute.mergeRenderParticles();
-    }
 }

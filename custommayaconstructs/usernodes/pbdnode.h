@@ -350,6 +350,10 @@ public:
 
         pbd.updateParticleMassWithPaintValues(paintDeltaUAV, paintValueUAV, massLow, massHigh);
     }
+
+    void mergeRenderParticles() {
+        pbd.mergeRenderParticles();
+    }
     
 private:
     PBD pbd;

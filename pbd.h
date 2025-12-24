@@ -55,6 +55,8 @@ public:
         float constraintLow, 
         float constraintHigh
     );
+
+    void mergeRenderParticles();
     
     void simulateSubstep();
 
