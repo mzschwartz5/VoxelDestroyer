@@ -50,11 +50,11 @@ void applyFriction(Particle preCollisionA, Particle preCollisionB, Particle fram
     float3 relFrameDelta = frameDeltaA - frameDeltaB;
     float3 relTangent = relFrameDelta - dot(relFrameDelta, augmentedNormal) * augmentedNormal;
 
-    float relTangentLen = length(relTangent);
-    if (relTangentLen < 1e-6f) return;
+    float relTangentLenSq = dot(relTangent, relTangent);
+    if (relTangentLenSq < 1e-8f) return;
 
     float maxTangent = friction * collisionDelta;
-    float scale = min(1.0f, maxTangent / relTangentLen);
+    float scale = min(1.0f, maxTangent / sqrt(relTangentLenSq));
     float3 relTangentClamped = relTangent * scale;
 
     float invMassA = unpackHalf2x16(preCollisionA.radiusAndInvMass).y;
