@@ -309,6 +309,8 @@ private:
             isParticleSRVPlugDirty = false;
         }
 
+        PBDNode* pbdNode = static_cast<PBDNode*>(Utils::connectedNode(MPlug(thisMObject(), aTrigger)));
+        pbdNode->mergeRenderParticles();
         deformVerticesCompute.dispatch();
 
         return MS::kSuccess;
