@@ -58,32 +58,57 @@ void main(uint3 gId : SV_DispatchThreadID)
     float3 v0 = particles[particleStartIdx + 0].position;
     float3 v1 = particles[particleStartIdx + 1].position;
     float3 v2 = particles[particleStartIdx + 2].position;
+    float3 v3 = particles[particleStartIdx + 3].position;
     float3 v4 = particles[particleStartIdx + 4].position;
+    float3 v5 = particles[particleStartIdx + 5].position;
+    float3 v6 = particles[particleStartIdx + 6].position;
+    float3 v7 = particles[particleStartIdx + 7].position;
 
     // Note: originalParticles contains only one reference particle per voxel, thus the index into it
     // does not need to be multiplied by 8 to account for the 8 particles per voxel.
     Particle p0_orig = originalParticles[voxelId];
-    float p0_orig_radius = unpackHalf2x16(p0_orig.radiusAndInvMass).x;
-    float voxelRestLengthInv = 1.0 / (2.0 * p0_orig_radius); // All particles in a voxel have the same radius.
-
-    // The deformed basis of the voxel (not normalized, but scaled by voxelRestLengthInv)
-    float3 e0 = (v1 - v0) * voxelRestLengthInv;
-    float3 e1 = (v2 - v0) * voxelRestLengthInv;
-    float3 e2 = (v4 - v0) * voxelRestLengthInv;
-
-    // Deform position
+    float r = unpackHalf2x16(p0_orig.radiusAndInvMass).x;
     float3x3 gridRotInv3x3 = (float3x3)gridRotationInverse;
-    float3 restPosition = mul(gridRotInv3x3, originalVertPositions[gId.x] - p0_orig.position);
-    restPosition = v0 + restPosition.x * e0
-                      + restPosition.y * e1
-                      + restPosition.z * e2;
+    float3 restLocal = mul(gridRotInv3x3, originalVertPositions[gId.x] - (p0_orig.position - float3(r, r, r)));
+    float3 uvw = restLocal / (4.0f * r);
+    float u = uvw.x; float v = uvw.y; float w = uvw.z;
+
+    float3 deformedPos =
+        v0 * (1 - u) * (1 - v) * (1 - w) +
+        v1 * u * (1 - v) * (1 - w) +
+        v2 * (1 - u) * v * (1 - w) +
+        v3 * u * v * (1 - w) +
+        v4 * (1 - u) * (1 - v) * w +
+        v5 * u * (1 - v) * w +
+        v6 * (1 - u) * v * w +
+        v7 * u * v * w;
+
     uint outOffset = gId.x * 3;
-    outVertPositions[outOffset + 0] = restPosition.x;
-    outVertPositions[outOffset + 1] = restPosition.y;
-    outVertPositions[outOffset + 2] = restPosition.z;
+    outVertPositions[outOffset + 0] = deformedPos.x;
+    outVertPositions[outOffset + 1] = deformedPos.y;
+    outVertPositions[outOffset + 2] = deformedPos.z;
 
     // Deform normal
-    float3x3 deformMatrix = transpose(inverseFromRows(e0, e1, e2));
+    float3 dP_du =
+        (v1 - v0) * (1.0f - v) * (1.0f - w) +
+        (v3 - v2) * (v)        * (1.0f - w) +
+        (v5 - v4) * (1.0f - v) * (w) +
+        (v7 - v6) * (v)        * (w);
+
+    float3 dP_dv =
+        (v2 - v0) * (1.0f - u) * (1.0f - w) +
+        (v3 - v1) * (u)        * (1.0f - w) +
+        (v6 - v4) * (1.0f - u) * (w) +
+        (v7 - v5) * (u)        * (w);
+
+    float3 dP_dw =
+        (v4 - v0) * (1.0f - u) * (1.0f - v) +
+        (v5 - v1) * (u)        * (1.0f - v) +
+        (v6 - v2) * (1.0f - u) * (v) +
+        (v7 - v3) * (u)        * (v);
+
+    float3x3 deformMatrix = transpose(inverseFromRows(dP_du, dP_dv, dP_dw));
+
     float3 normal = originalVertNormals[gId.x];
     normal = mul(gridRotInv3x3, normal);
     normal = normalize(mul(deformMatrix, normal));

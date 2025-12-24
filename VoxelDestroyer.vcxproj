@@ -330,11 +330,17 @@
       <ShaderModel>5.0</ShaderModel>
       <ObjectFileOutput>$(ProjectDir)\shaders\cso\vgs.cso</ObjectFileOutput>
     </FxCompile>
-    <FxCompile Include="shaders\closeParticleGaps.hlsl">
+    <FxCompile Include="shaders\mergeRenderParticles.hlsl">
       <EntryPoint>main</EntryPoint>
       <ShaderType>Compute</ShaderType>
       <ShaderModel>5.0</ShaderModel>
-      <ObjectFileOutput>$(ProjectDir)\shaders\cso\closeParticleGaps.cso</ObjectFileOutput>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\mergeRenderParticles.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\expandRenderParticles.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\expandRenderParticles.cso</ObjectFileOutput>
     </FxCompile>
     
   </ItemGroup>
