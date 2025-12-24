@@ -122,7 +122,7 @@ public:
         addAttribute(aFaceConstraintLow);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
-        aFaceConstraintHigh = nAttr.create("faceConstraintHigh", "fch", MFnNumericData::kFloat, 50.0f, &status);
+        aFaceConstraintHigh = nAttr.create("faceConstraintHigh", "fch", MFnNumericData::kFloat, 5.0f, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         nAttr.setMin(0.0f);
         nAttr.setMax(FLT_MAX);

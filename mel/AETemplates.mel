@@ -33,13 +33,13 @@ global proc AEPBDTemplate(string $nodeName)
 global proc AE_createFaceConstraintLow(string $attr)
 {
     string $ctrl = "AE_faceConstraintLow_ctrl";
-    attrFieldSliderGrp -label "Voxel strain limit (low)" -annotation "Breaking point for voxel interfaces in units of voxel-lengths, lower bound" -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
+    attrFieldSliderGrp -label "Voxel strain limit (low)" -annotation "Breaking point for voxel interfaces in units of voxel-lengths, lower bound" -attribute $attr -sliderMinValue 0 -sliderMaxValue 5 $ctrl;
 }
 
 global proc AE_createFaceConstraintHigh(string $attr)
 {
     string $ctrl = "AE_faceConstraintHigh_ctrl";
-    attrFieldSliderGrp -label "Voxel strain limit (high)" -annotation "Breaking point for voxel interfaces in units of voxel-lengths, upper bound" -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
+    attrFieldSliderGrp -label "Voxel strain limit (high)" -annotation "Breaking point for voxel interfaces in units of voxel-lengths, upper bound" -attribute $attr -sliderMinValue 0 -sliderMaxValue 5 $ctrl;
 }
 
 global proc AE_createParticleMassLow(string $attr)
@@ -57,14 +57,14 @@ global proc AE_createParticleMassHigh(string $attr)
 global proc AE_updateFaceConstraintLow(string $attr)
 {
     string $ctrl = "AE_faceConstraintLow_ctrl";
-    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
+    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 5 $ctrl;
     AE_enforceMinMax($attr, "faceConstraintLow", "faceConstraintHigh");
 }
 
 global proc AE_updateFaceConstraintHigh(string $attr)
 {
     string $ctrl = "AE_faceConstraintHigh_ctrl";
-    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 50 $ctrl;
+    attrFieldSliderGrp -edit -attribute $attr -sliderMinValue 0 -sliderMaxValue 5 $ctrl;
     AE_enforceMinMax($attr, "faceConstraintLow", "faceConstraintHigh");
 }
 

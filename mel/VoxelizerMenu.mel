@@ -71,7 +71,7 @@ global proc VoxelizerMenu() {
     string $surfaceCheckbox = `checkBox -label "Surface" -value true`;
     string $solidCheckbox = `checkBox -label "Solid" -value true`;
     string $renderAsVoxelsCheckbox = `checkBox -label "Render As Voxels" -value false`;
-    string $clipTrianglesCheckbox = `checkBox -label "Clip Triangles" -value true`;
+    string $clipTrianglesCheckbox = `checkBox -label "Clip Triangles" -value false`;
 
     // Buttons
     string $cancelButton = `button -label "Cancel" -command ("VoxelizerMenu_close(\"" + $voxelGridDisplayName + "\")")`;
