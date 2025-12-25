@@ -20,6 +20,8 @@ public:
    
     std::array<std::vector<FaceConstraint>, 3> constructFaceToFaceConstraints(MSharedPtr<Voxels> voxels);
 
+    std::vector<uint> constructLongRangeConstraints(MSharedPtr<Voxels> voxels);
+
     ParticleDataContainer createParticles(MSharedPtr<Voxels> voxels);
 
     void createComputeShaders(
