@@ -57,8 +57,8 @@ void applyFriction(Particle preCollisionA, Particle preCollisionB, Particle fram
     float scale = min(1.0f, maxTangent / sqrt(relTangentLenSq));
     float3 relTangentClamped = relTangent * scale;
 
-    float invMassA = unpackHalf2x16(preCollisionA.radiusAndInvMass).y;
-    float invMassB = unpackHalf2x16(preCollisionB.radiusAndInvMass).y;
+    float invMassA = particleInverseMass(preCollisionA);
+    float invMassB = particleInverseMass(preCollisionB);
     float invMassSumReciprocal = 1 / (invMassA + invMassB);
 
     postCollisionA.position -= (invMassA * invMassSumReciprocal) * relTangentClamped;

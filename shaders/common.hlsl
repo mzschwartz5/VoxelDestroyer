@@ -12,6 +12,10 @@ float particleInverseMass(Particle p) {
     return unpackHalf2x16(p.radiusAndInvMass).y;
 }
 
+float particleRadius(Particle p) {
+    return unpackHalf2x16(p.radiusAndInvMass).x;
+}
+
 uint updateMass(uint radiusMassPacked, float newMass) {
     uint lo = radiusMassPacked & 0xFFFFu;
     uint hiBits = (f32tof16(newMass) & 0xFFFFu) << 16;

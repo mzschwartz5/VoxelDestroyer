@@ -67,7 +67,7 @@ void main(uint3 gId : SV_DispatchThreadID)
     // Note: originalParticles contains only one reference particle per voxel, thus the index into it
     // does not need to be multiplied by 8 to account for the 8 particles per voxel.
     Particle p0_orig = originalParticles[voxelId];
-    float r = unpackHalf2x16(p0_orig.radiusAndInvMass).x;
+    float r = particleRadius(p0_orig);
     float3x3 gridRotInv3x3 = (float3x3)gridRotationInverse;
     float3 restLocal = mul(gridRotInv3x3, originalVertPositions[gId.x] - (p0_orig.position - float3(r, r, r)));
     float3 uvw = restLocal / (4.0f * r);

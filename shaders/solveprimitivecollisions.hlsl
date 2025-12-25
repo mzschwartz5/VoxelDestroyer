@@ -248,7 +248,7 @@ void main(uint3 globalThreadId : SV_DispatchThreadID)
     Particle particle = particles[globalThreadId.x];
     if (massIsInfinite(particle)) return;
     Particle oldParticle = oldParticles[globalThreadId.x];
-    float particleRadius = unpackHalf2x16(particle.radiusAndInvMass).x;
+    float radius = particleRadius(particle);
 
     float3 colliderNormal;
     for (int i = 0; i < numColliders; i++) {
@@ -259,19 +259,19 @@ void main(uint3 globalThreadId : SV_DispatchThreadID)
         int type = wMatrix[3][3];
         
         if (type == 0.0f) {
-            colliderNormal = solveBoxCollision(wMatrix, invWMatrix, particle, particleRadius);
+            colliderNormal = solveBoxCollision(wMatrix, invWMatrix, particle, radius);
         } 
         else if (type == 1.0f) {
-            colliderNormal = solveSphereCollision(wMatrix, particle, particleRadius);
+            colliderNormal = solveSphereCollision(wMatrix, particle, radius);
         }
         else if (type == 2.0f) {
-            colliderNormal = solveCapsuleCollision(wMatrix, invWMatrix, particle, particleRadius);
+            colliderNormal = solveCapsuleCollision(wMatrix, invWMatrix, particle, radius);
         }
         else if (type == 3.0f) {
-            colliderNormal = solveCylinderCollision(wMatrix, invWMatrix, particle, particleRadius);
+            colliderNormal = solveCylinderCollision(wMatrix, invWMatrix, particle, radius);
         }
         else if (type == 4.0f) {
-            colliderNormal = solvePlaneCollision(wMatrix, particle, particleRadius);
+            colliderNormal = solvePlaneCollision(wMatrix, particle, radius);
         }
 
         if (all(colliderNormal == float3(0.0f, 0.0f, 0.0f))) continue; // No collision occurred

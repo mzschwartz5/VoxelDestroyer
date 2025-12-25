@@ -22,9 +22,9 @@ void main(uint3 gId : SV_DispatchThreadID)
     }
 
     Particle particle = particles[gId.x];
-    float particleRadius = unpackHalf2x16(particle.radiusAndInvMass).x;
-    int3 gridMinOverlap = int3(floor((particle.position - particleRadius) * inverseCellSize));
-    int3 gridMaxOverlap = int3(floor((particle.position + particleRadius) * inverseCellSize));
+    float radius = particleRadius(particle);
+    int3 gridMinOverlap = int3(floor((particle.position - radius) * inverseCellSize));
+    int3 gridMaxOverlap = int3(floor((particle.position + radius) * inverseCellSize));
 
     // Increment the particle count for all cells that the particle overlaps.
     // Because we make the cells as large as the largest particle, this will be at most 8 cells.
