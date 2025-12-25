@@ -47,7 +47,7 @@ struct Particle
 #else
     float3 position;
 #endif
-    uint radiusAndInvMass; // Packed as two half-floats: [lower 16 bits: inverse mass, upper 16 bits: radius]
+    uint radiusAndInvMass; // Packed as two half-floats: [lower 16 bits: radius, upper 16 bits: inverse mass]
 };
 
 #endif // CONSTANTS_HLSLI

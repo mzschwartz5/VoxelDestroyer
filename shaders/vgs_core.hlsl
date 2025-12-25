@@ -28,6 +28,17 @@ float safeLength(float3 v) {
     return len;
 }
 
+float calcMassNormalization(
+    Particle particles[8]
+) {
+    float maxInvMass = 0.0f;
+    [unroll] for (uint i = 0; i < 8; ++i) {
+        maxInvMass = max(maxInvMass, particleInverseMass(particles[i]));
+    }
+    maxInvMass = max(maxInvMass, eps);
+    return 1.0f / maxInvMass;
+}
+
 void doVGSIterations(
     inout Particle particles[8],
     VGSConstants vgsConstants,
@@ -38,11 +49,10 @@ void doVGSIterations(
     float voxelRestVolume = vgsConstants.voxelRestVolume;
     float particleRadius = vgsConstants.particleRadius;
     uint iterCount = vgsConstants.iterCount;
+    float massNormalization = calcMassNormalization(particles);
 
     for (uint iter = 0; iter < iterCount; iter++)
     {
-        float3 center = 0.125 * (particles[0].position + particles[1].position + particles[2].position + particles[3].position + particles[4].position + particles[5].position + particles[6].position + particles[7].position);
-
         // Calculate basis vectors (average of edges for each axis)
         float3 v0 = 0.25 * ((particles[1].position - particles[0].position) + (particles[3].position - particles[2].position) + (particles[5].position - particles[4].position) + (particles[7].position - particles[6].position));
         float3 v1 = 0.25 * ((particles[2].position - particles[0].position) + (particles[3].position - particles[1].position) + (particles[6].position - particles[4].position) + (particles[7].position - particles[5].position));
@@ -93,13 +103,19 @@ void doVGSIterations(
         u1 *= mult;
         u2 *= mult;
 
-        if (!massIsInfinite(particles[0])) { particles[0].position = center - u0 - u1 - u2; }
-        if (!massIsInfinite(particles[1])) { particles[1].position = center + u0 - u1 - u2; }
-        if (!massIsInfinite(particles[2])) { particles[2].position = center - u0 + u1 - u2; }
-        if (!massIsInfinite(particles[3])) { particles[3].position = center + u0 + u1 - u2; }
-        if (!massIsInfinite(particles[4])) { particles[4].position = center - u0 - u1 + u2; }
-        if (!massIsInfinite(particles[5])) { particles[5].position = center + u0 - u1 + u2; }
-        if (!massIsInfinite(particles[6])) { particles[6].position = center - u0 + u1 + u2; }
-        if (!massIsInfinite(particles[7])) { particles[7].position = center + u0 + u1 + u2; }
+        float3 center = 0.125f * (particles[0].position + particles[1].position + particles[2].position + particles[3].position +
+                                  particles[4].position + particles[5].position + particles[6].position + particles[7].position);
+
+        // Lerp between current positions and goal positions weighted by inverse mass (relative to max inverse mass)
+        // NOTE: this seems to produce the right effect, but I fear it introduces compliance / increases time to converge, because a single iteration 
+        // won't preserve a voxel's COM. It might be better to compute the COM shift after applying the position updates, and then apply a COM correction step.
+        particles[0].position = lerp(particles[0].position, center - u0 - u1 - u2, particleInverseMass(particles[0]) * massNormalization);
+        particles[1].position = lerp(particles[1].position, center + u0 - u1 - u2, particleInverseMass(particles[1]) * massNormalization);
+        particles[2].position = lerp(particles[2].position, center - u0 + u1 - u2, particleInverseMass(particles[2]) * massNormalization);
+        particles[3].position = lerp(particles[3].position, center + u0 + u1 - u2, particleInverseMass(particles[3]) * massNormalization);
+        particles[4].position = lerp(particles[4].position, center - u0 - u1 + u2, particleInverseMass(particles[4]) * massNormalization);
+        particles[5].position = lerp(particles[5].position, center + u0 - u1 + u2, particleInverseMass(particles[5]) * massNormalization);
+        particles[6].position = lerp(particles[6].position, center - u0 + u1 + u2, particleInverseMass(particles[6]) * massNormalization);
+        particles[7].position = lerp(particles[7].position, center + u0 + u1 + u2, particleInverseMass(particles[7]) * massNormalization);
     }
 }
