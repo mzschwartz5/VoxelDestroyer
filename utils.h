@@ -206,4 +206,6 @@ void deleteDefaultUVSet(const MString& meshName);
 
 MString getActiveModelPanelName();
 
+MStringArray getAllModelPanelNames();
+
 } // namespace Utils

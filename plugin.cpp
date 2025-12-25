@@ -75,6 +75,13 @@ MStatus plugin::doIt(const MArgList& argList)
 	MDagPath selectedMeshDagPath;
 	selectedMesh.getDagPath(0, selectedMeshDagPath);
 
+	if (!pluginArgs.clipTriangles) {
+		// Enable two sided lighting if not clipping triangles (their backsides will be visible)
+		for (auto& panelName : Utils::getAllModelPanelNames()) {
+			MGlobal::executeCommand("modelEditor -e -twoSidedLighting true " + panelName, false, true);
+		}
+	}
+
 	// Progress window message updates done within the voxelizer (for finer-grained control)
 	double rotation[3];
 	MTransformationMatrix gridTransform;

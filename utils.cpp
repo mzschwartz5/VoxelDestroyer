@@ -410,4 +410,10 @@ MString getActiveModelPanelName() {
 	return parts[parts.length() - 1];
 }
 
+MStringArray getAllModelPanelNames() {
+    MStringArray panelNames;
+    MGlobal::executeCommand("getPanel -type \"modelPanel\"", panelNames);
+    return panelNames;
+}
+
 } // namespace Utils
