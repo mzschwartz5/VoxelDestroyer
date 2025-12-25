@@ -36,9 +36,10 @@ public:
 
     DragParticlesCompute(
         int numVoxels
-    ) : ComputeShader(IDR_SHADER8)
+    ) : ComputeShader(CAMERA_BASED_SHADER)
     {
         if (numVoxels <= 0) return;
+        loadShaderObject(NON_CAMERA_BASED_SHADER);
         initializeBuffers(numVoxels);
         initSubscriptions();
     };
@@ -143,6 +144,7 @@ public:
             dragValues.lastMousePosition = dragState.mousePosition;
             dragValues.selectRadius = dragState.selectRadius;
             dragValues.selectStrength = dragState.selectStrength;
+            activeShader = (dragState.cameraBased) ? CAMERA_BASED_SHADER : NON_CAMERA_BASED_SHADER;
             copyConstantBufferToGPU();
         } else {
             DirectX::clearUintBuffer(isDraggingUAV);
@@ -178,11 +180,14 @@ public:
             copyConstantBufferToGPU();
         }
         
-        ComputeShader::dispatch(numWorkgroups);
+        ComputeShader::dispatch(numWorkgroups, activeShader);
         dragValues.lastMousePosition = dragValues.currentMousePosition;
     };
 
 private:
+    static constexpr int CAMERA_BASED_SHADER = IDR_SHADER8;
+    static constexpr int NON_CAMERA_BASED_SHADER = IDR_SHADER18;
+    int activeShader = CAMERA_BASED_SHADER;
     ComPtr<ID3D11UnorderedAccessView> particlesUAV;
     ComPtr<ID3D11ShaderResourceView> depthSRV;
     ComPtr<ID3D11UnorderedAccessView> isDraggingUAV;
@@ -237,8 +242,10 @@ private:
         ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get(), isDraggingUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
-        ID3D11ShaderResourceView* srvs[] = { depthSRV.Get() };
-        DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs); 
+        if (activeShader == CAMERA_BASED_SHADER) {
+            ID3D11ShaderResourceView* srvs[] = { depthSRV.Get() };
+            DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs); 
+        }
 
         ID3D11Buffer* cbvs[] = { constantBuffer.Get() };
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);
@@ -249,8 +256,10 @@ private:
         ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr); 
 
-        ID3D11ShaderResourceView* srvs[] = { nullptr };
-        DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
+        if (activeShader == CAMERA_BASED_SHADER) {
+            ID3D11ShaderResourceView* srvs[] = { nullptr };
+            DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
+        }
 
         ID3D11Buffer* cbvs[] = { nullptr };
         DirectX::getContext()->CSSetConstantBuffers(0, ARRAYSIZE(cbvs), cbvs);

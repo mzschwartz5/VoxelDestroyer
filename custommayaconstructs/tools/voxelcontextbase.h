@@ -18,6 +18,7 @@ struct DragState
     float selectRadius{ 25.0f };
     float selectStrength{ 1.0f };
     MousePosition mousePosition;
+    bool cameraBased{ true };
 };
 
 /**
@@ -59,6 +60,15 @@ public:
     virtual float getSelectStrength() const {
         return selectStrength;
     }
+
+    virtual void setCameraBased(bool enabled) {
+        cameraBased = enabled;
+        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
+    }
+
+    virtual bool isCameraBased() const {
+        return cameraBased;
+    }
     
 private:
     inline static Event<const DragState&> dragStateChangedEvent;
@@ -70,6 +80,7 @@ private:
     short screenDragStartX, screenDragStartY;
     float selectRadius = 25.0f;
     float selectStrength = 1.0f;
+    bool cameraBased = true;
     MStatus status;
 
 protected:
@@ -93,7 +104,7 @@ protected:
         screenDragStartY = mouseY;
                 
         isDragging = true;
-        dragStateChangedEvent.notify({ isDragging, selectRadius, selectStrength, { mouseX, mouseY } });
+        dragStateChangedEvent.notify({ isDragging, selectRadius, selectStrength, { mouseX, mouseY }, cameraBased });
         return MS::kSuccess;
     }
 
@@ -119,7 +130,7 @@ protected:
         event.getPosition(mouseX, mouseY);
 
         isDragging = false;
-        dragStateChangedEvent.notify({ isDragging, selectRadius, selectStrength, { mouseX, mouseY } });
+        dragStateChangedEvent.notify({ isDragging, selectRadius, selectStrength, { mouseX, mouseY }, cameraBased });
         return MS::kSuccess;
     }
 

@@ -3,7 +3,9 @@
 
 RWStructuredBuffer<Particle> particles : register(u0);
 RWStructuredBuffer<bool> isDragging : register(u1);
+#ifdef CAMERA_BASED
 Texture2D<float> depthBuffer : register(t0);
+#endif
 
 cbuffer DragValues : register(b0)
 {
@@ -25,7 +27,9 @@ cbuffer DragValues : register(b0)
 void main( uint3 gId : SV_DispatchThreadID )
 {
     // Sample the depth buffer at a specific location
+#ifdef CAMERA_BASED
     float depthValue = depthBuffer.Load(int3(lastMouseX, viewportHeight - lastMouseY, 0));
+#endif
 
     // Calculate the voxel's center from the average position of the 8 voxel particles
     uint start_idx = gId.x << 3;
@@ -58,11 +62,13 @@ void main( uint3 gId : SV_DispatchThreadID )
     pixelSpaceVoxelCenter.x = (pixelSpaceVoxelCenter.x + 1.0f) * 0.5f * viewportWidth;
     pixelSpaceVoxelCenter.y = (pixelSpaceVoxelCenter.y + 1.0f) * 0.5f * viewportHeight;
 
+#ifdef CAMERA_BASED
     // Compare the voxel center's depth to the scene depth value. If voxel is visible, move it.
     if (depthValue < pixelSpaceVoxelCenter.z) {
         isDragging[gId.x] = false;
         return;
     }
+#endif
 
     // Also compare the distance from the mouse to the voxel center
     float2 lastMousePos = float2(lastMouseX, lastMouseY);

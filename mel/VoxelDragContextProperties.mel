@@ -40,6 +40,12 @@ global proc VoxelDragContextProperties() {
                     -cc "VoxelDragStrengthChanged()"
                     VoxelDragStrengthControl;
 
+                checkBoxGrp -numberOfCheckBoxes 1
+                    -label1 "Camera-based dragging"
+                    -value1 1
+                    -annotation "When enabled, only drag voxels visible to the camera."
+                    -cc "VoxelDragCameraBasedChanged()"
+                    VoxelDragCameraBasedControl;
             setParent ..;
         setParent ..;
 
@@ -58,4 +64,10 @@ global proc VoxelDragStrengthChanged() {
     string $ctx = `currentCtx`;
     float $strength = `floatSliderGrp -q -v VoxelDragStrengthControl`;
     catchQuiet(`voxelDragContextCommand -e -strength $strength $ctx`);
+}
+
+global proc VoxelDragCameraBasedChanged() {
+    string $ctx = `currentCtx`;
+    int $cameraBased = `checkBoxGrp -q -v1 VoxelDragCameraBasedControl`;
+    catchQuiet(`voxelDragContextCommand -e -cameraBased $cameraBased $ctx`);
 }

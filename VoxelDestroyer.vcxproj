@@ -268,6 +268,13 @@
       <EntryPoint>main</EntryPoint>
       <ShaderType>Compute</ShaderType>
       <ShaderModel>5.0</ShaderModel>
+      <AdditionalOptions>-DCAMERA_BASED</AdditionalOptions>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\dragparticles_camerabased.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\dragparticles.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
       <ObjectFileOutput>$(ProjectDir)\shaders\cso\dragparticles.cso</ObjectFileOutput>
     </FxCompile>
     <FxCompile Include="shaders\faceconstraints.hlsl">

@@ -15,7 +15,6 @@ enum class BrushMode {
 // Richer payload for paint-tool specific drag state change event
 struct PaintDragState : DragState {
     BrushMode brushMode{ BrushMode::SET };
-    bool cameraBased{ true };
     MColor lowColor;
     MColor highColor;
     int faceComponentMask{ 0b111111 }; // All directions enabled by default
@@ -48,8 +47,8 @@ public:
                 baseState.selectRadius,
                 baseState.selectStrength,
                 baseState.mousePosition,
+                baseState.cameraBased,
                 brushMode,
-                cameraBased,
                 lowColor,
                 highColor,
                 faceComponentMask,
@@ -78,15 +77,6 @@ public:
         return brushMode;
     }
 
-    void setCameraBased(bool enabled) {
-        cameraBased = enabled;
-        MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
-    }
-
-    bool isCameraBased() const {
-        return cameraBased;
-    }
-
     void setLowColor(const MColor& color) {
         lowColor = color;
         MToolsInfo::setDirtyFlag(*this); // Tells Maya to refresh the tool settings UI
@@ -96,8 +86,8 @@ public:
             getSelectRadius(),
             getSelectStrength(),
             getMousePosition(),
+            isCameraBased(),
             brushMode,
-            cameraBased,
             lowColor,
             highColor,
             faceComponentMask,
@@ -115,8 +105,8 @@ public:
             getSelectRadius(),
             getSelectStrength(),
             getMousePosition(),
+            isCameraBased(),
             brushMode,
-            cameraBased,
             lowColor,
             highColor,
             faceComponentMask,
@@ -186,7 +176,6 @@ private:
     inline static Event<const PaintDragState&> paintDragStateChangedEvent;
     EventBase::Unsubscribe unsubscribeBaseDragStateEvent;
     BrushMode brushMode = BrushMode::SET;
-    bool cameraBased = true;
     MCallbackId timerCallbackId;
     MColor lowColor = MColor(1.0f, 0.0f, 0.0f, 0.0f);
     MColor highColor = MColor(1.0f, 0.0f, 0.0f, 1.0f);

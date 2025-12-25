@@ -16,9 +16,11 @@ global proc VoxelDragContextValues(string $toolName) {
     string $ctx              = `currentCtx`;
     float  $radius           = `voxelDragContextCommand -q -radius $ctx`;
     float  $strength            = `voxelDragContextCommand -q -strength $ctx`;
+    int    $cameraBased      = `voxelDragContextCommand -q -cameraBased $ctx`;
 
     floatSliderGrp -e -v $radius VoxelDragRadiusControl;
     floatSliderGrp -e -v $strength VoxelDragStrengthControl;
+    checkBoxGrp -e -v1 $cameraBased VoxelDragCameraBasedControl;
 
     toolPropertySelect "VoxelDragContext";
 }
@@ -28,11 +30,13 @@ global proc VoxelDragContext_Reset()
     // reset UI controls to defaults
     floatSliderGrp -e -v 25.0 VoxelDragRadiusControl;
     floatSliderGrp -e -v 1.0 VoxelDragStrengthControl;
+    checkBoxGrp -e -v1 1 VoxelDragCameraBasedControl;
 
     // push defaults into the active context (if active)
     string $ctx = `currentCtx`;
     catchQuiet(`voxelDragContextCommand -e -radius 25.0 $ctx`);
     catchQuiet(`voxelDragContextCommand -e -strength 1.0 $ctx`);
+    catchQuiet(`voxelDragContextCommand -e -cameraBased 1 $ctx`);
 }
 
 global proc VoxelDragContext_Help()
