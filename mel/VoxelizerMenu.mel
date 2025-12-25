@@ -322,6 +322,10 @@ global proc VoxelizerMenu_resizeToBbox(string $selectedMeshName, string $cubeNam
     lockNode -lock false $cubeName;
     delete $cubeName;
     VoxelizerMenu_createVoxelGridDisplay($selectedMeshName, $initialValues);
+
+    intSliderGrp -e -value ($initialValues[7]) SubdivWidthField;
+    intSliderGrp -e -value ($initialValues[8]) SubdivHeightField;
+    intSliderGrp -e -value ($initialValues[9]) SubdivDepthField;
 }
 
 // Cancel and delete the voxel grid
