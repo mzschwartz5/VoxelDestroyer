@@ -116,12 +116,18 @@ public:
         // Safest to check the underlying resource pointer for changes
         if (resource.Get() == oldResource.Get()) return;
 
+        // Query the depth-stencil texture to determine if MSAA is enabled
+        ComPtr<ID3D11Texture2D> tex;
+        resource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)tex.GetAddressOf());
+        D3D11_TEXTURE2D_DESC texDesc{};
+        tex->GetDesc(&texDesc);
+
         // Create a Shader Resource View for the depth buffer
         // Note: the format was determined by querying the DSV's description, but could be fragile without programmatic  
         // checks + mapping from DSV format to SRV format.
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.ViewDimension = (texDesc.SampleDesc.Count > 1) ? D3D11_SRV_DIMENSION_TEXTURE2DMS : D3D11_SRV_DIMENSION_TEXTURE2D;
         srvDesc.Texture2D.MipLevels = 1;
 
         HRESULT hr = DirectX::getDevice()->CreateShaderResourceView(resource.Get(), &srvDesc, depthSRV.GetAddressOf());
