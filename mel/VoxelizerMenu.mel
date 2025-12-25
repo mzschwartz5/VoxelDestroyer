@@ -21,8 +21,8 @@ global proc VoxelizerMenu() {
     }
     string $selectedMeshName = $selection[0];
 
-    float $initialValues[] = getInitialVoxelGridValues($selectedMeshName);
-    string $voxelGridDisplayName = createVoxelGridDisplay($selectedMeshName, $initialValues);
+    float $initialValues[] = VoxelizerMenu_getInitialVoxelGridValues($selectedMeshName);
+    string $voxelGridDisplayName = VoxelizerMenu_createVoxelGridDisplay($selectedMeshName, $initialValues);
     float $gridDisplayExtents[];
     $gridDisplayExtents[0] = `polyCube -q -w $voxelGridDisplayName`;
     $gridDisplayExtents[1] = `polyCube -q -h $voxelGridDisplayName`;
@@ -31,7 +31,7 @@ global proc VoxelizerMenu() {
     float $voxelMinSizeHard = max($gridDisplayExtents[0], max($gridDisplayExtents[1], $gridDisplayExtents[2])) / $VOXEL_SUBDIV_HARDMAX;
     float $voxelMaxSizeSoft = min($gridDisplayExtents[0], min($gridDisplayExtents[1], $gridDisplayExtents[2])) / $VOXEL_SUBDIV_MIN;
 
-    window -title "Voxelizer Menu" VoxelizerMenuWindow;
+    window -title "Voxelizer Menu" -sizeable false VoxelizerMenuWindow;
     formLayout VoxelizerMenuForm;
 
     // Instruction text
@@ -42,7 +42,9 @@ global proc VoxelizerMenu() {
     string $spacer2 = `separator -style "in" -height 1`;
 
     // Subdivision controls
-    string $constrainCheckbox = `checkBox -label "Constrain grid dimensions (best effort)" -value true`;
+    string $constrainCheckbox = `checkBox -label "Lock grid size (best effort)" -value true`;
+
+    string $resizeToBbox = `button -label "Resize to mesh bounds" -command ("VoxelizerMenu_resizeToBbox(\"" + $selectedMeshName + "\", \"" + $voxelGridDisplayName + "\")") -annotation "Resize the grid dimensions while keeping the voxel size constant"`;
 
     string $gridPropsTitle = `text -label "Voxel Grid:" -align "left" -font "boldLabelFont"`;
 
@@ -88,15 +90,15 @@ global proc VoxelizerMenu() {
     formLayout -edit -attachForm $subdivHeightField "left" 20 -attachControl $subdivHeightField "top" 10 $subdivWidthField -attachForm $subdivHeightField "right" 20 VoxelizerMenuForm;
     formLayout -edit -attachForm $subdivDepthField "left" 20 -attachControl $subdivDepthField "top" 10 $subdivHeightField -attachForm $subdivDepthField "right" 20 VoxelizerMenuForm;
     formLayout -edit -attachForm $constrainCheckbox "left" 20 -attachControl $constrainCheckbox "top" 10 $subdivDepthField -attachForm $constrainCheckbox "right" 20 VoxelizerMenuForm;
-    formLayout -edit -attachControl $spacer2 "top" 10 $constrainCheckbox -attachForm $spacer2 "left" 20 -attachForm $spacer2 "right" 20 VoxelizerMenuForm;
+    formLayout -edit -attachForm $resizeToBbox "right" 20 -attachControl $resizeToBbox "top" 5 $subdivDepthField VoxelizerMenuForm;
+    formLayout -edit -attachControl $spacer2 "top" 10 $resizeToBbox -attachForm $spacer2 "left" 20 -attachForm $spacer2 "right" 20 VoxelizerMenuForm;
     formLayout -edit -attachForm $advancedOptionsTitle "left" 20 -attachControl $advancedOptionsTitle "top" 10 $spacer2 -attachForm $advancedOptionsTitle "right" 20 VoxelizerMenuForm;
     formLayout -edit -attachForm $surfaceCheckbox "left" 20 -attachControl $surfaceCheckbox "top" 10 $advancedOptionsTitle VoxelizerMenuForm;
     formLayout -edit -attachControl $solidCheckbox "left" 10 $surfaceCheckbox -attachControl $solidCheckbox "top" 10 $advancedOptionsTitle VoxelizerMenuForm;
     formLayout -edit -attachControl $renderAsVoxelsCheckbox "left" 10 $solidCheckbox -attachControl $renderAsVoxelsCheckbox "top" 10 $advancedOptionsTitle VoxelizerMenuForm;
     formLayout -edit -attachControl $clipTrianglesCheckbox "left" 10 $renderAsVoxelsCheckbox -attachControl $clipTrianglesCheckbox "top" 10 $advancedOptionsTitle VoxelizerMenuForm;
-    formLayout -edit -attachForm $runButton "left" 20 -attachControl $runButton "top" 15 $clipTrianglesCheckbox VoxelizerMenuForm;
-    formLayout -edit -attachForm $cancelButton "left" 80 -attachControl $cancelButton "top" 15 $clipTrianglesCheckbox VoxelizerMenuForm;
-    formLayout -edit -attachForm $runButton "bottom" 10 -attachForm $cancelButton "bottom" 10 VoxelizerMenuForm;
+    formLayout -edit -attachForm $runButton "left" 20 -attachForm $runButton "bottom" 10 -attachControl $runButton "top" 15 $clipTrianglesCheckbox VoxelizerMenuForm;
+    formLayout -edit -attachForm $cancelButton "left" 80 -attachForm $cancelButton "bottom" 10 -attachControl $cancelButton "top" 15 $clipTrianglesCheckbox VoxelizerMenuForm;
     
     showWindow VoxelizerMenuWindow;
 
@@ -146,7 +148,7 @@ global proc VoxelizerMenu_run(
     }
 }
 
-global proc float[] getInitialVoxelGridValues(string $selectedMeshName) {
+global proc float[] VoxelizerMenu_getInitialVoxelGridValues(string $selectedMeshName) {
     // First get the bounding box of the selected object
     // The bounding box of an object is axis aligned. We want to get the oriented bounding box, so unrotate the object,
     // get the bounding box, then restore the rotation.
@@ -173,7 +175,7 @@ global proc float[] getInitialVoxelGridValues(string $selectedMeshName) {
     return $results;
 }
 
-global proc string createVoxelGridDisplay(string $selectedMeshName, float $initialValues[]) {
+global proc string VoxelizerMenu_createVoxelGridDisplay(string $selectedMeshName, float $initialValues[]) {
     float $cubeExtents[3] = {$initialValues[6] * $initialValues[7], 
                             $initialValues[6] * $initialValues[8], 
                             $initialValues[6] * $initialValues[9]};
@@ -307,6 +309,19 @@ global proc VoxelizerMenu_updateVoxelSize(string $cubeName, float $voxelSize, in
         $cubeExtents[2] = $voxelSize * $voxelsPerEdge[2];
         polyCube -e -w $cubeExtents[0] -h $cubeExtents[1] -d $cubeExtents[2] $cubeName;
     }
+}
+
+global proc VoxelizerMenu_resizeToBbox(string $selectedMeshName, string $cubeName) {
+    float $initialValues[] = VoxelizerMenu_getInitialVoxelGridValues($selectedMeshName);
+    float $voxelSize = `floatSliderGrp -query -value VoxelSizeField`;
+    $initialValues[6] = $voxelSize;
+    $initialValues[7] = ceil(($initialValues[0] / $voxelSize) - 0.0001);
+    $initialValues[8] = ceil(($initialValues[1] / $voxelSize) - 0.0001);
+    $initialValues[9] = ceil(($initialValues[2] / $voxelSize) - 0.0001);
+
+    lockNode -lock false $cubeName;
+    delete $cubeName;
+    VoxelizerMenu_createVoxelGridDisplay($selectedMeshName, $initialValues);
 }
 
 // Cancel and delete the voxel grid
