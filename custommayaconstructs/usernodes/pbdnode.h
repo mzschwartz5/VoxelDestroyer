@@ -299,8 +299,8 @@ public:
             }
         );
         
-        std::array<std::vector<FaceConstraint>, 3> faceConstraints 
-            = pbd.constructFaceToFaceConstraints(voxels);
+        std::array<std::vector<FaceConstraint>, 3> faceConstraints = pbd.constructFaceToFaceConstraints(voxels);
+        std::vector<uint> longRangeConstraints = pbd.constructLongRangeConstraints(voxels);
         
         pbd.createComputeShaders(voxels, faceConstraints);
 
