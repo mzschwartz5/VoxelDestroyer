@@ -37,15 +37,14 @@ std::vector<uint> PBD::constructLongRangeConstraints(const MSharedPtr<Voxels> vo
     const std::vector<uint32_t>& mortonCodes = voxels->mortonCodes;
     const std::unordered_map<uint32_t, uint32_t>& mortonCodesToSortedIdx = voxels->mortonCodesToSortedIdx;
     const int numOccupied = voxels->numOccupied;
-    std::vector<uint> particleIndices;
-    particleIndices.resize(8);
+    std::array<uint, 8> particleIndices;
 
     for (int i = 0; i < numOccupied; i++) {
-        particleIndices.clear();
         std::array<uint32_t, 3> voxelCoords;
         Utils::fromMortonCode(mortonCodes[i], voxelCoords[0], voxelCoords[1], voxelCoords[2]);
+        bool hasAllNeighbors = true;
 
-        for (int corner = 0; corner < 8; ++corner) {
+        for (uint corner = 0; corner < 8; ++corner) {
             // Note that this can include the voxel itself (intentionally)
             std::array<uint32_t, 3> neighborCoords = {
                 voxelCoords[0] + ((corner >> 0) & 1),
@@ -54,16 +53,18 @@ std::vector<uint> PBD::constructLongRangeConstraints(const MSharedPtr<Voxels> vo
             }; 
 
             int neighborMortonCode = static_cast<int>(Utils::toMortonCode(neighborCoords[0], neighborCoords[1], neighborCoords[2]));
-            if (mortonCodesToSortedIdx.find(neighborMortonCode) == mortonCodesToSortedIdx.end()) break; // We need all 8 neighbors to form the long-range constraint
+            if (mortonCodesToSortedIdx.find(neighborMortonCode) == mortonCodesToSortedIdx.end()) {
+                hasAllNeighbors = false;
+                break;
+            };
             
             // Get the particle involved in the constraint from this neighbor voxel
             uint neighborVoxelIdx = mortonCodesToSortedIdx.at(neighborMortonCode);
-            particleIndices[corner] = neighborVoxelIdx * 8 + corner;
+            particleIndices[corner] = neighborVoxelIdx * 8u + corner;
         }
 
-        if (particleIndices.size() == 8) {
-            longRangeConstraints.insert( longRangeConstraints.end(), particleIndices.begin(), particleIndices.end() );
-        }
+        if (!hasAllNeighbors) continue;
+        longRangeConstraints.insert( longRangeConstraints.end(), particleIndices.begin(), particleIndices.end() );
     }
 
     return longRangeConstraints;
