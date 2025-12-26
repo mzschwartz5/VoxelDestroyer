@@ -11,14 +11,14 @@ struct FaceConstraintsCB {
     int faceTwoId;
     float constraintLow;
     float constraintHigh;
-    int padding0;
+    uint flattenedConstraintOffset; // Total number of face constraints before this axis (currently only for indexing into long-range constraint index array)
     int padding1;
     int padding2;
 };
 
 struct FaceConstraint {
-	int voxelOneIdx;
-	int voxelTwoIdx;
+	int voxelOneIdx = -1;
+	int voxelTwoIdx = -1;
 	float tensionLimit = 0.0f;
 	float compressionLimit = 0.0f;
 };
@@ -29,7 +29,7 @@ public:
     FaceConstraintsCompute() = default;
 
     FaceConstraintsCompute(
-        const std::array<std::vector<FaceConstraint>, 3>& constraints,
+        const std::vector<std::array<FaceConstraint, 3>>& constraints,
         uint numParticles,
         float particleRadius,
         float voxelRestVolume
@@ -158,7 +158,7 @@ private:
         }
     };
     
-    void initializeBuffers(const std::array<std::vector<FaceConstraint>, 3>& constraints, uint numParticles, float particleRadius, float voxelRestVolume) {
+    void initializeBuffers(const std::vector<std::array<FaceConstraint, 3>>& constraints, uint numParticles, float particleRadius, float voxelRestVolume) {
 
         vgsConstants.relaxation = 0.5f;
         vgsConstants.edgeUniformity = 1.0f;
@@ -168,16 +168,30 @@ private:
         vgsConstants.voxelRestVolume = voxelRestVolume;
         vgsConstantBuffer = DirectX::createConstantBuffer<VGSConstants>(vgsConstants);
 
+        // Split per-voxel face constraints into per-axis face constraint arrays
+        std::array<std::vector<FaceConstraint>, 3> perAxisConstraints;
+        for (const auto& constraintSet : constraints) {
+            for (int axis = 0; axis < 3; axis++) {
+                FaceConstraint constraint = constraintSet[axis];
+                if (constraint.voxelOneIdx == -1 || constraint.voxelTwoIdx == -1) continue;
+                perAxisConstraints[axis].push_back(constraint);
+            }
+        }
+
+        uint numXFaceConstraints = static_cast<uint>(perAxisConstraints[0].size());
+        uint numYFaceConstraints = static_cast<uint>(perAxisConstraints[1].size());
+        uint numZFaceConstraints = static_cast<uint>(perAxisConstraints[2].size());
+
         // Order of vertex indices and face IDs corresponds to definitions in cube.h
         faceConstraintsCBData = std::array<FaceConstraintsCB, 3>{
-            FaceConstraintsCB{{1, 3, 5, 7}, {0, 2, 4, 6}, static_cast<uint>(constraints[0].size()), 1, 0, 0, 0, 0, 0, 0},
-            FaceConstraintsCB{{2, 3, 6, 7}, {0, 1, 4, 5}, static_cast<uint>(constraints[1].size()), 3, 2, 0, 0, 0, 0, 0},
-            FaceConstraintsCB{{4, 5, 6, 7}, {0, 1, 2, 3}, static_cast<uint>(constraints[2].size()), 5, 4, 0, 0, 0, 0, 0}
+            FaceConstraintsCB{{1, 3, 5, 7}, {0, 2, 4, 6}, numXFaceConstraints, 1, 0, 0, 0, 0, 0, 0},
+            FaceConstraintsCB{{2, 3, 6, 7}, {0, 1, 4, 5}, numYFaceConstraints, 3, 2, 0, 0, numXFaceConstraints, 0, 0},
+            FaceConstraintsCB{{4, 5, 6, 7}, {0, 1, 2, 3}, numZFaceConstraints, 5, 4, 0, 0, numXFaceConstraints + numYFaceConstraints, 0, 0}
         };    
 
         for (int i = 0; i < 3; i++) {
-            numWorkgroups[i] = Utils::divideRoundUp(constraints[i].size(), VGS_THREADS);
-            constraintBuffers[i] = DirectX::createReadWriteBuffer<FaceConstraint>(constraints[i]);
+            numWorkgroups[i] = Utils::divideRoundUp(perAxisConstraints[i].size(), VGS_THREADS);
+            constraintBuffers[i] = DirectX::createReadWriteBuffer<FaceConstraint>(perAxisConstraints[i]);
             faceConstraintUAVs[i] = DirectX::createUAV(constraintBuffers[i]);
             faceConstraintsCBs[i] = DirectX::createConstantBuffer<FaceConstraintsCB>(faceConstraintsCBData[i]);
         }
