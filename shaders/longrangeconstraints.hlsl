@@ -1,7 +1,6 @@
 #include "vgs_core.hlsl"
 
 StructuredBuffer<uint> longRangeParticleIndices : register(t0);
-StructuredBuffer<uint> longRangeIndicesAndCounters : register(t1);
 RWStructuredBuffer<Particle> particles : register(u0);
 
 cbuffer LongRangeConstraintsCB : register(b0)
@@ -17,13 +16,11 @@ cbuffer VGSConstantsCB : register(b1)
     VGSConstants vgsConstants;
 };
 
-bool longRangeConstraintBroken(uint constraintIdx) {
-    // The lower 4 bits (0xF) are a counter of how many face constraints associated with this long-range constraint have been broken.
-    uint brokenCounter = longRangeIndicesAndCounters[constraintIdx] & 0xF;
+bool longRangeConstraintBroken(uint particleIdx0) {
+    // The lower 4 bits (0xF) of the first particle are a counter of how many face constraints associated with this long-range constraint have been broken.
     // Three is a bit of a heuristic: it's the minimum number of face constraints internal to a 2x2x2 voxel grouping
-    // that can disconnect the group into multiple parts. If that many (or more) are broken, we must break the long-range constraint.
-    // (Can think of it as being weakened enough that it effectively breaks.)
-    return (brokenCounter >= 3);
+    // that may disconnect the group into multiple parts. If that many (or more) are broken, we must break the long-range constraint.
+    return (particleIdx0 & 0xF) >= 3u;
 }
 
 [numthreads(VGS_THREADS, 1, 1)]
@@ -34,12 +31,17 @@ void main(uint3 globalThreadId : SV_DispatchThreadID)
         return;
     }
 
-    if (longRangeConstraintBroken(constraintIdx)) return;
-
-    Particle constraintParticles[8];
+    uint particleIdx0 = longRangeParticleIndices[constraintIdx << 3];
+    if (longRangeConstraintBroken(particleIdx0)) return;
+      
     uint particleIndices[8];
-    [unroll] for (uint i = 0; i < 8; ++i) {
-        particleIndices[i] = longRangeParticleIndices[(constraintIdx << 3) + i];
+    Particle constraintParticles[8];
+
+    particleIndices[0] = particleIdx0 >> 4;
+    constraintParticles[0] = particles[particleIndices[0]];
+
+    [unroll] for (uint i = 1; i < 8; ++i) {
+        particleIndices[i] = longRangeParticleIndices[(constraintIdx << 3) + i] >> 4;
         constraintParticles[i] = particles[particleIndices[i]];
     }
 

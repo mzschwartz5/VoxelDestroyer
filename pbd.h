@@ -19,9 +19,9 @@ public:
     PBD() = default;
     ~PBD() = default;
    
-    std::array<std::vector<FaceConstraint>, 3> constructFaceToFaceConstraints(MSharedPtr<Voxels> voxels);
+    std::array<std::vector<FaceConstraint>, 3> constructFaceToFaceConstraints(MSharedPtr<Voxels> voxels, std::array<std::vector<int>, 3>& voxelToFaceConstraintIndices);
 
-    LongRangeConstraints constructLongRangeConstraints(MSharedPtr<Voxels> voxels);
+    LongRangeConstraints constructLongRangeConstraints(MSharedPtr<Voxels> voxels, const std::array<std::vector<int>, 3>& voxelToFaceConstraintIndices, std::array<uint, 3> faceConstraintsCounts);
 
     ParticleDataContainer createParticles(MSharedPtr<Voxels> voxels);
 
