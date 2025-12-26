@@ -9,6 +9,36 @@ void breakConstraint(int constraintIdx, int voxelAIdx, int voxelBIdx) {
     faceConstraints[constraintIdx].voxelBIdx = -1;
 }
 
+void weakenLongRangeConstraints(uint voxelAParticlesIdx, uint voxelBParticlesIdx) {
+    [unroll]
+    for (int i = 0; i < 4; ++i) {
+        uint particleAIdx = voxelAParticlesIdx + faceAParticles[i];
+        uint particleBIdx = voxelBParticlesIdx + faceBParticles[i];
+
+        // This looks a bit strange, but basically we're using the longRangeConstraintIndices array for two purposes:
+        // The higher bits store the index of the long-range constraint associated with the particle.
+        // The lower 4 bits of the longRangeConstraintIndices serve as a counter for how many face constraints within 
+        // the constraint's voxel grouping have been broken. 
+        // 
+        // Since there are at most 12 face constraints per voxel grouping,
+        // we can safely increment without worrying about overflow into the higher bits (the constraint indices).
+        // 
+        // The inner access into longRangeConstraintIndices gets us the long range constraint index associated with this particle,
+        // and the outer access uses it to increment the number of broken faces for that constraint, stored at a different location, per-constraint, in the same array. 
+        //
+        // Also, we denote a particle with no long-range constraint by the sentinel value of 0xFFFFFFF0 in the higher bits (0x0FFFFFFF after shifting right by 4).
+        uint longRangeConstraintIdxA = longRangeConstraintIndices[particleAIdx] >> 4;
+        uint longRangeConstraintIdxB = longRangeConstraintIndices[particleBIdx] >> 4;
+
+        if (longRangeConstraintIdxA != 0x0FFFFFFF) {
+            InterlockedAdd(longRangeConstraintIndices[longRangeConstraintIdxA], 1);
+        }
+        if (longRangeConstraintIdxB != 0x0FFFFFFF) {
+            InterlockedAdd(longRangeConstraintIndices[longRangeConstraintIIdxB], 1);
+        }
+    }
+}
+
 /**
 * Solves face constraints for a pair of voxels using the VGS method.
 * One thread = one face constraint. 
@@ -35,6 +65,7 @@ void main(
     uint voxelBParticlesIdx = voxelBIdx << 3;
 
     Particle voxelParticles[8];
+    bool faceConstraintBroke = false;
     for (int i = 0; i < 4; ++i) {
         // Note: this is NOT a mistake. The face indices of the opposite voxel tell us where to index
         // the particles of the first voxel. Each face*Particles array tells us which particles to use from each voxel,
@@ -47,8 +78,14 @@ void main(
         float strain = (edgeLength - 2.0f * vgsConstants.particleRadius) / (2.0f * vgsConstants.particleRadius);
         if (strain > constraint.tensionLimit || strain < constraint.compressionLimit) {
             breakConstraint(constraintIdx, voxelAIdx, voxelBIdx);
-            return;
+            faceConstraintBroke = true;
+            break;
         }
+    }
+
+    if (faceConstraintBroke) {
+        weakenLongRangeConstraints(voxelAParticlesIdx, voxelBParticlesIdx);
+        return;
     }
 
     // Now we do VGS iterations on the imaginary "voxel" formed by the particles of the two voxels' faces.

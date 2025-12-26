@@ -32,8 +32,9 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(c
 }
 
 LongRangeConstraints PBD::constructLongRangeConstraints(const MSharedPtr<Voxels> voxels) {
+    // Sentinel value is the 28-bit max uint value (since lower 4 bits are used for a counter)
     LongRangeConstraints longRangeConstraints;
-    longRangeConstraints.constraintIndicesAndCounters.resize(numParticles(), UINT_MAX);
+    longRangeConstraints.constraintIndicesAndCounters.resize(numParticles(), 0xFFFFFFF0);
 
     const std::vector<uint32_t>& mortonCodes = voxels->mortonCodes;
     const std::unordered_map<uint32_t, uint32_t>& mortonCodesToSortedIdx = voxels->mortonCodesToSortedIdx;
@@ -130,6 +131,13 @@ void PBD::createComputeShaders(
         voxelRestVolume
     );
 
+    longRangeConstraintsCompute = LongRangeConstraintsCompute(
+        numParticles(),
+        particleRadius,
+        voxelRestVolume,
+        longRangeConstraints
+    );
+
 	faceConstraintsCompute = FaceConstraintsCompute(
 		faceConstraints,
         numParticles(),
@@ -137,15 +145,9 @@ void PBD::createComputeShaders(
         voxelRestVolume
 	);
     faceConstraintsCompute.setRenderParticlesUAV(renderParticlesUAV);
+    faceConstraintsCompute.setLongRangeConstraintIndicesUAV(longRangeConstraintsCompute.getConstraintIndicesAndCountersUAV());
 
     preVGSCompute = PreVGSCompute(numParticles());
-
-    longRangeConstraintsCompute = LongRangeConstraintsCompute(
-        numParticles(),
-        particleRadius,
-        voxelRestVolume,
-        longRangeConstraints
-    );
 }
 
 void PBD::setGPUResourceHandles(

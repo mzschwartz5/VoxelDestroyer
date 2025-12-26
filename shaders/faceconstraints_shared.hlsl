@@ -30,4 +30,5 @@ RWStructuredBuffer<uint> isSurfaceVoxel : register(u2);
 RWBuffer<float> paintDeltas : register(u3);
 RWBuffer<float> paintValues : register(u4);
 RWStructuredBuffer<Particle> renderParticles : register(u5);
+RWStructuredBuffer<uint> longRangeConstraintIndices : register(u6);
 static const float FLT_MAX = asfloat(0x7f7fffff);

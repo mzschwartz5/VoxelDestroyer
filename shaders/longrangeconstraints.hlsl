@@ -17,6 +17,15 @@ cbuffer VGSConstantsCB : register(b1)
     VGSConstants vgsConstants;
 };
 
+bool longRangeConstraintBroken(uint constraintIdx) {
+    // The lower 4 bits (0xF) are a counter of how many face constraints associated with this long-range constraint have been broken.
+    uint brokenCounter = longRangeIndicesAndCounters[constraintIdx] & 0xF;
+    // Three is a bit of a heuristic: it's the minimum number of face constraints internal to a 2x2x2 voxel grouping
+    // that can disconnect the group into multiple parts. If that many (or more) are broken, we must break the long-range constraint.
+    // (Can think of it as being weakened enough that it effectively breaks.)
+    return (brokenCounter >= 3);
+}
+
 [numthreads(VGS_THREADS, 1, 1)]
 void main(uint3 globalThreadId : SV_DispatchThreadID)
 {
@@ -24,6 +33,8 @@ void main(uint3 globalThreadId : SV_DispatchThreadID)
     if (constraintIdx >= numConstraints) {
         return;
     }
+
+    if (longRangeConstraintBroken(constraintIdx)) return;
 
     Particle constraintParticles[8];
     uint particleIndices[8];

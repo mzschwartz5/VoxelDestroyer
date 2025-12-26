@@ -106,6 +106,12 @@ public:
         this->renderParticlesUAV = renderParticlesUAV;
     }
 
+    void setLongRangeConstraintIndicesUAV(
+        const ComPtr<ID3D11UnorderedAccessView>& longRangeConstraintIndicesUAV
+    ) {
+        this->longRangeConstraintIndicesUAV = longRangeConstraintIndicesUAV;
+    }
+
 private:
     inline static constexpr int updateFaceConstraintsEntryPoint = IDR_SHADER5;
     inline static constexpr int mergeRenderParticlesEntryPoint = IDR_SHADER16;
@@ -124,10 +130,11 @@ private:
     ComPtr<ID3D11UnorderedAccessView> paintDeltaUAV;  // Only used during update from paint values
     ComPtr<ID3D11UnorderedAccessView> paintValueUAV;  // Only used during update from paint values
     ComPtr<ID3D11UnorderedAccessView> renderParticlesUAV; // A copy of the particles that can be adjusted (i.e. close particle gaps) for rendering (without affecting simulation).
+    ComPtr<ID3D11UnorderedAccessView> longRangeConstraintIndicesUAV; // The indices of long-range constraints associated with each particle, broken when face constraints break.
 
     void bind() override
     {
-        ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get(), faceConstraintUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get(), paintDeltaUAV.Get(), paintValueUAV.Get(), renderParticlesUAV.Get() };
+        ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get(), faceConstraintUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get(), paintDeltaUAV.Get(), paintValueUAV.Get(), renderParticlesUAV.Get(), longRangeConstraintIndicesUAV.Get() };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
         ID3D11Buffer* cbvs[] = { vgsConstantBuffer.Get(), faceConstraintsCBs[activeConstraintAxis].Get() };
@@ -136,7 +143,7 @@ private:
 
     void unbind() override
     {
-        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
         ID3D11Buffer* cbvs[] = { nullptr, nullptr };
