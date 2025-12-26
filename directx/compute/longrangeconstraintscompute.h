@@ -5,10 +5,7 @@
 struct LongRangeConstraints {
     // Each group of 8 consecutive indices corresponds to one voxel's long-range constraint particles
     std::vector<uint> particleIndices;
-    // Inverse mapping: each entry gives the constraint index for a given particle
-    // The lower 4 bits are used as a counter for the number of broken face constraints within voxels involved
-    // in this long-range constraint. When a number of face constraints have broken, the long range constraint is also broken.
-    std::vector<uint> constraintIndicesAndCounters;
+    std::array<std::vector<uint>, 3> faceIdxToLRConstraintIndices;
 };
 
 struct LongRangeConstraintsCB {
@@ -35,7 +32,6 @@ public:
 
     ~LongRangeConstraintsCompute() {
         DirectX::notifyMayaOfMemoryUsage(longRangeParticleIndicesBuffer, false);
-        DirectX::notifyMayaOfMemoryUsage(longRangeConstraintIndicesAndCountersBuffer, false);
         DirectX::notifyMayaOfMemoryUsage(longRangeConstraintsCB, false);
     }
 
@@ -43,8 +39,10 @@ public:
         ComputeShader::dispatch(numWorkgroups);
     }
 
-    const ComPtr<ID3D11UnorderedAccessView>& getConstraintIndicesAndCountersUAV() const {
-        return longRangeConstraintIndicesAndCountersUAV;
+    // This is hijacked by the FaceConstraintsCompute shader as a counter for number of broken face constraints
+    // within each long-range constraint. The lower 4 bits of the first numLRConstraint entries are used for this.
+    const ComPtr<ID3D11UnorderedAccessView>& getLongRangeParticleIndicesUAV() const {
+        return longRangeParticleIndicesUAV;
     }
 
     void setParticlesUAV(const ComPtr<ID3D11UnorderedAccessView>& uav) {
@@ -56,18 +54,16 @@ private:
     VGSConstants vgsConstants;
     // Owned resources
     ComPtr<ID3D11Buffer> longRangeParticleIndicesBuffer;
-    ComPtr<ID3D11Buffer> longRangeConstraintIndicesAndCountersBuffer;
     ComPtr<ID3D11Buffer> longRangeConstraintsCB;
     ComPtr<ID3D11Buffer> vgsConstantsCB;
     ComPtr<ID3D11ShaderResourceView> longRangeParticleIndicesSRV;
-    ComPtr<ID3D11UnorderedAccessView> longRangeConstraintIndicesAndCountersUAV;
-    ComPtr<ID3D11ShaderResourceView> longRangeConstraintIndicesAndCountersSRV;
+    ComPtr<ID3D11UnorderedAccessView> longRangeParticleIndicesUAV;
     // Passed-in resources
     ComPtr<ID3D11UnorderedAccessView> particlesUAV;
 
     void bind() override
     {
-        ID3D11ShaderResourceView* srvs[] = { longRangeParticleIndicesSRV.Get(), longRangeConstraintIndicesAndCountersSRV.Get() };
+        ID3D11ShaderResourceView* srvs[] = { longRangeParticleIndicesSRV.Get() };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
         ID3D11UnorderedAccessView* uavs[] = { particlesUAV.Get() };
@@ -79,7 +75,7 @@ private:
 
     void unbind() override
     {
-        ID3D11ShaderResourceView* srvs[] = { nullptr, nullptr };
+        ID3D11ShaderResourceView* srvs[] = { nullptr };
         DirectX::getContext()->CSSetShaderResources(0, ARRAYSIZE(srvs), srvs);
 
         ID3D11UnorderedAccessView* uavs[] = { nullptr };
@@ -93,11 +89,9 @@ private:
         uint numConstraints = static_cast<uint>(constraints.particleIndices.size() / 8);
         numWorkgroups = Utils::divideRoundUp(numConstraints, VGS_THREADS);
 
-        longRangeParticleIndicesBuffer = DirectX::createReadOnlyBuffer(constraints.particleIndices);
+        longRangeParticleIndicesBuffer = DirectX::createReadWriteBuffer(constraints.particleIndices);
         longRangeParticleIndicesSRV = DirectX::createSRV(longRangeParticleIndicesBuffer);
-        longRangeConstraintIndicesAndCountersBuffer = DirectX::createReadWriteBuffer(constraints.constraintIndicesAndCounters);
-        longRangeConstraintIndicesAndCountersUAV = DirectX::createUAV(longRangeConstraintIndicesAndCountersBuffer);
-        longRangeConstraintIndicesAndCountersSRV = DirectX::createSRV(longRangeConstraintIndicesAndCountersBuffer);
+        longRangeParticleIndicesUAV = DirectX::createUAV(longRangeParticleIndicesBuffer);
         
         longRangeConstraintsCB = DirectX::createConstantBuffer<LongRangeConstraintsCB>({ numConstraints, 0, 0, 0 });
 

@@ -3,7 +3,7 @@
 #include "cube.h"
 #include <maya/MFloatMatrix.h>
 
-std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(const MSharedPtr<Voxels> voxels) {
+std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(const MSharedPtr<Voxels> voxels, std::array<std::vector<int>, 3>& voxelToFaceConstraintIndices) {
     std::array<std::vector<FaceConstraint>, 3> faceConstraints;
 
     const std::vector<uint32_t>& mortonCodes = voxels->mortonCodes;
@@ -25,26 +25,35 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(c
             newConstraint.voxelOneIdx = i;
             newConstraint.voxelTwoIdx = mortonCodesToSortedIdx.at(neighborMortonCode);
             faceConstraints[j].push_back(newConstraint);
+
+            voxelToFaceConstraintIndices[j][i] = static_cast<int>(faceConstraints[j].size() - 1);
         }
     }
 
     return faceConstraints;
 }
 
-LongRangeConstraints PBD::constructLongRangeConstraints(const MSharedPtr<Voxels> voxels) {
-    // Sentinel value is the 28-bit max uint value (since lower 4 bits are used for a counter)
+LongRangeConstraints PBD::constructLongRangeConstraints(const MSharedPtr<Voxels> voxels, const std::array<std::vector<int>, 3>& voxelToFaceConstraintIndices, std::array<uint, 3> faceConstraintsCounts) {
     LongRangeConstraints longRangeConstraints;
-    longRangeConstraints.constraintIndicesAndCounters.resize(numParticles(), 0xFFFFFFF0);
+    // Up to 4 long range constraint indices per face constraint index
+    // Use 0xFFFFFFF as sentinel for no LR constraint
+    longRangeConstraints.faceIdxToLRConstraintIndices[0].resize(4 * faceConstraintsCounts[0], 0xFFFFFFFF);
+    longRangeConstraints.faceIdxToLRConstraintIndices[1].resize(4 * faceConstraintsCounts[1], 0xFFFFFFFF);
+    longRangeConstraints.faceIdxToLRConstraintIndices[2].resize(4 * faceConstraintsCounts[2], 0xFFFFFFFF);
 
     const std::vector<uint32_t>& mortonCodes = voxels->mortonCodes;
     const std::unordered_map<uint32_t, uint32_t>& mortonCodesToSortedIdx = voxels->mortonCodesToSortedIdx;
     const int numOccupied = voxels->numOccupied;
+    
     std::array<uint, 8> particleIndices;
+    std::array<std::vector<uint>, 3> faceConstraintIndices; // 4 internal face constraints per axis per LR constraint
+    std::array<std::vector<uint>, 3> faceConstraintVisitedCounts = { std::vector<uint>(faceConstraintsCounts[0], 0), std::vector<uint>(faceConstraintsCounts[1], 0), std::vector<uint>(faceConstraintsCounts[2], 0) };
 
     for (int i = 0; i < numOccupied; i++) {
         std::array<uint32_t, 3> voxelCoords;
         Utils::fromMortonCode(mortonCodes[i], voxelCoords[0], voxelCoords[1], voxelCoords[2]);
         bool hasAllNeighbors = true;
+        faceConstraintIndices[0].clear(); faceConstraintIndices[1].clear(); faceConstraintIndices[2].clear();
 
         for (uint corner = 0; corner < 8; ++corner) {
             // Note that this can include the voxel itself (intentionally)
@@ -61,18 +70,35 @@ LongRangeConstraints PBD::constructLongRangeConstraints(const MSharedPtr<Voxels>
             };
             
             // Get the particle involved in the constraint from this neighbor voxel
+            // Hijack the lower 4 bits of each entry to store a broken face constraint counter
             uint neighborVoxelIdx = mortonCodesToSortedIdx.at(neighborMortonCode);
-            particleIndices[corner] = neighborVoxelIdx * 8u + corner;
+            particleIndices[corner] = (neighborVoxelIdx * 8u + corner) << 4; // (28 bits for particle indices is far more than enough)
+
+            // Get the face constraints this voxel contributes to this LR constraint
+            for (int axis = 0; axis < 3; ++axis) {
+                if (((corner >> axis) & 1) != 0) continue; // only internal faces
+
+                int faceConstraintIdx = voxelToFaceConstraintIndices[axis][neighborVoxelIdx];
+                if (faceConstraintIdx == -1) continue;
+
+                faceConstraintIndices[axis].push_back(faceConstraintIdx);
+                faceConstraintVisitedCounts[axis][faceConstraintIdx]++;
+            }
         }
 
         if (!hasAllNeighbors) continue;
+        
+        // Record the particle indices for this long-range constraint
         longRangeConstraints.particleIndices.insert( longRangeConstraints.particleIndices.end(), particleIndices.begin(), particleIndices.end() );
-
-        // For each particle, set the constraint index in the inverse mapping
-        // Left shift by 4 to make room for the broken face constraint counter in the lower 4 bits
-        uint constraintIdx = static_cast<uint>(longRangeConstraints.particleIndices.size() / 8) - 1;
-        for (int j = 0; j < 8; j++) {
-            longRangeConstraints.constraintIndicesAndCounters[ particleIndices[j] ] = (constraintIdx << 4);
+        
+        // Record the face constraint indices for this long-range constraint
+        uint currentLRConstraintIdx = static_cast<uint>(longRangeConstraints.particleIndices.size() / 8 - 1);
+        for (int axis = 0; axis < 3; ++axis) {
+            for (uint faceConstraintIdx : faceConstraintIndices[axis]) {
+                uint visitedCount = faceConstraintVisitedCounts[axis][faceConstraintIdx];
+                uint lrConstraintArrayOffset = faceConstraintIdx * 4 + (visitedCount - 1);
+                longRangeConstraints.faceIdxToLRConstraintIndices[axis][lrConstraintArrayOffset] = currentLRConstraintIdx;
+            }
         }
     }
 
@@ -140,12 +166,13 @@ void PBD::createComputeShaders(
 
 	faceConstraintsCompute = FaceConstraintsCompute(
 		faceConstraints,
+        longRangeConstraints.faceIdxToLRConstraintIndices,
         numParticles(),
         particleRadius,
         voxelRestVolume
 	);
     faceConstraintsCompute.setRenderParticlesUAV(renderParticlesUAV);
-    faceConstraintsCompute.setLongRangeConstraintIndicesUAV(longRangeConstraintsCompute.getConstraintIndicesAndCountersUAV());
+    faceConstraintsCompute.setLongRangeConstraintCountersUAV(longRangeConstraintsCompute.getLongRangeParticleIndicesUAV());
 
     preVGSCompute = PreVGSCompute(numParticles());
 }
