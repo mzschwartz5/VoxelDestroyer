@@ -3,8 +3,8 @@
 #include "cube.h"
 #include <maya/MFloatMatrix.h>
 
-std::vector<std::array<FaceConstraint, 3>> PBD::constructFaceToFaceConstraints(const MSharedPtr<Voxels> voxels) {
-    std::vector<std::array<FaceConstraint, 3>> faceConstraints;
+std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(const MSharedPtr<Voxels> voxels) {
+    std::array<std::vector<FaceConstraint>, 3> faceConstraints;
 
     const std::vector<uint32_t>& mortonCodes = voxels->mortonCodes;
     const std::unordered_map<uint32_t, uint32_t>& mortonCodesToSortedIdx = voxels->mortonCodesToSortedIdx;
@@ -13,7 +13,6 @@ std::vector<std::array<FaceConstraint, 3>> PBD::constructFaceToFaceConstraints(c
     for (int i = 0; i < numOccupied; i++) {
         std::array<uint32_t, 3> voxelCoords;
         Utils::fromMortonCode(mortonCodes[i], voxelCoords[0], voxelCoords[1], voxelCoords[2]);
-        std::array<FaceConstraint, 3> constraints;
 
         // Check each neighboring direction (x+, y+, z+) (only need to do half the neighbors to avoid double-counting)
         for (int j = 0; j < 3; j++) {
@@ -25,10 +24,8 @@ std::vector<std::array<FaceConstraint, 3>> PBD::constructFaceToFaceConstraints(c
             FaceConstraint newConstraint;
             newConstraint.voxelOneIdx = i;
             newConstraint.voxelTwoIdx = mortonCodesToSortedIdx.at(neighborMortonCode);
-            constraints[j] = newConstraint;
+            faceConstraints[j].push_back(newConstraint);
         }
-
-        faceConstraints.push_back(constraints);
     }
 
     return faceConstraints;
@@ -119,7 +116,7 @@ ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
 
 void PBD::createComputeShaders(
     const MSharedPtr<Voxels> voxels, 
-    const std::vector<std::array<FaceConstraint, 3>>& faceConstraints,
+    const std::array<std::vector<FaceConstraint>, 3>& faceConstraints,
     const LongRangeConstraints& longRangeConstraints
 ) {
 
