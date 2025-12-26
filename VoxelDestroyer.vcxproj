@@ -225,6 +225,7 @@
     <ClInclude Include="directx\compute\deformverticescompute.h" />
     <ClInclude Include="directx\compute\solveprimitivecollisionscompute.h" />
     <ClInclude Include="directx\compute\paintdeltacompute.h" />
+    <ClInclude Include="directx\compute\longrangeconstraintcompute.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="plugin.cpp" />
@@ -348,6 +349,12 @@
       <ShaderType>Compute</ShaderType>
       <ShaderModel>5.0</ShaderModel>
       <ObjectFileOutput>$(ProjectDir)\shaders\cso\expandRenderParticles.cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="shaders\longrangeconstraints.hlsl">
+      <EntryPoint>main</EntryPoint>
+      <ShaderType>Compute</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)\shaders\cso\longrangeconstraints.cso</ObjectFileOutput>
     </FxCompile>
     
   </ItemGroup>

@@ -300,9 +300,9 @@ public:
         );
         
         std::array<std::vector<FaceConstraint>, 3> faceConstraints = pbd.constructFaceToFaceConstraints(voxels);
-        std::vector<uint> longRangeConstraints = pbd.constructLongRangeConstraints(voxels);
+        LongRangeConstraints longRangeConstraints = pbd.constructLongRangeConstraints(voxels);
         
-        pbd.createComputeShaders(voxels, faceConstraints);
+        pbd.createComputeShaders(voxels, faceConstraints, longRangeConstraints);
 
         Utils::createPluginData<FunctionalData>(
             pbdNode->thisMObject(),

@@ -8,6 +8,7 @@
 #include "directx/compute/prevgscompute.h"
 #include "directx/compute/faceconstraintscompute.h"
 #include "custommayaconstructs/data/particledata.h"
+#include "directx/compute/longrangeconstraintscompute.h"
 
 #include <maya/MSharedPtr.h>
 
@@ -20,13 +21,14 @@ public:
    
     std::array<std::vector<FaceConstraint>, 3> constructFaceToFaceConstraints(MSharedPtr<Voxels> voxels);
 
-    std::vector<uint> constructLongRangeConstraints(MSharedPtr<Voxels> voxels);
+    LongRangeConstraints constructLongRangeConstraints(MSharedPtr<Voxels> voxels);
 
     ParticleDataContainer createParticles(MSharedPtr<Voxels> voxels);
 
     void createComputeShaders(
         MSharedPtr<Voxels> voxels, 
-        const std::array<std::vector<FaceConstraint>, 3>& faceConstraints
+        const std::array<std::vector<FaceConstraint>, 3>& faceConstraints,
+        const LongRangeConstraints& longRangeConstraints
     );
 
     void setGPUResourceHandles(
@@ -91,4 +93,5 @@ private:
     VGSCompute vgsCompute;
     FaceConstraintsCompute faceConstraintsCompute;
     PreVGSCompute preVGSCompute;
+    LongRangeConstraintsCompute longRangeConstraintsCompute;
 };
