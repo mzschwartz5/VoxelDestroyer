@@ -8,11 +8,7 @@ cbuffer VGSConstantBuffer : register(b0)
 };
 
 [numthreads(VGS_THREADS, 1, 1)]
-void main(
-    uint3 globalThreadId : SV_DispatchThreadID,
-    uint3 groupId : SV_GroupID,
-    uint3 localThreadId : SV_GroupThreadID
-)
+void main(uint3 globalThreadId : SV_DispatchThreadID)
 {
     uint voxel_idx = globalThreadId.x;
     if (voxel_idx >= vgsConstants.numVoxels) return;
