@@ -19,7 +19,7 @@ public:
     PBD() = default;
     ~PBD() = default;
    
-    std::vector<std::array<FaceConstraint, 3>> constructFaceToFaceConstraints(MSharedPtr<Voxels> voxels);
+    std::array<std::vector<FaceConstraint>, 3> constructFaceToFaceConstraints(MSharedPtr<Voxels> voxels);
 
     LongRangeConstraints constructLongRangeConstraints(MSharedPtr<Voxels> voxels);
 
@@ -27,7 +27,7 @@ public:
 
     void createComputeShaders(
         MSharedPtr<Voxels> voxels, 
-        const std::vector<std::array<FaceConstraint, 3>>& faceConstraints,
+        const std::array<std::vector<FaceConstraint>, 3>& faceConstraints,
         const LongRangeConstraints& longRangeConstraints
     );
 

@@ -34,7 +34,7 @@ void weakenLongRangeConstraints(uint voxelAParticlesIdx, uint voxelBParticlesIdx
             InterlockedAdd(longRangeConstraintIndices[longRangeConstraintIdxA], 1);
         }
         if (longRangeConstraintIdxB != 0x0FFFFFFF) {
-            InterlockedAdd(longRangeConstraintIndices[longRangeConstraintIdxB], 1);
+            InterlockedAdd(longRangeConstraintIndices[longRangeConstraintIIdxB], 1);
         }
     }
 }

@@ -19,7 +19,7 @@ cbuffer FaceConstraintsCB : register(b1)
     int faceBId;          // Which face index this constraint corresponds to on voxel B (only used for paint value lookup)
     float constraintLow;
     float constraintHigh;
-    uint flattenedConstraintOffset; // Total number of face constraints before this axis (currently only for indexing into long-range constraint index array)
+    int padding0;
     int padding1;
     int padding2;
 };
