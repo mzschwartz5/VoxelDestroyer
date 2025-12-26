@@ -90,6 +90,7 @@ public:
 
         ComPtr<ID3D11Buffer> buffer;
         HRESULT hr = dxDevice->CreateBuffer(&bufferDesc, &initData, buffer.GetAddressOf());
+        notifyMayaOfMemoryUsage(buffer, true);
         return buffer;   
     }
 

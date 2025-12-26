@@ -31,8 +31,9 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(c
     return faceConstraints;
 }
 
-std::vector<uint> PBD::constructLongRangeConstraints(const MSharedPtr<Voxels> voxels) {
-    std::vector<uint> longRangeConstraints;
+LongRangeConstraints PBD::constructLongRangeConstraints(const MSharedPtr<Voxels> voxels) {
+    LongRangeConstraints longRangeConstraints;
+    longRangeConstraints.constraintIndicesAndCounters.resize(numParticles(), UINT_MAX);
 
     const std::vector<uint32_t>& mortonCodes = voxels->mortonCodes;
     const std::unordered_map<uint32_t, uint32_t>& mortonCodesToSortedIdx = voxels->mortonCodesToSortedIdx;
@@ -64,7 +65,14 @@ std::vector<uint> PBD::constructLongRangeConstraints(const MSharedPtr<Voxels> vo
         }
 
         if (!hasAllNeighbors) continue;
-        longRangeConstraints.insert( longRangeConstraints.end(), particleIndices.begin(), particleIndices.end() );
+        longRangeConstraints.particleIndices.insert( longRangeConstraints.particleIndices.end(), particleIndices.begin(), particleIndices.end() );
+
+        // For each particle, set the constraint index in the inverse mapping
+        // Left shift by 4 to make room for the broken face constraint counter in the lower 4 bits
+        uint constraintIdx = static_cast<uint>(longRangeConstraints.particleIndices.size() / 8) - 1;
+        for (int j = 0; j < 8; j++) {
+            longRangeConstraints.constraintIndicesAndCounters[ particleIndices[j] ] = (constraintIdx << 4);
+        }
     }
 
     return longRangeConstraints;
@@ -107,7 +115,8 @@ ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
 
 void PBD::createComputeShaders(
     const MSharedPtr<Voxels> voxels, 
-    const std::array<std::vector<FaceConstraint>, 3>& faceConstraints
+    const std::array<std::vector<FaceConstraint>, 3>& faceConstraints,
+    const LongRangeConstraints& longRangeConstraints
 ) {
 
     float particleRadius = static_cast<float>(voxels->voxelSize) * 0.25f;
@@ -130,6 +139,13 @@ void PBD::createComputeShaders(
     faceConstraintsCompute.setRenderParticlesUAV(renderParticlesUAV);
 
     preVGSCompute = PreVGSCompute(numParticles());
+
+    longRangeConstraintsCompute = LongRangeConstraintsCompute(
+        numParticles(),
+        particleRadius,
+        voxelRestVolume,
+        longRangeConstraints
+    );
 }
 
 void PBD::setGPUResourceHandles(
@@ -144,6 +160,7 @@ void PBD::setGPUResourceHandles(
     preVGSCompute.setParticlesUAV(particleUAV);
     preVGSCompute.setOldParticlesUAV(oldParticlesUAV);
     preVGSCompute.setIsDraggingSRV(isDraggingSRV);
+    longRangeConstraintsCompute.setParticlesUAV(particleUAV);
 }
 
 void PBD::updateFaceConstraintsWithPaintValues(
@@ -189,5 +206,6 @@ void PBD::simulateSubstep() {
 
     preVGSCompute.dispatch();
     vgsCompute.dispatch();
+    longRangeConstraintsCompute.dispatch();
     faceConstraintsCompute.dispatch();
 }
