@@ -9,8 +9,6 @@ global proc AEPBDTemplate(string $nodeName)
     editorTemplate -beginLayout "Simulation settings" -collapse 0;
         editorTemplate -label "Voxel relaxtion" -annotation "The rigidity of individual voxels." -addControl "vgsRelaxation";
         editorTemplate -label "Voxel edge uniformity" -annotation "The extent to which voxels try to maintain their edge lengths." -addControl "vgsEdgeUniformity";
-        editorTemplate -label "Face-to-face relaxation" -annotation "The rigidity of inter-voxel constraints." -addControl "ftfRelaxation";
-        editorTemplate -label "Face-to-face uniformity" -annotation "The extent to which inter-voxel constraints try to maintain their edge lengths." -addControl "ftfEdgeUniformity";
         editorTemplate -label "VGS iterations" -annotation "Number of iterations in the VGS core loop (note that the VGS core loop is nested in the PBD substep loop)." -addControl "vgsIterations";
         editorTemplate -label "Gravity strength" -annotation "Strength of the gravity force applied to all particles." -addControl "gravityStrength";
     editorTemplate -endLayout;
@@ -23,8 +21,7 @@ global proc AEPBDTemplate(string $nodeName)
     editorTemplate -endLayout;
 
     string $keep[] = {"faceConstraintLow", "faceConstraintHigh", "particleMassLow", "particleMassHigh",
-                     "voxelRelaxation", "voxelEdgeUniformity", "faceToFaceRelaxation", "faceToFaceEdgeUniformity",
-                     "vgsIterations", "gravityStrength"};
+                     "voxelRelaxation", "voxelEdgeUniformity", "vgsIterations", "gravityStrength"};
     suppressAttributesExcept($nodeName, $keep);
 
     editorTemplate -endScrollLayout;

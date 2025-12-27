@@ -38,8 +38,6 @@ public:
     // Attributes
     inline static MObject aVgsRelaxation;
     inline static MObject aVgsEdgeUniformity;
-    inline static MObject aFtfRelaxation;
-    inline static MObject aFtfEdgeUniformity;
     inline static MObject aVgsIterations;
     inline static MObject aGravityStrength;
     inline static MObject aFaceConstraintLow;
@@ -75,8 +73,8 @@ public:
         nAttr.setStorable(true);
         nAttr.setReadable(true);
         nAttr.setWritable(true);
-        nAttr.setMin(0.01f);
-        nAttr.setMax(0.99f);
+        nAttr.setMin(0.05f);
+        nAttr.setMax(0.5f);
         addAttribute(aVgsRelaxation);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
@@ -85,20 +83,6 @@ public:
         nAttr.setMin(0.0f);
         nAttr.setMax(1.0f);
         addAttribute(aVgsEdgeUniformity);
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-
-        aFtfRelaxation = nAttr.create("ftfRelaxation", "ftfr", MFnNumericData::kFloat, 0.5f, &status);
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-        nAttr.setMin(0.01f);
-        nAttr.setMax(0.99f);
-        addAttribute(aFtfRelaxation);
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-
-        aFtfEdgeUniformity = nAttr.create("ftfEdgeUniformity", "ftfeu", MFnNumericData::kFloat, 1.0f, &status);
-        CHECK_MSTATUS_AND_RETURN_IT(status);
-        nAttr.setMin(0.0f);
-        nAttr.setMax(1.0f);
-        addAttribute(aFtfEdgeUniformity);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         aVgsIterations = nAttr.create("vgsIterations", "vgsi", MFnNumericData::kInt, 3, &status);
@@ -332,8 +316,6 @@ public:
         pbdNode->pbd.updateSimulationParameters(
             MPlug(pbdNodeObj, aVgsRelaxation).asFloat(),
             MPlug(pbdNodeObj, aVgsEdgeUniformity).asFloat(),
-            MPlug(pbdNodeObj, aFtfRelaxation).asFloat(),
-            MPlug(pbdNodeObj, aFtfEdgeUniformity).asFloat(),
             static_cast<uint>(MPlug(pbdNodeObj, aVgsIterations).asInt()),
             MPlug(pbdNodeObj, aGravityStrength).asFloat(),
             static_cast<float>(secondsPerFrame) / numSubsteps

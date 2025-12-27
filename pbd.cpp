@@ -215,14 +215,12 @@ void PBD::updateParticleMassWithPaintValues(
 void PBD::updateSimulationParameters(
     float vgsRelaxation,
     float vgsEdgeUniformity,
-    float ftfRelaxation,
-    float ftfEdgeUniformity,
     uint vgsIterations,
     float gravityStrength,
     float secondsPerFrame
 ) {
     vgsCompute.updateVGSParameters(vgsRelaxation, vgsEdgeUniformity, static_cast<uint>(vgsIterations));
-    faceConstraintsCompute.updateVGSParameters(ftfRelaxation, ftfEdgeUniformity, static_cast<uint>(vgsIterations));
+    faceConstraintsCompute.updateVGSParameters(vgsRelaxation, vgsEdgeUniformity, static_cast<uint>(vgsIterations));
     preVGSCompute.updatePreVgsConstants(secondsPerFrame, gravityStrength);
 }
 
