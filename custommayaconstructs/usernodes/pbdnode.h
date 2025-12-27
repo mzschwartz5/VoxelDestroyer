@@ -36,6 +36,7 @@ public:
     inline static const MString pbdNodeName{"PBD"};
     inline static const MTypeId id{0x0013A7B0};
     // Attributes
+    inline static MObject aCompliance;
     inline static MObject aVgsRelaxation;
     inline static MObject aVgsEdgeUniformity;
     inline static MObject aVgsIterations;
@@ -68,11 +69,18 @@ public:
 
         // User attributes
         MFnNumericAttribute nAttr;
-        aVgsRelaxation = nAttr.create("vgsRelaxation", "vgsr", MFnNumericData::kFloat, 0.5f, &status);
+        aCompliance = nAttr.create("compliance", "cmpl", MFnNumericData::kFloat, 0.0f, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         nAttr.setStorable(true);
         nAttr.setReadable(true);
         nAttr.setWritable(true);
+        nAttr.setMin(0.0f);
+        nAttr.setMax(100.0f);
+        addAttribute(aCompliance);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        aVgsRelaxation = nAttr.create("vgsRelaxation", "vgsr", MFnNumericData::kFloat, 0.5f, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
         nAttr.setMin(0.05f);
         nAttr.setMax(0.5f);
         addAttribute(aVgsRelaxation);
@@ -314,6 +322,7 @@ public:
         int numSubsteps = MPlug(globalSolverNode, GlobalSolver::aNumSubsteps).asInt();
         
         pbdNode->pbd.updateSimulationParameters(
+            MPlug(pbdNodeObj, aCompliance).asFloat() / 200.0f, // 200 is an arbitrary scaling factor to make the UI range more intuitive
             MPlug(pbdNodeObj, aVgsRelaxation).asFloat(),
             MPlug(pbdNodeObj, aVgsEdgeUniformity).asFloat(),
             static_cast<uint>(MPlug(pbdNodeObj, aVgsIterations).asInt()),

@@ -7,6 +7,7 @@ global proc AEPBDTemplate(string $nodeName)
     editorTemplate -beginScrollLayout;
 
     editorTemplate -beginLayout "Simulation settings" -collapse 0;
+        editorTemplate -label "Compliance" -annotation "Compliance parameter for the PBD solver, controlling overall softness of the material. Higher values yield softer materials." -addControl "compliance";
         editorTemplate -label "Voxel relaxtion" -annotation "The rigidity of individual voxels." -addControl "vgsRelaxation";
         editorTemplate -label "Voxel edge uniformity" -annotation "The extent to which voxels try to maintain their edge lengths." -addControl "vgsEdgeUniformity";
         editorTemplate -label "VGS iterations" -annotation "Number of iterations in the VGS core loop (note that the VGS core loop is nested in the PBD substep loop)." -addControl "vgsIterations";
@@ -21,7 +22,7 @@ global proc AEPBDTemplate(string $nodeName)
     editorTemplate -endLayout;
 
     string $keep[] = {"faceConstraintLow", "faceConstraintHigh", "particleMassLow", "particleMassHigh",
-                     "voxelRelaxation", "voxelEdgeUniformity", "vgsIterations", "gravityStrength"};
+                     "voxelRelaxation", "voxelEdgeUniformity", "vgsIterations", "gravityStrength", "compliance"};
     suppressAttributesExcept($nodeName, $keep);
 
     editorTemplate -endScrollLayout;

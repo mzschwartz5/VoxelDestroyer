@@ -26,11 +26,13 @@ public:
     void updateVGSParameters(
         float relaxation,
         float edgeUniformity,
-        uint iterCount
+        uint iterCount,
+        float compliance
     ) {
         vgsConstants.relaxation = relaxation;
         vgsConstants.edgeUniformity = edgeUniformity;
         vgsConstants.iterCount = iterCount;
+        vgsConstants.compliance = compliance;
         DirectX::updateConstantBuffer(vgsConstantBuffer, vgsConstants);
     }
 
@@ -74,6 +76,7 @@ private:
         vgsConstants.numVoxels = numParticles / 8;
         vgsConstants.particleRadius = particleRadius;
         vgsConstants.voxelRestVolume = voxelRestVolume;
+        vgsConstants.compliance = 0;
     
         vgsConstantBuffer = DirectX::createConstantBuffer(vgsConstants);
     }
