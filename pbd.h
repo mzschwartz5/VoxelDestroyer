@@ -67,8 +67,6 @@ public:
     void updateSimulationParameters(
         float vgsRelaxation,
         float vgsEdgeUniformity,
-        float ftfRelaxation,
-        float ftfEdgeUniformity,
         uint vgsIterations,
         float gravityStrength,
         float secondsPerFrame
