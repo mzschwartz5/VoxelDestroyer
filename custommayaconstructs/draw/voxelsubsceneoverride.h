@@ -247,6 +247,12 @@ private:
                 subscene->voxelsToHide.insert(visibleVoxelIdToGlobalId[voxelInstanceId]);
             }
         }
+
+        if (subscene->voxelsToHide.size() == visibleVoxelIdToGlobalId.size()) {
+            MGlobal::displayWarning("Cannot hide all voxels; at least one voxel must remain visible.");
+            subscene->voxelsToHide.clear();
+            subscene->shouldUpdate = false;
+        }
     }
 
     /**
