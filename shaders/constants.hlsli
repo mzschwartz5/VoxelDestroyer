@@ -22,8 +22,8 @@ struct VGSConstants
     float voxelRestVolume;
     uint iterCount;
     uint numVoxels;
+    float compliance;
     int padding0;
-    int padding1;
 };
 
 struct PreVGSConstants

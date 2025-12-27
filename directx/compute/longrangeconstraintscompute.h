@@ -49,6 +49,19 @@ public:
         particlesUAV = uav;
     }
 
+    void updateVGSParameters(
+        float vgsRelaxation,
+        float vgsEdgeUniformity,
+        uint vgsIterations,
+        float compliance
+    ) {
+        vgsConstants.relaxation = vgsRelaxation;
+        vgsConstants.edgeUniformity = vgsEdgeUniformity;
+        vgsConstants.iterCount = vgsIterations;
+        vgsConstants.compliance = compliance;
+        DirectX::updateConstantBuffer(vgsConstantsCB, vgsConstants);
+    }
+
 private:
     int numWorkgroups = 0;
     VGSConstants vgsConstants;
@@ -95,11 +108,12 @@ private:
         
         longRangeConstraintsCB = DirectX::createConstantBuffer<LongRangeConstraintsCB>({ numConstraints, 0, 0, 0 });
 
-        // For now, at least, hardcode relaxation and edge uniformity
+        // Defaults
         vgsConstants.relaxation = 0.5f;
         vgsConstants.edgeUniformity = 1.0f;
         vgsConstants.iterCount = 3;
         vgsConstants.numVoxels = numParticles / 8;
+        vgsConstants.compliance = 0;
 
         // These two values get fudged a bit. Long range constraints treat 2x2x2 groups of voxels as a one voxel.
         // So the effective particle radius is **tripled** (not doubled - draw it out :)), and the rest volume is adjusted accordingly.

@@ -29,14 +29,15 @@ float safeLength(float3 v) {
 }
 
 float calcMassNormalization(
-    Particle particles[8]
+    Particle particles[8],
+    float compliance
 ) {
     float maxInvMass = 0.0f;
     [unroll] for (uint i = 0; i < 8; ++i) {
         maxInvMass = max(maxInvMass, particleInverseMass(particles[i]));
     }
     maxInvMass = max(maxInvMass, eps);
-    return 1.0f / maxInvMass;
+    return 1.0f / (maxInvMass + compliance);
 }
 
 void doVGSIterations(
@@ -49,7 +50,7 @@ void doVGSIterations(
     float voxelRestVolume = vgsConstants.voxelRestVolume;
     float particleRadius = vgsConstants.particleRadius;
     uint iterCount = vgsConstants.iterCount;
-    float massNormalization = calcMassNormalization(particles);
+    float massNormalization = calcMassNormalization(particles, vgsConstants.compliance);
 
     for (uint iter = 0; iter < iterCount; iter++)
     {

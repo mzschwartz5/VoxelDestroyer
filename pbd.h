@@ -65,6 +65,7 @@ public:
     void simulateSubstep();
 
     void updateSimulationParameters(
+        float compliance,
         float vgsRelaxation,
         float vgsEdgeUniformity,
         uint vgsIterations,
