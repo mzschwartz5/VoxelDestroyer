@@ -41,7 +41,7 @@ In the future, I hope to make this available for download directly through the M
 - The input mesh must be a single, manifold, non-self-intersecting, water-tight mesh.
 - If voxelization fails on one of these counts, try using Maya's mesh clean up tools, merging vertices, or using boolean operations to join mesh pieces.
 
-### <img src="icons/voxelize.png" alt="voxel" width="30" style="vertical-align:middle" /> Voxelize the mesh
+### <img src="icons/Voxelize.png" alt="voxel" width="30" style="vertical-align:middle" /> Voxelize the mesh
 
 After loading the plugin, select your input mesh. Then, from the cubit menu shelf, click the left-most button to open the voxelizer menu. Choose your voxelization options (see details below), the click voxelize to prepare the mesh. That's it! The mesh will now simulate on playback - though you may want to customize its behavior with some of the other tools that ship with this plugin.
 
