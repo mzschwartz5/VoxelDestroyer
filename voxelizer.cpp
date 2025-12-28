@@ -85,7 +85,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     }
 
     transform.set(MTransformationMatrix(originalMeshMatrix));
-    sortedVoxels.voxelizedMeshDagPath = finalizeVoxelMesh(sortedVoxels, newMeshName, originalMeshName, gridTransform.asMatrix()); // TODO: if no boolean, should get rid of non-manifold geometry
+    sortedVoxels.voxelizedMeshDagPath = finalizeVoxelMesh(sortedVoxels, newMeshName, originalMeshName, gridTransform.asMatrix(), doBoolean); // TODO: if no boolean, should get rid of non-manifold geometry
     MGlobal::executeCommand("delete " + originalMeshName, false, true); // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh (or just allow for undo)
 
     MThreadPool::release(); // reduce reference count incurred by init()
@@ -464,7 +464,8 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     Voxels& voxels,
     const MString& newMeshName,
     const MString& originalMeshName,
-    const MMatrix& gridTransform
+    const MMatrix& gridTransform,
+    const bool doBoolean
 ) {
     MProgressWindow::setProgressRange(0, 100);
     MProgressWindow::setProgress(0);
@@ -507,6 +508,7 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     MProgressWindow::setProgressStatus("Setting normals and shading on interior faces...");
     MObject allInteriorFaces = Utils::combineFaceComponents(voxels.interiorFaceComponents);
     selectionList.add(resultMeshDagPath, allInteriorFaces);
+    if (!doBoolean) selectionList.add(resultMeshDagPath, allSurfaceFaces); // When rendering as voxels, the exterior should also have face normals
     MGlobal::setActiveSelectionList(selectionList);
     MGlobal::executeCommand("polySetToFaceNormal;", false, false);    
     MProgressWindow::advanceProgress(progressIncrement);

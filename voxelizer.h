@@ -280,6 +280,7 @@ private:
         Voxels& voxels,
         const MString& newMeshName,
         const MString& originalMesh,
-        const MMatrix& gridTransform
+        const MMatrix& gridTransform,
+        const bool doBoolean
     );
 };
