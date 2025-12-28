@@ -1,5 +1,4 @@
 #pragma once
-#include <maya/MGlobal.h>
 #include <maya/MFloatVector.h>
 #include <maya/MPlug.h>
 #include <maya/MFnPluginData.h>
@@ -11,7 +10,6 @@
 #include <windows.h>
 #include <cstdint>
 #include <type_traits>
-#include <utility>
 
 namespace Utils {
 

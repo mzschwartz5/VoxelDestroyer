@@ -3,7 +3,6 @@
 #include "computeshader.h"
 #include "../../custommayaconstructs/tools/voxeldragcontext.h"
 #include "../../custommayaconstructs/draw/voxelrendereroverride.h"
-#include <maya/MPoint.h>
 #include <maya/MFloatPoint.h>
 #include <maya/MFloatVector.h>
 struct DragValues

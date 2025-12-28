@@ -5,8 +5,6 @@
 #include <maya/MShaderManager.h>
 #include "../../utils.h"
 #include "../../cube.h"
-#include <maya/MHWGeometry.h>
-#include <maya/MRenderUtilities.h>
 #include "../../directx/directx.h"
 #include "../../directx/pingpongview.h"
 #include <maya/MDrawContext.h>
@@ -15,7 +13,6 @@
 #include "../tools/voxelpaintcontext.h"
 #include "../commands/changevoxeleditmodecommand.h"
 #include <maya/MMatrixArray.h>
-#include <algorithm>
 #include <array>
 #include <maya/MConditionMessage.h>
 using namespace MHWRender;

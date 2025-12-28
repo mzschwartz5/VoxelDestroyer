@@ -1,7 +1,6 @@
 #pragma once
 #include <maya/MViewport2Renderer.h>
 #include <maya/MRenderTargetManager.h>
-#include <maya/MGlobal.h>
 #include <maya/MMatrix.h>
 #include "../../event.h"
 #include "voxelpaintrenderoperation.h"

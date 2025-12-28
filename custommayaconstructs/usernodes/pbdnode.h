@@ -15,20 +15,13 @@
 
 #include <maya/MGlobal.h>
 #include <maya/MPxNode.h>
-#include <maya/MDagPath.h>
-#include <maya/MFnDependencyNode.h>
-#include <maya/MPlug.h>
-#include <maya/MStatus.h>
 #include <maya/MNodeMessage.h>
-#include <maya/MConditionMessage.h>
 #include <maya/MDataBlock.h>
 #include <maya/MCallbackIdArray.h>
 #include <maya/MFnAttribute.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
-#include <maya/MFnMessageAttribute.h>
 #include <maya/MTypeId.h>
-#include <maya/MString.h>
 
 class PBDNode : public MPxNode
 {

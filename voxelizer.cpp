@@ -2,9 +2,6 @@
 #include <maya/MSelectionList.h>
 #include <maya/MFnTransform.h>
 #include <algorithm>
-#include <maya/MFnSet.h>
-#include <maya/MItMeshPolygon.h>
-#include <maya/MFloatPointArray.h>
 #include <numeric>
 #include "cgalhelper.h"
 #include <maya/MFloatVectorArray.h>

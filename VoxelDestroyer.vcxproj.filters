@@ -59,12 +59,8 @@
     <ClInclude Include="directx\compute\prevgscompute.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="directx\compute\postvgscompute.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="directx\compute\faceconstraintscompute.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

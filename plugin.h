@@ -1,28 +1,10 @@
 #pragma once
 #include <maya/MArgList.h>
-#include <maya/MObject.h>
-#include <maya/MGlobal.h>
 #include <maya/MSyntax.h>
-#include <maya/MArgDatabase.h>
 #include <maya/MPxCommand.h>
-#include <maya/MFnPlugin.h>
-#include <maya/MEventMessage.h>
-#include <maya/MFnMesh.h>
-#include <maya/MPointArray.h>
-#include <maya/MDagPath.h>
-#include <maya/MFnDagNode.h>
-#include <maya/MFnTransform.h>
 #include <maya/MVector.h>
-#include "utils.h"
-#include <vector>
 #include <array>
-#include "voxelizer.h"
-#include "directx/directx.h"
-#include <maya/MConditionMessage.h>
-#include <unordered_map>
-#include <string>
 #include "custommayaconstructs/draw/voxelrendereroverride.h"
-#include <maya/MViewport2Renderer.h>
 #include <maya/MEventMessage.h>
 using namespace MHWRender;
 

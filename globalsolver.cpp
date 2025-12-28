@@ -3,13 +3,13 @@
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnUnitAttribute.h>
-#include <maya/MDGModifier.h>
 #include <maya/MFnDependencyNode.h>
-#include <maya/MItDependencyNodes.h>
-#include <maya/MFnDagNode.h>
 #include <maya/MAnimControl.h>
 #include "custommayaconstructs/tools/voxeldragcontext.h"
 #include "custommayaconstructs/usernodes/colliderlocator.h"
+#include "custommayaconstructs/data/particledata.h"
+#include "custommayaconstructs/data/functionaldata.h"
+#include "custommayaconstructs/data/colliderdata.h"
 
 const MTypeId GlobalSolver::id(0x0013A7B1);
 const MString GlobalSolver::globalSolverNodeName("GlobalSolver");

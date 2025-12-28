@@ -1,9 +1,7 @@
 #pragma once
 #include <maya/MGlobal.h>
 #include <d3d11.h>
-#include <d3dcompiler.h>
 #include <vector>
-#include <maya/MViewport2Renderer.h>
 #include <wrl/client.h>
 using namespace MHWRender;
 using Microsoft::WRL::ComPtr;

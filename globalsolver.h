@@ -2,9 +2,6 @@
 
 #include <maya/MPxNode.h>
 #include <maya/MCallbackIdArray.h>
-#include "custommayaconstructs/data/particledata.h"
-#include "custommayaconstructs/data/functionaldata.h"
-#include "custommayaconstructs/data/colliderdata.h"
 #include "directx/compute/dragparticlescompute.h"
 #include "directx/compute/buildcollisiongridcompute.h"
 #include "directx/compute/prefixscancompute.h"

@@ -3,8 +3,6 @@
 #include <maya/MPxData.h>
 #include <maya/MTypeId.h>
 #include <maya/MString.h>
-#include <maya/MPoint.h>
-#include <vector>
 #include "shaders/constants.hlsli"
 
 struct ParticleDataContainer {

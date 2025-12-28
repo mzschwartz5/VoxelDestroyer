@@ -1,10 +1,6 @@
 #include "plugin.h"
-#include <maya/MCommandResult.h>
-#include <maya/MFnMessageAttribute.h>
-#include <windows.h>
 #include "custommayaconstructs/tools/voxeldragcontextcommand.h"
 #include "custommayaconstructs/tools/voxelpaintcontextcommand.h"
-#include <maya/MAnimControl.h>
 #include <maya/MProgressWindow.h>
 #include "custommayaconstructs/data/voxeldata.h"
 #include "custommayaconstructs/data/particledata.h"
@@ -25,11 +21,11 @@
 #include "custommayaconstructs/commands/changevoxeleditmodecommand.h"
 #include "custommayaconstructs/commands/applyvoxelpaintcommand.h"
 #include <maya/MDrawRegistry.h>
-#include <maya/MTimer.h>
 #include <maya/MTransformationMatrix.h>
 #include "directx/compute/computeshader.h"
 #include "globalsolver.h"
 #include <maya/M3dView.h>
+#include <maya/MFnPlugin.h>
 
 // define EXPORT for exporting dll functions
 #define EXPORT __declspec(dllexport)

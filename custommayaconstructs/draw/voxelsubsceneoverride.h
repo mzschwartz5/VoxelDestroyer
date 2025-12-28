@@ -8,7 +8,6 @@
 #include "../../cube.h"
 #include "../commands/changevoxeleditmodecommand.h"
 #include "../../event.h"
-#include <maya/MGeometryRequirements.h>
 #include <maya/MGeometryExtractor.h>
 #include <maya/MPxComponentConverter.h>
 #include <memory>

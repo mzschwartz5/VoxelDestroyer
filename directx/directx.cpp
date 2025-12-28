@@ -1,5 +1,6 @@
 #include "directx.h"
-#include "../resource.h"
+#include <maya/MViewport2Renderer.h>
+#include <d3dcompiler.h>
 
 HINSTANCE DirectX::pluginInstance = NULL;
 ID3D11Device* DirectX::dxDevice = nullptr;

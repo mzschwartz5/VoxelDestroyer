@@ -1,15 +1,11 @@
 #pragma once
 
 #include <maya/MPxLocatorNode.h>
-#include <maya/MTypeId.h>
 #include <maya/MString.h>
 #include <maya/MStatus.h>
 #include <maya/MUIDrawManager.h>
-#include <maya/MMatrix.h>
-#include <maya/MColor.h>
 #include <maya/MFnMatrixAttribute.h>
 #include <maya/MFnTypedAttribute.h>
-#include <maya/MDagModifier.h>
 #include <maya/MDGModifier.h>
 #include <maya/MFileIO.h>
 #include <maya/MMessage.h>

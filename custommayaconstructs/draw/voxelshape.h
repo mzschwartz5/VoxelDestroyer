@@ -8,7 +8,6 @@
 #include <maya/MNodeMessage.h>
 #include "../../voxelizer.h"
 #include "../usernodes/pbdnode.h"
-#include "../usernodes/voxelizernode.h"
 #include "../data/particledata.h"
 #include "../data/d3d11data.h"
 #include "../data/voxeldata.h"

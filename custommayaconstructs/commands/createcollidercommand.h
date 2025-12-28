@@ -8,6 +8,10 @@
 #include <maya/MDagPath.h>
 #include <maya/MFnDagNode.h>
 #include "../../utils.h"
+#include <maya/MObject.h>
+#include <maya/MStatus.h>
+#include <maya/MString.h>
+#include <maya/MDagModifier.h>
 
 /**
  * Callable command from MEL shelf button to create collider nodes.

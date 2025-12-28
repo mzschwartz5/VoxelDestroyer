@@ -1,7 +1,6 @@
 #include "pbd.h"
 #include "utils.h"
 #include "cube.h"
-#include <maya/MFloatMatrix.h>
 
 std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(const MSharedPtr<Voxels> voxels, std::array<std::vector<int>, 3>& voxelToFaceConstraintIndices) {
     std::array<std::vector<FaceConstraint>, 3> faceConstraints;
