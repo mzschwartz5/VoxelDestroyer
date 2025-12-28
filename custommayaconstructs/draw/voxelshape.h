@@ -342,11 +342,30 @@ private:
         voxelShape->isParticleSRVPlugDirty = true;
     }
 
+    static void onInteriorMaterialChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+        if (plug != aInteriorMaterial || !(msg & MNodeMessage::kAttributeSet)) return;
+
+        VoxelShape* voxelShape = static_cast<VoxelShape*>(clientData);
+        MString interiorMaterialShaderGroup = plug.asString();
+
+        MSelectionList interiorFacesSelectList;
+        MDagPath originalGeomPath = voxelShape->pathToOriginalGeometry();
+        MObjectArray interiorFaceComponents = voxelShape->getVoxels()->interiorFaceComponents;
+        MObject interiorFaceComponent = Utils::combineFaceComponents(interiorFaceComponents);
+
+        interiorFacesSelectList.add(originalGeomPath, interiorFaceComponent);
+        MGlobal::setActiveSelectionList(interiorFacesSelectList);
+        MGlobal::executeCommand("sets -e -forceElement \"" + interiorMaterialShaderGroup + "\"", false, true);
+    }
+
     void postConstructor() override {
         MPxSurfaceShape::postConstructor();
         setRenderable(true);
 
         MCallbackId callbackId = MNodeMessage::addNodeDirtyPlugCallback(thisMObject(), onParticleSRVPlugDirty, this);
+        callbackIds.append(callbackId);
+
+        callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onInteriorMaterialChanged, this);
         callbackIds.append(callbackId);
 
         // Effectively a destructor callback to clean up when the node is deleted
