@@ -1,6 +1,7 @@
 // Note: the name of the procedure must match the shape node name + "DagMenuProc"
 global proc VoxelShapeDagMenuProc( string $menu, string $child ) {
     setParent -m $menu;
+
     // Get the first shape node child that is not an intermediate object
     string $shapes[] = `listRelatives -s $child`;
     string $target = $child;
@@ -25,4 +26,69 @@ global proc VoxelShapeDagMenuProc( string $menu, string $child ) {
     // Object mode
     $cmd = "changeVoxelEditMode -m 3" + $childFlag;
     menuItem -l "Object Mode" -rp "NW" -c $cmd;
+
+    // Assign a material to voxelized interior
+    // (This option is not a radial menu item for changing the voxel edit mode like the others above)
+    menuItem -l "Assign Interior Voxel Material" -ia "" -subMenu true;
+        menuItem -l "New Material..." -c ("VoxelShape_OpenMaterialPicker \"" + $target + "\"");
+        // List existing materials in the scene
+        menuItem -l "Existing Material..." -subMenu true;
+            string $mats[] = `ls -mat`;
+            for ($mat in $mats) {
+                menuItem -l $mat -c ("VoxelShape__SetInteriorMaterial \"" + $target + "\" \"" + $mat + "\"");
+            }
+        setParent -menu ..;
+    setParent -menu ..;
+}
+
+// When assigning a material, we simply set the name of the shader node to a string attribute on the voxel shape.
+// There, an attribute-changed callback will actually handle the assignment.
+global proc VoxelShape__SetInteriorMaterial( string $shape, string $shaderNode ) {
+    string $shadingGroup[] = `listConnections -s false -d true -type "shadingEngine" $shaderNode`;
+    undoInfo -openChunk;
+    setAttr ($shape + ".interiorMaterial") -type "string" $shadingGroup[0];
+    undoInfo -closeChunk;
+}
+
+global proc Voxel__OnInteriorNewMaterialCreated(string $shape, string $shaderNode, string $shaderType)
+{
+    VoxelShape__SetInteriorMaterial($shape, $shaderNode);
+    evalDeferred("deleteUI -window \"VoxelInteriorNewMaterialWindow\";");
+}
+
+// Use the same internal procs Maya uses to create the shader picker window
+// But attach our own callback so we can assign the material to our voxel shape interior
+global proc VoxelShape_OpenMaterialPicker(string $shape)
+{
+    source "buildShaderMenus.mel";
+    source "createAndAssignShader.mel";
+    source "renderCreateBarUI.mel";
+    string $postCommand = ("Voxel__OnInteriorNewMaterialCreated \"" + $shape + "\" %node %type");
+    
+    int $winW = 300;
+    int $winH = 730;
+
+    string $win = "VoxelInteriorNewMaterialWindow";
+    if (`window -exists $win`) deleteUI -window $win;
+    window -title "Assign Interior Voxel Material" -rtf false -widthHeight $winW $winH $win;
+
+    string $form = ($win + "_form");
+    formLayout -p $win $form;
+    setParent $form;
+        string $filter = "shader/surface shader/volume rendernode/arnold/shader/surface rendernode/arnold/shader/volume";
+        string $tl = createRenderNodeTreeLister($postCommand, $filter);
+        string $closeBtn = `button -label "Close" -h 26 -c ("deleteUI -window \"" + $win + "\"")`;
+
+        formLayout -e
+            -af $tl "left" 1
+            -af $tl "right" 1
+            -af $tl "top" 1
+            -ac $tl "bottom" 5 $closeBtn
+
+            -af $closeBtn "left" 5
+            -af $closeBtn "right" 5
+            -af $closeBtn "bottom" 5
+            $form;
+
+    showWindow $win;
 }

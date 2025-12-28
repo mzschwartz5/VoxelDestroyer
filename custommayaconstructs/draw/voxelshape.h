@@ -34,6 +34,7 @@ public:
     inline static MObject aParticleData;
     inline static MObject aVoxelData;
     inline static MObject aTrigger;
+    inline static MObject aInteriorMaterial;
 
     static void* creator() { return new VoxelShape(); }
     
@@ -81,6 +82,14 @@ public:
         nAttr.setWritable(true);
         nAttr.setReadable(false);
         status = addAttribute(aTrigger);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+
+        aInteriorMaterial = tAttr.create("interiorMaterial", "intmat", MFnData::kString, MObject::kNullObj, &status);
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        tAttr.setStorable(true);
+        tAttr.setWritable(true);
+        tAttr.setReadable(true);
+        status = addAttribute(aInteriorMaterial);
         CHECK_MSTATUS_AND_RETURN_IT(status);
 
         return MS::kSuccess;
