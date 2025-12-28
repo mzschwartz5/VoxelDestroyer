@@ -72,15 +72,14 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     Voxels sortedVoxels = sortVoxelsByMortonCode(voxels); // note: assign to new var to take advantage of RVO
 
     MProgressWindow::setProgressStatus("Calculating voxel-mesh intersections...");
-    const std::tuple<MObject, MObject> faceComponents = prepareForAndDoVoxelIntersection(
+    status = prepareForAndDoVoxelIntersection(
         sortedVoxels,
         selectedMesh,
         meshTris,
         newMeshName,
         gridTransform.asMatrix(),
         doBoolean,
-        clipTriangles,
-        status
+        clipTriangles
     );
 
     if (status != MStatus::kSuccess) {
@@ -89,7 +88,7 @@ Voxels Voxelizer::voxelizeSelectedMesh(
     }
 
     transform.set(MTransformationMatrix(originalMeshMatrix));
-    sortedVoxels.voxelizedMeshDagPath = finalizeVoxelMesh(newMeshName, originalMeshName, gridTransform.asMatrix(), faceComponents); // TODO: if no boolean, should get rid of non-manifold geometry
+    sortedVoxels.voxelizedMeshDagPath = finalizeVoxelMesh(sortedVoxels, newMeshName, originalMeshName, gridTransform.asMatrix()); // TODO: if no boolean, should get rid of non-manifold geometry
     MGlobal::executeCommand("delete " + originalMeshName, false, true); // TODO: maybe we want to do something non-destructive that also does not obstruct the view of the original mesh (or just allow for undo)
 
     MThreadPool::release(); // reduce reference count incurred by init()
@@ -397,15 +396,14 @@ void Voxelizer::createVoxels(
     }
 }
 
-std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
+MStatus Voxelizer::prepareForAndDoVoxelIntersection(
     Voxels& voxels,      
     MFnMesh& originalMesh,
     const std::vector<Triangle>& meshTris,
     const MString& newMeshName,
     const MMatrix& gridTransform,
     bool doBoolean,
-    bool clipTriangles,
-    MStatus& status
+    bool clipTriangles
 ) 
 {
     // Prepare for boolean operations
@@ -420,27 +418,24 @@ std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
 
     if (!CGAL::is_closed(originalMeshCGAL)) {
         MGlobal::displayError("Input mesh must be water tight.");
-        status = MStatus::kFailure;
-        return std::make_tuple(MObject(), MObject());
+        return MStatus::kFailure;
     }
     if (!CGAL::is_valid_polygon_mesh(originalMeshCGAL)) {
         MGlobal::displayError("Invalid mesh - try checking for and resolving non-manifold geometry.");
-        status = MStatus::kFailure;
-        return std::make_tuple(MObject(), MObject());
+        return MStatus::kFailure;
     }
     if (CGAL::Polygon_mesh_processing::does_self_intersect(originalMeshCGAL)) {
         MGlobal::displayError("Input mesh self-intersects.");
-        status = MStatus::kFailure;
-        return std::make_tuple(MObject(), MObject());
+        return MStatus::kFailure;
     }
 
     // These components will be built out in getVoxelMeshIntersection
     MFnSingleIndexedComponent singleIndexComponentFn;
-    MObject surfaceFaceComponent = singleIndexComponentFn.create(MFn::kMeshPolygonComponent);
-    MObject interiorFaceComponent = singleIndexComponentFn.create(MFn::kMeshPolygonComponent);
     for (int i = 0; i < voxels.numOccupied; ++i) {
-        MObject voxelFaceComponent = singleIndexComponentFn.create(MFn::kMeshPolygonComponent);
-        voxels.faceComponents.set(voxelFaceComponent, i);
+        MObject surfaceComp  = singleIndexComponentFn.create(MFn::kMeshPolygonComponent);
+        MObject interiorComp = singleIndexComponentFn.create(MFn::kMeshPolygonComponent);
+        voxels.surfaceFaceComponents.set(surfaceComp, i);
+        voxels.interiorFaceComponents.set(interiorComp, i);
     }
 
     VoxelIntersectionTaskData taskData {
@@ -448,9 +443,6 @@ std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
         &originalVertices,
         &meshTris,
         &sideTester,
-        &surfaceFaceComponent,
-        &interiorFaceComponent,
-        &voxels.faceComponents,
         &gridTransform,
         doBoolean,
         clipTriangles,
@@ -468,14 +460,14 @@ std::tuple<MObject, MObject> Voxelizer::prepareForAndDoVoxelIntersection(
     voxels.containedTris.clear();
     voxels.overlappingTris.clear();
 
-    return std::make_tuple(surfaceFaceComponent, interiorFaceComponent);
+    return MStatus::kSuccess;
 }
 
 MDagPath Voxelizer::finalizeVoxelMesh(
+    Voxels& voxels,
     const MString& newMeshName,
     const MString& originalMeshName,
-    const MMatrix& gridTransform,
-    const std::tuple<MObject, MObject>& faceComponents
+    const MMatrix& gridTransform
 ) {
     MProgressWindow::setProgressRange(0, 100);
     MProgressWindow::setProgress(0);
@@ -501,8 +493,9 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     selectionList.add(originalMeshName);
     MGlobal::setActiveSelectionList(selectionList);
     // The original mesh may have a transform; bake it first. (TODO: would like to avoid mutating the input mesh, but transferAttributes doesn't work without even if sampleSpace is worldspace.)
-    MGlobal::executeCommand(MString("makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 -pn 1"), false, true); 
-    selectionList.add(resultMeshDagPath, std::get<0>(faceComponents));
+    MGlobal::executeCommand(MString("makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 -pn 1"), false, true);
+    MObject allSurfaceFaces = Utils::combineFaceComponents(voxels.surfaceFaceComponents);
+    selectionList.add(resultMeshDagPath, allSurfaceFaces);
     MGlobal::setActiveSelectionList(selectionList);
     MGlobal::executeCommand("transferAttributes -transferPositions 0 -transferNormals 1 -transferUVs 2 -transferColors 2 -sampleSpace 0 -searchMethod 3 -flipUVs 0 -colorBorders 1;", false, true);
     MProgressWindow::advanceProgress(progressIncrement);
@@ -515,7 +508,8 @@ MDagPath Voxelizer::finalizeVoxelMesh(
     // This could be a place for optimization- transfering normals to interior faces is slow because the search process for closest point is expensive.
     selectionList.clear();
     MProgressWindow::setProgressStatus("Setting normals and shading on interior faces...");
-    selectionList.add(resultMeshDagPath, std::get<1>(faceComponents));
+    MObject allInteriorFaces = Utils::combineFaceComponents(voxels.interiorFaceComponents);
+    selectionList.add(resultMeshDagPath, allInteriorFaces);
     MGlobal::setActiveSelectionList(selectionList);
     MGlobal::executeCommand("polySetToFaceNormal;", false, false);    
     MProgressWindow::advanceProgress(progressIncrement);
@@ -577,16 +571,15 @@ Voxels Voxelizer::sortVoxelsByMortonCode(const Voxels& voxels) {
 void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) {
     VoxelIntersectionTaskData* taskData = static_cast<VoxelIntersectionTaskData*>(data);
     Voxels* voxels = taskData->voxels;
-    MFnSingleIndexedComponent surfaceFaceComponent(*(taskData->surfaceFaces));
-    MFnSingleIndexedComponent interiorFaceComponent(*(taskData->interiorFaces));
-    const MObjectArray& voxelFaceComponents = *(taskData->faceComponents);
     const MString& newMeshName = taskData->newMeshName;
-
+    
     // Threads will write the outputs of the boolean operations to these vectors
     std::vector<MPointArray> meshPointsAfterIntersection(voxels->numOccupied);
     std::vector<MIntArray> polyCountsAfterIntersection(voxels->numOccupied);
     std::vector<MIntArray> polyConnectsAfterIntersection(voxels->numOccupied);
     std::vector<int> numSurfaceFacesAfterIntersection(voxels->numOccupied, 0);
+    const MObjectArray& surfaceFaceComponents = voxels->surfaceFaceComponents;
+    const MObjectArray& interiorFaceComponents = voxels->interiorFaceComponents;
 
     std::vector<VoxelIntersectionThreadData> threadData(voxels->numOccupied);
     for (int i = 0; i < voxels->numOccupied; ++i) {
@@ -613,11 +606,13 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
     MPointArray allMeshPoints;
     MIntArray allPolyCounts, allPolyConnects;
     MIntArray surfaceFaceIndices, interiorFaceIndices;
-    MFnSingleIndexedComponent fnVoxelFaceComponent;
+    MFnSingleIndexedComponent surfaceFaceComponent, interiorFaceComponent;
     int startFaceIdx = 0;
     for (int i = 0; i < voxels->numOccupied; ++i) {
-        MIntArray voxelFaceIndices;
-        fnVoxelFaceComponent.setObject(voxelFaceComponents[i]);
+        surfaceFaceIndices.clear(); 
+        interiorFaceIndices.clear();
+        surfaceFaceComponent.setObject(surfaceFaceComponents[i]);
+        interiorFaceComponent.setObject(interiorFaceComponents[i]);
 
         int startVertIdx = voxels->totalVerts;
         voxels->totalVerts += meshPointsAfterIntersection[i].length();
@@ -628,17 +623,17 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
         if (numSurfaceFaces > 0) {
             for (int f = 0; f < numSurfaceFaces; ++f) {
                 surfaceFaceIndices.append(startFaceIdx + f);
-                voxelFaceIndices.append(startFaceIdx + f);
             }
         }
         if (numInteriorFaces > 0) {
             for (int f = 0; f < numInteriorFaces; ++f) {
                 interiorFaceIndices.append(startFaceIdx + numSurfaceFaces + f);
-                voxelFaceIndices.append(startFaceIdx + numSurfaceFaces + f);
             }
         }
-        fnVoxelFaceComponent.addElements(voxelFaceIndices);
         startFaceIdx += totalFaceCount;
+
+        surfaceFaceComponent.addElements(surfaceFaceIndices);
+        interiorFaceComponent.addElements(interiorFaceIndices);
 
         for (unsigned int j = 0; j < meshPointsAfterIntersection[i].length(); ++j) {
             allMeshPoints.append(meshPointsAfterIntersection[i][j]);
@@ -658,8 +653,6 @@ void Voxelizer::getVoxelMeshIntersection(void* data, MThreadRootTask* rootTask) 
         polyConnectsAfterIntersection[i].clear();
     }
 
-    surfaceFaceComponent.addElements(surfaceFaceIndices);
-    interiorFaceComponent.addElements(interiorFaceIndices);
 
     // Create Maya mesh
     // Note: the new mesh currently has no shading group or vertex attributes.

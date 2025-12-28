@@ -339,18 +339,22 @@ private:
         // Convert voxelsToHide to a map of face indices to hide (where key is face index and value is voxel instance ID)
         std::unordered_map<uint, uint> indicesToHide;
         MFnSingleIndexedComponent faceComponent;
-        const MObjectArray& voxelFaceComponents = voxelShape->getVoxels().get()->faceComponents;
+        const MObjectArray& voxelSurfaceFaces = voxelShape->getVoxels().get()->surfaceFaceComponents;
+        const MObjectArray& voxelInteriorFaces = voxelShape->getVoxels().get()->interiorFaceComponents;
 
-        for (uint voxelInstanceId : voxelsToHide) {
-            faceComponent.setObject(voxelFaceComponents[voxelInstanceId]);
-
+        auto addIndicesToHide = [&](const MObjectArray& faceComponents, uint voxelInstanceId) {
+            faceComponent.setObject(faceComponents[voxelInstanceId]);
             for (int j = 0; j < faceComponent.elementCount(); ++j) {
                 int faceIdx = faceComponent.element(j);
-    
                 indicesToHide.insert({allMeshIndices[faceIdx * 3 + 0], voxelInstanceId});
                 indicesToHide.insert({allMeshIndices[faceIdx * 3 + 1], voxelInstanceId});
                 indicesToHide.insert({allMeshIndices[faceIdx * 3 + 2], voxelInstanceId});
             }
+        };
+
+        for (uint voxelInstanceId : voxelsToHide) {
+            addIndicesToHide(voxelSurfaceFaces, voxelInstanceId);
+            addIndicesToHide(voxelInteriorFaces, voxelInstanceId);
         }
 
         // Now go through each (mesh) render item and remove those indices from its index buffer.

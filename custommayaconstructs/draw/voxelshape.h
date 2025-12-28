@@ -387,14 +387,14 @@ private:
         const MSharedPtr<Voxels>& voxels
     ) const {
         std::vector<uint> vertexVoxelIds(numVertices, UINT_MAX);
-        const MObjectArray& faceComponents = voxels->faceComponents;
+        const MObjectArray& surfaceFaceComponents = voxels->surfaceFaceComponents;
+        const MObjectArray& interiorFaceComponents = voxels->interiorFaceComponents;
         const std::vector<uint32_t>& mortonCodes = voxels->mortonCodes;
         const std::unordered_map<uint32_t, uint32_t>& mortonCodesToSortedIdx = voxels->mortonCodesToSortedIdx;
 
         MFnSingleIndexedComponent fnFaceComponent;
-        for (int i = 0; i < voxels->numOccupied; ++i) {
-            int voxelIndex = mortonCodesToSortedIdx.at(mortonCodes[i]);
-            MObject faceComponent = faceComponents[i];
+        auto addVoxelIdToVerts = [&](const MObjectArray& faceComponents, int voxelIndex) {
+            MObject faceComponent = faceComponents[voxelIndex];
             fnFaceComponent.setObject(faceComponent);
 
             for (int j = 0; j < fnFaceComponent.elementCount(); ++j) {
@@ -405,6 +405,12 @@ private:
                     vertexVoxelIds[vertexIndex] = voxelIndex;
                 }
             }
+        };
+
+        for (int i = 0; i < voxels->numOccupied; ++i) {
+            int voxelIndex = mortonCodesToSortedIdx.at(mortonCodes[i]);
+            addVoxelIdToVerts(surfaceFaceComponents, voxelIndex);
+            addVoxelIdToVerts(interiorFaceComponents, voxelIndex);
         }
 
         return vertexVoxelIds;
