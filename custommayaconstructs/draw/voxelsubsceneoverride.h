@@ -759,6 +759,9 @@ private:
     }
 
     void createVoxelGeometryBuffers() {
+        voxelIndexBuffers.clear();
+        voxelVertexBuffer = nullptr;
+
         MVertexBufferDescriptor posDesc("", MGeometry::kPosition, MGeometry::kFloat, 3);
         auto posVB = make_unique<MVertexBuffer>(posDesc);
         float* posData = static_cast<float*>(posVB->acquire(8, true));
@@ -798,6 +801,9 @@ private:
         MStatus status;
         meshVertexBuffers.clear();
         meshIndexBuffers.clear();
+        meshRenderItemIDs.clear();
+        allMeshIndices.clear();
+
 
         const MDagPath originalGeomPath = voxelShape->pathToOriginalGeometry();
         MFnMesh originalMeshFn(originalGeomPath.node());
@@ -915,7 +921,8 @@ public:
         const MSubSceneContainer& container,
         const MFrameContext& frameContext) const override
     {
-        return shouldUpdate;
+        bool rebuildGeometry = voxelShape->requiresGeometryRebuild();
+        return shouldUpdate || rebuildGeometry;
     }
 
     /**
@@ -926,15 +933,26 @@ public:
     void update(MSubSceneContainer& container, const MFrameContext& frameContext) override
     {
         if (!voxelShape) return;
+
+        if (voxelShape->requiresGeometryRebuild()) {
+            container.clear();
+            voxelShape->clearGeometryRebuildFlag();
+            editModeChanged = true;
+        }
         
         if (container.count() <= 0) {
+            recentlyHiddenFaces.clear();
+            recentlyHiddenVoxels.clear();
+            hiddenFaces.clear();
+            hiddenVoxels.clear();
+
             // Initialize the visibleVoxelIdToGlobalId map to a 1:1 mapping, which will then be updated as voxels get (un)hidden.
             int numVoxels = voxelShape->getVoxels().get()->numOccupied;
             visibleVoxelIdToGlobalId.resize(numVoxels);
             std::iota(visibleVoxelIdToGlobalId.begin(), visibleVoxelIdToGlobalId.end(), 0);
 
             // The render items for the actual, voxelized mesh.
-            createMeshRenderItems(container);
+            createMeshRenderItems(container); 
             // Geometry buffers for a simple unit cube, reused for all voxel render items.
             createVoxelGeometryBuffers();
             // The visible wireframe render item
@@ -953,7 +971,7 @@ public:
                 item->enable(enabled);
             }
 
-            // Special case: the edit mode may dictate that the preview highlight is enabled, but there may be no hovered voxel, so give the change to re-disable it.
+            // Special case: the edit mode may dictate that the preview highlight is enabled, but there may be no hovered voxel, so give the chance to re-disable it.
             updateVoxelRenderItem(container, voxelPreviewSelectionHighlightItemName, hoveredVoxelMatrices);
             editModeChanged = false;
         }

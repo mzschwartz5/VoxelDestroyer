@@ -41,12 +41,37 @@ global proc VoxelShapeDagMenuProc( string $menu, string $child ) {
     setParent -menu ..;
 }
 
+global proc string VoxelShape__GetOrCreateShadingGroup(string $shaderNode)
+{
+    string $sgs[] = `listConnections -s false -d true -type "shadingEngine" $shaderNode`;
+
+    // Prefer the SG whose surfaceShader is actually connected from $shaderNode
+    for ($sg in $sgs) {
+        string $src[] = `listConnections -s true -d false ($sg + ".surfaceShader")`;
+        if (size($src) > 0 && $src[0] == $shaderNode) return $sg;
+    }
+
+    if (size($sgs) > 0) return $sgs[0];
+
+    // None exists yet: create one and hook it up
+    string $newSg = `sets -renderable true -noSurfaceShader true -empty -name ($shaderNode + "SG")`;
+    string $cmd = ("connectAttr -f \"" + $shaderNode + ".outColor\" \"" + $newSg + ".surfaceShader\"");
+
+    // If outColor connection failed, try outValue
+    int $err = catchQuiet( `connectAttr -f ($shaderNode + ".outColor") ($newSg + ".surfaceShader")` );
+    if ($err) {
+        catchQuiet( `connectAttr -f ($shaderNode + ".outValue") ($newSg + ".surfaceShader")` );
+    }
+
+    return $newSg;
+}
+
 // When assigning a material, we simply set the name of the shader node to a string attribute on the voxel shape.
 // There, an attribute-changed callback will actually handle the assignment.
 global proc VoxelShape__SetInteriorMaterial( string $shape, string $shaderNode ) {
-    string $shadingGroup[] = `listConnections -s false -d true -type "shadingEngine" $shaderNode`;
+    string $shadingGroup = VoxelShape__GetOrCreateShadingGroup($shaderNode);
     undoInfo -openChunk;
-    setAttr ($shape + ".interiorMaterial") -type "string" $shadingGroup[0];
+    setAttr ($shape + ".interiorMaterial") -type "string" $shadingGroup;
     undoInfo -closeChunk;
 }
 
