@@ -208,4 +208,6 @@ MString getActiveModelPanelName();
 
 MStringArray getAllModelPanelNames();
 
+MObject combineFaceComponents(MObjectArray& faceComponents);
+
 } // namespace Utils

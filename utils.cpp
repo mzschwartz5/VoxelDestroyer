@@ -8,6 +8,7 @@
 #include <maya/MMatrix.h>
 #include <maya/MSelectionList.h>
 #include <maya/MFnMesh.h>
+#include <maya/MFnSingleIndexedComponent.h>
 #include <windows.h>
 #include <sstream>
 #include <cstring>
@@ -414,6 +415,21 @@ MStringArray getAllModelPanelNames() {
     MStringArray panelNames;
     MGlobal::executeCommand("getPanel -type \"modelPanel\"", panelNames);
     return panelNames;
+}
+
+MObject combineFaceComponents(MObjectArray& faceComponents) {
+    MFnSingleIndexedComponent fnCombinedComponent;
+    MObject combinedComponent = fnCombinedComponent.create(MFn::kMeshPolygonComponent);
+
+    MFnSingleIndexedComponent fnComponent_i;
+    for (uint i = 0; i < faceComponents.length(); ++i) {
+        fnComponent_i.setObject(faceComponents[i]);
+        for (int j = 0; j < fnComponent_i.elementCount(); ++j) {
+            fnCombinedComponent.addElement(fnComponent_i.element(j));
+        }
+    }
+
+    return combinedComponent;
 }
 
 } // namespace Utils

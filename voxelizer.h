@@ -10,7 +10,6 @@
 #include <vector>
 #include <array>
 #include <unordered_map>
-#include <tuple>
 
 #include "utils.h"
 #include <maya/MThreadPool.h>
@@ -65,7 +64,8 @@ struct Voxels {
     std::unordered_map<uint32_t, uint32_t> mortonCodesToSortedIdx;
     std::vector<std::vector<int>> containedTris;   // Indices of triangles (of the input mesh) whose centroids are contained within the voxel
     std::vector<std::vector<int>> overlappingTris; // Indices of triangles (of the input mesh) that overlap the voxel, but whose centroids are not contained within the voxel
-    MObjectArray faceComponents;                   // Face component per voxel, post voxelization
+    MObjectArray interiorFaceComponents;           // Interior faces (face set object per voxel), after voxelization
+    MObjectArray surfaceFaceComponents;            // Surface faces (face set object per voxel), after voxelization
     MDagPath voxelizedMeshDagPath;
     
     int totalVerts = 0; // total number of vertices in the voxelized mesh
@@ -83,7 +83,8 @@ struct Voxels {
           mortonCodesToSortedIdx(other.mortonCodesToSortedIdx),
           containedTris(other.containedTris),
           overlappingTris(other.overlappingTris),
-          faceComponents(other.faceComponents),
+          interiorFaceComponents(other.interiorFaceComponents),
+          surfaceFaceComponents(other.surfaceFaceComponents),
           voxelizedMeshDagPath(other.voxelizedMeshDagPath),
           totalVerts(other.totalVerts),
           numOccupied(other.numOccupied),
@@ -101,7 +102,8 @@ struct Voxels {
             mortonCodesToSortedIdx = other.mortonCodesToSortedIdx;
             containedTris = other.containedTris;
             overlappingTris = other.overlappingTris;
-            faceComponents = other.faceComponents;
+            interiorFaceComponents = other.interiorFaceComponents;
+            surfaceFaceComponents = other.surfaceFaceComponents;
             voxelizedMeshDagPath = other.voxelizedMeshDagPath;
             totalVerts = other.totalVerts;
             numOccupied = other.numOccupied;
@@ -120,7 +122,8 @@ struct Voxels {
           mortonCodesToSortedIdx(std::move(other.mortonCodesToSortedIdx)),
           containedTris(std::move(other.containedTris)),
           overlappingTris(std::move(other.overlappingTris)),
-          faceComponents(std::move(other.faceComponents)),
+          interiorFaceComponents(std::move(other.interiorFaceComponents)),
+          surfaceFaceComponents(std::move(other.surfaceFaceComponents)),
           voxelizedMeshDagPath(std::move(other.voxelizedMeshDagPath)),
           totalVerts(other.totalVerts),
           numOccupied(other.numOccupied),
@@ -135,7 +138,8 @@ struct Voxels {
         occupied.resize(size, false);
         isSurface.resize(size, false);
         modelMatrices.setLength(size);
-        faceComponents.setLength(size);
+        interiorFaceComponents.setLength(size);
+        surfaceFaceComponents.setLength(size);
         mortonCodes.resize(size, UINT_MAX);
         containedTris.resize(size);
         overlappingTris.resize(size);
@@ -225,15 +229,14 @@ private:
     // Sets up the CGAL acceleration tree and launches the MThreadPool (which, itself sets up each thread).
     // Returns MSingleIndexedComponents for the surface and interior faces of the voxelized mesh.
     // (There are too many "do intersection" here functions IMO, but Maya's thread pool forces you into a pattern of manager functions that don't do much themselves)
-    std::tuple<MObject, MObject> prepareForAndDoVoxelIntersection(
+    MStatus prepareForAndDoVoxelIntersection(
         Voxels& voxels,      
         MFnMesh& originalMesh,
         const std::vector<Triangle>& meshTris,
         const MString& newMeshName,
         const MMatrix& gridTransform,
         bool doBoolean,
-        bool clipTriangles,
-        MStatus& status
+        bool clipTriangles
     );
 
     // Payload for the function that sets up all threads.
@@ -242,9 +245,6 @@ private:
         const MPointArray* const originalVertices;
         const std::vector<Triangle>* const triangles;
         const SideTester* const sideTester;
-        MObject* const surfaceFaces;
-        MObject* const interiorFaces;
-        MObjectArray* const faceComponents;
         const MMatrix* const gridTransform;
         bool doBoolean;
         bool clipTriangles;
@@ -277,9 +277,9 @@ private:
      * Currently, this takes the majority of the time in the voxelization process.
      */
     MDagPath finalizeVoxelMesh(
+        Voxels& voxels,
         const MString& newMeshName,
         const MString& originalMesh,
-        const MMatrix& gridTransform,
-        const std::tuple<MObject, MObject>& faceComponents
+        const MMatrix& gridTransform
     );
 };
