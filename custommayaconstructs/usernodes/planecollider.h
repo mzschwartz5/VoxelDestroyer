@@ -97,7 +97,7 @@ public:
         if (plug != aColliderData) return MS::kUnknownParameter;
 
         MDataHandle parentTransformMatHandle = dataBlock.inputValue(aParentTransformMatrix);
-        MMatrix worldMat = Utils::getWorldMatrix(thisMObject());
+        MMatrix worldMat = Utils::getWorldMatrixWithoutScale(thisMObject());
         MDataHandle widthHandle = dataBlock.inputValue(aWidth);
         float width = widthHandle.asFloat();
         MDataHandle heightHandle = dataBlock.inputValue(aHeight);

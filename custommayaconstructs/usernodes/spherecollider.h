@@ -63,7 +63,7 @@ public:
     {
         if (plug != aColliderData) return MS::kUnknownParameter;
         MDataHandle parentTransformMatHandle = dataBlock.inputValue(aParentTransformMatrix);
-        MMatrix worldMat = Utils::getWorldMatrix(thisMObject());
+        MMatrix worldMat = Utils::getWorldMatrixWithoutScale(thisMObject());
         MDataHandle radiusHandle = dataBlock.inputValue(aRadius);
         float radius = radiusHandle.asFloat();
         MDataHandle frictionHandle = dataBlock.inputValue(aFriction);

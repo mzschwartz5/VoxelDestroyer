@@ -60,18 +60,7 @@ public:
      * Overridden to return the object's transform matrix without scale (which would otherwise complicate collider calculations for non-box colliders).
      */
     MMatrix transform(const MDagPath& objPath, const MDagPath& cameraPath) const override {
-        MMatrix worldMatrix = objPath.inclusiveMatrix();
-        MTransformationMatrix transformMatrix(worldMatrix);
-
-        double qx = 0.0, qy = 0.0, qz = 0.0, qw = 1.0;
-        transformMatrix.getRotationQuaternion(qx, qy, qz, qw);
-        MVector translation = transformMatrix.getTranslation(MSpace::kWorld);
-
-        MTransformationMatrix unscaledMatrix;
-        unscaledMatrix.setTranslation(translation, MSpace::kWorld);
-        unscaledMatrix.setRotationQuaternion(qx, qy, qz, qw);
-
-        return unscaledMatrix.asMatrix();
+        return Utils::getWorldMatrixWithoutScale(objPath.node());
     }
 
 private:

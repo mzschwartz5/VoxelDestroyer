@@ -291,12 +291,25 @@ MObject createDagNode(const MString& typeName, const MObject& parent, const MStr
     return nodeObj;
 }
 
-MMatrix getWorldMatrix(const MObject& node) {
-    MDagPath dagPath;
-    if (MDagPath::getAPathTo(node, dagPath) == MS::kSuccess) {
-        return dagPath.inclusiveMatrix();
+MMatrix getWorldMatrixWithoutScale(const MObject& object) {
+    MDagPath objPath;
+    MStatus status = MDagPath::getAPathTo(object, objPath);
+    if (status != MS::kSuccess) {
+        return MMatrix::identity;
     }
-    return MMatrix::identity;
+    
+    MMatrix worldMatrix = objPath.inclusiveMatrix();
+    MTransformationMatrix transformMatrix(worldMatrix);
+
+    double qx = 0.0, qy = 0.0, qz = 0.0, qw = 1.0;
+    transformMatrix.getRotationQuaternion(qx, qy, qz, qw);
+    MVector translation = transformMatrix.getTranslation(MSpace::kWorld);
+
+    MTransformationMatrix unscaledMatrix;
+    unscaledMatrix.setTranslation(translation, MSpace::kWorld);
+    unscaledMatrix.setRotationQuaternion(qx, qy, qz, qw);
+
+    return unscaledMatrix.asMatrix();
 }
 
 // Note: this isn't particularly fast (iterates over all nodes), so don't use in performance-critical paths.

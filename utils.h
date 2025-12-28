@@ -182,7 +182,7 @@ void deleteDGNode(const MObject& nodeObj);
 
 MObject createDagNode(const MString& typeName, const MObject& parent = MObject::kNullObj, const MString& name = "", MDagModifier* dagMod = nullptr);
 
-MMatrix getWorldMatrix(const MObject& node);
+MMatrix getWorldMatrixWithoutScale(const MObject& object);
 
 MObject getNodeFromName(const MString& name);
 
