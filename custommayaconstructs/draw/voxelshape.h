@@ -285,9 +285,18 @@ public:
         }
     }
 
+    bool requiresGeometryRebuild() const {
+        return rebuildGeometry;
+    }
+
+    void clearGeometryRebuildFlag() {
+        rebuildGeometry = false;
+    }
+
 private:
     bool isInitialized = false;
     bool isParticleSRVPlugDirty = false;
+    bool rebuildGeometry = false;
     MCallbackIdArray callbackIds;
     EventBase::Unsubscribe unsubPaintStateChanges;
     DeformVerticesCompute deformVerticesCompute;
@@ -342,11 +351,20 @@ private:
         voxelShape->isParticleSRVPlugDirty = true;
     }
 
+    /**
+     * The user can assign a new interior voxel material to this shape using the marking menu. All the menu option does is set
+     * the aInteriorMaterial string attribute (the name of a shading group) on this shape. Then we use that string to set the 
+     * interior faces of the _original_ voxelized geometry to use that shading group.
+     * 
+     * Finally, the subscene override that draws this shape sees the interior material changed, and rebuilds its render items,
+     * re-extracting the original geometry and shaders (including the new interior shader)!
+     */
     static void onInteriorMaterialChanged(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
         if (plug != aInteriorMaterial || !(msg & MNodeMessage::kAttributeSet)) return;
 
         VoxelShape* voxelShape = static_cast<VoxelShape*>(clientData);
         MString interiorMaterialShaderGroup = plug.asString();
+        voxelShape->rebuildGeometry = true;
 
         MSelectionList interiorFacesSelectList;
         MDagPath originalGeomPath = voxelShape->pathToOriginalGeometry();
