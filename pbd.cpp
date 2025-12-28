@@ -212,19 +212,14 @@ void PBD::updateParticleMassWithPaintValues(
 
 // Note that FPS changes just make the playback choppier / smoother. A lower FPS means each frame is a bigger simulation timestep,
 // but the same time passes overall. To make the sim *run* slower or faster, you need to change the timeslider playback speed factor.
-void PBD::updateSimulationParameters(
-    float compliance,
-    float vgsRelaxation,
-    float vgsEdgeUniformity,
-    uint vgsIterations,
-    float gravityStrength,
-    float secondsPerSubstep
-) {
-    compliance /= secondsPerSubstep; // normalize compliance by timestep to keep behavior consistent at different substeps per frame.
-    vgsCompute.updateVGSParameters(vgsRelaxation, vgsEdgeUniformity, static_cast<uint>(vgsIterations), compliance);
-    faceConstraintsCompute.updateVGSParameters(vgsRelaxation, vgsEdgeUniformity, static_cast<uint>(vgsIterations), compliance);
-    longRangeConstraintsCompute.updateVGSParameters(vgsRelaxation, vgsEdgeUniformity, static_cast<uint>(vgsIterations), compliance);
-    preVGSCompute.updatePreVgsConstants(secondsPerSubstep, gravityStrength);
+void PBD::updateSimulationParameters(const SimulationParameters& simParams) {
+    if (simParams == simulationParameters) return;
+
+    const float compliance = simParams.compliance / simParams.secondsPerFrame; // normalize compliance by timestep to keep behavior consistent at different substeps per frame.
+    vgsCompute.updateVGSParameters(simParams.vgsRelaxation, simParams.vgsEdgeUniformity, static_cast<uint>(simParams.vgsIterations), compliance);
+    faceConstraintsCompute.updateVGSParameters(simParams.vgsRelaxation, simParams.vgsEdgeUniformity, static_cast<uint>(simParams.vgsIterations), compliance);
+    longRangeConstraintsCompute.updateVGSParameters(simParams.vgsRelaxation, simParams.vgsEdgeUniformity, static_cast<uint>(simParams.vgsIterations), compliance);
+    preVGSCompute.updatePreVgsConstants(simParams.secondsPerFrame, simParams.gravityStrength);
 }
 
 void PBD::mergeRenderParticles() {

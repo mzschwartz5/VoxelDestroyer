@@ -244,9 +244,6 @@ public:
         MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onVoxelDataConnected, this, &status);
         callbackIds.append(callbackId);
 
-        callbackId = MConditionMessage::addConditionCallback("playingBack", updateSimulationParameters, this);
-        callbackIds.append(callbackId);
-
         // Effectively a destructor callback to clean up when the node is deleted
         // This is more reliable than a destructor, because Maya won't necessarily call destructors on node deletion (unless undo queue is flushed)
         callbackId = MNodeMessage::addNodePreRemovalCallback(thisMObject(), [](MObject& node, void* clientData) {
@@ -310,25 +307,24 @@ public:
 
     // Note that FPS changes just make the playback choppier / smoother. A lower FPS means each frame is a bigger simulation timestep,
     // but the same time passes overall. To make the sim *run* slower or faster, you need to change the timeslider playback speed factor.
-    static void updateSimulationParameters(bool state, void* clientData) {
-        PBDNode* pbdNode = static_cast<PBDNode*>(clientData);
+    void updateSimulationParameters(MDataBlock& dataBlock) {
         const double secondsPerFrame = MTime(1.0, MTime::uiUnit()).as(MTime::kSeconds);
         if (secondsPerFrame < 0.005) {
             MGlobal::displayWarning("High FPS (low simulation timestep) may cause precision issues.");
         }
 
-        MObject pbdNodeObj = pbdNode->thisMObject();
+        MObject pbdNodeObj = thisMObject();
         MObject globalSolverNode = GlobalSolver::getOrCreateGlobalSolver();
         int numSubsteps = MPlug(globalSolverNode, GlobalSolver::aNumSubsteps).asInt();
         
-        pbdNode->pbd.updateSimulationParameters(
-            MPlug(pbdNodeObj, aCompliance).asFloat() / 200.0f, // 200 is an arbitrary scaling factor to make the UI range more intuitive
-            MPlug(pbdNodeObj, aVgsRelaxation).asFloat(),
-            MPlug(pbdNodeObj, aVgsEdgeUniformity).asFloat(),
-            static_cast<uint>(MPlug(pbdNodeObj, aVgsIterations).asInt()),
-            MPlug(pbdNodeObj, aGravityStrength).asFloat(),
+        pbd.updateSimulationParameters({
+            dataBlock.inputValue(aCompliance).asFloat() / 200.0f, // 200 is an arbitrary scaling factor to make the UI range more intuitive
+            dataBlock.inputValue(aVgsRelaxation).asFloat(),
+            dataBlock.inputValue(aVgsEdgeUniformity).asFloat(),
+            static_cast<uint>(dataBlock.inputValue(aVgsIterations).asInt()),
+            dataBlock.inputValue(aGravityStrength).asFloat(),
             static_cast<float>(secondsPerFrame) / numSubsteps
-        );
+        });
     }
 
     void updateFaceConstraintsWithPaintValues(const ComPtr<ID3D11UnorderedAccessView>& paintDeltaUAV, const ComPtr<ID3D11UnorderedAccessView>& paintValueUAV) {
@@ -383,6 +379,7 @@ private:
             return MS::kSuccess;
         }
 
+        updateSimulationParameters(dataBlock);
         return MS::kUnknownParameter;
     }
 

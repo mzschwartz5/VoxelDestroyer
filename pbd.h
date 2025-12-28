@@ -12,6 +12,24 @@
 
 #include <maya/MSharedPtr.h>
 
+struct SimulationParameters {
+    float compliance;
+    float vgsRelaxation;
+    float vgsEdgeUniformity;
+    uint vgsIterations;
+    float gravityStrength;
+    float secondsPerFrame;
+    
+    bool operator==(const SimulationParameters& other) const {
+        return (compliance == other.compliance &&
+                vgsRelaxation == other.vgsRelaxation &&
+                vgsEdgeUniformity == other.vgsEdgeUniformity &&
+                vgsIterations == other.vgsIterations &&
+                gravityStrength == other.gravityStrength &&
+                secondsPerFrame == other.secondsPerFrame);
+    };
+};
+
 class PBD
 {
 public:
@@ -64,14 +82,7 @@ public:
     
     void simulateSubstep();
 
-    void updateSimulationParameters(
-        float compliance,
-        float vgsRelaxation,
-        float vgsEdgeUniformity,
-        uint vgsIterations,
-        float gravityStrength,
-        float secondsPerFrame
-    );
+    void updateSimulationParameters(const SimulationParameters& simParams);
 
     const ComPtr<ID3D11ShaderResourceView>& getRenderParticlesSRV() const {
         return renderParticlesSRV;
@@ -87,6 +98,7 @@ private:
     ComPtr<ID3D11Buffer> renderParticlesBuffer;
     ComPtr<ID3D11UnorderedAccessView> renderParticlesUAV;
     ComPtr<ID3D11ShaderResourceView> renderParticlesSRV;
+    SimulationParameters simulationParameters;
 
     // Shaders
     VGSCompute vgsCompute;
