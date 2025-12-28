@@ -26,11 +26,11 @@ public:
         MArgParser ap = parser();
         if (ap.isFlagSet("-r")) {
             double v; ap.getFlagArgument("-r", 0, v);
-            fCtx->setSelectRadius(v);
+            fCtx->setSelectRadius(static_cast<float>(v));
         }
         if (ap.isFlagSet("-s")) {
             double v; ap.getFlagArgument("-s", 0, v);
-            fCtx->setSelectStrength(v);
+            fCtx->setSelectStrength(static_cast<float>(v));
         }
         if (ap.isFlagSet("-cb")) {
             int v; ap.getFlagArgument("-cb", 0, v);

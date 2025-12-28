@@ -1,6 +1,5 @@
 #pragma once
 #include <maya/MPxContext.h>
-#include <maya/MViewport2Renderer.h>
 #include <maya/M3dView.h>
 #include <algorithm>
 #include "../../event.h"
