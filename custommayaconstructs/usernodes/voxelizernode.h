@@ -14,7 +14,7 @@
 class VoxelizerNode : public MPxNode {
 public:
     inline static MTypeId id{0x0013A7C0};
-    inline static MString typeName{"voxelizerNode"};
+    inline static MString typeName{"VoxelizerNode"};
     inline static MObject aVoxelData;
 
     static void* creator() {

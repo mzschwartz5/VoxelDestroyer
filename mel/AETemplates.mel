@@ -142,6 +142,30 @@ global proc AEGlobalSolverTemplate(string $nodeName)
     editorTemplate -endScrollLayout;
 }
 
+global proc AEVoxelizerNodeTemplate(string $nodeName)
+{
+    editorTemplate -beginScrollLayout;
+
+    // There are currently no custom controls for the voxelizer node.
+    // Suppress everything so as not to show internal attributes that are unusable.
+    string $keep[] = {};
+    suppressAttributesExcept($nodeName, $keep);
+
+    editorTemplate -endScrollLayout;
+}
+
+global proc AEVoxelShapeTemplate(string $nodeName)
+{
+    editorTemplate -beginScrollLayout;
+
+    // There are currently no custom controls for the voxelizer node.
+    // Suppress everything so as not to show internal attributes that are unusable.
+    string $keep[] = {};
+    suppressAttributesExcept($nodeName, $keep);
+
+    editorTemplate -endScrollLayout;
+}
+
 global proc AEBoxColliderTemplate(string $nodeName)
 {
     editorTemplate -beginScrollLayout;
