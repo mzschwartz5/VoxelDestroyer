@@ -199,12 +199,12 @@ EXPORT MStatus initializePlugin(MObject obj)
 	MStatus status;
 	M3dView activeView = M3dView::active3dView();
 	if (activeView.getRendererName(&status) != M3dView::kViewport2Renderer) {
-		MGlobal::displayError("VoxelDestroyer requires Viewport 2.0 to be the current renderer.");
+		MGlobal::displayError("cubit requires Viewport 2.0 to be the current renderer.");
 		return MStatus::kFailure;
 	}
 
 	if (MRenderer::theRenderer()->drawAPI() != DrawAPI::kDirectX11) {
-		MGlobal::displayError("VoxelDestroyer requires DirectX 11 to be the current Viewport 2.0 rendering engine.");
+		MGlobal::displayError("cubit requires DirectX 11 to be the current Viewport 2.0 rendering engine.");
 		return MStatus::kFailure;
 	}
 
@@ -216,8 +216,8 @@ EXPORT MStatus initializePlugin(MObject obj)
 	plugin::voxelRendererOverride = new VoxelRendererOverride(VoxelRendererOverride::voxelRendererOverrideName);
 
 	// Register all commands, nodes, and custom plug data types
-	MFnPlugin plugin(obj, "VoxelDestroyer", "1.0", "Any");
-	status = plugin.registerCommand("VoxelDestroyer", plugin::creator, plugin::syntax);
+	MFnPlugin plugin(obj, "cubit", "1.0", "Any");
+	status = plugin.registerCommand("cubit", plugin::creator, plugin::syntax);
 	CHECK_MSTATUS(status);
 	status = plugin.registerCommand(CreateColliderCommand::commandName, CreateColliderCommand::creator, CreateColliderCommand::syntax);
 	CHECK_MSTATUS(status);
@@ -308,7 +308,7 @@ EXPORT MStatus uninitializePlugin(MObject obj)
 	// Deregister all commands, nodes, and custom plug data types
     MStatus status;
     MFnPlugin plugin(obj);
-    status = plugin.deregisterCommand("VoxelDestroyer");
+    status = plugin.deregisterCommand("cubit");
 	CHECK_MSTATUS(status);
 	status = plugin.deregisterCommand(CreateColliderCommand::commandName);
 	CHECK_MSTATUS(status);

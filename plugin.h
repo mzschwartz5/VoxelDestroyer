@@ -25,7 +25,7 @@ class plugin : public MPxCommand
 {
 public:
 	plugin() {};
-	// Called when the command ("VoxelDestroyer") is executed in Maya
+	// Called when the command ("cubit") is executed in Maya
 	virtual MStatus doIt(const MArgList& args);
 	PluginArgs parsePluginArgs(const MArgList& args);
 	// Called when the command is registered in Maya

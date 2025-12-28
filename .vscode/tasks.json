@@ -8,7 +8,7 @@
                 "/m",
                 "/p:Configuration=Debug",
                 "/p:Platform=x64",
-                "${workspaceFolder}/VoxelDestroyer.vcxproj"
+                "${workspaceFolder}/cubit.vcxproj"
             ],
             "type": "shell",
             "group": {
@@ -24,7 +24,7 @@
                 "/m",
                 "/p:Configuration=Release",
                 "/p:Platform=x64",
-                "${workspaceFolder}/VoxelDestroyer.vcxproj"
+                "${workspaceFolder}/cubit.vcxproj"
             ],
             "type": "shell",
             "group": {

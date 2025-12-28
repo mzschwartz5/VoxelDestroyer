@@ -134,15 +134,15 @@ global proc VoxelizerMenu_run(
     int $clipTriangles = `checkBox -query -value $clipTrianglesCheckbox`;
     int $type = $surface + ($solid * 2) + ($renderAsVoxels * 4) + ($clipTriangles * 8); // Convert checkboxes to a single integer
 
-    // Construct the VoxelDestroyer command with the passed arguments
-    string $command = "VoxelDestroyer -px " + $posX + " -py " + $posY + " -pz " + $posZ + 
+    // Construct the cubit command with the passed arguments
+    string $command = "cubit -px " + $posX + " -py " + $posY + " -pz " + $posZ + 
                                     " -rx " + $rotX + " -ry " + $rotY + " -rz " + $rotZ + 
                                     " -vx " + $voxelsPerEdgeX + " -vy " + $voxelsPerEdgeY + " -vz " + $voxelsPerEdgeZ + 
                                     " -vsz " + $voxelSize + " -n \"" + $selectedMeshName + "\"" + " -t " + $type + ";";
 
     // Execute the command and handle errors
     if (catch(eval($command))) {
-        warning("VoxelDestroyer failed.");
+        warning("cubit failed.");
     } else {
         VoxelizerMenu_close($cubeName);
     }
@@ -347,41 +347,41 @@ global proc VoxelizerMenu_addToShelf() {
     global string $voxelDragContext;
     $voxelPaintContext = `voxelPaintContextCommand`;
     $voxelDragContext = `voxelDragContextCommand`;
-    // Ensure the "VoxelDestroyer" shelf exists
+    // Ensure the "cubit" shelf exists
     global string $gShelfTopLevel;
-    if (!`shelfLayout -exists "VoxelDestroyer"`) {
-        shelfLayout -p $gShelfTopLevel "VoxelDestroyer";
+    if (!`shelfLayout -exists "cubit"`) {
+        shelfLayout -p $gShelfTopLevel "cubit";
     }
 
-    // Get all buttons in the "VoxelDestroyer" shelf
-    string $buttons[] = `shelfLayout -query -childArray "VoxelDestroyer"`;
+    // Get all buttons in the "cubit" shelf
+    string $buttons[] = `shelfLayout -query -childArray "cubit"`;
 
-    // Check if the "VoxelDestroyer" button already exists
+    // Check if the "cubit" button already exists
     int $exists = 0;
     for ($button in $buttons) {
-        if (`shelfButton -query -label $button` == "VoxelDestroyer") {
+        if (`shelfButton -query -label $button` == "cubit") {
             $exists = 1;
             break;
         }
     }
 
-    // Add the "VoxelDestroyer" button if it doesn't exist
+    // Add the "cubit" button if it doesn't exist
     if (!$exists) {
-        shelfButton -parent "VoxelDestroyer"
-            -label "VoxelDestroyer"
-            -annotation "Run VoxelDestroyer Plugin"
+        shelfButton -parent "cubit"
+            -label "cubit"
+            -annotation "Run cubit Plugin"
             -image1 "Voxelize.png"
             -command "VoxelizerMenu();";
         
         // Also add a button for the live-interaction tool
-        shelfButton -parent "VoxelDestroyer"
+        shelfButton -parent "cubit"
             -label "VoxelDragTool"
             -annotation "Interactively drag voxels in the viewport while previewing an animation"
             -image1 "VoxelDrag.png"
             -command "setToolTo $voxelDragContext;"
             -doubleClickCommand "setToolTo $voxelDragContext; toolPropertyWindow;";
 
-        shelfButton -parent "VoxelDestroyer"
+        shelfButton -parent "cubit"
             -label "VoxelCollider"
             -annotation "Add a collider primitive to the simulation"
             -image1 "VoxelCollider.png"
@@ -392,7 +392,7 @@ global proc VoxelizerMenu_addToShelf() {
             -menuItem "Box Collider" "createCollider -n BoxCollider;"
             -menuItem "Cylinder Collider" "createCollider -n CylinderCollider;";
 
-        shelfButton -parent "VoxelDestroyer"
+        shelfButton -parent "cubit"
             -label "VoxelPaintTool"
             -annotation "Paint simulation weights onto voxels"
             -image1 "VoxelPaint.png"
@@ -400,11 +400,11 @@ global proc VoxelizerMenu_addToShelf() {
             -doubleClickCommand "setToolTo $voxelPaintContext; toolPropertyWindow;";
     }
 
-    shelfTabLayout -edit -selectTab "VoxelDestroyer" $gShelfTopLevel;
+    shelfTabLayout -edit -selectTab "cubit" $gShelfTopLevel;
 }
 
 global proc VoxelizerMenu_removeFromShelf() {
-    if (`shelfLayout -exists "VoxelDestroyer"`) {
-        deleteShelfTabNoPrompt("VoxelDestroyer");
+    if (`shelfLayout -exists "cubit"`) {
+        deleteShelfTabNoPrompt("cubit");
     }
 }

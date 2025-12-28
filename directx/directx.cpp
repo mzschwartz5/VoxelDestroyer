@@ -13,7 +13,7 @@ MStatus DirectX::initialize(HINSTANCE pluginInstance)
     MRenderer* renderer = MRenderer::theRenderer(true);
     void* deviceHandle = renderer->GPUDeviceHandle();
     if (!deviceHandle) {
-        MGlobal::displayError("Failed to get the GPU device handle, VoxelDestroyer cannot finish initialization.");
+        MGlobal::displayError("Failed to get the GPU device handle, cubit cannot finish initialization.");
         return MStatus::kFailure;
     }
 

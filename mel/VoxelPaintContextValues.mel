@@ -106,5 +106,5 @@ global proc VoxelPaintContext_Reset()
 global proc VoxelPaintContext_Help()
 {
     // TODO: better URL?
-    showHelp -a "http://github.com/mzschwartz5/VoxelDestroyer";
+    showHelp -a "http://github.com/mzschwartz5/cubit";
 }

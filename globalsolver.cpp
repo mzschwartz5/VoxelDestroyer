@@ -310,7 +310,7 @@ void GlobalSolver::onColliderDataConnectionChange(MNodeMessage::AttributeMessage
     int plugLogicalIndex = plug.logicalIndex();
 
     if (numColliders > MAX_COLLIDERS) {
-        MGlobal::displayError("Voxel destroyer supports " + MString(std::to_string(MAX_COLLIDERS).c_str()) + " or fewer collider primitives. The added collider will not participate in collisions.");
+        MGlobal::displayError("cubit supports " + MString(std::to_string(MAX_COLLIDERS).c_str()) + " or fewer collider primitives. The added collider will not participate in collisions.");
         return;
     }
 

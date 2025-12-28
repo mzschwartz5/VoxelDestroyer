@@ -1,5 +1,5 @@
-# VoxelDestroyer
-A Maya plugin for simulation of soft-body deformation and fracture, in real-time.* VoxelDestroyer works by creating a voxelized version of an input mesh and using the voxels as deformation lattices for the vertices within. The simulation itself is based on Position Based Dynamics (PBD), using special voxelized gram-schmidt (VGS) constraints both within and between voxels to achieve both deformation and fracture. The technique originates from [this paper](https://web.ics.purdue.edu/~tmcgraw/papers/voxel_2025.pdf) by Tim McGraw and Xinyi Zhou.
+# cubit
+A Maya plugin for simulation of soft-body deformation and fracture, in real-time.* cubit works by creating a voxelized version of an input mesh and using the voxels as deformation lattices for the vertices within. The simulation itself is based on Position Based Dynamics (PBD), using special voxelized gram-schmidt (VGS) constraints both within and between voxels to achieve both deformation and fracture. The technique originates from [this paper](https://web.ics.purdue.edu/~tmcgraw/papers/voxel_2025.pdf) by Tim McGraw and Xinyi Zhou.
 
 The magic of _this_ plugin is that it gives users the ability to customize the simulation weights and constraints via custom painting and selection tools.
 
@@ -43,11 +43,11 @@ In the future, I hope to make this available for download directly through the M
 
 ### <img src="icons/voxelize.png" alt="voxel" width="30" style="vertical-align:middle" /> Voxelize the mesh
 
-After loading the plugin, select your input mesh. Then, from the VoxelDestroyer menu shelf, click the left-most button to open the voxelizer menu. Choose your voxelization options (see details below), the click voxelize to prepare the mesh. That's it! The mesh will now simulate on playback - though you may want to customize its behavior with some of the other tools that ship with this plugin.
+After loading the plugin, select your input mesh. Then, from the cubit menu shelf, click the left-most button to open the voxelizer menu. Choose your voxelization options (see details below), the click voxelize to prepare the mesh. That's it! The mesh will now simulate on playback - though you may want to customize its behavior with some of the other tools that ship with this plugin.
 
 ### Voxelizer Options
 
-![VoxelDestroyer menu for voxelization / mesh preparation](images/VoxelizerMenu.png)
+![cubit menu for voxelization / mesh preparation](images/VoxelizerMenu.png)
 
 #### Voxel Grid
 1. The voxel size changes the edge length of a voxel. Voxels are always cubes.

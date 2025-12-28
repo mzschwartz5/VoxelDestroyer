@@ -405,7 +405,7 @@ void deleteDefaultUVSet(const MString& meshName) {
     MString firstUVSet = allUVSets[0];
 
     if (allUVSets.length() < 2) {
-        MGlobal::displayWarning(MString("VoxelDestroyer cannot delete default UV set ") + firstUVSet + " because it's the only UV set");
+        MGlobal::displayWarning(MString("cubit cannot delete default UV set ") + firstUVSet + " because it's the only UV set");
         return;
     }
 

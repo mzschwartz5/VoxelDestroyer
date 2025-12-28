@@ -42,5 +42,5 @@ global proc VoxelDragContext_Reset()
 global proc VoxelDragContext_Help()
 {
     // TODO: better URL?
-    showHelp -a "http://github.com/mzschwartz5/VoxelDestroyer";
+    showHelp -a "http://github.com/mzschwartz5/cubit";
 }
