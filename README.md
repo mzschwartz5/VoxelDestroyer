@@ -1,11 +1,21 @@
 # VoxelDestroyer
-A Maya plugin for simulation of soft-body deformation and fracture, in real-time.
+A Maya plugin for simulation of soft-body deformation and fracture, in real-time.* VoxelDestroyer works by creating a voxelized version of an input mesh and using the voxels as deformation lattices for the vertices within. The simulation itself is based on Position Based Dynamics (PBD), using special voxelized gram-schmidt (VGS) constraints both within and between voxels to achieve both deformation and fracture. The technique originates from [this paper](https://web.ics.purdue.edu/~tmcgraw/papers/voxel_2025.pdf) by Tim McGraw and Xinyi Zhou.
 
-Real-time in Maya? What's the point? That's a fair question - I see this plugin as a step in a (currently incomplete) pipeline. Prepare the mesh in Maya, using this plugin to paint simulation weights and constraints onto the mesh and quickly visualize the results. Then export the mesh and the weights + constraints to a game engine (where real-time actually matters), and run the simulation in-game with a corresponding engine plugin.
+The magic of _this_ plugin is that it gives users the ability to customize the simulation weights and constraints via custom painting and selection tools.
 
+___
+
+*Real-time in Maya? What's the point? That's a fair question - I see this plugin as a step in a (currently incomplete) pipeline. Prepare the mesh in Maya, using this plugin to paint simulation weights and constraints onto the mesh, and quickly visualize the results. Then export the mesh and the weights + constraints to a game engine (where real-time actually matters), and run the simulation in-game with a corresponding engine plugin. Of course, I think it's totally valid to use this in animation as well, you just may get better mileage out of other non-real-time techniques.
+
+
+# Contents
 - [Installing the plugin](#installing-the-plugin)
   - [Installation requirements](#installation-requirements)
   - [Installation steps](#installation-steps)
+- [Basic usage](#basic-usage)
+  - [Input mesh requirements](#input-mesh-requirements)
+  - [Voxelize the mesh](#voxelize-the-mesh)
+  - [Voxelizer options](#voxelizer-options)
 - [Developing the plug-in](#developing-the-plug-in)
   - [Development requirements](#development-requirements)
 - [License](#license)
@@ -24,6 +34,32 @@ Real-time in Maya? What's the point? That's a fair question - I see this plugin 
 - Enable Viewport 2.0 with DirectX11: `Windows > Settings/Preferences > Preferences > Display > Viewport 2.0 > DirectX 11` (this may require a Maya restart).
 
 In the future, I hope to make this available for download directly through the Maya plugin app store.
+
+# Basic usage
+
+### Input mesh requirements
+- The input mesh must be a single, manifold, non-self-intersecting, water-tight mesh.
+- If voxelization fails on one of these counts, try using Maya's mesh clean up tools, merging vertices, or using boolean operations to join mesh pieces.
+
+### <img src="icons/voxelize.png" alt="voxel" width="30" style="vertical-align:middle" /> Voxelize the mesh
+
+After loading the plugin, select your input mesh. Then, from the VoxelDestroyer menu shelf, click the left-most button to open the voxelizer menu. Choose your voxelization options (see details below), the click voxelize to prepare the mesh. That's it! The mesh will now simulate on playback - though you may want to customize its behavior with some of the other tools that ship with this plugin.
+
+### Voxelizer Options
+
+![VoxelDestroyer menu for voxelization / mesh preparation](images/VoxelizerMenu.png)
+
+#### Voxel Grid
+1. The voxel size changes the edge length of a voxel. Voxels are always cubes.
+1. The sliders can be used to change the subdivision resolution of the voxelization grid.
+1. The checkbox "Lock grid size" will attempt to maintain the world size of the grid. So changing either voxel size or the subdivision sliders while this is checked will force the other to change. Because voxels must be cubes, this is a best-effort process.
+
+#### Advanced Options
+
+1. Surface: check this box to voxelize and simulate a surface shell of the input mesh.
+2. Solid: check this box to voxelize and simulate the interior of the mesh. (Checking both surface and solid yields a full, conservative voxelization. This is the default behavior).
+3. Render as voxels: when unchecked, the original mesh is drawn, but it is simulated according to its voxelization. When checked, the voxels are drawn instead of the original mesh.
+4. Clip triangles: whether or not to clip the mesh's triangles to voxel bounds during voxelization. Unclipped triangles give a nice effect when tearing a mesh. Clipped tend to look better during regular deformation.
 
 # Developing the plug-in
 
