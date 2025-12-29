@@ -135,7 +135,7 @@ For more info about tool settings, see the [paint tool settings section](#paint-
 <a id="face-to-face-strain-limits"></a>
 ## <img src="icons/VoxelPaint.png" alt="voxel" width="30" align="absmiddle" />Face-to-face strain limits
 
-A similar painting tool exists for setting the face-to-face strain limits between voxels. This tool allows you to set how much the voxels can compress or stretch apart before breaking apart from their neighbors.
+A similar painting tool exists for setting the face-to-face strain limits between voxels. This tool allows you to set how much the voxels can compress or stretch apart before breaking apart from their neighbors. The units of these strain limits are in voxel-rest-lengths, i.e. if the upper value is 5 (the default), it means voxel-voxel connections can stretch 5x their rest length before breaking.
 
 Like with particle mass, there's also a special _infinite strain_ value that makes face-to-face connections completely unbreakable.
 
