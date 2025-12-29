@@ -105,6 +105,5 @@ global proc VoxelPaintContext_Reset()
 
 global proc VoxelPaintContext_Help()
 {
-    // TODO: better URL?
-    showHelp -a "http://github.com/mzschwartz5/cubit";
+    showHelp -a "https://github.com/mzschwartz5/cubit?tab=readme-ov-file#paint-tool-settings";
 }
