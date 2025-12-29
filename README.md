@@ -17,6 +17,7 @@ ___
   - [Voxelize the mesh](#voxelize-the-mesh)
   - [Voxelizer options](#voxelizer-options)
   - [Mesh-specific simulation settings](#mesh-specific-simulation-settings)
+  - [Assign a material to the mesh interior](#assign-a-material-to-the-mesh-interior)
 - [Painting simulation weights](#painting-simulation-weights)
   - [Selecting and hiding](#selecting-and-hiding)
   - [Particle mass](#particle-mass)
@@ -26,7 +27,7 @@ ___
   - [Drag tool settings](#drag-tool-settings)
 - [Adding primitive colliders](#adding-primitive-colliders)
 - [Global simulation settings](#global-simulation-settings)
-- [Roadmap](#roadmap)
+- [Roadmap](#issue-roadmap)
 - [Developing the plug-in](#developing-the-plug-in)
   - [Development requirements](#development-requirements)
 - [License](#license)
@@ -40,7 +41,7 @@ ___
 
 ### Installation steps
 
-- Download the `.mll` file and put it in your plugin directory. Then load it up from Maya's plugin manager (Windows > Settings and Preferences > Plug-in Manager). If you don't know your plugin directory path, look at the plug-in manager for examples.
+- Download the `cubit.mll` file (in the root directory) and put it in your plugin directory. Then load it up from Maya's plugin manager (Windows > Settings and Preferences > Plug-in Manager). If you don't know your plugin directory path, look at the plug-in manager for examples.
 - Ensure the `dx11Shader.mll` plugin is loaded in the plugin manager.
 - Enable Viewport 2.0 with DirectX11: `Windows > Settings/Preferences > Preferences > Display > Viewport 2.0 > DirectX 11` (this may require a Maya restart).
 
@@ -75,7 +76,7 @@ After loading the plugin, select your input mesh. Then, from the _cubit_ menu sh
 1. **Render as voxels**: when unchecked, the original mesh is drawn, but it is simulated according to its voxelization. When checked, the voxels are drawn instead of the original mesh.
 1. **Clip triangles**: whether or not to clip the mesh's triangles to voxel bounds during voxelization. Unclipped triangles give a nice effect when tearing a mesh. Clipped tend to look better during regular deformation.
 
-### Mesh-specific Simulation Settings
+### Mesh-specific simulation settings
 
 Open this menu by opening the Attribute Editor (`Windows > General Editor > Attribute Editor`), and finding the mesh's PBD node.
 
@@ -88,6 +89,16 @@ Open this menu by opening the Attribute Editor (`Windows > General Editor > Attr
 1. **Gravity strength**: the gravitational acceleration constant in m/s^2
 
 These settings are all keyable.
+
+### Assign a material to the mesh interior
+
+The input mesh was just a surface, but the voxelized mesh is a volume! The voxelization process transfers attributes (UVs, normals) and shading sets to the interior, extrapolating based on the closest surface point, but it may not look exactly how you want. By right-clicking a voxelized mesh, you can assign an interior shader:
+
+![assign an interior material](images/assigninteriormaterial.png)
+
+Recommendation: use a material that samples 3D textures to take advantage of the volumetric nature of the voxelized mesh!
+
+This feature is still in development and has limitations. In the future, it will support using shaders with custom vertex attributes regarding the voxel grid (grid position, distance transform information, etc.). See the [roadmap](#issue-roadmap) for more information.
 
 # Painting simulation weights
 
@@ -208,13 +219,14 @@ The reason these settings are global is because particle data must be managed in
 
 These settings are all keyable.
 
+<a id="issue-roadmap"></a>
 # 🚧 Roadmap
 
 There are still several features under development (though currently on pause), and many bugs as well. You can view them all in repo's [issues](https://github.com/mzschwartz5/cubit/issues). There are a few high-priority enhancements to call out here, though:
 
-1. #45 - support for saving scenes with the _cubit_ plugin! Pretty important obviously, it just didn't make the beta cut. Similarly, #36 - the ability to reset the simulation to the beginning or cached frames.
-1. #77 - support for recording and playing back interactions with the drag tool. Right now, interaction is just for fun and testing; it cannot be rendered out. With record and replay, it could be included in the render.
-1. #41 - support for using voxelization vertex attributes in custom interior shaders. Basically, right now you can assign a shader to the interior of the voxelized mesh, but your shader does not have access to some key information about the voxelized mesh that could greatly help create interesting volumetric effects. 
+1. [Support for saving scenes with the _cubit_ plugin!](https://github.com/mzschwartz5/cubit/issues/45) Pretty important obviously, it just didn't make the beta cut. Similarly - [the ability to reset the simulation](https://github.com/mzschwartz5/cubit/issues/36) to the beginning or cached frames.
+1. [Support for recording and playing back interactions with the drag tool.](https://github.com/mzschwartz5/cubit/issues/77) Right now, interaction is just for fun and testing; it cannot be rendered out. With record and replay, it could be included in the render.
+1. [Support for using voxelization vertex attributes in custom interior shaders.](https://github.com/mzschwartz5/cubit/issues/41) Basically, right now you can assign a shader to the interior of the voxelized mesh, but your shader does not have access to some key information about the voxelized mesh that could greatly help create interesting volumetric effects. 
 
 # Developing the plug-in
 
