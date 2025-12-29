@@ -52,7 +52,8 @@ In the future, I hope to make this available for download directly through the M
 - The input mesh must be a single, manifold, non-self-intersecting, water-tight mesh.
 - If voxelization fails on one of these counts, try using Maya's mesh clean up tools, merging vertices, or using boolean operations to join mesh pieces.
 
-### <img src="icons/Voxelize.png" alt="voxel" width="30" align="absmiddle" /> Voxelize the mesh
+<a id="voxelize-the-mesh"></a>
+### <img src="icons/Voxelize.png" alt="voxel" width="30" align="absmiddle" />Voxelize the mesh
 
 ![Voxelization setup example](images/VoxelizeExample.png)
 
@@ -86,6 +87,8 @@ Open this menu by opening the Attribute Editor (`Windows > General Editor > Attr
 1. **VGS iterations** the number of substeps run in the VGS algorithm core loop. For high resolution voxelizations, more substeps may be required to get convergence. (Careful! This has a high performance impact).
 1. **Gravity strength**: the gravitational acceleration constant in m/s^2
 
+These settings are all keyable.
+
 # Painting simulation weights
 
 ![moo](images/moo.png)
@@ -94,7 +97,8 @@ Beyond the per-mesh simulation settings mentioned [above](#mesh-specific-simulat
 
 _cubit_ ships with custom tools that allow you to paint on the mass of the mesh and also the strain limits between voxel faces: that is, how much a voxel can stretch or compress before breaking from its neighbors.
 
-## <img src="images/selectandhideicon.png" alt="voxel" width="30" align="absmiddle" /> Selecting and hiding
+<a id="selecting-and-hiding"></a>
+## <img src="images/selectandhideicon.png" alt="voxel" width="30" align="absmiddle" />Selecting and hiding
 
 Much of the time, the pieces of the mesh you want to paint are on the _inside_. After all, these simulated meshes are solid, and meant to be destroyed. To be able to paint weights on the mesh interior, you need to be able to _access_ it. That's where the select tool comes in handy:
 
@@ -102,7 +106,8 @@ Much of the time, the pieces of the mesh you want to paint are on the _inside_. 
 
 With the voxel selection tool, you can use the typical marquee or drag selection workflows (camera-based or not) to highlight and hide individual voxels - and the pieces of the mesh within.
 
-## <img src="icons/VoxelPaint.png" alt="voxel" width="40" align="absmiddle" /> Particle mass
+<a id="particle-mass"></a>
+## <img src="icons/VoxelPaint.png" alt="voxel" width="40" align="absmiddle" />Particle mass
 
 In each voxel, there are 8 particles: these are the simulation primitives in PBD. To set the mass of the mesh, you set the mass of particles. The particle paint tool allows you to do just this. 
 
@@ -116,7 +121,8 @@ The paint tool also exposes a special _infinite mass_ value: particles with infi
 
 For more info about tool settings, see the [paint tool settings section](#paint-tool-settings) below.
 
-## <img src="icons/VoxelPaint.png" alt="voxel" width="30" align="absmiddle" /> Face-to-face strain limits
+<a id="face-to-face-strain-limits"></a>
+## <img src="icons/VoxelPaint.png" alt="voxel" width="30" align="absmiddle" />Face-to-face strain limits
 
 A similar painting tool exists for setting the face-to-face strain limits between voxels. This tool allows you to set how much the voxels can compress or stretch apart before breaking apart from their neighbors.
 
@@ -150,6 +156,7 @@ On each mesh's PBD node, in Maya's Attribute Editor, there are settings that giv
 
 This way, the global paint settings can stay constant while meaning different things for different meshes, and the paint colors stay meaningful.
 
+<a id="real-time-simulation-interaction"></a>
 # <img src="icons/VoxelDrag.png" alt="voxel" width="30" align="absmiddle" /> Real-time simulation interaction
 
 With _cubit_, you can interact with the simulated mesh _in the viewport_, during playback. Click-and-drag the mesh with the voxel drag tool to pull, tear, and launch mesh voxels.
@@ -166,6 +173,49 @@ Open this menu by navigating to `Windows > General Editors > Tool Settings` afte
 1. **Strength**: how far voxels get dragged relative to the mouse's movement. A factor of 1 means voxels get dragged exactly as much as the mouse moves.
 1. **Camera-based**: whether or not the mouse can drag voxels that are not visible.
 
+<a id="adding-primitive-colliders"></a>
+# <img src="icons/VoxelCollider.png" alt="voxel" width="30" align="absmiddle" /> Adding primitive colliders
+
+![Capsule collider](images/capsulecollider.png)
+
+Other objects in the scene can participate in the simulation via primitive colliders. _cubit_ supports five types of primitive collider shapes: plane, sphere, capsule, box, and cylinder. As their name implies, colliders can act as kinematic collision volumes against simulated meshes. You can even animate colliders via keyframes!
+
+Attach a collider to an object by selecting the object in the viewport, then right-clicking the collider icon in the _cubit_ shelf menu and selecting your desired collider shape.
+
+### Collider settings
+
+![collider editor](images/collidereditor.png)
+
+Each collider has slightly different settings depending on its shape - various adjustable geometric properties. The collider settings can be found in its shape node in the Attribute Editor.
+
+In addition to geometric attributes, each collider has a `Friction` attribute that controls how simulated PBD particles interact with the collider surface.
+
+Fun fact - when you voxelize your first mesh, if you don't already have a collider in the scene, a plane collider will be created for you to act as the ground!
+
+These settings are all keyable.
+
+# Global Simulation Settings
+
+In addition to the per-mesh simulation settings [discussed previously](#mesh-specific-simulation-settings), there are some simulation settings that affect all simulated objects.
+
+![global simulation settings](images/globalsimulationsettings.PNG)
+1. **Enable particle collisions**: when enabled, PBD particles can collide with each other. This allows voxels to stack on each other, prevents interpenetration of different parts of a mesh, and allows for multiple meshes to collide with each other.
+1. **Enable primitive collisions**: when enabled, PBD particles will collide with primitive colliders. 
+1. **Substeps per frame**: this setting controls the number of PBD loop iterations performed per frame. Setting this too low can cause under-convergence (often manifests as extra compliance), and setting it too high can have a large impact on performance.
+1. **Particle friction**: this is the friction coefficient for particle-particle collisions.
+
+The reason these settings are global is because particle data must be managed in one place in order to facilitate collisions between particles of different meshes.
+
+These settings are all keyable.
+
+# 🚧 Roadmap
+
+There are still several features under development (though currently on pause), and many bugs as well. You can view them all in repo's [issues](https://github.com/mzschwartz5/cubit/issues). There are a few high-priority enhancements to call out here, though:
+
+1. #45 - support for saving scenes with the _cubit_ plugin! Pretty important obviously, it just didn't make the beta cut. Similarly, #36 - the ability to reset the simulation to the beginning or cached frames.
+1. #77 - support for recording and playing back interactions with the drag tool. Right now, interaction is just for fun and testing; it cannot be rendered out. With record and replay, it could be included in the render.
+1. #41 - support for using voxelization vertex attributes in custom interior shaders. Basically, right now you can assign a shader to the interior of the voxelized mesh, but your shader does not have access to some key information about the voxelized mesh that could greatly help create interesting volumetric effects. 
+
 # Developing the plug-in
 
 ### Development requirements
@@ -178,6 +228,7 @@ Open this menu by navigating to `Windows > General Editors > Tool Settings` afte
 Debug configuration: builds dependencies as DLLs and puts them alongside the plugin `.mll` in the specified maya plugin directory. Building as DLLs reduces the build time.
 
 Release configuration: builds dependencies as static libs. Slower to build, but easier to distribute / consume. Release builds, of course, will run much faster as well.
+
 
 # License
 
