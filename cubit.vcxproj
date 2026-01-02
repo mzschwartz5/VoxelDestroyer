@@ -173,7 +173,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="directx\compute\faceconstraintscompute.h" />
     <ClInclude Include="plugin.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="pbd.h" />
@@ -184,6 +183,7 @@
     <ClInclude Include="shaders\constants.hlsli" />
     <ClInclude Include="cube.h" />
     <ClInclude Include="globalsolver.h" />
+    <ClInclude Include="simulationcache.h" />
     <ClInclude Include="custommayaconstructs\tools\voxelcontextbase.h" />
     <ClInclude Include="custommayaconstructs\tools\voxeldragcontext.h" />
     <ClInclude Include="custommayaconstructs\tools\voxeldragcontextcommand.h" />
@@ -212,6 +212,7 @@
     <ClInclude Include="custommayaconstructs\commands\changevoxeleditmodecommand.h" />
     <ClInclude Include="custommayaconstructs\commands\applyvoxelpaintcommand.h" />
     <ClInclude Include="directx\directx.h" />
+    <ClInclude Include="directx\compute\faceconstraintscompute.h" />
     <ClInclude Include="directx\compute\computeshader.h" />
     <ClInclude Include="directx\compute\vgscompute.h" />
     <ClInclude Include="directx\compute\prevgscompute.h" />
@@ -234,6 +235,7 @@
     <ClCompile Include="voxelizer.cpp" />
     <ClCompile Include="cgalhelper.cpp" />
     <ClCompile Include="globalsolver.cpp" />
+    <ClCompile Include="simulationcache.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="resources.rc" />
