@@ -2,8 +2,10 @@
 
 #include <maya/MPxNode.h>
 #include <unordered_map>
-#include <string>
+#include <maya/MString.h>
 #include "directx/directx.h"
+#include <maya/MTimeSliderCustomDrawManager.h>
+#include "utils.h"
 
 struct CachedBufferData {
     std::vector<uint8_t> data;
@@ -20,15 +22,21 @@ public:
     static MStatus initialize();
     static const MObject& node();
 
-    void addData(std::unordered_map<std::string, ComPtr<ID3D11Buffer>>& buffersToCache);
-    void removeData(double frameKey, std::unordered_map<std::string, ComPtr<ID3D11Buffer>>& buffersToCache);
-    
-    ComPtr<ID3D11Buffer> getData(const std::string& bufferName);
+    void addData(std::unordered_map<MString, ComPtr<ID3D11Buffer>, Utils::MStringHash, Utils::MStringEq>& buffersToCache);
+    void removeData(double frameKey, std::unordered_map<MString, ComPtr<ID3D11Buffer>, Utils::MStringHash, Utils::MStringEq>& buffersToCache);
+    ComPtr<ID3D11Buffer> getData(const MString& bufferName);
 
 private:
-    SimulationCache() = default;
-    ~SimulationCache() = default;
     static MObject simulationCacheObject;
+    static const MString timeSliderDrawContextName;
+    std::unordered_map<double, std::unordered_map<MString, CachedBufferData, Utils::MStringHash, Utils::MStringEq>> cache;
+    MTimeSliderDrawPrimitives drawPrimitives;
+    int customDrawID = -1;
 
-    std::unordered_map<double, std::unordered_map<std::string, CachedBufferData>> cache;
+    SimulationCache() = default;
+    ~SimulationCache();
+    void postConstructor() override;
+    void addMarkerToTimeline(double frameKey);
+    bool hasMarkerAtFrame(double frameKey);
+    void removeMarkerAtFrame(double frameKey);
 };
