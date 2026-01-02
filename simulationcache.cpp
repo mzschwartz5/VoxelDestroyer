@@ -1,18 +1,19 @@
 #include "simulationcache.h"
 #include <maya/MAnimControl.h>
+#include <maya/MFnDependencyNode.h>
 
 const MTypeId SimulationCache::id(0x0013A7C1);
 const MString SimulationCache::simulationCacheNodeName("SimulationCache");
 const MString SimulationCache::timeSliderDrawContextName("SimulationCacheTimeSliderContext");
 MObject SimulationCache::simulationCacheObject = MObject::kNullObj;
 
-void SimulationCache::addData(std::unordered_map<MString, ComPtr<ID3D11Buffer>, Utils::MStringHash, Utils::MStringEq>& buffersToCache) {
+void SimulationCache::addData(const std::unordered_map<MString, ComPtr<ID3D11Buffer>, Utils::MStringHash, Utils::MStringEq>& buffersToCache) {
     double currentFrame = MAnimControl::currentTime().value();
     addMarkerToTimeline(currentFrame);
 
-    for (auto& bufferCachePair : buffersToCache) {
+    for (const auto& bufferCachePair : buffersToCache) {
         const MString& bufferName = bufferCachePair.first;
-        ComPtr<ID3D11Buffer>& buffer = bufferCachePair.second;
+        const ComPtr<ID3D11Buffer>& buffer = bufferCachePair.second;
         D3D11_BUFFER_DESC desc;
         buffer->GetDesc(&desc);
 
@@ -22,13 +23,12 @@ void SimulationCache::addData(std::unordered_map<MString, ComPtr<ID3D11Buffer>, 
     }
 }
 
-void SimulationCache::removeData(double frameKey, std::unordered_map<MString, ComPtr<ID3D11Buffer>, Utils::MStringHash, Utils::MStringEq>& buffersToCache) {
+void SimulationCache::removeData(double frameKey, const std::vector<MString>& bufferNamesToRemove) {
     auto frameIt = cache.find(frameKey);
     if (frameIt == cache.end()) return;
 
-    for (const auto& bufferCachePair : frameIt->second) {
-        const MString& bufferName = bufferCachePair.first;
-        buffersToCache.erase(bufferName);
+    for (const MString& bufferName : bufferNamesToRemove) {
+        frameIt->second.erase(bufferName);
     }
 
     if (frameIt->second.empty()) {
@@ -62,13 +62,13 @@ MStatus SimulationCache::initialize() {
     return MStatus::kSuccess;
 }
 
-const MObject& SimulationCache::node() {
+SimulationCache* const SimulationCache::instance() {
     if (!simulationCacheObject.isNull()) {
-        return simulationCacheObject;
+        return static_cast<SimulationCache*>(MFnDependencyNode(simulationCacheObject).userNode());
     }
 
     simulationCacheObject = Utils::createDGNode(simulationCacheNodeName);
-    return simulationCacheObject;
+    return static_cast<SimulationCache*>(MFnDependencyNode(simulationCacheObject).userNode());
 }
 
 void SimulationCache::postConstructor() {

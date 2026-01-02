@@ -20,10 +20,10 @@ public:
 
     static void* creator() { return new SimulationCache(); }
     static MStatus initialize();
-    static const MObject& node();
+    static SimulationCache* const instance();
 
-    void addData(std::unordered_map<MString, ComPtr<ID3D11Buffer>, Utils::MStringHash, Utils::MStringEq>& buffersToCache);
-    void removeData(double frameKey, std::unordered_map<MString, ComPtr<ID3D11Buffer>, Utils::MStringHash, Utils::MStringEq>& buffersToCache);
+    void addData(const std::unordered_map<MString, ComPtr<ID3D11Buffer>, Utils::MStringHash, Utils::MStringEq>& buffersToCache);
+    void removeData(double frameKey, const std::vector<MString>& bufferNamesToRemove);
     ComPtr<ID3D11Buffer> getData(const MString& bufferName);
 
 private:
