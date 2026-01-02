@@ -25,6 +25,7 @@
 #include <maya/MAnimControl.h>
 #include "directx/compute/computeshader.h"
 #include "globalsolver.h"
+#include "simulationcache.h"
 #include <maya/M3dView.h>
 #include <maya/MFnPlugin.h>
 
@@ -260,6 +261,8 @@ EXPORT MStatus initializePlugin(MObject obj)
 	status = MDrawRegistry::registerDrawOverrideCreator(ColliderDrawOverride::drawDbClassification, ColliderDrawOverride::drawRegistrantId, ColliderDrawOverride::creator);
 	CHECK_MSTATUS(status);
 	status = plugin.registerNode(GlobalSolver::globalSolverNodeName, GlobalSolver::id, GlobalSolver::creator, GlobalSolver::initialize, MPxNode::kDependNode);
+	CHECK_MSTATUS(status);
+	status = plugin.registerNode(SimulationCache::simulationCacheNodeName, SimulationCache::id, SimulationCache::creator, SimulationCache::initialize, MPxNode::kDependNode);
 	CHECK_MSTATUS(status);
 	status = plugin.registerShape(VoxelShape::typeName, VoxelShape::id, VoxelShape::creator, VoxelShape::initialize, &VoxelShape::drawDbClassification);
 	CHECK_MSTATUS(status);
