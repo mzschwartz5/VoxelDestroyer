@@ -1,10 +1,11 @@
 #pragma once
 
 #include <maya/MPxNode.h>
-#include <unordered_map>
 #include <maya/MString.h>
-#include "directx/directx.h"
 #include <maya/MTimeSliderCustomDrawManager.h>
+#include <maya/MCallbackIdArray.h>
+#include <unordered_map>
+#include "directx/directx.h"
 #include "utils.h"
 
 struct CachedBufferData {
@@ -32,9 +33,12 @@ private:
     std::unordered_map<double, std::unordered_map<MString, CachedBufferData, Utils::MStringHash, Utils::MStringEq>> cache;
     MTimeSliderDrawPrimitives drawPrimitives;
     int customDrawID = -1;
+    MCallbackIdArray callbackIds;
+    bool dataAdded = false;
 
     SimulationCache() = default;
     ~SimulationCache();
+    static void onTimeChanged(void* clientData);
     void postConstructor() override;
     void addMarkerToTimeline(double frameKey);
     bool hasMarkerAtFrame(double frameKey);

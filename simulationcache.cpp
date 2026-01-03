@@ -1,6 +1,8 @@
 #include "simulationcache.h"
 #include <maya/MAnimControl.h>
 #include <maya/MFnDependencyNode.h>
+#include <maya/MEventMessage.h>
+#include <maya/MNodeMessage.h>
 
 const MTypeId SimulationCache::id(0x0013A7C1);
 const MString SimulationCache::simulationCacheNodeName("SimulationCache");
@@ -8,8 +10,8 @@ const MString SimulationCache::timeSliderDrawContextName("SimulationCacheTimeSli
 MObject SimulationCache::simulationCacheObject = MObject::kNullObj;
 
 void SimulationCache::addData(const std::unordered_map<MString, ComPtr<ID3D11Buffer>, Utils::MStringHash, Utils::MStringEq>& buffersToCache) {
-    double currentFrame = MAnimControl::currentTime().value();
-    addMarkerToTimeline(currentFrame);
+    double currentFrame = MAnimControl::currentTime().as(MTime::uiUnit());
+    dataAdded = true;
 
     for (const auto& bufferCachePair : buffersToCache) {
         const MString& bufferName = bufferCachePair.first;
@@ -33,12 +35,11 @@ void SimulationCache::removeData(double frameKey, const std::vector<MString>& bu
 
     if (frameIt->second.empty()) {
         cache.erase(frameIt);
-        removeMarkerAtFrame(frameKey);
     }
 }
 
 ComPtr<ID3D11Buffer> SimulationCache::getData(const MString& bufferName) {
-    double currentFrame = MAnimControl::currentTime().value();
+    double currentFrame = MAnimControl::currentTime().as(MTime::uiUnit());
 
     auto frameIt = cache.find(currentFrame);
     if (frameIt == cache.end()) {
@@ -72,33 +73,47 @@ SimulationCache* const SimulationCache::instance() {
 }
 
 void SimulationCache::postConstructor() {
-    customDrawID = MTimeSliderCustomDrawManager::instance().registerCustomDrawOn(timeSliderDrawContextName, 0);
+    MPxNode::postConstructor();
+    customDrawID = MTimeSliderCustomDrawManager::instance().registerCustomDrawOn(timeSliderDrawContextName, 10000);
+
+    MCallbackId callbackId = MEventMessage::addEventCallback("timeChanged", SimulationCache::onTimeChanged, this, nullptr);
+    callbackIds.append(callbackId);
+
+    callbackId = MNodeMessage::addNodePreRemovalCallback(thisMObject(), [](MObject& node, void* clientData) {
+        SimulationCache* simCache = static_cast<SimulationCache*>(clientData);
+        MMessage::removeCallbacks(simCache->callbackIds);
+    }, this);
+    callbackIds.append(callbackId);
+
     setExistWithoutOutConnections(true);
 }
 
 SimulationCache::~SimulationCache() {
     MTimeSliderCustomDrawManager::instance().deregisterCustomDraw(customDrawID); 
     simulationCacheObject = MObject::kNullObj;
+    MMessage::removeCallbacks(callbackIds);
 }
 
 void SimulationCache::addMarkerToTimeline(double frameKey) {
     if (hasMarkerAtFrame(frameKey)) return;
+    MTime time(frameKey, MTime::uiUnit());
 
     MTimeSliderDrawPrimitive marker(
-        MTimeSliderDrawPrimitive::kVerticalLine,
-        MTime(frameKey),
-        MTime(frameKey),
-        MColor(1.0f, 0.0f, 0.0f)
+        MTimeSliderDrawPrimitive::kFilledRect,
+        time,
+        time + MTime(1.0, MTime::uiUnit()),
+        MColor(1.0f, 0.0f, 0.0f, 0.5f),
+        100,
+        0
     );
 
     drawPrimitives.append(marker);
-    MTimeSliderCustomDrawManager::instance().setDrawPrimitives(customDrawID, drawPrimitives);
 }
 
 bool SimulationCache::hasMarkerAtFrame(double frameKey) {
     for (size_t i = 0; i < drawPrimitives.length(); ++i) {
         MTimeSliderDrawPrimitive prim = drawPrimitives[i];
-        if (prim.startTime().value() == frameKey) {
+        if (prim.startTime().as(MTime::uiUnit()) == frameKey) {
             return true;
         }
     }
@@ -109,10 +124,26 @@ void SimulationCache::removeMarkerAtFrame(double frameKey) {
     MTimeSliderDrawPrimitives newPrims;
     for (size_t i = 0; i < drawPrimitives.length(); ++i) {
         MTimeSliderDrawPrimitive prim = drawPrimitives[i];
-        if (prim.startTime().value() != frameKey) {
+        if (prim.startTime().as(MTime::uiUnit()) != frameKey) {
             newPrims.append(prim);
         }
     }
     drawPrimitives = std::move(newPrims);
-    MTimeSliderCustomDrawManager::instance().setDrawPrimitives(customDrawID, drawPrimitives);
+}
+
+void SimulationCache::onTimeChanged(void* clientData) {
+    SimulationCache* simCache = static_cast<SimulationCache*>(clientData);
+    
+    double currentFrame = MAnimControl::currentTime().as(MTime::uiUnit());
+    if (simCache->dataAdded) {
+        simCache->addMarkerToTimeline(currentFrame);
+    }
+    // if (simCache->cache.find(currentFrame) == simCache->cache.end()) {
+    //     simCache->removeMarkerAtFrame(currentFrame);
+    // }
+    
+    MTimeSliderCustomDrawManager::instance().setDrawPrimitives(simCache->customDrawID, simCache->drawPrimitives);
+    MTimeSliderCustomDrawManager::instance().requestTimeSliderRedraw();
+    
+    simCache->dataAdded = false;
 }
