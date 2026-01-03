@@ -13,6 +13,13 @@ struct CachedBufferData {
     D3D11_BUFFER_DESC desc;
 };
 
+class StopPrimitiveEditCallback : public MStopPrimitiveEditingFct {
+public:
+    void operator()() override {
+        MGlobal::displayInfo("Stopped editing primitive.");
+    }
+};
+
 class SimulationCache : public MPxNode {
 
 public:
