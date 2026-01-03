@@ -31,7 +31,7 @@ global proc VoxelizerMenu() {
     float $voxelMinSizeHard = max($gridDisplayExtents[0], max($gridDisplayExtents[1], $gridDisplayExtents[2])) / $VOXEL_SUBDIV_HARDMAX;
     float $voxelMaxSizeSoft = min($gridDisplayExtents[0], min($gridDisplayExtents[1], $gridDisplayExtents[2])) / $VOXEL_SUBDIV_MIN;
 
-    window -title "Voxelizer Menu" -widthHeight 700 344 -sizeable false VoxelizerMenuWindow;
+    window -title "Voxelizer Menu" VoxelizerMenuWindow;
     formLayout VoxelizerMenuForm;
 
     // Instruction text
@@ -76,8 +76,8 @@ global proc VoxelizerMenu() {
     string $clipTrianglesCheckbox = `checkBox -label "Clip Triangles" -value false`;
 
     // Buttons
-    string $cancelButton = `button -label "Cancel" -height 26 -command ("VoxelizerMenu_close(\"" + $voxelGridDisplayName + "\")")`;
-    string $runButton = `button -label "Voxelize" -height 26
+    string $cancelButton = `button -label "Cancel" -command ("VoxelizerMenu_close(\"" + $voxelGridDisplayName + "\")")`;
+    string $runButton = `button -label "Voxelize"
         -annotation "Voxelizes a mesh in preparation for VGS simulation. Uses selected mesh or, if none selected, the closest mesh to the center of the grid bounds."
         -command ("VoxelizerMenu_run(\"" + $voxelGridDisplayName + "\", \"" + $selectedMeshName + "\", \"" + $surfaceCheckbox + "\", \"" + $solidCheckbox + "\", \"" + $renderAsVoxelsCheckbox + "\", \"" + $clipTrianglesCheckbox + "\")")`;
 
@@ -97,8 +97,8 @@ global proc VoxelizerMenu() {
     formLayout -edit -attachControl $solidCheckbox "left" 10 $surfaceCheckbox -attachControl $solidCheckbox "top" 10 $advancedOptionsTitle VoxelizerMenuForm;
     formLayout -edit -attachControl $renderAsVoxelsCheckbox "left" 10 $solidCheckbox -attachControl $renderAsVoxelsCheckbox "top" 10 $advancedOptionsTitle VoxelizerMenuForm;
     formLayout -edit -attachControl $clipTrianglesCheckbox "left" 10 $renderAsVoxelsCheckbox -attachControl $clipTrianglesCheckbox "top" 10 $advancedOptionsTitle VoxelizerMenuForm;
-    formLayout -edit -attachForm $runButton "left" 20 -attachControl $runButton "top" 15 $clipTrianglesCheckbox VoxelizerMenuForm;
-    formLayout -edit -attachForm $cancelButton "left" 80 -attachControl $cancelButton "top" 15 $clipTrianglesCheckbox VoxelizerMenuForm;
+    formLayout -edit -attachForm $runButton "left" 20 -attachForm $runButton "bottom" 10 -attachControl $runButton "top" 15 $clipTrianglesCheckbox VoxelizerMenuForm;
+    formLayout -edit -attachForm $cancelButton "left" 80 -attachForm $cancelButton "bottom" 10 -attachControl $cancelButton "top" 15 $clipTrianglesCheckbox VoxelizerMenuForm;
     
     showWindow VoxelizerMenuWindow;
 

@@ -196,8 +196,6 @@ void GlobalSolver::calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNode
 
 // Prepends new particle data (corresponding to a new model) to the particle (and related) buffer(s)
 void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
-    MFnDependencyNode globalSolverNode(getOrCreateGlobalSolver());
-    
     Utils::PluginData<ParticleData> particleData(particleDataToAddPlug);
     uint totalParticles = getTotalParticles();
     

@@ -22,6 +22,7 @@
 #include "custommayaconstructs/commands/applyvoxelpaintcommand.h"
 #include <maya/MDrawRegistry.h>
 #include <maya/MTransformationMatrix.h>
+#include <maya/MAnimControl.h>
 #include "directx/compute/computeshader.h"
 #include "globalsolver.h"
 #include <maya/M3dView.h>
@@ -116,6 +117,7 @@ MStatus plugin::doIt(const MArgList& argList)
 
 	PlaneCollider::createGroundColliderIfNoneExists();
 	MTime::setUIUnit(MTime::k60FPS);
+	MAnimControl::setPlaybackSpeed(0); // Force Play Every Frame mode
 
 	MProgressWindow::endProgress();
 
