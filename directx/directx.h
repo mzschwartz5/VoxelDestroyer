@@ -18,6 +18,13 @@ public:
     static ID3D11DeviceContext* getContext();
     static HINSTANCE getPluginInstance();
 
+    struct ComPtrHash {
+        template <typename T>
+        std::size_t operator()(const ComPtr<T>& ptr) const noexcept {
+            return std::hash<T*>()(ptr.Get());
+        }
+    };
+
     template<typename T>
     static ComPtr<ID3D11Buffer> createReadOnlyBuffer(
         const std::vector<T>& data,

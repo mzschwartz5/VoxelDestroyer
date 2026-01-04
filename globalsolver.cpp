@@ -10,6 +10,7 @@
 #include "custommayaconstructs/data/particledata.h"
 #include "custommayaconstructs/data/functionaldata.h"
 #include "custommayaconstructs/data/colliderdata.h"
+#include "simulationcache.h"
 
 const MTypeId GlobalSolver::id(0x0013A7B1);
 const MString GlobalSolver::globalSolverNodeName("GlobalSolver");
@@ -99,6 +100,7 @@ void GlobalSolver::tearDown() {
     globalSolverNodeObject = MObject::kNullObj;
     colliderBuffer = ColliderBuffer();
     dirtyColliderIndices.clear();
+    SimulationCache::instance()->tearDown();
 }
 
 // TODO: on file load, we don't want to recreate the buffer for each connection, just once. Is total numConnections known at load?
@@ -537,5 +539,6 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
         }
     }
 
+    SimulationCache::instance()->cacheData(time);
     return MS::kSuccess;
 }

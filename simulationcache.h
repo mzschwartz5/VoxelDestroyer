@@ -1,13 +1,13 @@
 #pragma once
 
-#include <maya/MPxNode.h>
 #include <maya/MString.h>
 #include <maya/MTimeSliderCustomDrawManager.h>
-#include <maya/MCallbackIdArray.h>
 #include <unordered_set>
 #include <unordered_map>
 #include "directx/directx.h"
 #include <cstdint>
+
+class GlobalSolver; // forward declaration to make friend
 
 class StopPrimitiveEditCallback : public MStopPrimitiveEditingFct {
 public:
@@ -16,33 +16,32 @@ public:
     }
 };
 
-class SimulationCache : public MPxNode {
+class SimulationCache {
 
 public:
-    static const MTypeId id;
-    static const MString simulationCacheNodeName;
-
-    static void* creator() { return new SimulationCache(); }
-    static MStatus initialize();
     static SimulationCache* const instance();
 
-    void unregisterBuffer(ComPtr<ID3D11Buffer>* id);
+    void unregisterBuffer(ComPtr<ID3D11Buffer> buffer);
 
     // Small object for managing registration lifetime (automatically unregisters on destruction)
     class Registration {
     public:
         Registration() = default;
-        Registration(ComPtr<ID3D11Buffer>* id) : id_(id) {}
-        // move-only (so two handles don't try to unregister the same id)
+        Registration(ComPtr<ID3D11Buffer> buffer) : buffer_(buffer) {}
+        // move-only (so two handles don't try to unregister the same buffer)
         Registration(const Registration&) = delete;
         Registration& operator=(const Registration&) = delete;
-        Registration(Registration&& other) noexcept { *this = std::move(other); }
+        Registration(Registration&& other) noexcept { 
+            buffer_ = other.buffer_;
+            other.buffer_.Reset();
+        }
 
         Registration& operator=(Registration&& other) noexcept {
             if (this != &other) {
                 reset();
-                id_ = other.id_;
-                other.id_ = 0;
+                buffer_ = other.buffer_;
+                other.buffer_.Reset();
+
             }
             return *this;
         }
@@ -50,33 +49,32 @@ public:
         ~Registration() { reset(); }
 
         void reset() {
-            SimulationCache::instance()->unregisterBuffer(id_);
-            id_ = 0;
+            SimulationCache::instance()->unregisterBuffer(buffer_);
+            buffer_.Reset();
         }
 
     private:
-        ComPtr<ID3D11Buffer>* id_ = 0;
+        ComPtr<ID3D11Buffer> buffer_;
     };
 
-    Registration registerBuffer(ComPtr<ID3D11Buffer>* buffer);
+    Registration registerBuffer(ComPtr<ID3D11Buffer> buffer);
 
 private:
-    static MObject simulationCacheObject;
+    friend class GlobalSolver;
+    static SimulationCache* simulationCacheInstance;
     static const MString timeSliderDrawContextName;
     // Each pointer points to where a ComPtr<ID3D11Buffer> is stored (typically as a member of another object)
-    std::unordered_set<ComPtr<ID3D11Buffer>*> registry;
+    std::unordered_set<ComPtr<ID3D11Buffer>, DirectX::ComPtrHash> registry;
     // Frame number to map of buffer pointer to cached data (as vector of bytes)
-    std::unordered_map<double, std::unordered_map<ComPtr<ID3D11Buffer>*, std::vector<uint8_t>>> cache;
+    std::unordered_map<double, std::unordered_map<ComPtr<ID3D11Buffer>, std::vector<uint8_t>, DirectX::ComPtrHash>> cache;
     MTimeSliderDrawPrimitives drawPrimitives;
     int customDrawID = -1;
-    MCallbackIdArray callbackIds;
 
-    SimulationCache() = default;
+    SimulationCache();
     ~SimulationCache();
-    static void onTimeChanged(void* clientData);
-    void postConstructor() override;
+    void tearDown();
     void addMarkerToTimeline(double frameKey);
     bool hasMarkerAtFrame(double frameKey);
     void removeMarkerAtFrame(double frameKey);
-    void cacheData();
+    void cacheData(const MTime& time);
 };

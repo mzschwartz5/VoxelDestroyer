@@ -3,71 +3,61 @@
 #include <maya/MFnDependencyNode.h>
 #include <maya/MEventMessage.h>
 #include <maya/MNodeMessage.h>
-#include "utils.h"
 
-const MTypeId SimulationCache::id(0x0013A7C1);
-const MString SimulationCache::simulationCacheNodeName("SimulationCache");
 const MString SimulationCache::timeSliderDrawContextName("SimulationCacheTimeSliderContext");
-MObject SimulationCache::simulationCacheObject = MObject::kNullObj;
+SimulationCache* SimulationCache::simulationCacheInstance = nullptr;
 
-SimulationCache::Registration SimulationCache::registerBuffer(ComPtr<ID3D11Buffer>* pBuffer) {
-    registry.insert(pBuffer);
-    return Registration(pBuffer);
-}
-
-void SimulationCache::unregisterBuffer(ComPtr<ID3D11Buffer>* pBuffer) {
-    registry.erase(pBuffer);
-    for (auto& frameCachePair : cache) {
-        frameCachePair.second.erase(pBuffer);
-    }
-}
-
-void SimulationCache::cacheData() {
-    double currentFrame = MAnimControl::currentTime().as(MTime::uiUnit());
-    for (const auto& bufferPtr : registry) {
-        const ComPtr<ID3D11Buffer>& buffer = *bufferPtr;
-        std::vector<uint8_t>& bufferData = cache[currentFrame][bufferPtr];
-        DirectX::copyBufferToVector(buffer, bufferData);
-    }
-}
-
-MStatus SimulationCache::initialize() {
-    return MStatus::kSuccess;
-}
-
-SimulationCache* const SimulationCache::instance() {
-    if (!simulationCacheObject.isNull()) {
-        return static_cast<SimulationCache*>(MFnDependencyNode(simulationCacheObject).userNode());
-    }
-
-    simulationCacheObject = Utils::createDGNode(simulationCacheNodeName);
-    return static_cast<SimulationCache*>(MFnDependencyNode(simulationCacheObject).userNode());
-}
-
-void SimulationCache::postConstructor() {
-    MPxNode::postConstructor();
+SimulationCache::SimulationCache() {
     MTimeSliderCustomDrawManager& drawManager = MTimeSliderCustomDrawManager::instance();
     customDrawID = drawManager.registerCustomDrawOutside(MTimeSliderCustomDrawManager::kAbove, timeSliderDrawContextName, MString("Cubit Simulation Cache"), 0);
 
     MSharedPtr<MStopPrimitiveEditingFct> stopEditCallback = MSharedPtr<MStopPrimitiveEditingFct>(new StopPrimitiveEditCallback());
     drawManager.setStopPrimitiveEditFunction(customDrawID, stopEditCallback);
-
-    MCallbackId callbackId = MEventMessage::addEventCallback("timeChanged", SimulationCache::onTimeChanged, this, nullptr);
-    callbackIds.append(callbackId);
-
-    callbackId = MNodeMessage::addNodePreRemovalCallback(thisMObject(), [](MObject& node, void* clientData) {
-        SimulationCache* simCache = static_cast<SimulationCache*>(clientData);
-        MMessage::removeCallbacks(simCache->callbackIds);
-    }, this);
-    callbackIds.append(callbackId);
-
-    setExistWithoutOutConnections(true);
 }
 
 SimulationCache::~SimulationCache() {
+    drawPrimitives.clear();
     MTimeSliderCustomDrawManager::instance().deregisterCustomDraw(customDrawID); 
-    simulationCacheObject = MObject::kNullObj;
-    MMessage::removeCallbacks(callbackIds);
+}
+
+void SimulationCache::tearDown() {
+    if (simulationCacheInstance) {
+        delete simulationCacheInstance;
+        simulationCacheInstance = nullptr;
+    }
+}
+
+SimulationCache* const SimulationCache::instance() {
+    if (simulationCacheInstance) {
+        return simulationCacheInstance;
+    }
+
+    simulationCacheInstance = new SimulationCache();
+    return simulationCacheInstance;
+}
+
+SimulationCache::Registration SimulationCache::registerBuffer(ComPtr<ID3D11Buffer> buffer) {
+    registry.insert(buffer);
+    return Registration(buffer);
+}
+
+void SimulationCache::unregisterBuffer(ComPtr<ID3D11Buffer> buffer) {
+    registry.erase(buffer);
+    for (auto& frameCachePair : cache) {
+        frameCachePair.second.erase(buffer);
+    }
+}
+
+void SimulationCache::cacheData(const MTime& time) {
+    double currentFrame = time.as(MTime::uiUnit());
+    for (const auto& buffer : registry) {
+        std::vector<uint8_t>& bufferData = cache[currentFrame][buffer];
+        DirectX::copyBufferToVector(buffer, bufferData);
+    }
+
+    addMarkerToTimeline(currentFrame);
+    MTimeSliderCustomDrawManager::instance().setDrawPrimitives(customDrawID, drawPrimitives);
+    MTimeSliderCustomDrawManager::instance().requestTimeSliderRedraw();
 }
 
 void SimulationCache::addMarkerToTimeline(double frameKey) {
@@ -105,17 +95,4 @@ void SimulationCache::removeMarkerAtFrame(double frameKey) {
         }
     }
     drawPrimitives = std::move(newPrims);
-}
-
-void SimulationCache::onTimeChanged(void* clientData) {
-    SimulationCache* simCache = static_cast<SimulationCache*>(clientData);
-    if (!simCache) return;
-    
-    double currentFrame = MAnimControl::currentTime().as(MTime::uiUnit());
-
-    // simCache->cacheData(); // TODO: this can't be called from non-main thread. Will change when SimCache is moved to be called from GlobalSolver in compute.
-    simCache->addMarkerToTimeline(currentFrame);
-    
-    MTimeSliderCustomDrawManager::instance().setDrawPrimitives(simCache->customDrawID, simCache->drawPrimitives);
-    MTimeSliderCustomDrawManager::instance().requestTimeSliderRedraw();
 }
