@@ -30,6 +30,11 @@ public:
         initializeBuffers(numParticles, particleRadius, voxelRestVolume, constraints);
     }
 
+    LongRangeConstraintsCompute(const LongRangeConstraintsCompute&) = delete;
+    LongRangeConstraintsCompute& operator=(const LongRangeConstraintsCompute&) = delete;
+    LongRangeConstraintsCompute(LongRangeConstraintsCompute&&) noexcept = default;
+    LongRangeConstraintsCompute& operator=(LongRangeConstraintsCompute&&) noexcept = default;
+
     ~LongRangeConstraintsCompute() {
         DirectX::notifyMayaOfMemoryUsage(longRangeParticleIndicesBuffer, false);
         DirectX::notifyMayaOfMemoryUsage(longRangeConstraintsCB, false);

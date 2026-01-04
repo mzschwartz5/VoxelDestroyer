@@ -27,6 +27,11 @@ public:
         }
     }
 
+    PrefixScanCompute(const PrefixScanCompute&) = delete;
+    PrefixScanCompute& operator=(const PrefixScanCompute&) = delete;
+    PrefixScanCompute(PrefixScanCompute&&) noexcept = default;
+    PrefixScanCompute& operator=(PrefixScanCompute&&) noexcept = default;
+
     void dispatch() override {
         activeUAVForScan = collisionCellParticleCountsUAV;
         ComputeShader::dispatch(numWorkgroupsForScan[0]);

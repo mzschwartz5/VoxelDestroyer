@@ -33,6 +33,11 @@ public:
         DirectX::notifyMayaOfMemoryUsage(vertexVoxelIdsBuffer);
     }
 
+    DeformVerticesCompute(const DeformVerticesCompute&) = delete;
+    DeformVerticesCompute& operator=(const DeformVerticesCompute&) = delete;
+    DeformVerticesCompute(DeformVerticesCompute&&) noexcept = default;
+    DeformVerticesCompute& operator=(DeformVerticesCompute&&) noexcept = default;
+
     void dispatch() override
     {
         ComputeShader::dispatch(numWorkgroups);

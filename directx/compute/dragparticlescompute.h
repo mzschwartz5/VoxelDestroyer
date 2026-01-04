@@ -76,6 +76,10 @@ public:
         });
     }
 
+    DragParticlesCompute(const DragParticlesCompute&) = delete;
+    DragParticlesCompute& operator=(const DragParticlesCompute&) = delete;
+    DragParticlesCompute(DragParticlesCompute&&) noexcept = default;
+
     // This class needs a move assignment operator override because the subscriptions it creates capture the `this` pointer.
     // We need to unsubscribe on move and re-subscribe in the moved-to object to avoid dangling pointers.
     // This is used implicitly (via RVO) in global-solver compute initialization.
