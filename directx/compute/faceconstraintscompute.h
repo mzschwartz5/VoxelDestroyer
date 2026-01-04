@@ -50,6 +50,11 @@ public:
         }
     }
 
+    FaceConstraintsCompute(const FaceConstraintsCompute&) = delete;
+    FaceConstraintsCompute& operator=(const FaceConstraintsCompute&) = delete;
+    FaceConstraintsCompute(FaceConstraintsCompute&&) noexcept = default;
+    FaceConstraintsCompute& operator=(FaceConstraintsCompute&&) noexcept = default;
+
     void dispatch() override
     {
         for (activeConstraintAxis = 0; activeConstraintAxis < 3; activeConstraintAxis++) {

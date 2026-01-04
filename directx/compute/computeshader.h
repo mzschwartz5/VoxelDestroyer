@@ -36,6 +36,12 @@ public:
     static void clearShaderCache() {
         shaderCache.clear();
     }
+
+    // Move only
+    ComputeShader(const ComputeShader&) = delete;
+    ComputeShader& operator=(const ComputeShader&) = delete;
+    ComputeShader(ComputeShader&&) noexcept = default;
+    ComputeShader& operator=(ComputeShader&&) noexcept = default;
     
 protected:    
     virtual void bind() = 0;

@@ -28,6 +28,11 @@ public:
         DirectX::notifyMayaOfMemoryUsage(collisionCellParticleCountsBuffer);
     }
 
+    BuildCollisionGridCompute(const BuildCollisionGridCompute&) = delete;
+    BuildCollisionGridCompute& operator=(const BuildCollisionGridCompute&) = delete;
+    BuildCollisionGridCompute(BuildCollisionGridCompute&&) noexcept = default;
+    BuildCollisionGridCompute& operator=(BuildCollisionGridCompute&&) noexcept = default;
+
     void dispatch() override {
         DirectX::clearUintBuffer(collisionCellParticleCountsUAV);
         ComputeShader::dispatch(numWorkgroups);
