@@ -31,7 +31,8 @@ public:
     static SimulationCache* const instance();
 
     void addData(const std::unordered_map<MString, ComPtr<ID3D11Buffer>, Utils::MStringHash, Utils::MStringEq>& buffersToCache);
-    void removeData(double frameKey, const std::vector<MString>& bufferNamesToRemove);
+    void removeData(const std::vector<MString>& bufferNamesToRemove);
+
     ComPtr<ID3D11Buffer> getData(const MString& bufferName);
 
 private:
@@ -41,7 +42,8 @@ private:
     MTimeSliderDrawPrimitives drawPrimitives;
     int customDrawID = -1;
     MCallbackIdArray callbackIds;
-    bool dataAdded = false;
+    double frameToMark = -1;
+    double frameToUnmark = -1;
 
     SimulationCache() = default;
     ~SimulationCache();
