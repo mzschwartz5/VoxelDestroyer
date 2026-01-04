@@ -110,6 +110,9 @@ private:
         longRangeParticleIndicesBuffer = DirectX::createReadWriteBuffer(constraints.particleIndices);
         longRangeParticleIndicesSRV = DirectX::createSRV(longRangeParticleIndicesBuffer);
         longRangeParticleIndicesUAV = DirectX::createUAV(longRangeParticleIndicesBuffer);
+        // Must be considered for caching because the lower bits store the broken face constraint counts, which change (unlike the constraint indices themselves).
+        // (TODO: consider the tradeoff here: smaller simulation state storage but means more data gets to be cached, when caching is enabled. Basically GPU memory vs CPU memory tradeoff.)
+        registerBufferForCaching(longRangeParticleIndicesBuffer);
         
         longRangeConstraintsCB = DirectX::createConstantBuffer<LongRangeConstraintsCB>({ numConstraints, 0, 0, 0 });
 

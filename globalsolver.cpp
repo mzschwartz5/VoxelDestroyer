@@ -26,6 +26,7 @@ MObject GlobalSolver::aTime = MObject::kNullObj;
 MObject GlobalSolver::aTrigger = MObject::kNullObj;
 MObject GlobalSolver::aSimulateFunction = MObject::kNullObj;
 std::unordered_map<GlobalSolver::BufferType, ComPtr<ID3D11Buffer>> GlobalSolver::buffers;
+std::unordered_map<GlobalSolver::BufferType, SimulationCache::Registration> GlobalSolver::bufferCacheRegistrations;
 std::unordered_map<uint, std::function<void()>> GlobalSolver::pbdSimulateFuncs;
 ColliderBuffer GlobalSolver::colliderBuffer;
 std::unordered_set<int> GlobalSolver::dirtyColliderIndices;
@@ -100,6 +101,7 @@ void GlobalSolver::tearDown() {
     globalSolverNodeObject = MObject::kNullObj;
     colliderBuffer = ColliderBuffer();
     dirtyColliderIndices.clear();
+    bufferCacheRegistrations.clear();
     SimulationCache::instance()->tearDown();
 }
 
@@ -200,13 +202,18 @@ void GlobalSolver::calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNode
 void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
     Utils::PluginData<ParticleData> particleData(particleDataToAddPlug);
     uint totalParticles = getTotalParticles();
+    SimulationCache* const simulationCache = SimulationCache::instance();
     
     std::vector<Particle>* const particles = particleData.get()->getData().particles;
     DirectX::addToBuffer<Particle>(buffers[BufferType::PARTICLE], *particles);
     DirectX::addToBuffer<Particle>(buffers[BufferType::OLDPARTICLE], *particles);
+    // Re-registering releases the old registration, which deletes the old buffer from the cache
+    bufferCacheRegistrations[BufferType::PARTICLE] = simulationCache->registerBuffer(buffers[BufferType::PARTICLE]);
+    bufferCacheRegistrations[BufferType::OLDPARTICLE] = simulationCache->registerBuffer(buffers[BufferType::OLDPARTICLE]);
 
     std::vector<uint>* const surfaceVal = particleData.get()->getData().isSurface;
     DirectX::addToBuffer<uint>(buffers[BufferType::SURFACE], *surfaceVal);
+    bufferCacheRegistrations[BufferType::SURFACE] = simulationCache->registerBuffer(buffers[BufferType::SURFACE]);
 
     return;
 }
@@ -277,7 +284,6 @@ void GlobalSolver::createGlobalComputeShaders(float maximumParticleRadius) {
     solvePrimitiveCollisionsCompute = SolvePrimitiveCollisionsCompute(colliderBuffer);
     solvePrimitiveCollisionsCompute.setParticlesUAV(particleUAV);
     solvePrimitiveCollisionsCompute.setOldParticlesSRV(oldParticlesSRV);
-    buffers[BufferType::COLLIDER] = solvePrimitiveCollisionsCompute.getColliderBuffer();
 }
 
 void GlobalSolver::onSimulateFunctionConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {

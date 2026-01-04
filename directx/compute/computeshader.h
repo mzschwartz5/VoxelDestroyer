@@ -6,6 +6,7 @@
 #include "../directx.h"
 #include <unordered_map>
 #include "../../utils.h"
+#include "simulationcache.h"
 using Microsoft::WRL::ComPtr;
 
 class ComputeShader
@@ -47,6 +48,10 @@ protected:
     virtual void bind() = 0;
     virtual void unbind() = 0;
 
+    void registerBufferForCaching(const ComPtr<ID3D11Buffer>& buffer) {
+        simCacheRegistrations.push_back(SimulationCache::instance()->registerBuffer(buffer));
+    }
+
     void loadShaderObject(int id) {
         if (shaderCache.find(id) != shaderCache.end()) {
             return;
@@ -74,5 +79,9 @@ private:
     // Cache of created shaders to avoid loading the same shader multiple times,
     // as multiple instances of the same shader may be used across different nodes.
     inline static std::unordered_map<int, ComPtr<ID3D11ComputeShader>> shaderCache;
+    // The registrations are tied to the lifetime of this compute shader instance.
+    // When the compute shader is destroyed, these registrations are destroyed,
+    // and the buffers are automatically unregistered from the simulation cache.
+    std::vector<SimulationCache::Registration> simCacheRegistrations;
     int mainId;
 };
