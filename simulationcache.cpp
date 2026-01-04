@@ -60,6 +60,23 @@ void SimulationCache::cacheData(const MTime& time) {
     MTimeSliderCustomDrawManager::instance().requestTimeSliderRedraw();
 }
 
+bool SimulationCache::tryUseCache(const MTime& time) {
+    double currentFrame = time.as(MTime::uiUnit());
+    auto frameIt = cache.find(currentFrame);
+    if (frameIt == cache.end()) {
+        return false;
+    }
+
+    ID3D11DeviceContext* dxContext = DirectX::getContext();
+    for (const auto& bufferDataPair : frameIt->second) {
+        const ComPtr<ID3D11Buffer>& buffer = bufferDataPair.first;
+        const std::vector<uint8_t>& bufferData = bufferDataPair.second;
+        dxContext->UpdateSubresource(buffer.Get(), 0, nullptr, bufferData.data(), 0, 0);
+    }
+
+    return true;
+}
+
 void SimulationCache::addMarkerToTimeline(double frameKey) {
     if (hasMarkerAtFrame(frameKey)) return;
     MTime time(frameKey, MTime::uiUnit());
@@ -68,7 +85,7 @@ void SimulationCache::addMarkerToTimeline(double frameKey) {
         MTimeSliderDrawPrimitive::kFilledRect,
         time,
         time + MTime(1.0, MTime::uiUnit()),
-        MColor(1.0f, 0.0f, 0.0f),
+        MColor(0.0f, 1.0f, 0.0f),
         -1,
         0
     );
