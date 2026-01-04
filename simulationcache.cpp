@@ -3,63 +3,32 @@
 #include <maya/MFnDependencyNode.h>
 #include <maya/MEventMessage.h>
 #include <maya/MNodeMessage.h>
+#include "utils.h"
 
 const MTypeId SimulationCache::id(0x0013A7C1);
 const MString SimulationCache::simulationCacheNodeName("SimulationCache");
 const MString SimulationCache::timeSliderDrawContextName("SimulationCacheTimeSliderContext");
 MObject SimulationCache::simulationCacheObject = MObject::kNullObj;
 
-void SimulationCache::addData(const std::unordered_map<MString, ComPtr<ID3D11Buffer>, Utils::MStringHash, Utils::MStringEq>& buffersToCache) {
-    double currentFrame = MAnimControl::currentTime().as(MTime::uiUnit());
-    for (const auto& bufferCachePair : buffersToCache) {
-        const MString& bufferName = bufferCachePair.first;
-        const ComPtr<ID3D11Buffer>& buffer = bufferCachePair.second;
-        D3D11_BUFFER_DESC desc;
-        buffer->GetDesc(&desc);
+SimulationCache::Registration SimulationCache::registerBuffer(ComPtr<ID3D11Buffer>* pBuffer) {
+    registry.insert(pBuffer);
+    return Registration(pBuffer);
+}
 
-        cache[currentFrame][bufferName].desc = desc;
-        std::vector<uint8_t>& bufferData = cache[currentFrame][bufferName].data;
+void SimulationCache::unregisterBuffer(ComPtr<ID3D11Buffer>* pBuffer) {
+    registry.erase(pBuffer);
+    for (auto& frameCachePair : cache) {
+        frameCachePair.second.erase(pBuffer);
+    }
+}
+
+void SimulationCache::cacheData() {
+    double currentFrame = MAnimControl::currentTime().as(MTime::uiUnit());
+    for (const auto& bufferPtr : registry) {
+        const ComPtr<ID3D11Buffer>& buffer = *bufferPtr;
+        std::vector<uint8_t>& bufferData = cache[currentFrame][bufferPtr];
         DirectX::copyBufferToVector(buffer, bufferData);
     }
-
-    frameToMark = currentFrame;
-}
-
-void SimulationCache::removeData(const std::vector<MString>& bufferNamesToRemove) {
-    double currentFrame = MAnimControl::currentTime().as(MTime::uiUnit());
-
-    auto frameIt = cache.find(currentFrame);
-    if (frameIt == cache.end()) return;
-
-    for (const MString& bufferName : bufferNamesToRemove) {
-        frameIt->second.erase(bufferName);
-    }
-
-    if (frameIt->second.empty()) {
-        cache.erase(frameIt);
-        frameToUnmark = currentFrame;
-    }
-}
-
-ComPtr<ID3D11Buffer> SimulationCache::getData(const MString& bufferName) {
-    double currentFrame = MAnimControl::currentTime().as(MTime::uiUnit());
-
-    auto frameIt = cache.find(currentFrame);
-    if (frameIt == cache.end()) {
-        return nullptr;
-    }
-
-    auto bufferIt = frameIt->second.find(bufferName);
-    if (bufferIt == frameIt->second.end()) {
-        return nullptr;
-    }
-
-    const CachedBufferData& data = bufferIt->second;
-    ComPtr<ID3D11Buffer> buffer = DirectX::createBufferFromDescriptor(data.desc, &data.data);
-
-    // Creating the buffer tells Maya we're using memory, but this is temporary, so just tell Maya we're done with it.
-    DirectX::notifyMayaOfMemoryUsage(buffer, false); 
-    return buffer;
 }
 
 MStatus SimulationCache::initialize() {
@@ -82,7 +51,6 @@ void SimulationCache::postConstructor() {
 
     MSharedPtr<MStopPrimitiveEditingFct> stopEditCallback = MSharedPtr<MStopPrimitiveEditingFct>(new StopPrimitiveEditCallback());
     drawManager.setStopPrimitiveEditFunction(customDrawID, stopEditCallback);
-
 
     MCallbackId callbackId = MEventMessage::addEventCallback("timeChanged", SimulationCache::onTimeChanged, this, nullptr);
     callbackIds.append(callbackId);
@@ -145,17 +113,9 @@ void SimulationCache::onTimeChanged(void* clientData) {
     
     double currentFrame = MAnimControl::currentTime().as(MTime::uiUnit());
 
-    if (simCache->frameToUnmark != -1) {
-        simCache->removeMarkerAtFrame(simCache->frameToUnmark);
-    }
-    
-    if (simCache->frameToMark != -1) {
-        simCache->addMarkerToTimeline(simCache->frameToMark);
-    }
+    // simCache->cacheData(); // TODO: this can't be called from non-main thread. Will change when SimCache is moved to be called from GlobalSolver in compute.
+    simCache->addMarkerToTimeline(currentFrame);
     
     MTimeSliderCustomDrawManager::instance().setDrawPrimitives(simCache->customDrawID, simCache->drawPrimitives);
     MTimeSliderCustomDrawManager::instance().requestTimeSliderRedraw();
-    
-    simCache->frameToMark = -1;
-    simCache->frameToUnmark = -1;
 }
