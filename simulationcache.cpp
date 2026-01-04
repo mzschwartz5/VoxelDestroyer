@@ -75,7 +75,7 @@ SimulationCache* const SimulationCache::instance() {
 void SimulationCache::postConstructor() {
     MPxNode::postConstructor();
     MTimeSliderCustomDrawManager& drawManager = MTimeSliderCustomDrawManager::instance();
-    customDrawID = drawManager.registerCustomDrawOn(timeSliderDrawContextName, 10000);
+    customDrawID = drawManager.registerCustomDrawOutside(MTimeSliderCustomDrawManager::kAbove, timeSliderDrawContextName, MString("Cubit Simulation Cache"), 0);
 
     MSharedPtr<MStopPrimitiveEditingFct> stopEditCallback = MSharedPtr<MStopPrimitiveEditingFct>(new StopPrimitiveEditCallback());
     drawManager.setStopPrimitiveEditFunction(customDrawID, stopEditCallback);
@@ -104,11 +104,11 @@ void SimulationCache::addMarkerToTimeline(double frameKey) {
     MTime time(frameKey, MTime::uiUnit());
 
     MTimeSliderDrawPrimitive marker(
-        MTimeSliderDrawPrimitive::kVerticalLine,
+        MTimeSliderDrawPrimitive::kFilledRect,
         time,
-        time,
+        time + MTime(1.0, MTime::uiUnit()),
         MColor(1.0f, 0.0f, 0.0f),
-        100,
+        -1,
         0
     );
 
