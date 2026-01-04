@@ -11,8 +11,6 @@ MObject SimulationCache::simulationCacheObject = MObject::kNullObj;
 
 void SimulationCache::addData(const std::unordered_map<MString, ComPtr<ID3D11Buffer>, Utils::MStringHash, Utils::MStringEq>& buffersToCache) {
     double currentFrame = MAnimControl::currentTime().as(MTime::uiUnit());
-    dataAdded = true;
-
     for (const auto& bufferCachePair : buffersToCache) {
         const MString& bufferName = bufferCachePair.first;
         const ComPtr<ID3D11Buffer>& buffer = bufferCachePair.second;
@@ -23,10 +21,14 @@ void SimulationCache::addData(const std::unordered_map<MString, ComPtr<ID3D11Buf
         std::vector<uint8_t>& bufferData = cache[currentFrame][bufferName].data;
         DirectX::copyBufferToVector(buffer, bufferData);
     }
+
+    frameToMark = currentFrame;
 }
 
-void SimulationCache::removeData(double frameKey, const std::vector<MString>& bufferNamesToRemove) {
-    auto frameIt = cache.find(frameKey);
+void SimulationCache::removeData(const std::vector<MString>& bufferNamesToRemove) {
+    double currentFrame = MAnimControl::currentTime().as(MTime::uiUnit());
+
+    auto frameIt = cache.find(currentFrame);
     if (frameIt == cache.end()) return;
 
     for (const MString& bufferName : bufferNamesToRemove) {
@@ -35,6 +37,7 @@ void SimulationCache::removeData(double frameKey, const std::vector<MString>& bu
 
     if (frameIt->second.empty()) {
         cache.erase(frameIt);
+        frameToUnmark = currentFrame;
     }
 }
 
@@ -138,17 +141,21 @@ void SimulationCache::removeMarkerAtFrame(double frameKey) {
 
 void SimulationCache::onTimeChanged(void* clientData) {
     SimulationCache* simCache = static_cast<SimulationCache*>(clientData);
+    if (!simCache) return;
     
     double currentFrame = MAnimControl::currentTime().as(MTime::uiUnit());
-    if (simCache->dataAdded) {
-        simCache->addMarkerToTimeline(currentFrame);
+
+    if (simCache->frameToUnmark != -1) {
+        simCache->removeMarkerAtFrame(simCache->frameToUnmark);
     }
-    // if (simCache->cache.find(currentFrame) == simCache->cache.end()) {
-    //     simCache->removeMarkerAtFrame(currentFrame);
-    // }
+    
+    if (simCache->frameToMark != -1) {
+        simCache->addMarkerToTimeline(simCache->frameToMark);
+    }
     
     MTimeSliderCustomDrawManager::instance().setDrawPrimitives(simCache->customDrawID, simCache->drawPrimitives);
     MTimeSliderCustomDrawManager::instance().requestTimeSliderRedraw();
     
-    simCache->dataAdded = false;
+    simCache->frameToMark = -1;
+    simCache->frameToUnmark = -1;
 }
