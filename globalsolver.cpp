@@ -510,6 +510,9 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
         return MS::kSuccess;
     }
     lastComputeTime = time;
+    SimulationCache* const simulationCache = SimulationCache::instance();
+    bool hasCachedData = simulationCache->tryUseCache(time);
+    if (hasCachedData) return MS::kSuccess;
 
     bool particleCollisionsEnabled = block.inputValue(aParticleCollisionsEnabled).asBool();
     bool primitiveCollisionsEnabled = block.inputValue(aPrimitiveCollisionsEnabled).asBool();
@@ -539,6 +542,6 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
         }
     }
 
-    SimulationCache::instance()->cacheData(time);
+    simulationCache->cacheData(time);
     return MS::kSuccess;
 }
