@@ -191,6 +191,9 @@ private:
         for (int i = 0; i < 3; i++) {
             numWorkgroups[i] = Utils::divideRoundUp(faceConstraints[i].size(), VGS_THREADS);
             faceConstraintBuffers[i] = DirectX::createReadWriteBuffer<FaceConstraint>(faceConstraints[i]);
+            // Since face constraints can break, when caching we need to cache these buffers to be able to restore them.
+            // TODO: should separate the face constraint struct into the voxel indices and the strain limits, so that we're caching less.
+            registerBufferForCaching(faceConstraintBuffers[i]);
             faceConstraintUAVs[i] = DirectX::createUAV(faceConstraintBuffers[i]);
             faceConstraintsCBs[i] = DirectX::createConstantBuffer<FaceConstraintsCB>(faceConstraintsCBData[i]);
             longRangeConstraintIndicesBuffers[i] = DirectX::createReadWriteBuffer<uint>(faceIdxToLongRangeConstraintIndices[i]);

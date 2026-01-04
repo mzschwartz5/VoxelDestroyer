@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include <functional>
 #include <unordered_set>
+#include "simulationcache.h"
 using Microsoft::WRL::ComPtr;
 
 struct ColliderBuffer; // forward declaration
@@ -32,10 +33,10 @@ public:
         PARTICLE,
         OLDPARTICLE,
         SURFACE,
-        DRAGGING,
-        COLLIDER
+        DRAGGING
     };
     static std::unordered_map<BufferType, ComPtr<ID3D11Buffer>> buffers;
+    static std::unordered_map<BufferType, SimulationCache::Registration> bufferCacheRegistrations;
     static const ComPtr<ID3D11Buffer>& getBuffer(BufferType bufferType) {
         return buffers[bufferType];
     }
