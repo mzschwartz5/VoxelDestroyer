@@ -9,13 +9,6 @@
 
 class GlobalSolver; // forward declaration to make friend
 
-class StopPrimitiveEditCallback : public MStopPrimitiveEditingFct {
-public:
-    void operator()() override {
-        MGlobal::displayInfo("Stopped editing primitive.");
-    }
-};
-
 class SimulationCache {
 
 public:

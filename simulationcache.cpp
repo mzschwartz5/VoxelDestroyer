@@ -10,9 +10,6 @@ SimulationCache* SimulationCache::simulationCacheInstance = nullptr;
 SimulationCache::SimulationCache() {
     MTimeSliderCustomDrawManager& drawManager = MTimeSliderCustomDrawManager::instance();
     customDrawID = drawManager.registerCustomDrawOutside(MTimeSliderCustomDrawManager::kAbove, timeSliderDrawContextName, MString("Cubit Simulation Cache"), 0);
-
-    MSharedPtr<MStopPrimitiveEditingFct> stopEditCallback = MSharedPtr<MStopPrimitiveEditingFct>(new StopPrimitiveEditCallback());
-    drawManager.setStopPrimitiveEditFunction(customDrawID, stopEditCallback);
 }
 
 SimulationCache::~SimulationCache() {
