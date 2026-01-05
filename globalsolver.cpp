@@ -111,6 +111,11 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
         return;
     }
     bool connectionMade = (msg & MNodeMessage::kConnectionMade);
+
+    // Clear the simulation cache - which also resets the frame to the start and resets buffer data to the cached start state
+    // We also dirty the trigger plug to trigger a redraw with the reset state. 
+    SimulationCache::instance()->clearCache();
+    MGlobal::executeCommandOnIdle("dgdirty " + MPlug(getOrCreateGlobalSolver(), aTrigger).name());
     
     MObject globalSolverObj = getOrCreateGlobalSolver();
     int numPBDNodes = Utils::arrayPlugNumElements(globalSolverObj, aParticleData);
@@ -207,7 +212,6 @@ void GlobalSolver::addParticleData(MPlug& particleDataToAddPlug) {
     std::vector<Particle>* const particles = particleData.get()->getData().particles;
     DirectX::addToBuffer<Particle>(buffers[BufferType::PARTICLE], *particles);
     DirectX::addToBuffer<Particle>(buffers[BufferType::OLDPARTICLE], *particles);
-    // Re-registering releases the old registration, which deletes the old buffer from the cache
     bufferCacheRegistrations[BufferType::PARTICLE] = simulationCache->registerBuffer(buffers[BufferType::PARTICLE]);
     bufferCacheRegistrations[BufferType::OLDPARTICLE] = simulationCache->registerBuffer(buffers[BufferType::OLDPARTICLE]);
 
@@ -512,13 +516,14 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
     // Sometimes aTrigger gets triggered even when time has not explicitly changed (like on initialization)
     // To guard against that, cache off time on each compute and compare to last.
     MTime time = block.inputValue(aTime).asTime();
+    SimulationCache* const simulationCache = SimulationCache::instance();
+    bool hasCacheData = simulationCache->tryUseCache(time);
+    if (!hasCacheData) simulationCache->cacheData(time);
+
     if (time == lastComputeTime) {
         return MS::kSuccess;
     }
     lastComputeTime = time;
-    SimulationCache* const simulationCache = SimulationCache::instance();
-    bool hasCachedData = simulationCache->tryUseCache(time);
-    if (hasCachedData) return MS::kSuccess;
 
     bool particleCollisionsEnabled = block.inputValue(aParticleCollisionsEnabled).asBool();
     bool primitiveCollisionsEnabled = block.inputValue(aPrimitiveCollisionsEnabled).asBool();
@@ -548,6 +553,5 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
         }
     }
 
-    simulationCache->cacheData(time);
     return MS::kSuccess;
 }
