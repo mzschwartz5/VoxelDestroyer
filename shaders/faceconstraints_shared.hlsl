@@ -1,10 +1,3 @@
-struct FaceConstraint {
-    int voxelAIdx;
-    int voxelBIdx;
-    float tensionLimit;
-    float compressionLimit;
-};
-
 cbuffer VGSConstantsBuffer : register(b0)
 {
     VGSConstants vgsConstants;
@@ -25,11 +18,8 @@ cbuffer FaceConstraintsCB : register(b1)
 };
 
 RWStructuredBuffer<Particle> particles : register(u0);
-RWStructuredBuffer<FaceConstraint> faceConstraints : register(u1);
-RWStructuredBuffer<uint> isSurfaceVoxel : register(u2);
-RWBuffer<float> paintDeltas : register(u3);
-RWBuffer<float> paintValues : register(u4);
-RWStructuredBuffer<Particle> renderParticles : register(u5);
-RWStructuredBuffer<uint> longRangeConstraintIndices : register(u6);
-RWStructuredBuffer<uint> longRangeConstraintCounters : register(u7);
+RWStructuredBuffer<int> faceConstraintsIndices : register(u1);
+RWStructuredBuffer<float> faceConstraintsLimits : register(u2);
+RWStructuredBuffer<uint> isSurfaceVoxel : register(u3);
+
 static const float FLT_MAX = asfloat(0x7f7fffff);

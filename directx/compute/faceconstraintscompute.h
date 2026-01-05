@@ -6,7 +6,7 @@
 struct FaceConstraintsCB {
 	std::array<uint, 4> faceOneIndices;
 	std::array<uint, 4> faceTwoIndices;
-    uint numContraints;
+    uint numConstraints;
     int faceOneId;
     int faceTwoId;
     float constraintLow;
@@ -16,11 +16,13 @@ struct FaceConstraintsCB {
     int padding2;
 };
 
-struct FaceConstraint {
-	int voxelOneIdx;
-	int voxelTwoIdx;
-	float tensionLimit = 0.0f;
-	float compressionLimit = 0.0f;
+struct FaceConstraints {
+	std::vector<int> voxelIndices;
+    std::vector<float> limits;
+
+    uint size() const {
+        return static_cast<uint>(voxelIndices.size() / 2);
+    }
 };
 
 class FaceConstraintsCompute : public ComputeShader
@@ -29,7 +31,7 @@ public:
     FaceConstraintsCompute() = default;
 
     FaceConstraintsCompute(
-        const std::array<std::vector<FaceConstraint>, 3>& faceConstraints,
+        const std::array<FaceConstraints, 3>& faceConstraints,
         const std::array<std::vector<uint>, 3>& faceIdxToLongRangeConstraintIndices,
         uint numParticles,
         float particleRadius,
@@ -46,7 +48,10 @@ public:
 
     ~FaceConstraintsCompute() {
         for (int i = 0; i < 3; i++) {
-            DirectX::notifyMayaOfMemoryUsage(faceConstraintBuffers[i]);
+            DirectX::notifyMayaOfMemoryUsage(faceConstraintIndexBuffers[i]);
+            DirectX::notifyMayaOfMemoryUsage(faceConstraintLimitsBuffers[i]);
+            DirectX::notifyMayaOfMemoryUsage(longRangeConstraintIndicesBuffers[i]);
+            DirectX::notifyMayaOfMemoryUsage(faceConstraintsCBs[i]);
         }
     }
 
@@ -57,7 +62,10 @@ public:
 
     void dispatch() override
     {
+        extraUAVs[0] = longRangeConstraintCountersUAV;
+
         for (activeConstraintAxis = 0; activeConstraintAxis < 3; activeConstraintAxis++) {
+            extraUAVs[1] = longRangeConstraintIndicesUAVs[activeConstraintAxis];
             ComputeShader::dispatch(numWorkgroups[activeConstraintAxis]);
         }
         activeConstraintAxis = 0;
@@ -71,6 +79,8 @@ public:
     ) {
         this->paintDeltaUAV = paintDeltaUAV;
         this->paintValueUAV = paintValueUAV;
+        extraUAVs[0] = this->paintDeltaUAV;
+        extraUAVs[1] = this->paintValueUAV;
         
         if (constraintLow != faceConstraintsCBData[0].constraintLow || constraintHigh != faceConstraintsCBData[0].constraintHigh) {
             updateConstraintLimits(constraintLow,  constraintHigh);
@@ -82,6 +92,8 @@ public:
     }
 
     void mergeRenderParticles() {
+        extraUAVs[0] = renderParticlesUAV;
+
         ComputeShader::dispatch(numExpandParticlesWorkgroups, expandRenderParticlesEntryPoint);
         for (activeConstraintAxis = 0; activeConstraintAxis < 3; activeConstraintAxis++) {
             ComputeShader::dispatch(numWorkgroups[activeConstraintAxis], mergeRenderParticlesEntryPoint);
@@ -125,11 +137,16 @@ private:
     int activeConstraintAxis = 0; // x = 0, y = 1, z = 2
     std::array<int, 3> numWorkgroups = { 0, 0, 0 };
     int numExpandParticlesWorkgroups = 0;
+    // UAVs that get bound depending on which entry point is being dispatched
+    // There are 4 shared UAVs, and up to 2 extra UAVs that may get set. Note that Maya's version of DX11 only supports up to 8 UAVs bound at once.
+    std::array<ComPtr<ID3D11UnorderedAccessView>, 2> extraUAVs;
     std::array<FaceConstraintsCB, 3> faceConstraintsCBData;
-    std::array<ComPtr<ID3D11UnorderedAccessView>, 3> faceConstraintUAVs;
+    std::array<ComPtr<ID3D11UnorderedAccessView>, 3> faceConstraintIndicesUAVs;
+    std::array<ComPtr<ID3D11UnorderedAccessView>, 3> faceConstraintLimitsUAVs;
     std::array<ComPtr<ID3D11UnorderedAccessView>, 3> longRangeConstraintIndicesUAVs;
     std::array<ComPtr<ID3D11Buffer>, 3> faceConstraintsCBs;
-    std::array<ComPtr<ID3D11Buffer>, 3> faceConstraintBuffers;
+    std::array<ComPtr<ID3D11Buffer>, 3> faceConstraintIndexBuffers;
+    std::array<ComPtr<ID3D11Buffer>, 3> faceConstraintLimitsBuffers;
     std::array<ComPtr<ID3D11Buffer>, 3> longRangeConstraintIndicesBuffers;
     VGSConstants vgsConstants;
     ComPtr<ID3D11Buffer> vgsConstantBuffer;
@@ -143,9 +160,8 @@ private:
     void bind() override
     {
         ID3D11UnorderedAccessView* uavs[] = { 
-            particlesUAV.Get(), faceConstraintUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get(), 
-            paintDeltaUAV.Get(), paintValueUAV.Get(), renderParticlesUAV.Get(), 
-            longRangeConstraintIndicesUAVs[activeConstraintAxis].Get(), longRangeConstraintCountersUAV.Get() 
+            particlesUAV.Get(), faceConstraintIndicesUAVs[activeConstraintAxis].Get(),  faceConstraintLimitsUAVs[activeConstraintAxis].Get(), isSurfaceUAV.Get(),
+            extraUAVs[0].Get(), extraUAVs[1].Get()
         };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
@@ -155,7 +171,7 @@ private:
 
     void unbind() override
     {
-        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+        ID3D11UnorderedAccessView* uavs[] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
         DirectX::getContext()->CSSetUnorderedAccessViews(0, ARRAYSIZE(uavs), uavs, nullptr);
 
         ID3D11Buffer* cbvs[] = { nullptr, nullptr };
@@ -170,7 +186,7 @@ private:
         }
     };
     
-    void initializeBuffers(const std::array<std::vector<FaceConstraint>, 3>& faceConstraints, const std::array<std::vector<uint>, 3>& faceIdxToLongRangeConstraintIndices, uint numParticles, float particleRadius, float voxelRestVolume) {
+    void initializeBuffers(const std::array<FaceConstraints, 3>& faceConstraints, const std::array<std::vector<uint>, 3>& faceIdxToLongRangeConstraintIndices, uint numParticles, float particleRadius, float voxelRestVolume) {
 
         vgsConstants.relaxation = 0.5f;
         vgsConstants.edgeUniformity = 1.0f;
@@ -183,21 +199,22 @@ private:
 
         // Order of vertex indices and face IDs corresponds to definitions in cube.h
         faceConstraintsCBData = std::array<FaceConstraintsCB, 3>{
-            FaceConstraintsCB{{1, 3, 5, 7}, {0, 2, 4, 6}, static_cast<uint>(faceConstraints[0].size()), 1, 0, 0, 0, 0, 0, 0},
-            FaceConstraintsCB{{2, 3, 6, 7}, {0, 1, 4, 5}, static_cast<uint>(faceConstraints[1].size()), 3, 2, 0, 0, 0, 0, 0},
-            FaceConstraintsCB{{4, 5, 6, 7}, {0, 1, 2, 3}, static_cast<uint>(faceConstraints[2].size()), 5, 4, 0, 0, 0, 0, 0}
+            FaceConstraintsCB{{1, 3, 5, 7}, {0, 2, 4, 6}, faceConstraints[0].size(), 1, 0, 0, 0, 0, 0, 0},
+            FaceConstraintsCB{{2, 3, 6, 7}, {0, 1, 4, 5}, faceConstraints[1].size(), 3, 2, 0, 0, 0, 0, 0},
+            FaceConstraintsCB{{4, 5, 6, 7}, {0, 1, 2, 3}, faceConstraints[2].size(), 5, 4, 0, 0, 0, 0, 0}
         };    
 
         for (int i = 0; i < 3; i++) {
             numWorkgroups[i] = Utils::divideRoundUp(faceConstraints[i].size(), VGS_THREADS);
-            faceConstraintBuffers[i] = DirectX::createReadWriteBuffer<FaceConstraint>(faceConstraints[i]);
-            // Since face constraints can break, when caching we need to cache these buffers to be able to restore them.
-            // TODO: should separate the face constraint struct into the voxel indices and the strain limits, so that we're caching less.
-            registerBufferForCaching(faceConstraintBuffers[i]);
-            faceConstraintUAVs[i] = DirectX::createUAV(faceConstraintBuffers[i]);
+            faceConstraintLimitsBuffers[i] = DirectX::createReadWriteBuffer(faceConstraints[i].limits);
+            faceConstraintIndexBuffers[i] = DirectX::createReadWriteBuffer(faceConstraints[i].voxelIndices);
+            faceConstraintIndicesUAVs[i] = DirectX::createUAV(faceConstraintIndexBuffers[i]);
+            faceConstraintLimitsUAVs[i] = DirectX::createUAV(faceConstraintLimitsBuffers[i]);
             faceConstraintsCBs[i] = DirectX::createConstantBuffer<FaceConstraintsCB>(faceConstraintsCBData[i]);
-            longRangeConstraintIndicesBuffers[i] = DirectX::createReadWriteBuffer<uint>(faceIdxToLongRangeConstraintIndices[i]);
+            longRangeConstraintIndicesBuffers[i] = DirectX::createReadWriteBuffer(faceIdxToLongRangeConstraintIndices[i]);
             longRangeConstraintIndicesUAVs[i] = DirectX::createUAV(longRangeConstraintIndicesBuffers[i]);
+            // The indices get cached because they can change when face constraints are broken (set to -1)
+            registerBufferForCaching(faceConstraintIndexBuffers[i]);
         }
     }
 };

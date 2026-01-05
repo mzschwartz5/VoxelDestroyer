@@ -2,6 +2,9 @@
 #include "constants.hlsli"
 #include "faceconstraints_shared.hlsl"
 
+RWBuffer<float> paintDeltas : register(u4);
+RWBuffer<float> paintValues : register(u5);
+
 // This entry point is for updating the face constraints based on paint values.
 // One thread per face constraint (over three dispatches, one per axis - just because that's how the face constraint data is stored).
 // This runs every time a brush stroke ends - that way, we can use the computed delta to know which faces were updated, and can 
@@ -14,11 +17,8 @@ void main(
     uint constraintIdx = globalThreadId.x;
     if (constraintIdx >= numConstraints) return;
 
-    FaceConstraint constraint;
-    constraint = faceConstraints[constraintIdx];
-
-    int voxelAIdx = constraint.voxelAIdx;
-    int voxelBIdx = constraint.voxelBIdx;
+    int voxelAIdx = faceConstraintsIndices[constraintIdx * 2];
+    int voxelBIdx = faceConstraintsIndices[constraintIdx * 2 + 1];
     if (voxelAIdx == -1 || voxelBIdx == -1) return;
 
     int paintValueAIdx = voxelAIdx * 6 + faceAId;
@@ -52,7 +52,6 @@ void main(
         limit = lerp(constraintLow, constraintHigh, selectedPaintValue);
     }
 
-    constraint.tensionLimit = limit;
-    constraint.compressionLimit = -limit;
-    faceConstraints[constraintIdx] = constraint;
+    faceConstraintsLimits[constraintIdx * 2] = limit;
+    faceConstraintsLimits[constraintIdx * 2 + 1] = -limit;
 }
