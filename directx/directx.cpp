@@ -37,19 +37,6 @@ HINSTANCE DirectX::getPluginInstance()
     return pluginInstance;
 }
 
-ComPtr<ID3D11Buffer> DirectX::createBufferFromDescriptor(
-    const D3D11_BUFFER_DESC& desc,
-    const void* initData
-) {
-    D3D11_SUBRESOURCE_DATA subresourceData = {};
-    subresourceData.pSysMem = initData;
-
-    ComPtr<ID3D11Buffer> buffer;
-    HRESULT hr = dxDevice->CreateBuffer(&desc, &subresourceData, buffer.GetAddressOf());
-    notifyMayaOfMemoryUsage(buffer, true);
-    return buffer;
-}
-
 ComPtr<ID3D11ShaderResourceView> DirectX::createSRV(
     const ComPtr<ID3D11Buffer>& buffer,
     UINT elementCount,
