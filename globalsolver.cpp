@@ -112,11 +112,6 @@ void GlobalSolver::onParticleDataConnectionChange(MNodeMessage::AttributeMessage
     }
     bool connectionMade = (msg & MNodeMessage::kConnectionMade);
 
-    // Clear the simulation cache - which also resets the frame to the start and resets buffer data to the cached start state
-    // We also dirty the trigger plug to trigger a redraw with the reset state. 
-    SimulationCache::instance()->clearCache();
-    MGlobal::executeCommandOnIdle("dgdirty " + MPlug(getOrCreateGlobalSolver(), aTrigger).name());
-    
     MObject globalSolverObj = getOrCreateGlobalSolver();
     int numPBDNodes = Utils::arrayPlugNumElements(globalSolverObj, aParticleData);
     numPBDNodes -= connectionMade ? 0 : 1; // If disconnecting, the plug is still counted in numElements, so subtract 1.
@@ -514,16 +509,16 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
     }
 
     // Sometimes aTrigger gets triggered even when time has not explicitly changed (like on initialization)
-    // To guard against that, cache off time on each compute and compare to last.
+    // To guard against that, store time on each compute and compare to last.
     MTime time = block.inputValue(aTime).asTime();
-    SimulationCache* const simulationCache = SimulationCache::instance();
-    bool hasCacheData = simulationCache->tryUseCache(time);
-    if (!hasCacheData) simulationCache->cacheData(time);
-
     if (time == lastComputeTime) {
         return MS::kSuccess;
     }
     lastComputeTime = time;
+    
+    SimulationCache* const simulationCache = SimulationCache::instance();
+    bool hasCacheData = simulationCache->tryUseCache(time);
+    if (hasCacheData) return MS::kSuccess;
 
     bool particleCollisionsEnabled = block.inputValue(aParticleCollisionsEnabled).asBool();
     bool primitiveCollisionsEnabled = block.inputValue(aPrimitiveCollisionsEnabled).asBool();
@@ -553,5 +548,6 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
         }
     }
 
+    simulationCache->cacheData(time);
     return MS::kSuccess;
 }

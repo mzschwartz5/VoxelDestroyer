@@ -20,6 +20,7 @@
 #include "custommayaconstructs/commands/createcollidercommand.h"
 #include "custommayaconstructs/commands/changevoxeleditmodecommand.h"
 #include "custommayaconstructs/commands/applyvoxelpaintcommand.h"
+#include "simulationcache.h"
 #include <maya/MDrawRegistry.h>
 #include <maya/MTransformationMatrix.h>
 #include <maya/MAnimControl.h>
@@ -67,6 +68,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	
 	MTime::setUIUnit(MTime::k60FPS);
 	MAnimControl::setPlaybackSpeed(0); // Force Play Every Frame mode
+    SimulationCache::instance()->resetCache();
 
 	PluginArgs pluginArgs = parsePluginArgs(argList);
 	MSelectionList selectedMesh;
@@ -127,6 +129,10 @@ MStatus plugin::doIt(const MArgList& argList)
 	status = MGlobal::executeCommandOnIdle(MString("modelEditor -edit -rnm $gViewport2 -rom " + VoxelRendererOverride::voxelRendererOverrideName + " " + activeModelPanel));
 
 	MGlobal::executeCommand("undoInfo -closeChunk", false, false); // close the undo chunk
+
+    MTime startTime = MAnimControl::minTime();
+	MAnimControl::setCurrentTime(startTime);
+
 	return MS::kSuccess;
 }
 

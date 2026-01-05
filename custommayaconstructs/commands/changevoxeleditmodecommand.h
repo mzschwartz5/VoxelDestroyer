@@ -13,6 +13,7 @@
 #include <maya/MUuid.h>
 #include <maya/M3dView.h>
 #include "simulationcache.h"
+#include <maya/MAnimControl.h>
 
 enum class VoxelEditMode : int {
     Selection,
@@ -89,7 +90,11 @@ public:
             }
         );
 
-        SimulationCache::instance()->clearCache();
+        // Reset the simulation cache so that the model is in the initial state and the paint/select wireframe matches up
+        SimulationCache::instance()->resetCache();
+        MTime startTime = MAnimControl::minTime();
+        MAnimControl::setCurrentTime(startTime);
+
         M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }
@@ -113,7 +118,11 @@ public:
         MGlobal::executeCommand(setComponentCmd);
         MGlobal::executeCommand("setToolTo " + context + "; toolPropertyWindow;");
 
-        SimulationCache::instance()->clearCache();
+        // Reset the simulation cache so that the model is in the initial state and the paint/select wireframe matches up
+        SimulationCache::instance()->resetCache();
+        MTime startTime = MAnimControl::minTime();
+        MAnimControl::setCurrentTime(startTime);
+
         M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }
@@ -167,7 +176,11 @@ public:
             }
         );
 
-        SimulationCache::instance()->clearCache();
+        // Reset the simulation cache so that the model is in the initial state and the paint/select wireframe matches up
+        SimulationCache::instance()->resetCache();
+        MTime startTime = MAnimControl::minTime();
+        MAnimControl::setCurrentTime(startTime);
+
         M3dView::active3dView().refresh(false, true);
     }
 
