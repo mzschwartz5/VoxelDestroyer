@@ -64,6 +64,9 @@ MStatus plugin::doIt(const MArgList& argList)
 	MProgressWindow::reserve();
 	MProgressWindow::setTitle("Mesh Preparation Progress");
 	MProgressWindow::startProgress();
+	
+	MTime::setUIUnit(MTime::k60FPS);
+	MAnimControl::setPlaybackSpeed(0); // Force Play Every Frame mode
 
 	PluginArgs pluginArgs = parsePluginArgs(argList);
 	MSelectionList selectedMesh;
@@ -116,8 +119,6 @@ MStatus plugin::doIt(const MArgList& argList)
 	MProgressWindow::setProgress(100);
 
 	PlaneCollider::createGroundColliderIfNoneExists();
-	MTime::setUIUnit(MTime::k60FPS);
-	MAnimControl::setPlaybackSpeed(0); // Force Play Every Frame mode
 
 	MProgressWindow::endProgress();
 
