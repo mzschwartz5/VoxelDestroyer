@@ -48,6 +48,7 @@ void SimulationCache::unregisterBuffer(ComPtr<ID3D11Buffer> buffer) {
         if (frameCachePair.second.empty()) {
             removeMarkerAtFrame(frameCachePair.first);
         }
+        
     }
 }
 
@@ -80,18 +81,19 @@ bool SimulationCache::tryUseCache(const MTime& time) {
 }
 
 void SimulationCache::clearCache() {
-    // This is a little outside the purview of what a cache should do, but it's very helpful to do it here.
+    // This is a little outside the purview of what a cache should do, but it's very useful to do it here.
     // We want the first frame of playback to always be cached, even after clear, so we always have a beginning state to reset to (e.g. while painting).
     MTime startTime = MAnimControl::minTime();
     double startFrame = std::floor(startTime.as(MTime::uiUnit()));
-    tryUseCache(startTime); // resets cached buffer data to start state
+    tryUseCache(startTime); // effectively resets buffer data to start state
 
     cache.clear();
     drawPrimitives.clear();
     
     addMarkerToTimeline(startFrame);
     MTimeSliderCustomDrawManager::instance().setDrawPrimitives(customDrawID, drawPrimitives);
-    MAnimControl::setCurrentTime(startTime); // this will also trigger GlobalSolver to compute, which will in turn cache the start frame again
+
+    MAnimControl::setCurrentTime(startTime); // (this will trigger GlobalSolver to compute, which in turn caches the start frame again)
 }
 
 void SimulationCache::addMarkerToTimeline(double frameKey) {
