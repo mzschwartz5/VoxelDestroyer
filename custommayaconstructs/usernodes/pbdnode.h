@@ -284,8 +284,8 @@ public:
         std::array<std::vector<int>, 3> voxelToFaceConstraintIndices; // per-axis arrays of mappings from voxel index to face constraint index
         voxelToFaceConstraintIndices.fill( std::vector<int>(voxels->numOccupied, -1) );
 
-        std::array<std::vector<FaceConstraint>, 3> faceConstraints = pbd.constructFaceToFaceConstraints(voxels, voxelToFaceConstraintIndices);
-        LongRangeConstraints longRangeConstraints = pbd.constructLongRangeConstraints(voxels, voxelToFaceConstraintIndices, { static_cast<uint>(faceConstraints[0].size()), static_cast<uint>(faceConstraints[1].size()), static_cast<uint>(faceConstraints[2].size())});
+        std::array<FaceConstraints, 3> faceConstraints = pbd.constructFaceToFaceConstraints(voxels, voxelToFaceConstraintIndices);
+        LongRangeConstraints longRangeConstraints = pbd.constructLongRangeConstraints(voxels, voxelToFaceConstraintIndices, { faceConstraints[0].size(), faceConstraints[1].size(), faceConstraints[2].size()});
 
         pbd.createComputeShaders(voxels, faceConstraints, longRangeConstraints);
 

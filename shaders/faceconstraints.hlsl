@@ -1,12 +1,15 @@
 #include "vgs_core.hlsl"
 #include "faceconstraints_shared.hlsl"
 
+RWStructuredBuffer<uint> longRangeConstraintCounters : register(u4);
+RWStructuredBuffer<uint> longRangeConstraintIndices : register(u5);
+
 void breakConstraint(int constraintIdx, int voxelAIdx, int voxelBIdx) {
     isSurfaceVoxel[voxelAIdx] = 1;
     isSurfaceVoxel[voxelBIdx] = 1;
 
-    faceConstraints[constraintIdx].voxelAIdx = -1;
-    faceConstraints[constraintIdx].voxelBIdx = -1;
+    faceConstraintsIndices[constraintIdx * 2] = -1;
+    faceConstraintsIndices[constraintIdx * 2 + 1] = -1;
 
     // Each face constraint belongs to up to 4 long-range constraints.
     for (int i = 0; i < 4; ++i) {
@@ -15,7 +18,7 @@ void breakConstraint(int constraintIdx, int voxelAIdx, int voxelBIdx) {
 
         // The counters buffer doubles as the LR particles indices buffer. We hijack the lower 4 bits of the first particle index
         // to act as a counter of how many face constraints associated with this long-range constraint have been broken.
-        int original;
+        uint original;
         InterlockedAdd(longRangeConstraintCounters[longRangeConstraintIdx << 3], 1, original);
     }
 }
@@ -32,18 +35,18 @@ void main(
     uint constraintIdx = globalThreadId.x;
     if (constraintIdx >= numConstraints) return;
 
-    FaceConstraint constraint;
-    constraint = faceConstraints[constraintIdx];
-    
     // A face constraint deals with two voxels, which we'll refer to as A and B throughout this shader.
-    int voxelAIdx = constraint.voxelAIdx;
-    int voxelBIdx = constraint.voxelBIdx;
+    int voxelAIdx = faceConstraintsIndices[constraintIdx * 2];
+    int voxelBIdx = faceConstraintsIndices[constraintIdx * 2 + 1];
 
     // Face constraint is already broken.
     if (voxelAIdx == -1 || voxelBIdx == -1) return;
 
     uint voxelAParticlesIdx = voxelAIdx << 3;
     uint voxelBParticlesIdx = voxelBIdx << 3;
+
+    float tensionLimit = faceConstraintsLimits[constraintIdx * 2];
+    float compressionLimit = faceConstraintsLimits[constraintIdx * 2 + 1];
 
     Particle voxelParticles[8];
     for (int i = 0; i < 4; ++i) {
@@ -56,7 +59,7 @@ void main(
         // Check if the constraint between these two voxels should be broken due to tension/compression
         float edgeLength = length(voxelParticles[faceAParticles[i]].position - voxelParticles[faceBParticles[i]].position);
         float strain = (edgeLength - 2.0f * vgsConstants.particleRadius) / (2.0f * vgsConstants.particleRadius);
-        if (strain > constraint.tensionLimit || strain < constraint.compressionLimit) {
+        if (strain > tensionLimit || strain < compressionLimit) {
             breakConstraint(constraintIdx, voxelAIdx, voxelBIdx);
             return;
         }

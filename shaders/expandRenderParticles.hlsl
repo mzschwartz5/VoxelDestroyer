@@ -2,6 +2,8 @@
 #include "constants.hlsli"
 #include "faceconstraints_shared.hlsl"
 
+RWStructuredBuffer<Particle> renderParticles : register(u4);
+
 [numthreads(VGS_THREADS, 1, 1)]
 void main(
     uint3 globalThreadId : SV_DispatchThreadID

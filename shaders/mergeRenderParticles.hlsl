@@ -2,6 +2,8 @@
 #include "constants.hlsli"
 #include "faceconstraints_shared.hlsl"
 
+RWStructuredBuffer<Particle> renderParticles : register(u4);
+
 [numthreads(VGS_THREADS, 1, 1)]
 void main(
     uint3 globalThreadId : SV_DispatchThreadID
@@ -9,9 +11,8 @@ void main(
     uint constraintIdx = globalThreadId.x;
     if (constraintIdx >= numConstraints) return;
 
-    FaceConstraint constraint = faceConstraints[constraintIdx];
-    int voxelAIdx = constraint.voxelAIdx;
-    int voxelBIdx = constraint.voxelBIdx;
+    int voxelAIdx = faceConstraintsIndices[constraintIdx * 2];
+    int voxelBIdx = faceConstraintsIndices[constraintIdx * 2 + 1];
     if (voxelAIdx == -1 || voxelBIdx == -1) return;
 
     uint voxelAStartIdx = voxelAIdx << 3;

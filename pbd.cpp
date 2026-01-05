@@ -2,8 +2,8 @@
 #include "utils.h"
 #include "cube.h"
 
-std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(const MSharedPtr<Voxels> voxels, std::array<std::vector<int>, 3>& voxelToFaceConstraintIndices) {
-    std::array<std::vector<FaceConstraint>, 3> faceConstraints;
+std::array<FaceConstraints, 3> PBD::constructFaceToFaceConstraints(const MSharedPtr<Voxels> voxels, std::array<std::vector<int>, 3>& voxelToFaceConstraintIndices) {
+    std::array<FaceConstraints, 3> faceConstraints;
 
     const std::vector<uint32_t>& mortonCodes = voxels->mortonCodes;
     const std::unordered_map<uint32_t, uint32_t>& mortonCodesToSortedIdx = voxels->mortonCodesToSortedIdx;
@@ -20,10 +20,11 @@ std::array<std::vector<FaceConstraint>, 3> PBD::constructFaceToFaceConstraints(c
             int neighborMortonCode = static_cast<int>(Utils::toMortonCode(neighborCoords[0], neighborCoords[1], neighborCoords[2]));
             if (mortonCodesToSortedIdx.find(neighborMortonCode) == mortonCodesToSortedIdx.end()) continue;
 
-            FaceConstraint newConstraint;
-            newConstraint.voxelOneIdx = i;
-            newConstraint.voxelTwoIdx = mortonCodesToSortedIdx.at(neighborMortonCode);
-            faceConstraints[j].push_back(newConstraint);
+            faceConstraints[j].voxelIndices.push_back(i);
+            faceConstraints[j].voxelIndices.push_back(mortonCodesToSortedIdx.at(neighborMortonCode));
+
+            faceConstraints[j].limits.push_back(0.0f); // Initial constraint limits - can be updated via voxel paint tool
+            faceConstraints[j].limits.push_back(0.0f);
 
             voxelToFaceConstraintIndices[j][i] = static_cast<int>(faceConstraints[j].size() - 1);
         }
@@ -141,7 +142,7 @@ ParticleDataContainer PBD::createParticles(const MSharedPtr<Voxels> voxels) {
 
 void PBD::createComputeShaders(
     const MSharedPtr<Voxels> voxels, 
-    const std::array<std::vector<FaceConstraint>, 3>& faceConstraints,
+    const std::array<FaceConstraints, 3>& faceConstraints,
     const LongRangeConstraints& longRangeConstraints
 ) {
 
