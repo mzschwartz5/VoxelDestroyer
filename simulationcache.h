@@ -50,7 +50,7 @@ public:
     };
 
     Registration registerBuffer(ComPtr<ID3D11Buffer> buffer);
-    void clearCache();
+    void resetCache();
 
 private:
     friend class GlobalSolver;

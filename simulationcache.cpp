@@ -35,6 +35,13 @@ SimulationCache* const SimulationCache::instance() {
 
 SimulationCache::Registration SimulationCache::registerBuffer(ComPtr<ID3D11Buffer> buffer) {
     registry.insert(buffer);
+
+    // Add its initial data to the cache start frame (special frame that persists even when clearing the cache)
+    MTime startTime = MAnimControl::minTime();
+    double startFrame = std::floor(startTime.as(MTime::uiUnit()));
+    std::vector<uint8_t>& bufferData = cache[startFrame][buffer];
+    DirectX::copyBufferToVector(buffer, bufferData);
+
     return Registration(buffer);
 }
 
@@ -45,8 +52,9 @@ void SimulationCache::unregisterBuffer(ComPtr<ID3D11Buffer> buffer) {
         if (frameCachePair.second.empty()) {
             removeMarkerAtFrame(frameCachePair.first);
         }
-        
     }
+
+    MTimeSliderCustomDrawManager::instance().setDrawPrimitives(customDrawID, drawPrimitives);
 }
 
 void SimulationCache::cacheData(const MTime& time) {
@@ -77,20 +85,18 @@ bool SimulationCache::tryUseCache(const MTime& time) {
     return true;
 }
 
-void SimulationCache::clearCache() {
-    // This is a little outside the purview of what a cache should do, but it's very useful to do it here.
-    // We want the first frame of playback to always be cached, even after clear, so we always have a beginning state to reset to (e.g. while painting).
+void SimulationCache::resetCache() {
+    // This is a little outside the purview of what a cache should do, but it's very useful:
+    // Before resetting the cache, reset the simulation to the start frame so we never lose the initial state.
     MTime startTime = MAnimControl::minTime();
     double startFrame = std::floor(startTime.as(MTime::uiUnit()));
     tryUseCache(startTime); // effectively resets buffer data to start state
 
     cache.clear();
     drawPrimitives.clear();
-    
-    addMarkerToTimeline(startFrame);
-    MTimeSliderCustomDrawManager::instance().setDrawPrimitives(customDrawID, drawPrimitives);
 
-    MAnimControl::setCurrentTime(startTime); // (this will trigger GlobalSolver to compute, which in turn caches the start frame again)
+    // And recache the initial data for the start frame
+    cacheData(startTime);
 }
 
 void SimulationCache::addMarkerToTimeline(double frameKey) {
