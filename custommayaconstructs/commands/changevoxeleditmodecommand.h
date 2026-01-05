@@ -12,6 +12,7 @@
 #include <maya/MString.h>
 #include <maya/MUuid.h>
 #include <maya/M3dView.h>
+#include "simulationcache.h"
 
 enum class VoxelEditMode : int {
     Selection,
@@ -88,6 +89,7 @@ public:
             }
         );
 
+        SimulationCache::instance()->clearCache();
         M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }
@@ -111,6 +113,7 @@ public:
         MGlobal::executeCommand(setComponentCmd);
         MGlobal::executeCommand("setToolTo " + context + "; toolPropertyWindow;");
 
+        SimulationCache::instance()->clearCache();
         M3dView::active3dView().refresh(false, true);
         return MS::kSuccess;
     }
@@ -164,6 +167,7 @@ public:
             }
         );
 
+        SimulationCache::instance()->clearCache();
         M3dView::active3dView().refresh(false, true);
     }
 
