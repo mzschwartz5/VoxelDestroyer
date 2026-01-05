@@ -99,11 +99,6 @@ public:
         return buffer;   
     }
 
-    static ComPtr<ID3D11Buffer> createBufferFromDescriptor(
-        const D3D11_BUFFER_DESC& desc,
-        const void* initData
-    );
-
     static ComPtr<ID3D11ShaderResourceView> createSRV(
         const ComPtr<ID3D11Buffer>& buffer,
         UINT elementCount = 0,
