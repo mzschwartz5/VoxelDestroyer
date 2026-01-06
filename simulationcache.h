@@ -78,4 +78,5 @@ private:
     void removeMarkerAtFrame(double frameKey);
     void cacheData(const MTime& time);
     bool tryUseCache(const MTime& time);
+    bool hasCacheData(const MTime& time);
 };

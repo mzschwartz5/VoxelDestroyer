@@ -544,16 +544,17 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
         dirtyColliderIndices.clear();
     }
 
-    // Sometimes aTrigger gets triggered even when time has not explicitly changed (like on initialization)
-    // To guard against that, store time on each compute and compare to last.
     MTime time = block.inputValue(aTime).asTime();
-    if (time == lastComputeTime) {
+    SimulationCache* const simulationCache = SimulationCache::instance();
+    bool hasCacheData = simulationCache->hasCacheData(time);
+
+    // Do not simulate backwards unless we have cache data for that time
+    if (time <= lastComputeTime && !hasCacheData) {
         return MS::kSuccess;
     }
     lastComputeTime = time;
     
-    SimulationCache* const simulationCache = SimulationCache::instance();
-    bool hasCacheData = simulationCache->tryUseCache(time);
+    simulationCache->tryUseCache(time);
     if (hasCacheData) return MS::kSuccess;
 
     bool particleCollisionsEnabled = block.inputValue(aParticleCollisionsEnabled).asBool();
