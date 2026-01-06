@@ -4,8 +4,10 @@
 #include <maya/MTimeSliderCustomDrawManager.h>
 #include <unordered_set>
 #include <unordered_map>
+#include <set>
 #include "directx/directx.h"
 #include <cstdint>
+#include <cfloat>
 
 class GlobalSolver; // forward declaration to make friend
 
@@ -60,8 +62,13 @@ private:
     std::unordered_set<ComPtr<ID3D11Buffer>, DirectX::ComPtrHash> registry;
     // Frame number to map of buffer pointer to cached data (as vector of bytes)
     std::unordered_map<double, std::unordered_map<ComPtr<ID3D11Buffer>, std::vector<uint8_t>, DirectX::ComPtrHash>> cache;
+    // Cached frames, in order - helps with eviction
+    std::set<double> cachedFrames;
     MTimeSliderDrawPrimitives drawPrimitives;
     int customDrawID = -1;
+    // These are both in bytes
+    uint64_t singleFrameCacheSize = 0;
+    uint64_t currentCacheSize = 0;
 
     SimulationCache();
     ~SimulationCache();
