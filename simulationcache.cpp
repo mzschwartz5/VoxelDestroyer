@@ -122,6 +122,11 @@ bool SimulationCache::tryUseCache(const MTime& time) {
     return true;
 }
 
+bool SimulationCache::hasCacheData(const MTime& time) {
+    double currentFrame = std::floor(time.as(MTime::uiUnit()));
+    return cache.find(currentFrame) != cache.end();
+}
+
 void SimulationCache::resetCache() {
     // This is a little outside the purview of what a cache should do, but it's very useful:
     // Before resetting the cache, reset the simulation to the start frame so we never lose the initial state.
