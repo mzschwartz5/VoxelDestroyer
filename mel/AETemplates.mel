@@ -136,7 +136,13 @@ global proc AEGlobalSolverTemplate(string $nodeName)
         editorTemplate -label "Particle Friction" -annotation "Friction coefficient applied during particle collisions." -addControl "particleFriction";
     editorTemplate -endLayout;
 
-    string $keep[] = {"numSubsteps", "particleCollisionsEnabled", "primitiveCollisionsEnabled", "particleFriction"};
+    editorTemplate -beginLayout "Cache Settings" -collapse 0;
+        editorTemplate -label "Cache Frequency" -annotation "Number of frames between cached simulation states. A value of 1 caches every frame." -addControl "cacheFrequency";
+        editorTemplate -label "Max Cache Size (MB)" -annotation "Maximum size of the simulation cache in megabytes. When the cache exceeds this size, older cached frames will be discarded." -addControl "maxCacheSize";
+    editorTemplate -endLayout;
+
+    string $keep[] = {"numSubsteps", "particleCollisionsEnabled", "primitiveCollisionsEnabled", "particleFriction",
+                     "cacheFrequency", "maxCacheSize"};
     suppressAttributesExcept($nodeName, $keep);
 
     editorTemplate -endScrollLayout;

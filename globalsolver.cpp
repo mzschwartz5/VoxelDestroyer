@@ -19,6 +19,8 @@ MObject GlobalSolver::aNumSubsteps = MObject::kNullObj;
 MObject GlobalSolver::aParticleCollisionsEnabled = MObject::kNullObj;
 MObject GlobalSolver::aPrimitiveCollisionsEnabled = MObject::kNullObj;
 MObject GlobalSolver::aParticleFriction = MObject::kNullObj;
+MObject GlobalSolver::aCacheFrequency = MObject::kNullObj;
+MObject GlobalSolver::aMaxCacheSize = MObject::kNullObj;
 MObject GlobalSolver::aParticleData = MObject::kNullObj;
 MObject GlobalSolver::aColliderData = MObject::kNullObj;
 MObject GlobalSolver::aParticleBufferOffset = MObject::kNullObj;
@@ -54,19 +56,20 @@ const MObject& GlobalSolver::getOrCreateGlobalSolver() {
 void GlobalSolver::postConstructor() {
     MPxNode::postConstructor();
     setExistWithoutOutConnections(true);
-    MStatus status;
     
     unsubscribeFromDragStateChange = VoxelDragContext::subscribeToDragStateChange([this](const DragState& dragState) {
         isDragging = dragState.isDragging;
     });
 
-    MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onParticleDataConnectionChange, this, &status);
+    MCallbackId callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onParticleDataConnectionChange, this);
     callbackIds.append(callbackId);
-    callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onSimulateFunctionConnectionChange, this, &status);
+    callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onSimulateFunctionConnectionChange, this);
     callbackIds.append(callbackId);
-    callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onColliderDataConnectionChange, this, &status);
+    callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onColliderDataConnectionChange, this);
     callbackIds.append(callbackId);
     callbackId = MNodeMessage::addNodeDirtyPlugCallback(thisMObject(), onColliderDataDirty, this);
+    callbackIds.append(callbackId);
+    callbackId = MNodeMessage::addAttributeChangedCallback(thisMObject(), onCacheSizeChange, this);
     callbackIds.append(callbackId);
 
     // Effectively a destructor callback to clean up when the node is deleted
@@ -76,7 +79,7 @@ void GlobalSolver::postConstructor() {
         MMessage::removeCallbacks(globalSolver->callbackIds);
         globalSolver->unsubscribeFromDragStateChange();
         tearDown();
-    }, this, &status);
+    }, this);
     callbackIds.append(callbackId);
 }
 
@@ -360,6 +363,15 @@ void GlobalSolver::onColliderDataDirty(MObject& node, MPlug& plug, void* clientD
     dirtyColliderIndices.insert(plug.logicalIndex());
 }
 
+void GlobalSolver::onCacheSizeChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData) {
+    if (plug != aMaxCacheSize || !(msg & MNodeMessage::kAttributeSet)) return;
+
+    // Reset the simulation cache
+    SimulationCache::instance()->resetCache();
+    MTime startTime = MAnimControl::minTime();
+    MAnimControl::setCurrentTime(startTime);
+}
+
 MStatus GlobalSolver::initialize() {
     MStatus status;
 
@@ -403,6 +415,30 @@ MStatus GlobalSolver::initialize() {
     nFloatAttr.setWritable(true);
     nFloatAttr.setReadable(true);
     status = addAttribute(aParticleFriction);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    MFnNumericAttribute nIntAttr;
+    aCacheFrequency = nIntAttr.create("cacheFrequency", "cf", MFnNumericData::kInt, 1, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    nIntAttr.setMin(0);
+    nIntAttr.setSoftMin(10);
+    nIntAttr.setSoftMax(60);
+    nIntAttr.setStorable(true);
+    nIntAttr.setWritable(true);
+    nIntAttr.setReadable(true);
+    status = addAttribute(aCacheFrequency);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+
+    aMaxCacheSize = nIntAttr.create("maxCacheSize", "mcs", MFnNumericData::kInt, 500, &status);
+    CHECK_MSTATUS_AND_RETURN_IT(status);
+    nIntAttr.setMin(0);
+    nIntAttr.setSoftMin(250);
+    nIntAttr.setSoftMax(2000);
+    nIntAttr.setMax(32000);
+    nIntAttr.setStorable(true);
+    nIntAttr.setWritable(true);
+    nIntAttr.setReadable(true);
+    status = addAttribute(aMaxCacheSize);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     // Input attribute
@@ -548,6 +584,12 @@ MStatus GlobalSolver::compute(const MPlug& plug, MDataBlock& block)
         }
     }
 
-    simulationCache->cacheData(time);
+    int currentFrame = static_cast<int>(std::floor(time.as(MTime::uiUnit())));
+    int cacheFrequency = block.inputValue(aCacheFrequency).asInt();
+    if (cacheFrequency > 0 && (std::abs(static_cast<int>(currentFrame - lastCachedFrame)) >= cacheFrequency)) {
+        simulationCache->cacheData(time);
+        lastCachedFrame = currentFrame;
+    }
+
     return MS::kSuccess;
 }

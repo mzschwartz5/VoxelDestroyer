@@ -48,6 +48,8 @@ public:
     static MObject aParticleCollisionsEnabled;
     static MObject aPrimitiveCollisionsEnabled;
     static MObject aParticleFriction;
+    static MObject aCacheFrequency; // how often to cache a frame of simulation data
+    static MObject aMaxCacheSize;   // cache size in MB
     // Input attributes
     static MObject aTime;
     static MObject aParticleData;
@@ -75,11 +77,13 @@ private:
     static void onParticleDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static void onColliderDataConnectionChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static void onColliderDataDirty(MObject& node, MPlug& plug, void* clientData);
+    static void onCacheSizeChange(MNodeMessage::AttributeMessage msg, MPlug& plug, MPlug& otherPlug, void* clientData);
     static void addParticleData(MPlug& particleDataToAddPlug);
     static void deleteParticleData(MPlug& particleDataToRemovePlug);
     static void calculateNewOffsetsAndParticleRadius(MPlug changedPlug, MNodeMessage::AttributeMessage changeType, std::unordered_map<int, int>& offsetForLogicalPlug, float& maximumParticleRadius);
     static void maybeDeleteGlobalSolver();
     MCallbackIdArray callbackIds;
+    uint lastCachedFrame = UINT_MAX;
 
     // Maps PBD node plug index to its simulate function.
     // Essentially a cache so we don't have to retrieve the function from plugs every frame.
