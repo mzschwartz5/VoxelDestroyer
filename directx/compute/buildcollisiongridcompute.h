@@ -24,14 +24,9 @@ public:
         initializeBuffers(numParticles, particleSize);
     };
 
-    ~BuildCollisionGridCompute() override {
+    void reset() override {
         DirectX::notifyMayaOfMemoryUsage(collisionCellParticleCountsBuffer);
     }
-
-    BuildCollisionGridCompute(const BuildCollisionGridCompute&) = delete;
-    BuildCollisionGridCompute& operator=(const BuildCollisionGridCompute&) = delete;
-    BuildCollisionGridCompute(BuildCollisionGridCompute&&) noexcept = default;
-    BuildCollisionGridCompute& operator=(BuildCollisionGridCompute&&) noexcept = default;
 
     void dispatch() override {
         DirectX::clearUintBuffer(collisionCellParticleCountsUAV);

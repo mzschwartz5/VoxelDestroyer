@@ -38,6 +38,10 @@ GlobalSolver::~GlobalSolver() {
     // As with other Maya nodes, preRemovalCallback is not always called (e.g. on a new scene load), so also do cleanup here.
     MMessage::removeCallbacks(callbackIds);
     unsubscribeFromDragStateChange();
+    buildCollisionGridCompute.reset();
+    buildCollisionParticleCompute.reset();
+    dragParticlesCompute.reset();
+    prefixScanCompute.reset();
     tearDown();
 }
 
@@ -101,10 +105,12 @@ void GlobalSolver::tearDown() {
             buffer.second.Reset();
         }
     }
+
     globalSolverNodeObject = MObject::kNullObj;
     colliderBuffer = ColliderBuffer();
     dirtyColliderIndices.clear();
     bufferCacheRegistrations.clear();
+
     SimulationCache::instance()->tearDown();
 }
 

@@ -47,6 +47,7 @@ public:
 protected:    
     virtual void bind() = 0;
     virtual void unbind() = 0;
+    virtual void reset() {}
 
     void registerBufferForCaching(const ComPtr<ID3D11Buffer>& buffer) {
         simCacheRegistrations.push_back(SimulationCache::instance()->registerBuffer(buffer));

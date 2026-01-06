@@ -44,8 +44,11 @@ public:
     };
 
     ~DragParticlesCompute() override {
-        DirectX::notifyMayaOfMemoryUsage(isDraggingBuffer);
         removeSubscriptions();
+    }
+
+    void reset() override {
+        DirectX::notifyMayaOfMemoryUsage(isDraggingBuffer);
     }
 
     void setParticlesUAV(const ComPtr<ID3D11UnorderedAccessView>& particlesUAV)

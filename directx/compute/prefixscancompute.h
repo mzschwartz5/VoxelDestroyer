@@ -21,16 +21,11 @@ public:
         initializeBuffers();
     }
 
-    ~PrefixScanCompute() {
+    void reset() override {
         for (int i = 0; i < numScans; ++i) {
            DirectX::notifyMayaOfMemoryUsage(partialSumsBuffers[i]);
         }
     }
-
-    PrefixScanCompute(const PrefixScanCompute&) = delete;
-    PrefixScanCompute& operator=(const PrefixScanCompute&) = delete;
-    PrefixScanCompute(PrefixScanCompute&&) noexcept = default;
-    PrefixScanCompute& operator=(PrefixScanCompute&&) noexcept = default;
 
     void dispatch() override {
         activeUAVForScan = collisionCellParticleCountsUAV;

@@ -19,14 +19,9 @@ public:
         initializeBuffers(numParticles);
     }
 
-    ~BuildCollisionParticlesCompute() {
+    void reset() override {
         DirectX::notifyMayaOfMemoryUsage(particlesByCollisionCellBuffer);
     }
-
-    BuildCollisionParticlesCompute(const BuildCollisionParticlesCompute&) = delete;
-    BuildCollisionParticlesCompute& operator=(const BuildCollisionParticlesCompute&) = delete;
-    BuildCollisionParticlesCompute(BuildCollisionParticlesCompute&&) noexcept = default;
-    BuildCollisionParticlesCompute& operator=(BuildCollisionParticlesCompute&&) noexcept = default;
 
     void dispatch() override {
         DirectX::clearUintBuffer(particlesByCollisionCellUAV);

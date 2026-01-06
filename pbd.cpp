@@ -177,6 +177,13 @@ void PBD::createComputeShaders(
     preVGSCompute = PreVGSCompute(numParticles());
 }
 
+// See note in PBDNode destructor
+// Only need to reset compute shaders that own buffers
+void PBD::resetComputeShaders() {
+    faceConstraintsCompute.reset();
+    longRangeConstraintsCompute.reset();
+}
+
 void PBD::setGPUResourceHandles(
     ComPtr<ID3D11UnorderedAccessView> particleUAV,
     ComPtr<ID3D11UnorderedAccessView> oldParticlesUAV,
