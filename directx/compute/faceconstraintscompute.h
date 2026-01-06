@@ -46,7 +46,7 @@ public:
         numExpandParticlesWorkgroups = Utils::divideRoundUp(numParticles / 8, VGS_THREADS);
     };
 
-    ~FaceConstraintsCompute() {
+    void reset() override {
         for (int i = 0; i < 3; i++) {
             DirectX::notifyMayaOfMemoryUsage(faceConstraintIndexBuffers[i]);
             DirectX::notifyMayaOfMemoryUsage(faceConstraintLimitsBuffers[i]);
@@ -54,11 +54,6 @@ public:
             DirectX::notifyMayaOfMemoryUsage(faceConstraintsCBs[i]);
         }
     }
-
-    FaceConstraintsCompute(const FaceConstraintsCompute&) = delete;
-    FaceConstraintsCompute& operator=(const FaceConstraintsCompute&) = delete;
-    FaceConstraintsCompute(FaceConstraintsCompute&&) noexcept = default;
-    FaceConstraintsCompute& operator=(FaceConstraintsCompute&&) noexcept = default;
 
     void dispatch() override
     {

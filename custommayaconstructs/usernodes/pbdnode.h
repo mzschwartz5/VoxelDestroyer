@@ -53,7 +53,13 @@ public:
     ~PBDNode() override {
         // The pre-removal callback doesn't get called on new scene / file.
         MMessage::removeCallbacks(callbackIds);
+
+        // Manual reset of compute shaders (currently just where shaders notify maya of released GPU memory)
+        // Can't use destructor because it's called on move-assignment of a temporary. A better solution would be to 
+        // wrap ComPtrs in an RAII-style object that handles the Maya notification automatically, but that would be a big refactor.
+        pbd.resetComputeShaders();
     }
+    
     // Functions for Maya to create and initialize the node
     static void* creator() { return new PBDNode(); }
     

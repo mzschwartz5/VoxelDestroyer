@@ -312,7 +312,10 @@ private:
 
     
     VoxelShape() = default;
-    ~VoxelShape() override = default;
+    ~VoxelShape() override {
+        MMessage::removeCallbacks(callbackIds);
+        deformVerticesCompute.reset();
+    };
 
     MStatus compute(const MPlug& plug, MDataBlock& dataBlock) override {
         if (!isInitialized) return MS::kSuccess;

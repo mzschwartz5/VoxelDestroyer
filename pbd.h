@@ -56,6 +56,8 @@ public:
         ComPtr<ID3D11ShaderResourceView> isDraggingSRV
     );
 
+    void resetComputeShaders();
+
     void setInitialized(bool initialized) {
         this->initialized = initialized;
     }
