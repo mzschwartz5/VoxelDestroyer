@@ -67,7 +67,7 @@ MStatus plugin::doIt(const MArgList& argList)
 	MProgressWindow::startProgress();
 	
 	MTime::setUIUnit(MTime::k60FPS);
-	MAnimControl::setPlaybackSpeed(0); // Force Play Every Frame mode
+	MGlobal::executeCommand("optionVar -iv \"cachedPlaybackEnable\" 0;"); // disable built-in caching system (cubit uses its own caching system)
     SimulationCache::instance()->resetCache();
 
 	PluginArgs pluginArgs = parsePluginArgs(argList);
