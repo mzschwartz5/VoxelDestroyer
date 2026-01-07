@@ -306,6 +306,7 @@ EXPORT MStatus initializePlugin(MObject obj)
     Utils::extractResourceToFile(MhInstPlugin, IDR_PNG_VOXELPAINT, L"PNG", iconsDir + "VoxelPaint.png");
 
 	MGlobal::executeCommand("VoxelizerMenu_addToShelf");
+	MGlobal::executeCommand("cubit_AddResetCacheButtonToTimelineMenu");
 	return status;
 }
 

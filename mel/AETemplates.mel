@@ -272,3 +272,75 @@ global proc suppressAttributesExcept(string $nodeName, string $keep[])
 
     editorTemplate -suppress "worldMatrixIn";
 }
+
+// Just going to shove this feature in here for now rather than making a separate file for it.
+// It adds a menu item to the timeslider's cache (sub)menu to clear the cubit simulation cache.
+global proc cubit_AddResetCacheButtonToTimelineMenu() {
+    // Force Maya to build the Time Slider menu
+    source "TimeSliderMenu";
+    updateTimeSliderMenu TimeSlider|MainTimeSliderLayout|TimeSliderMenu;
+
+    string $menu = "TimeSlider|MainTimeSliderLayout|TimeSliderMenu";
+    string $cachedPlaybackMenuItem = cubit_findMenuItemByLabel($menu, "Cached Playback");
+    if ($cachedPlaybackMenuItem == "") {
+        return;
+    }
+
+    string $flushCacheMenuItem = cubit_findMenuItemByLabel($cachedPlaybackMenuItem, "Flush cache");
+
+    menuItem
+        -label "Flush cubit (plugin) cache"
+        -parent $cachedPlaybackMenuItem
+        -insertAfter $flushCacheMenuItem
+        -command "cubit_FlushPluginCache();"
+        cubitFlushCacheMenuItem;
+}
+
+global proc string cubit_findMenuItemByLabel(string $rootMenuOrItem, string $targetLabel)
+{
+    string $children[];
+
+    // If it's a menu, query its items
+    if (`menu -exists $rootMenuOrItem`) {
+        $children = `menu -q -itemArray $rootMenuOrItem`;
+    }
+
+    // If it's a submenu menuItem, query its items
+    else if (`menuItem -exists $rootMenuOrItem` && `menuItem -q -subMenu $rootMenuOrItem`) {
+        $children = `menuItem -q -itemArray $rootMenuOrItem`;
+    } else {
+        return "";
+    }
+
+    for ($c in $children) {
+        if (!`menuItem -exists $c`) continue;
+
+        string $lbl = `menuItem -q -label $c`;
+        if ($lbl == $targetLabel) {
+            return $c;
+        }
+
+        // Recurse into submenus
+        if (`menuItem -q -subMenu $c`) {
+            string $hit = cubit_findMenuItemByLabel($c, $targetLabel);
+            if ($hit != "") return $hit;
+        }
+    }
+
+    return "";
+}
+
+// Quick-and-dirty way to flush the cache. The global solver has a callback on maxCacheSize changes that flushes the cache.
+// So just set the attribute to its current value.
+global proc cubit_FlushPluginCache()
+{
+    string $globalSolverNodes[] = `ls -type "GlobalSolver"`;
+    if (size($globalSolverNodes) < 1) {
+        return;
+    }
+
+    string $globalSolverNode = $globalSolverNodes[0];
+
+    int $maxCacheSize = `getAttr ($globalSolverNode + ".maxCacheSize")`;
+    setAttr ($globalSolverNode + ".maxCacheSize") $maxCacheSize;
+}
