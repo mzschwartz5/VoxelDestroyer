@@ -54,17 +54,17 @@ global proc VoxelizerMenu() {
         -cc ("VoxelizerMenu_updateVoxelSize(\"" + $voxelGridDisplayName + "\", #1, `checkBox -query -value \"" + $constrainCheckbox + "\"`)")
         VoxelSizeField`;
 
-    string $subdivWidthField = `intSliderGrp -label "Width: " -value $initialValues[7] -field true -minValue $VOXEL_SUBDIV_MIN -maxValue $VOXEL_SUBDIV_SOFTMAX -fieldMinValue $VOXEL_SUBDIV_MIN -fieldMaxValue $VOXEL_SUBDIV_HARDMAX
+    string $subdivWidthField = `intSliderGrp -label "X Subdivs: " -value $initialValues[7] -field true -minValue $VOXEL_SUBDIV_MIN -maxValue $VOXEL_SUBDIV_SOFTMAX -fieldMinValue $VOXEL_SUBDIV_MIN -fieldMaxValue $VOXEL_SUBDIV_HARDMAX
         -cc ("VoxelizerMenu_updateSubdivisions(\"" + $voxelGridDisplayName + "\", #1, 0, `checkBox -query -value \"" + $constrainCheckbox + "\"`)") 
         -columnAlign 1 "left" -columnWidth 1 55 -columnWidth 2 50
         SubdivWidthField`;
 
-    string $subdivHeightField = `intSliderGrp -label "Height: " -value $initialValues[8] -field true -minValue $VOXEL_SUBDIV_MIN -maxValue $VOXEL_SUBDIV_SOFTMAX -fieldMinValue $VOXEL_SUBDIV_MIN -fieldMaxValue $VOXEL_SUBDIV_HARDMAX
+    string $subdivHeightField = `intSliderGrp -label "Y Subdivs: " -value $initialValues[8] -field true -minValue $VOXEL_SUBDIV_MIN -maxValue $VOXEL_SUBDIV_SOFTMAX -fieldMinValue $VOXEL_SUBDIV_MIN -fieldMaxValue $VOXEL_SUBDIV_HARDMAX
         -cc ("VoxelizerMenu_updateSubdivisions(\"" + $voxelGridDisplayName + "\", #1, 1, `checkBox -query -value \"" + $constrainCheckbox + "\"`)") 
         -columnAlign 1 "left" -columnWidth 1 55 -columnWidth 2 50
         SubdivHeightField`;
 
-    string $subdivDepthField = `intSliderGrp -label "Depth: " -value $initialValues[9] -field true -minValue $VOXEL_SUBDIV_MIN -maxValue $VOXEL_SUBDIV_SOFTMAX -fieldMinValue $VOXEL_SUBDIV_MIN -fieldMaxValue $VOXEL_SUBDIV_HARDMAX
+    string $subdivDepthField = `intSliderGrp -label "Z Subdivs: " -value $initialValues[9] -field true -minValue $VOXEL_SUBDIV_MIN -maxValue $VOXEL_SUBDIV_SOFTMAX -fieldMinValue $VOXEL_SUBDIV_MIN -fieldMaxValue $VOXEL_SUBDIV_HARDMAX
         -cc ("VoxelizerMenu_updateSubdivisions(\"" + $voxelGridDisplayName + "\", #1, 2, `checkBox -query -value \"" + $constrainCheckbox + "\"`)") 
         -columnAlign 1 "left" -columnWidth 1 55 -columnWidth 2 50
         SubdivDepthField`;
