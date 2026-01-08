@@ -55,6 +55,7 @@ void SimulationCache::unregisterBuffer(ComPtr<ID3D11Buffer> buffer) {
 
         if (it->second.empty()) {
             removeMarkerAtFrame(it->first);
+            cachedFrames.erase(it->first);
             it = cache.erase(it);
         } else {
             ++it;
